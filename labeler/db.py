@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import numpy as np
 from sqlalchemy import (
     Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, TypeDecorator, create_engine,
-    event, select, text,
+    delete, event, select, text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
@@ -199,6 +199,8 @@ class Database:
     def update_track(self, track_id: int, **fields) -> None:
         with self.Session.begin() as s:
             t = s.get(Track, track_id)
+            if t is None:  # deleted by the user meanwhile
+                return
             for k, v in fields.items():
                 setattr(t, k, v)
 
@@ -206,6 +208,8 @@ class Database:
                        model: str, threshold: float) -> None:
         """Insert (name, value, confidence) labels, replacing earlier unreviewed ones from the same source."""
         with self.Session.begin() as s:
+            if s.get(Track, track_id) is None:  # deleted by the user meanwhile
+                return
             names = [n for n, _, _ in items]
             for old in s.scalars(select(Attribute).where(
                     Attribute.track_id == track_id, Attribute.source == source,
@@ -313,6 +317,8 @@ class Database:
     def upsert_embedding(self, track_id: int, vector: np.ndarray, model: str) -> None:
         vector = np.asarray(vector, dtype=np.float32)
         with self.Session.begin() as s:
+            if s.get(Track, track_id) is None:  # deleted by the user meanwhile
+                return
             row = s.scalar(select(Embedding).where(Embedding.track_id == track_id, Embedding.model == model))
             if row is None:
                 row = Embedding(track_id=track_id, model=model)
@@ -376,6 +382,31 @@ class Database:
                 "tracks": s.scalar(select(func.count(Track.id))) or 0,
                 "needs_review": len(flagged),
             }
+
+    def delete_tracks(self, ids: list[int] | None = None, everything: bool = False) -> tuple[list[int], list[str]]:
+        """Delete people and everything stored about them (labels, reviews, embeddings).
+        Returns (deleted ids, picture file names to remove). Bulk statements, so deleting thousands is quick."""
+        if not everything and not ids:
+            return [], []
+        with self.Session.begin() as s:
+            which = select(Track.id) if everything else select(Track.id).where(Track.id.in_(list(ids)))
+            rows = s.execute(select(Track.id, Track.crop_path, Track.face_path).where(Track.id.in_(which))).all()
+            deleted = [r.id for r in rows]
+            if not deleted:
+                return [], []
+            paths = [p for r in rows for p in (r.crop_path, r.face_path) if p]
+            for start in range(0, len(deleted), 1000):
+                chunk = deleted[start:start + 1000]
+                attr_ids = select(Attribute.id).where(Attribute.track_id.in_(chunk))
+                s.execute(delete(Review).where(Review.attribute_id.in_(attr_ids)))
+                s.execute(delete(Attribute).where(Attribute.track_id.in_(chunk)))
+                s.execute(delete(Embedding).where(Embedding.track_id.in_(chunk)))
+                s.execute(delete(Track).where(Track.id.in_(chunk)))
+        with self._vec_lock:
+            if self._vectors is not None:
+                for i in deleted:
+                    self._vectors.pop(i, None)
+        return deleted, paths
 
     def cleanup(self, retention_days: int) -> list[str]:
         """Delete tracks older than the retention window; returns their crop paths."""

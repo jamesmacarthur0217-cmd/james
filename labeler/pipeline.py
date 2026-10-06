@@ -60,6 +60,7 @@ class TrackState:
     last_labeled: float | None = None
     vlm_history: list[dict[str, str]] = field(default_factory=list)   # recent per-frame VLM answers
     student_labels: dict[str, tuple[str, float]] = field(default_factory=dict)  # trusted fast predictions
+    deleted: bool = False          # the user deleted this person's record; stop recording them
 
     def colors(self) -> dict[str, tuple[str, float]]:
         out = {}
@@ -109,6 +110,7 @@ class Pipeline:
         self.fps = 0.0
         self.frames = 0
         self.blank = False
+        self.deleted_ids: set[int] = set()
         self._live_lock = threading.Lock()
         self._live: list[dict] = []
         self._thumbs: dict[int, bytes] = {}
@@ -128,6 +130,18 @@ class Pipeline:
     def live_thumb(self, tracker_id: int) -> bytes | None:
         with self._live_lock:
             return self._thumbs.get(tracker_id)
+
+    def forget(self, db_ids: list[int]) -> None:
+        """Called when the user deletes records. A deleted person still in view is not recorded again
+        (shown as a gray "deleted" box); if they leave and come back, they are a new person."""
+        ids = set(db_ids)
+        self.deleted_ids |= ids
+        for st in list(self.tracks.values()):
+            if st.db_id in ids:
+                st.deleted = True
+        for db_id in ids:
+            self.by_db_id.pop(db_id, None)
+            self.recently_lost.pop(db_id, None)
 
     def status(self) -> dict:
         return {
@@ -201,6 +215,10 @@ class Pipeline:
             for i, tid in enumerate(ids):
                 if tid not in self.tracks and self._should_ignore(tuple(xyxy[i]), frame.shape):
                     self._ignored.append(tuple(xyxy[i]))
+                    continue
+                if tid in self.tracks and self.tracks[tid].deleted:
+                    self.tracks[tid].last_seen = now
+                    self._ignored.append((*tuple(xyxy[i]), "deleted"))
                     continue
                 seen.add(tid)
                 kpts = kpts_all[i] if kpts_all is not None else None
@@ -412,6 +430,8 @@ class Pipeline:
 
     def _finish(self, tid: int, lost_at: float | None = None) -> None:
         st = self.tracks.pop(tid)
+        if st.deleted:
+            return
         if st.n_frames < self.cfg["tracking"]["min_frames_keep"]:
             if st.db_id is not None:
                 self.by_db_id.pop(st.db_id, None)
@@ -436,6 +456,8 @@ class Pipeline:
     def on_vlm_result(self, db_id: int, results: list[dict[str, str]]) -> None:
         """Called on the VLM thread. Labels are a majority vote over the person's most recent
         answers, so they follow real changes without flickering on a single odd frame."""
+        if db_id in self.deleted_ids:
+            return
         st = self.by_db_id.get(db_id)
         if st is not None:
             st.vlm_pending = False
@@ -533,10 +555,10 @@ class Pipeline:
         h, w = out.shape[:2]
         for zx1, zy1, zx2, zy2 in self.ignore_zones:
             cv2.rectangle(out, (int(zx1 * w), int(zy1 * h)), (int(zx2 * w), int(zy2 * h)), (90, 90, 90), 1)
-        for x1, y1, x2, y2 in self._ignored:
+        for x1, y1, x2, y2, *why in self._ignored:
             cv2.rectangle(out, (int(x1), int(y1)), (int(x2), int(y2)), (140, 140, 140), 1)
-            cv2.putText(out, "ignored", (int(x1) + 2, int(y1) + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
-                        (170, 170, 170), 1, cv2.LINE_AA)
+            cv2.putText(out, why[0] if why else "ignored", (int(x1) + 2, int(y1) + 14), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.45, (170, 170, 170), 1, cv2.LINE_AA)
         for tid in seen:
             st = self.tracks[tid]
             x1, y1, x2, y2 = (int(v) for v in st.box)

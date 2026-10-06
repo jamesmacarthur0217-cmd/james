@@ -41,6 +41,11 @@
       <button id="f-clear">Clear</button>
     </div>
     <div class="banner" id="banner" hidden></div>
+    <div class="select-bar">
+      <label><input type="checkbox" id="sel-all"> Select all shown</label>
+      <button id="del-selected" class="danger" disabled>Delete selected</button>
+      <button id="del-all" class="danger-quiet" title="Delete every recorded person">Delete all…</button>
+    </div>
     <div class="people" id="people"><div class="empty">No one yet.</div></div>
   </section>
   </div>
@@ -128,8 +133,65 @@ async function fetchTracks() {
   return (await fetch("/api/tracks?" + p)).json();
 }
 
+// Selection for deleting: kept across refreshes, so ticks survive the 3-second auto-refresh.
+const selected = new Set();
+let shownIds = [];
+
+function updateSelectBar() {
+  for (const id of [...selected]) if (!shownIds.includes(id)) selected.delete(id);
+  $("del-selected").disabled = selected.size === 0;
+  $("del-selected").textContent = selected.size ? `Delete selected (${selected.size})` : "Delete selected";
+  $("sel-all").checked = shownIds.length > 0 && shownIds.every(id => selected.has(id));
+  $("sel-all").indeterminate = selected.size > 0 && !$("sel-all").checked;
+}
+
+$("people").addEventListener("change", (e) => {
+  if (!e.target.matches("input[data-select]")) return;
+  const id = Number(e.target.dataset.select);
+  e.target.checked ? selected.add(id) : selected.delete(id);
+  e.target.closest(".person").classList.toggle("is-selected", e.target.checked);
+  updateSelectBar();
+});
+$("sel-all").onchange = () => {
+  if ($("sel-all").checked) shownIds.forEach(id => selected.add(id)); else selected.clear();
+  document.querySelectorAll("input[data-select]").forEach(cb => {
+    cb.checked = selected.has(Number(cb.dataset.select));
+    cb.closest(".person").classList.toggle("is-selected", cb.checked);
+  });
+  updateSelectBar();
+};
+
+async function deletePeople(body, what) {
+  const r = await fetch("/api/tracks/delete", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) { alert("Delete failed"); return; }
+  const res = await r.json();
+  selected.clear();
+  await refresh();
+  status();
+  $("banner").hidden = false;
+  $("banner").innerHTML = `Deleted ${res.deleted} ${res.deleted === 1 ? "person" : "people"} (${what}), `
+    + `with ${res.pictures_removed} picture file${res.pictures_removed === 1 ? "" : "s"}. `
+    + '<a href="#" data-back>OK</a>';
+}
+
+$("del-selected").onclick = () => {
+  const ids = [...selected];
+  if (!ids.length) return;
+  if (!confirm(`Permanently delete ${ids.length} ${ids.length === 1 ? "person" : "people"}, `
+               + "with their pictures, labels and review history? This cannot be undone.")) return;
+  deletePeople({ ids }, "selected");
+};
+$("del-all").onclick = () => {
+  const answer = prompt("This permanently deletes EVERY recorded person, with all pictures, labels and "
+                        + "review history.\n\nType DELETE ALL to confirm:");
+  if (answer !== "DELETE ALL") return;
+  deletePeople({ everything: true }, "everything");
+};
+
 async function refresh() {
   const tracks = await fetchTracks();
+  shownIds = tracks.map(t => t.id);
   const back = ' <a href="#" data-back>Back to recent</a>';
   $("banner").hidden = view.kind === "recent";
   if (view.kind === "search") $("banner").innerHTML = `Best matches for “${esc(view.q)}”, closest first.` + back;
@@ -139,12 +201,15 @@ async function refresh() {
       .map(p => `<span class="chip ${p.review ? "review" : ""} ${p.human ? "human" : ""}"
          title="${esc(p.title)}">${esc(p.text)}</span>`).join("");
     const when = t.started_at.replace("T", " ");
-    return `<div class="person">
+    return `<div class="person${selected.has(t.id) ? " is-selected" : ""}">
+      <input type="checkbox" data-select="${t.id}" ${selected.has(t.id) ? "checked" : ""}
+             aria-label="Select person ${t.id}">
       ${t.crop ? `<img src="/crops/${encodeURIComponent(t.crop)}?v=${t.n_frames}" alt="">` : `<img alt="">`}
       <div><div class="meta">#${t.id} · ${when} · ${t.status}${t.low_light ? " · low light" : ""}${score(t)}</div>
       <div class="chips">${chips || '<span class="chip">labeling…</span>'}</div>
       <button class="link" data-similar="${t.id}">Look-alikes</button></div></div>`;
   }).join("") : '<div class="empty">No matching people.</div>';
+  updateSelectBar();
 }
 
 function score(t) {

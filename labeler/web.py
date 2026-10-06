@@ -21,6 +21,11 @@ class ReviewIn(BaseModel):
     reviewer: str = "reviewer"
 
 
+class DeleteIn(BaseModel):
+    ids: list[int] = []
+    everything: bool = False
+
+
 def create_app(cfg: dict, db: Database, pipeline: Pipeline | None, embedder=None) -> FastAPI:
     app = FastAPI(title="VisionLabeler")
     crop_dir = resolve(cfg["storage"]["crop_dir"])
@@ -86,6 +91,20 @@ def create_app(cfg: dict, db: Database, pipeline: Pipeline | None, embedder=None
     @app.get("/api/tracks")
     def tracks(limit: int = 50, name: str | None = None, value: str | None = None):
         return db.list_tracks(limit=min(limit, 500), name=name, value=value)
+
+    @app.post("/api/tracks/delete")
+    def delete_tracks(body: DeleteIn):
+        """Delete selected people (or everyone) with their pictures, labels and history."""
+        deleted, paths = db.delete_tracks(body.ids, everything=body.everything)
+        if pipeline is not None:
+            pipeline.forget(deleted)
+        removed = 0
+        for name in paths:
+            path = crop_dir / name
+            if path.is_file():
+                path.unlink(missing_ok=True)
+                removed += 1
+        return {"deleted": len(deleted), "pictures_removed": removed}
 
     @app.get("/api/search")
     def search(q: str, limit: int = 20):

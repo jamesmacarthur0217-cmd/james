@@ -70,3 +70,10 @@ button.link { border: none; background: none; padding: 4px 0 0; color: var(--acc
 .now-card .meta b { color: var(--text); }
 .st-observing, .st-labeling, .st-updating { color: var(--warn); }
 .st-labeled { color: var(--ok); }
+.select-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; flex-wrap: wrap; }
+.select-bar label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+button.danger { background: #c9372c; border-color: #c9372c; color: #fff; }
+button.danger:disabled { opacity: 0.45; cursor: default; }
+button.danger-quiet { margin-left: auto; color: #c9372c; border-color: transparent; background: none; }
+.person > input[type=checkbox] { align-self: center; width: 16px; height: 16px; flex: none; }
+.person.is-selected { border-color: var(--accent); }
