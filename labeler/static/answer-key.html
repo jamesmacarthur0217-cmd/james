@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Answer Key</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+  .labeler { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
+  @media (max-width: 600px) { .labeler { grid-template-columns: 1fr; } }
+  .labeler img { width: 100%; max-height: 360px; object-fit: contain; background: var(--chip); border-radius: 8px; }
+  .fields { display: grid; grid-template-columns: max-content 1fr; gap: 6px 10px; align-items: center; font-size: 13px; }
+  .items { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+  .items label { display: flex; gap: 4px; align-items: center; }
+  table.score { border-collapse: collapse; font-size: 13px; width: 100%; }
+  table.score td, table.score th { border-bottom: 1px solid var(--border); padding: 5px 8px; text-align: left; }
+  table.score td.num { text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<header>
+  <h1>VisionLabeler</h1>
+  <nav><a href="/">Live</a><a href="/review">Review queue</a><a href="/reports">Reports</a><a href="/alerts">Alerts</a><a href="/answer-key" class="active">Answer key</a></nav>
+</header>
+<main class="cols">
+  <section class="panel">
+    <h2>Label this person yourself</h2>
+    <p class="hint">The system's labels are hidden so they can't influence you. Pick what you can clearly see;
+      leave "not sure" otherwise. About 50-100 people gives a useful accuracy score for this camera.</p>
+    <div id="labeler"><div class="empty">Loading…</div></div>
+  </section>
+  <section class="panel">
+    <h2>How accurate is the system here?</h2>
+    <p class="hint">The system's current labels compared with your answers. "Answered" is how often it gave
+      an answer instead of "unknown"; "right" is how often that answer matched yours.</p>
+    <div id="score"></div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+const NAMES = { apparent_gender: "Gender (apparent)", age_group: "Age group", age_range: "Age range",
+  upper_type: "Top", upper_color: "Top color", lower_type: "Bottoms", lower_color: "Bottoms color",
+  headwear: "Headwear", eyewear: "Eyewear", face_mask: "Face mask", carrying: "Carrying" };
+const ORDER = ["apparent_gender", "age_group", "upper_type", "upper_color", "lower_type", "lower_color",
+               "headwear", "eyewear", "face_mask", "carrying"];
+let fields = {}, person = null;
+const skipped = [];
+
+function form() {
+  const rows = ORDER.filter(n => fields[n]).map(n => {
+    if (n === "carrying") {
+      const items = fields[n].filter(v => v !== "none");
+      return `<span>${NAMES[n]}</span><div class="items">
+        <label><input type="radio" name="carry-mode" value="unsure" checked> not sure</label>
+        <label><input type="radio" name="carry-mode" value="items"> these:</label>
+        ${items.map(i => `<label><input type="checkbox" class="carry" value="${esc(i)}"> ${esc(i)}</label>`).join("")}</div>`;
+    }
+    const opts = fields[n].filter(v => v !== "unknown").map(v => `<option>${esc(v)}</option>`).join("");
+    return `<label for="f-${n}">${NAMES[n]}</label><select id="f-${n}" data-name="${n}"><option value="">not sure</option>${opts}</select>`;
+  }).join("");
+  return `<div class="labeler"><img src="/crops/${encodeURIComponent(person.crop)}" alt="Person ${person.id}">
+    <div><div class="muted" style="margin-bottom:8px">#${person.id}${person.camera ? " · " + esc(person.camera) : ""}</div>
+    <div class="fields">${rows}</div>
+    <div class="row" style="margin-top:12px;display:flex;gap:8px">
+      <button class="primary" id="save">Save and next</button><button id="skip">Skip (unclear picture)</button></div></div></div>`;
+}
+
+async function next() {
+  const data = await (await fetch("/api/answer-key/next?skip=" + skipped.join(","))).json();
+  person = data.person;
+  $("labeler").innerHTML = person ? form() : '<div class="empty">Everyone recorded so far is in the answer key.</div>';
+  if (!person) return;
+  document.querySelectorAll(".carry").forEach(cb => cb.onchange = () => {
+    document.querySelector('input[name="carry-mode"][value="items"]').checked = true; });
+  $("skip").onclick = () => { skipped.push(person.id); next(); };
+  $("save").onclick = save;
+}
+
+async function save() {
+  const labels = {};
+  document.querySelectorAll(".fields select").forEach(s => { if (s.value) labels[s.dataset.name] = s.value; });
+  if (document.querySelector('input[name="carry-mode"]:checked')?.value === "items") {
+    labels.carrying = [...document.querySelectorAll(".carry:checked")].map(c => c.value).join(",") || "none";
+  }
+  if (!Object.keys(labels).length) { alert("Pick at least one thing you can see, or press Skip."); return; }
+  const r = await fetch(`/api/answer-key/${person.id}`, { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ labels }) });
+  if (!r.ok) { alert("Could not save"); return; }
+  loadScore();
+  next();
+}
+
+async function loadScore() {
+  const s = await (await fetch("/api/answer-key/score")).json();
+  const rows = Object.entries(s.attributes);
+  $("score").innerHTML = rows.length ? `<p class="muted">${s.people} people in the answer key</p>
+    <table class="score"><tr><th>Attribute</th><th class="num">labels</th><th class="num">answered</th><th class="num">right</th></tr>
+    ${rows.map(([n, v]) => `<tr><td>${esc(NAMES[n] || n)}</td><td class="num">${v.n}</td>
+      <td class="num">${Math.round(v.answered / v.n * 100)}%</td>
+      <td class="num">${v.accuracy === null ? "-" : Math.round(v.accuracy * 100) + "%"}</td></tr>`).join("")}</table>`
+    : '<div class="empty">Label a few people to see the score.</div>';
+}
+
+async function init() {
+  fields = (await (await fetch("/api/schema")).json()).all_fields;
+  next();
+  loadScore();
+}
+init();
+</script>
+</body>
+</html>

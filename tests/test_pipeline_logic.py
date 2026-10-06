@@ -38,6 +38,8 @@ def make_pipeline(db, embedder=None):
     p.deleted_ids = set()
     p.alerts = None
     p.name = "test-cam"
+    p.age = None
+    p.age_ids = set()
     return p
 
 
@@ -128,3 +130,25 @@ def test_vlm_worker_runs_two_at_once_and_survives_errors():
     assert client.peak == 2
     assert sorted(got) == [0, 1, 2, 3, 9]
     assert got[2] == [{"upper_color": "red"}] and got[9] == []
+
+
+def test_age_model_answer_replaces_the_vlm_age(db, camera):
+    p = make_pipeline(db)
+    st = TrackState(3, datetime.now(), 0.0, db_id=db.create_track(camera, 3, datetime.now()))
+    st.candidates = [Candidate(0.9, np.zeros((10, 10, 3), np.uint8), np.zeros((64, 64, 3), np.uint8))]
+    p.by_db_id[st.db_id] = st
+
+    class FakeAge:
+        name = "fake-age"
+
+        def estimate(self, faces):
+            return ("30-39", 0.7) if faces else None
+
+    p.age = FakeAge()
+    p._store_age(st)
+    base = {f: "unknown" for f in schema.MODE_FIELDS["kiosk"]}
+    p.on_vlm_result(st.db_id, [dict(base, age_range="50-59", upper_color="red")])
+    attrs = db.list_tracks()[0]["attributes"]
+    assert attrs["age_range"]["value"] == "30-39" and attrs["age_range"]["source"] == "age_model"
+    assert attrs["upper_color"]["value"] == "red"
+    assert p._current_labels(st)["age_range"][2] == "age_model"

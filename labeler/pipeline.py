@@ -61,6 +61,7 @@ class TrackState:
     vlm_history: list[dict[str, str]] = field(default_factory=list)   # recent per-frame VLM answers
     student_labels: dict[str, tuple[str, float]] = field(default_factory=dict)  # trusted fast predictions
     deleted: bool = False          # the user deleted this person's record; stop recording them
+    age_label: tuple[str, str, float] | None = None   # (attribute, value, confidence) from the age model
 
     def colors(self) -> dict[str, tuple[str, float]]:
         out = {}
@@ -83,6 +84,8 @@ class Pipeline:
         self.embedder = embedder
         self.student = student if embedder is not None else None
         self.alerts = None   # AlertEngine, set by run.py
+        self.age = None      # AgeEstimator, set by run.py
+        self.age_ids: set[int] = set()   # people whose age came from the age model
         self.vlm_model_name = cfg["vlm"]["model"]
         self.threshold = cfg["review"]["confidence_threshold"]
         self.crop_dir = resolve(cfg["storage"]["crop_dir"])
@@ -375,12 +378,34 @@ class Pipeline:
     def _student_covers_all(self, st: TrackState) -> bool:
         return self.student is not None and all(n in st.student_labels for n in schema.MODE_FIELDS[self.mode])
 
+    def _store_age(self, st: TrackState) -> None:
+        """Apparent age from the person's best face crops (the age model beats the VLM on age)."""
+        if self.age is None:
+            return
+        try:
+            result = self.age.estimate([c.face for c in st.candidates if c.face is not None][:3])
+        except Exception:
+            log.exception("age estimation failed")
+            return
+        if result is None:
+            return
+        from .age import TO_GROUP
+        value, conf = result
+        name = "age_range" if self.mode == "kiosk" else "age_group"
+        if name == "age_group":
+            value = TO_GROUP[value]
+        st.age_label = (name, value, conf)
+        self.age_ids.add(st.db_id)
+        self.db.add_attributes(st.db_id, [(name, value, round(conf, 3))], source="age_model",
+                               model=self.age.name, threshold=self.threshold)
+
     def _request_vlm(self, st: TrackState) -> None:
         st.vlm_requested = True
         st.recent = []
         self._save_crops(st)
         self._store_colors(st)
         self._store_embedding(st)
+        self._store_age(st)
         if self.vlm is None:
             return
         if self.cfg["student"]["skip_vlm_when_confident"] and self._student_covers_all(st):
@@ -465,6 +490,7 @@ class Pipeline:
             self._save_crops(st)
             self._store_colors(st)
             self._store_embedding(st)
+            self._store_age(st)
         self.db.update_track(
             st.db_id, status="finished", ended_at=datetime.now(), n_frames=st.n_frames,
             low_light=st.low_light_frames > st.n_frames / 2,
@@ -492,6 +518,8 @@ class Pipeline:
             pool = results
         items = []
         for name in schema.MODE_FIELDS[self.mode]:
+            if name in ("age_range", "age_group") and db_id in self.age_ids:
+                continue   # the age model's answer is used instead (more accurate, see labeler/age.py)
             votes = Counter(r[name] for r in pool if r.get(name) not in (None, "unknown"))
             if votes:
                 value, count = votes.most_common(1)[0]
@@ -513,6 +541,9 @@ class Pipeline:
         """name -> (value, confidence, source): VLM labels first, then the fast classifiers,
         then live colors filling the gaps."""
         out = {n: (v, c, "vlm") for n, (v, c) in st.labels.items()}
+        if st.age_label:
+            name, value, conf = st.age_label
+            out[name] = (value, round(conf, 2), "age_model")
         for name, (value, conf) in st.student_labels.items():
             if out.get(name, ("unknown",))[0] == "unknown":
                 out[name] = (value, round(conf, 2), "student")

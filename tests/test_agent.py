@@ -31,9 +31,9 @@ def test_synonyms_count_as_mentions():
 
 
 def test_age_comes_from_numbers_in_the_question():
-    raw = {"conditions": [{"attribute": "age_range", "value": "35-44"}]}          # model guessed wrong
-    assert clean_plan(raw, CAMS, NOW, "a 30 year old man")["conditions"] == [["age_range", "25-34"]]
-    assert clean_plan({}, CAMS, NOW, "people aged 70")["conditions"] == [["age_range", "65+"]]
+    raw = {"conditions": [{"attribute": "age_range", "value": "40-49"}]}          # model guessed wrong
+    assert clean_plan(raw, CAMS, NOW, "a 30 year old man")["conditions"] == [["age_range", "30-39"]]
+    assert clean_plan({}, CAMS, NOW, "people aged 70")["conditions"] == [["age_range", "70+"]]
     assert clean_plan(raw, CAMS, NOW, "an older man")["conditions"] == []
 
 

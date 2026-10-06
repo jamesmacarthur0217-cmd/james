@@ -9,10 +9,10 @@ from labeler.config import _expand
 
 
 def test_clean_maps_off_vocabulary_answers_to_unknown():
-    out = schema.clean({"upper_color": "crimson", "apparent_gender": "MAN", "age_range": "25-34"}, "kiosk")
+    out = schema.clean({"upper_color": "crimson", "apparent_gender": "MAN", "age_range": "20-29"}, "kiosk")
     assert out["upper_color"] == "unknown"
     assert out["apparent_gender"] == "man"
-    assert out["age_range"] == "25-34"
+    assert out["age_range"] == "20-29"
     assert out["eyewear"] == "unknown"          # missing field
 
 

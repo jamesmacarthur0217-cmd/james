@@ -25,13 +25,13 @@ def test_disagreement_between_sources_goes_to_review(db, camera):
 
 def test_low_confidence_goes_to_review_but_unknown_does_not(db, camera):
     t = _person(db, camera)
-    db.add_attributes(t, [("age_range", "25-34", 0.5), ("eyewear", "unknown", 1.0)], "vlm", "qwen", threshold=0.6)
+    db.add_attributes(t, [("age_range", "20-29", 0.5), ("eyewear", "unknown", 1.0)], "vlm", "qwen", threshold=0.6)
     assert [i["name"] for i in db.review_queue()] == ["age_range"]
 
 
 def test_review_queue_puts_disagreements_first(db, camera):
     low = _person(db, camera)
-    db.add_attributes(low, [("age_range", "25-34", 0.5)], "vlm", "qwen", threshold=0.6)
+    db.add_attributes(low, [("age_range", "20-29", 0.5)], "vlm", "qwen", threshold=0.6)
     conflict = _person(db, camera)
     db.add_attributes(conflict, [("upper_color", "red", 0.9)], "color_estimator", "r", threshold=0.6)
     db.add_attributes(conflict, [("upper_color", "blue", 1.0)], "vlm", "q", threshold=0.6)

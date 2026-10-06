@@ -28,8 +28,10 @@ sys.path.insert(0, str(ROOT))
 from labeler import schema  # noqa: E402
 from labeler.config import load_config  # noqa: E402
 
-AGE_GROUP = {"0-12": "child", "13-17": "teen", "18-24": "adult", "25-34": "adult", "35-44": "adult",
-             "45-54": "adult", "55-64": "adult", "65+": "senior", "unknown": "unknown"}
+AGE_GROUP = {"0-12": "child", "13-17": "teen", "18-24": "adult", "25-34": "adult", "35-44": "adult",   # old ranges
+             "45-54": "adult", "55-64": "adult", "65+": "senior",
+             "0-9": "child", "10-19": "teen", "20-29": "adult", "30-39": "adult", "40-49": "adult",       # decades
+             "50-59": "adult", "60-69": "senior", "70+": "senior", "unknown": "unknown"}
 MIN_CLASS = 8          # classes rarer than this in training are left to the VLM
 MIN_TEST_CLASS = 5     # each answer needs this many test examples before the student can be trusted
 THRESHOLDS = [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95]

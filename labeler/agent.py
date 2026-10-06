@@ -91,7 +91,7 @@ SYNONYMS = {
     "beige": {"beige", "tan", "khaki", "cream"},
     "multicolor": {"multicolor", "multicolored", "multicolour", "colorful", "colourful"},
 }
-AGE_BINS = [(12, "0-12"), (17, "13-17"), (24, "18-24"), (34, "25-34"), (44, "35-44"), (54, "45-54"), (64, "55-64")]
+AGE_BINS = [(9, "0-9"), (19, "10-19"), (29, "20-29"), (39, "30-39"), (49, "40-49"), (59, "50-59"), (69, "60-69")]
 
 
 def _words(text: str) -> set[str]:
@@ -114,7 +114,7 @@ def _age_from_question(question: str) -> str | None:
     if not m:
         return None
     age = int(m.group(1) or m.group(2))
-    return next((label for top, label in AGE_BINS if age <= top), "65+")
+    return next((label for top, label in AGE_BINS if age <= top), "70+")
 
 
 def _parse_time(text: str) -> datetime | None:

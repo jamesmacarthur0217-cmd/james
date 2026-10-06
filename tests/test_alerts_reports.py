@@ -119,3 +119,25 @@ def test_report_api_and_csv(db, camera, tmp_path):
     r = api.get("/api/reports/export.csv", params={"start": today})
     assert r.headers["content-type"].startswith("text/csv") and r.text.startswith("﻿id,camera")
     assert len(r.text.strip().splitlines()) == 2
+
+
+def test_answer_key_flow_and_score(db, camera, tmp_path):
+    api = _api(db, tmp_path)
+    a = _person(db, camera, upper_color="red", apparent_gender="man")
+    b = _person(db, camera, upper_color="blue", apparent_gender="unknown")
+    for t in (a, b):
+        db.update_track(t, status="finished", crop_path=f"{t}.jpg")
+    first = api.get("/api/answer-key/next").json()["person"]
+    assert first["id"] == b                                           # newest first
+    assert api.get("/api/answer-key/next", params={"skip": str(b)}).json()["person"]["id"] == a
+    assert api.post(f"/api/answer-key/{b}", json={"labels": {"upper_color": "crimson"}}).status_code == 400
+    assert api.post(f"/api/answer-key/{b}", json={"labels": {"upper_color": "red", "apparent_gender": "woman",
+                                                             "carrying": "none"}}).status_code == 200
+    assert api.post(f"/api/answer-key/{a}", json={"labels": {"upper_color": "red"}}).status_code == 200
+    assert api.get("/api/answer-key/next").json()["person"] is None
+    s = api.get("/api/answer-key/score").json()
+    assert s["people"] == 2
+    assert s["attributes"]["upper_color"] == {"n": 2, "answered": 2, "right": 1, "accuracy": 0.5, "overall": 0.5}
+    assert s["attributes"]["apparent_gender"]["answered"] == 0        # the system said unknown
+    db.delete_tracks([a])
+    assert api.get("/api/answer-key/score").json()["people"] == 1

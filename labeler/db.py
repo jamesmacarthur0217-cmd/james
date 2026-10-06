@@ -140,6 +140,16 @@ class AlertEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
 
 
+class AnswerKey(Base):
+    """Labels a person entered for a recorded person without seeing the system's labels.
+    Used to measure how accurate the system really is on this camera."""
+    __tablename__ = "answer_key"
+    track_id: Mapped[int] = mapped_column(ForeignKey("tracks.id", ondelete="CASCADE"), primary_key=True)
+    labels: Mapped[str] = mapped_column(Text)          # JSON {attribute: value}; "not sure" attributes left out
+    labeled_by: Mapped[str] = mapped_column(String(100), default="reviewer")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
 class Review(Base):
     """Audit trail of human verification; also the source of training labels."""
     __tablename__ = "reviews"
@@ -434,6 +444,7 @@ class Database:
                 s.execute(delete(Attribute).where(Attribute.track_id.in_(chunk)))
                 s.execute(delete(Embedding).where(Embedding.track_id.in_(chunk)))
                 s.execute(delete(AlertEvent).where(AlertEvent.track_id.in_(chunk)))
+                s.execute(delete(AnswerKey).where(AnswerKey.track_id.in_(chunk)))
                 s.execute(delete(Track).where(Track.id.in_(chunk)))
         with self._vec_lock:
             if self._vectors is not None:
@@ -506,6 +517,49 @@ class Database:
         with self.Session() as s:
             return s.scalar(select(func.max(AlertEvent.id))) or 0
 
+    # --- answer key ---------------------------------------------------------------------
+
+    def next_for_answer_key(self, exclude: list[int] | None = None) -> dict | None:
+        """A finished person with a picture who is not in the answer key yet (newest first)."""
+        with self.Session() as s:
+            q = (select(Track).where(Track.status == "finished", Track.crop_path.is_not(None),
+                                     Track.id.not_in(select(AnswerKey.track_id)))
+                 .order_by(Track.id.desc()))
+            if exclude:
+                q = q.where(Track.id.not_in(exclude))
+            t = s.scalars(q.limit(1)).first()
+            return None if t is None else {"id": t.id, "crop": t.crop_path,
+                                           "camera": self._camera_names(s).get(t.camera_id)}
+
+    def save_answer_key(self, track_id: int, labels: dict[str, str], labeled_by: str = "reviewer") -> bool:
+        with self.Session.begin() as s:
+            if s.get(Track, track_id) is None:
+                return False
+            row = s.get(AnswerKey, track_id) or AnswerKey(track_id=track_id)
+            row.labels, row.labeled_by, row.created_at = json.dumps(labels), labeled_by, datetime.now()
+            s.add(row)
+            return True
+
+    def answer_key_score(self) -> dict:
+        """How often the system's current labels match the answer key, per attribute."""
+        with self.Session() as s:
+            rows = s.execute(select(AnswerKey, Track).join(Track, Track.id == AnswerKey.track_id)
+                             .options(selectinload(Track.attributes))).all()
+            stats: dict[str, dict] = defaultdict(lambda: {"n": 0, "answered": 0, "right": 0})
+            for key_row, track in rows:
+                current = {n: a["value"] for n, a in resolve(track.attributes).items()}
+                for name, truth in json.loads(key_row.labels).items():
+                    st = stats[name]
+                    st["n"] += 1
+                    guess = current.get(name, "unknown")
+                    if guess != "unknown":
+                        st["answered"] += 1
+                        st["right"] += guess == truth
+            return {"people": len(rows), "attributes": {
+                n: {**v, "accuracy": round(v["right"] / v["answered"], 3) if v["answered"] else None,
+                    "overall": round(v["right"] / v["n"], 3) if v["n"] else None}
+                for n, v in sorted(stats.items())}}
+
     # --- reports ----------------------------------------------------------------------
 
     def people_between(self, start: datetime, end: datetime, camera: str | None = None,
@@ -551,6 +605,7 @@ class Database:
             paths = [p for t in old for p in (t.crop_path, t.face_path) if p]
             if old:
                 s.execute(delete(AlertEvent).where(AlertEvent.track_id.in_([t.id for t in old])))
+                s.execute(delete(AnswerKey).where(AnswerKey.track_id.in_([t.id for t in old])))
             for t in old:
                 s.delete(t)
         if old:

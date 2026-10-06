@@ -76,10 +76,10 @@ def test_delete_api_removes_records_and_pictures(client, db, camera):
 def test_review_api_and_guards(client, db, camera):
     api, _ = client
     t = db.create_track(camera, 1, datetime.now())
-    db.add_attributes(t, [("age_range", "25-34", 0.5)], "vlm", "q", threshold=0.6)
+    db.add_attributes(t, [("age_range", "20-29", 0.5)], "vlm", "q", threshold=0.6)
     item = api.get("/api/review").json()[0]
     assert item["allowed"] == schema.FIELDS["age_range"]
-    assert api.post(f"/api/review/{item['attribute_id']}", json={"value": "35-44"}).status_code == 200
+    assert api.post(f"/api/review/{item['attribute_id']}", json={"value": "30-39"}).status_code == 200
     assert api.get("/api/review").json() == []
     assert api.post("/api/review/999999", json={"value": "x"}).status_code == 404
     assert api.get("/api/search", params={"q": "red shirt"}).status_code == 503   # embeddings off

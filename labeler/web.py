@@ -41,6 +41,10 @@ class RuleUpdate(BaseModel):
     enabled: bool
 
 
+class AnswerIn(BaseModel):
+    labels: dict[str, str]
+
+
 class AskIn(BaseModel):
     question: str
     limit: int = 30
@@ -128,6 +132,39 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     @app.get("/alerts")
     def alerts_page():
         return FileResponse(STATIC / "alerts.html")
+
+    @app.get("/answer-key")
+    def answer_key_page():
+        return FileResponse(STATIC / "answer-key.html")
+
+    @app.get("/api/answer-key/next")
+    def answer_key_next(skip: str = ""):
+        exclude = [int(x) for x in skip.split(",") if x.strip().isdigit()]
+        return {"person": db.next_for_answer_key(exclude)}
+
+    @app.post("/api/answer-key/{track_id}")
+    def answer_key_save(track_id: int, body: AnswerIn):
+        allowed = {**schema.FIELDS, **{n: v + ["none"] for n, v in schema.LIST_FIELDS.items()}}
+        labels = {}
+        for name, value in body.labels.items():
+            if name not in allowed:
+                raise HTTPException(400, f"unknown attribute {name}")
+            if name in schema.LIST_FIELDS:
+                items = sorted({v.strip() for v in value.split(",") if v.strip()} - {"none"})
+                if any(i not in schema.LIST_FIELDS[name] for i in items):
+                    raise HTTPException(400, f"unknown item in {value}")
+                labels[name] = ",".join(items) or "none"
+            elif value in allowed[name] and value != "unknown":
+                labels[name] = value
+            else:
+                raise HTTPException(400, f"{value!r} is not a value of {name}")
+        if not db.save_answer_key(track_id, labels):
+            raise HTTPException(404, "person not found")
+        return {"ok": True}
+
+    @app.get("/api/answer-key/score")
+    def answer_key_score():
+        return db.answer_key_score()
 
     # --- reports -------------------------------------------------------------------------
 

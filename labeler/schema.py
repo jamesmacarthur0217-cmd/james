@@ -8,7 +8,8 @@ COLORS = [
 ]
 
 FIELDS: dict[str, list[str]] = {
-    "age_range": ["0-12", "13-17", "18-24", "25-34", "35-44", "45-54", "55-64", "65+", "unknown"],
+    # Decades, like people say ("about 30" = 30-39) and like the age model's training data.
+    "age_range": ["0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70+", "unknown"],
     "age_group": ["child", "teen", "adult", "senior", "unknown"],
     "apparent_gender": ["man", "woman", "unknown"],
     "upper_type": ["t-shirt", "shirt", "jacket", "hoodie", "sweater", "dress", "uniform", "other", "unknown"],

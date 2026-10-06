@@ -22,6 +22,8 @@ PROMPT_KIOSK = """You are labeling a person seen by a camera.
 Image 1 shows the person. Image 2, if present, is a close-up of their face.
 Describe only what is clearly visible. Answer "unknown" whenever something is not clearly visible.
 age_range is an estimate of apparent age, not a fact.
+apparent_gender: answer "man" or "woman" when the face, hair, build or clothing make it reasonably clear;
+answer "unknown" only when you really cannot tell.
 upper_* is clothing on the upper body, lower_* is clothing on the legs; use "unknown" for legs that are out of view.
 If the head is visible and nothing is on it, headwear is "none". If the eyes are visible without glasses, eyewear is
 "none". If the face is visible and uncovered, face_mask is "no".

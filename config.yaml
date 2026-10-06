@@ -63,6 +63,10 @@ embeddings:
   model: google/siglip2-base-patch16-224
   device: cuda
 
+age_model:                    # apparent age from face crops; more accurate than the VLM (tools/bench_age.py)
+  enabled: true
+  model: dima806/fairface_age_image_detection
+
 student:                      # fast attribute classifiers trained from VLM labels (tools/train_attributes.py)
   enabled: true
   model_path: models/attributes.joblib

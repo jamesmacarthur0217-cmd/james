@@ -37,6 +37,9 @@ class Student:
         proba = a["model"].predict_proba(x)[0]
         k = int(proba.argmax())
         value, conf = str(a["model"].classes_[k]), float(proba[k])
+        base = name.split(":")[0]
+        if base in schema.FIELDS and value not in schema.FIELDS[base]:
+            return None   # trained on an older vocabulary (e.g. the old age ranges): don't use it
         # Each answer has its own threshold, chosen on held-out people (see tools/train_attributes.py).
         threshold = a["thresholds"].get(value)
         return value, conf, threshold is not None and conf >= threshold

@@ -123,11 +123,20 @@ def main() -> int:
         else:
             log.warning("fast classifiers enabled but %s not found; train them with tools/train_attributes.py", path)
 
+    age_model = None
+    if cfg["age_model"]["enabled"]:
+        from labeler.age import AgeEstimator
+        try:
+            age_model = AgeEstimator(cfg["age_model"]["model"])
+        except Exception as e:
+            log.warning("age model unavailable (%s); age comes from the VLM", e)
+
     from labeler.alerts import AlertEngine
     alerts = AlertEngine(db)
     pipelines.extend(Pipeline(cfg, db, worker, embedder, student, camera=cam) for cam in cfg["cameras"])
     for p in pipelines:
         p.alerts = alerts
+        p.age = age_model
     log.info("cameras: %s", ", ".join(f"{p.name} ({p.cam['source']}, {p.mode})" for p in pipelines))
 
     threads = [threading.Thread(target=p.run, kwargs={"max_frames": args.max_frames},
