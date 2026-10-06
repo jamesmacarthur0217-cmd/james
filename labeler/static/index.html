@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VisionLabeler</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>VisionLabeler</h1>
+  <nav><a href="/" class="active">Live</a><a href="/review">Review queue</a></nav>
+  <div class="status" id="status">connecting…</div>
+  <button id="stop" title="Finish labeling the people in view, save, and close the app">Stop</button>
+</header>
+<main class="layout">
+  <section class="panel">
+    <div class="panel-head">
+      <h2><span class="live-dot" id="live-dot"></span>Live camera</h2>
+      <span class="muted" id="live-caption"></span>
+      <button id="fullscreen" title="Show the live view full screen">Full screen</button>
+    </div>
+    <div class="video" id="video">
+      <img id="live" src="/stream" alt="Live camera feed with labels">
+    </div>
+  </section>
+  <div class="side">
+  <section class="panel">
+    <h2>In view now</h2>
+    <div class="now" id="now"><div class="empty">Nobody in view.</div></div>
+  </section>
+  <section class="panel">
+    <h2>People seen</h2>
+    <form class="search" id="q-form">
+      <input id="q" placeholder="Describe a person, e.g. man in a beige coat" style="flex:1; min-width:180px">
+      <button class="primary">Search</button>
+    </form>
+    <div class="search">
+      <select id="f-name"><option value="">Filter by attribute…</option></select>
+      <select id="f-value" disabled><option value="">value</option></select>
+      <button id="f-clear">Clear</button>
+    </div>
+    <div class="banner" id="banner" hidden></div>
+    <div class="people" id="people"><div class="empty">No one yet.</div></div>
+  </section>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+let schema = null;
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+async function loadSchema() {
+  schema = await (await fetch("/api/schema")).json();
+  for (const name of Object.keys(schema.fields)) {
+    $("f-name").add(new Option(name.replace(/_/g, " "), name));
+  }
+}
+
+$("f-name").onchange = () => {
+  const sel = $("f-value"); sel.innerHTML = "";
+  const name = $("f-name").value;
+  sel.disabled = !name;
+  sel.add(new Option("value", ""));
+  if (name) for (const v of schema.fields[name]) sel.add(new Option(v, v));
+  refresh();
+};
+$("f-value").onchange = () => { view = { kind: "recent" }; refresh(); };
+$("f-clear").onclick = () => { $("f-name").value = ""; $("q").value = ""; view = { kind: "recent" }; $("f-name").onchange(); };
+
+// What the list shows: recent people (auto-refreshing), a text search, or look-alikes of one person.
+let view = { kind: "recent" };
+$("q-form").onsubmit = (e) => {
+  e.preventDefault();
+  const q = $("q").value.trim();
+  view = q ? { kind: "search", q } : { kind: "recent" };
+  refresh();
+};
+$("people").addEventListener("click", (e) => {
+  const id = e.target.dataset.similar;
+  if (id) { view = { kind: "similar", id: Number(id) }; refresh(); }
+});
+$("banner").addEventListener("click", (e) => {
+  if (e.target.dataset.back !== undefined) { view = { kind: "recent" }; $("q").value = ""; refresh(); }
+});
+
+// Turn attributes into readable phrases: "age 25-34", "red t-shirt", "carrying backpack".
+function phrases(a) {
+  const known = (n) => a[n] && !["unknown", "none", "no"].includes(a[n].value) ? a[n].value : null;
+  const out = [];
+  const add = (text, names) => {
+    const items = names.filter(n => a[n]).map(n => a[n]);
+    out.push({
+      text,
+      review: items.some(x => x.needs_review),
+      human: items.length > 0 && items.every(x => x.source === "human"),
+      title: names.filter(n => a[n]).map(n =>
+        `${n}: ${a[n].value} (${a[n].source}, ${Math.round(a[n].confidence * 100)}%)`).join("\n"),
+    });
+  };
+  if (known("age_range")) add(`age ${known("age_range")}`, ["age_range"]);
+  if (known("age_group")) add(known("age_group"), ["age_group"]);
+  if (known("apparent_gender")) add(known("apparent_gender"), ["apparent_gender"]);
+  for (const part of ["upper", "lower"]) {
+    const color = known(part + "_color"), type = known(part + "_type");
+    if (color || type) add([color, type || (part === "upper" ? "top" : "bottoms")].filter(Boolean).join(" "),
+                           [part + "_color", part + "_type"]);
+  }
+  if (known("headwear")) add(known("headwear"), ["headwear"]);
+  if (known("eyewear")) add(known("eyewear"), ["eyewear"]);
+  if (a.face_mask && a.face_mask.value === "yes") add("face mask", ["face_mask"]);
+  if (known("carrying")) add("carrying " + known("carrying").replace(/,/g, ", "), ["carrying"]);
+  return out;
+}
+
+async function fetchTracks() {
+  if (view.kind === "search") {
+    const r = await fetch("/api/search?" + new URLSearchParams({ q: view.q, limit: 20 }));
+    return r.ok ? r.json() : [];
+  }
+  if (view.kind === "similar") {
+    const r = await fetch(`/api/tracks/${view.id}/similar?limit=10`);
+    return r.ok ? r.json() : [];
+  }
+  const p = new URLSearchParams({ limit: 30 });
+  if ($("f-name").value && $("f-value").value) { p.set("name", $("f-name").value); p.set("value", $("f-value").value); }
+  return (await fetch("/api/tracks?" + p)).json();
+}
+
+async function refresh() {
+  const tracks = await fetchTracks();
+  const back = ' <a href="#" data-back>Back to recent</a>';
+  $("banner").hidden = view.kind === "recent";
+  if (view.kind === "search") $("banner").innerHTML = `Best matches for “${esc(view.q)}”, closest first.` + back;
+  if (view.kind === "similar") $("banner").innerHTML = `People who look most like #${view.id}.` + back;
+  $("people").innerHTML = tracks.length ? tracks.map(t => {
+    const chips = phrases(t.attributes)
+      .map(p => `<span class="chip ${p.review ? "review" : ""} ${p.human ? "human" : ""}"
+         title="${esc(p.title)}">${esc(p.text)}</span>`).join("");
+    const when = t.started_at.replace("T", " ");
+    return `<div class="person">
+      ${t.crop ? `<img src="/crops/${encodeURIComponent(t.crop)}?v=${t.n_frames}" alt="">` : `<img alt="">`}
+      <div><div class="meta">#${t.id} · ${when} · ${t.status}${t.low_light ? " · low light" : ""}${score(t)}</div>
+      <div class="chips">${chips || '<span class="chip">labeling…</span>'}</div>
+      <button class="link" data-similar="${t.id}">Look-alikes</button></div></div>`;
+  }).join("") : '<div class="empty">No matching people.</div>';
+}
+
+function score(t) {
+  if (t.similarity === undefined) return "";
+  return ` · <b>similarity ${t.similarity.toFixed(2)}</b>`;
+}
+
+async function status() {
+  try {
+    const s = await (await fetch("/api/status")).json();
+    const warn = s.blank_picture ? '<b style="color:var(--warn)">no picture from camera</b> · ' : "";
+    $("status").innerHTML = warn + `mode <b>${s.mode}</b> · <b>${s.fps ?? "-"}</b> fps · <b>${s.active_people ?? 0}</b> in view · `
+      + `VLM queue <b>${s.vlm_enabled ? s.vlm_queue : "off"}</b> · <b>${s.tracks}</b> people · `
+      + `<a href="/review"><b>${s.needs_review}</b> to review</a>`;
+  } catch { $("status").textContent = "disconnected"; }
+}
+
+$("stop").onclick = async () => {
+  if (!confirm("Stop VisionLabeler? People in view are saved and labeling finishes first.")) return;
+  $("stop").disabled = true;
+  try { await fetch("/api/shutdown", { method: "POST" }); } catch {}
+  document.querySelector("main").innerHTML =
+    '<div class="panel">Stopping… You can close this tab. The console window shows when it has finished.</div>';
+};
+
+$("fullscreen").onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else $("video").requestFullscreen().catch(() => {});
+};
+
+// "In view now": one card per person on screen, updated several times a second.
+// Cards are kept and updated in place so thumbnails don't flicker.
+const STATUS_TEXT = { observing: "observing…", labeling: "analyzing…", updating: "re-analyzing…",
+                      labeled: "analyzed", "colors only": "colors only" };
+const cards = new Map();
+let thumbTick = 0;
+
+function mmss(s) { s = Math.floor(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+
+function liveCard(p) {
+  let el = cards.get(p.tracker_id);
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "now-card";
+    el.innerHTML = '<img alt=""><div><div class="meta"></div><div class="chips"></div></div>';
+    cards.set(p.tracker_id, el);
+  }
+  const name = p.id ? `#${p.id}` : "new person";
+  const ago = p.labeled_ago_s == null ? "" : ` · updated ${mmss(p.labeled_ago_s)} ago`;
+  el.querySelector(".meta").innerHTML =
+    `<b>${name}</b> · in view ${mmss(p.in_view_s)} · <span class="st-${p.status.replace(" ", "-")}">`
+    + `${STATUS_TEXT[p.status] || p.status}</span>${ago}`;
+  const chips = phrases(p.attributes).map(c =>
+    `<span class="chip" title="${esc(c.title)}">${esc(c.text)}</span>`).join("");
+  const chipBox = el.querySelector(".chips");
+  if (chipBox.dataset.html !== chips) { chipBox.innerHTML = chips; chipBox.dataset.html = chips; }
+  if (thumbTick % 3 === 0) {
+    const img = el.querySelector("img");
+    const next = new Image();
+    next.onload = () => { img.src = next.src; };
+    next.src = `/api/live/thumb/${p.tracker_id}?t=${Date.now()}`;
+  }
+  return el;
+}
+
+async function pollLive() {
+  try {
+    const data = await (await fetch("/api/live")).json();
+    thumbTick++;
+    const ids = new Set(data.people.map(p => p.tracker_id));
+    for (const id of [...cards.keys()]) if (!ids.has(id)) { cards.get(id).remove(); cards.delete(id); }
+    const box = $("now");
+    if (!data.people.length) {
+      box.innerHTML = '<div class="empty">Nobody in view.</div>';
+    } else {
+      box.querySelector(".empty")?.remove();
+      for (const p of data.people) box.appendChild(liveCard(p));
+    }
+    $("live-caption").textContent = `${data.fps} fps · ${data.people.length} in view`;
+    $("live-dot").classList.toggle("on", data.fps > 0);
+  } catch {
+    $("live-dot").classList.remove("on");
+  }
+}
+
+loadSchema().then(refresh);
+status();
+pollLive();
+setInterval(pollLive, 400);
+setInterval(() => { if (view.kind === "recent") refresh(); }, 3000);
+setInterval(status, 1000);
+</script>
+</body>
+</html>

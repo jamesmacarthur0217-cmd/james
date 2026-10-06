@@ -1,0 +1,19 @@
+# PyTorch with CUDA is installed separately (see README):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+ultralytics>=8.3
+opencv-python>=4.10
+numpy
+pyyaml
+requests
+sqlalchemy>=2.0
+fastapi>=0.110
+uvicorn>=0.29
+lap>=0.5.12
+transformers>=4.50
+sentencepiece
+protobuf
+pillow
+psycopg[binary]>=3.2
+pgvector>=0.3
+scikit-learn>=1.5
+joblib

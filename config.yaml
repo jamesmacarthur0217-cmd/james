@@ -1,0 +1,82 @@
+# VisionLabeler configuration.
+# Paths are relative to this folder unless absolute.
+
+camera:
+  name: cam1
+  # Webcam index (0, 1, ...), a video file path, an image path, or an rtsp:// URL.
+  source: 0                 # your USB webcam; use samples/bus.jpg for the demo image
+  loop_files: true        # restart video/image files when they end
+  # Areas of the picture to ignore, e.g. a monitor, TV or poster showing people.
+  # Each zone is [left, top, right, bottom] as fractions of the frame (0 to 1):
+  #   ignore_zones: [[0.28, 0.40, 0.45, 0.65]]
+  ignore_zones: []
+
+# kiosk    = people close to the camera, facing it: age range, eyewear, face mask
+# security = people far away: clothing, bags, age group only
+mode: kiosk
+
+detector:
+  model: yolo11s-pose.pt  # downloaded automatically on first run
+  conf: 0.1               # low on purpose: weak detections only keep known people tracked
+  imgsz: 640
+  device: 0               # GPU index, or "cpu"
+  tracker: labeler/trackers/people.yaml   # ByteTrack tuned for people; see that file
+  min_box_area:           # new people smaller than this share of the frame are ignored
+    kiosk: 0.03           # a kiosk user is close; this skips people far behind and pictures of people
+    security: 0.0         # in security views people are far away and small
+
+tracking:
+  min_frames_keep: 8          # tracks shorter than this are treated as noise
+  min_frames_for_label: 20    # frames seen before the VLM is asked to label a person
+  best_frames: 5              # best-quality frames kept per track
+  lost_after_s: 4.0           # a track is finished after this long unseen (longer than the tracker's memory)
+  color_every_n_frames: 2
+  relink:                     # a person who leaves and returns continues the same record
+    enabled: true
+    window_s: 30              # how long after leaving a person can still be re-linked
+    check_at_frames: [5, 12]  # when a new track is compared with recently lost people
+    short_gap_s: 5            # gaps up to this long: moderate similarity + similar position
+    short_gap_min_similarity: 0.75
+    short_gap_min_overlap: 0.2
+    long_gap_min_similarity: 0.90   # longer gaps: appearance alone, so the bar is high
+
+vlm:
+  enabled: true
+  host: http://localhost:11434
+  model: qwen3-vl:4b-instruct
+  workers: 2                  # requests sent at once; needs Ollama's OLLAMA_NUM_PARALLEL >= this.
+                              # Measured: 2 = 1.9x faster than 1; 3-4 add nothing on an RTX 4070 SUPER
+  frames_per_track: 2         # frames labeled per person; disagreement lowers confidence
+  relabel_every_s: 15         # re-analyze people who stay in view (0 = label once only)
+  history_frames: 4           # labels are a vote over this many recent answers per person
+  timeout_s: 90
+  max_queue: 32
+
+embeddings:
+  enabled: true               # appearance vectors for text search and look-alike search
+  model: google/siglip2-base-patch16-224
+  device: cuda
+
+student:                      # fast attribute classifiers trained from VLM labels (tools/train_attributes.py)
+  enabled: true
+  model_path: models/attributes.joblib
+  every_n_frames: 15          # instant labels for the live view, refreshed this often per person
+  skip_vlm_when_confident: true   # skip the VLM when every attribute is confident (rare with current data)
+
+review:
+  confidence_threshold: 0.6   # below this, an attribute goes to the review queue
+
+database:
+  # PostgreSQL + pgvector in Docker (start it with: docker compose up -d).
+  # The address and password live in .env. For a quick test without Docker use:
+  #   url: sqlite:///data/vision.db
+  url: ${DATABASE_URL}
+
+storage:
+  crop_dir: data/crops
+  save_face_crops: false      # face images are biometric data; off by default
+  retention_days: 30          # tracks older than this are deleted on startup (0 = keep forever)
+
+web:
+  host: 127.0.0.1
+  port: 8000

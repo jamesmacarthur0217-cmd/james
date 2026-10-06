@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review Queue</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>VisionLabeler</h1>
+  <nav><a href="/">Live</a><a href="/review" class="active">Review queue</a></nav>
+  <div class="status" id="count"></div>
+</header>
+<main>
+  <p class="hint">Labels where two models disagreed (shown first), then the least confident. Your answers become training data.</p>
+  <div class="cards" id="cards"></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+async function load() {
+  const items = await (await fetch("/api/review")).json();
+  $("count").textContent = `${items.length} waiting`;
+  $("cards").innerHTML = items.length ? items.map(it => {
+    const input = it.allowed
+      ? `<select>${it.allowed.map(v => `<option ${v === it.value ? "selected" : ""}>${esc(v)}</option>`).join("")}</select>`
+      : `<input value="${esc(it.value)}" placeholder="comma-separated, or none">`;
+    const cands = it.candidates.map(c => `${esc(c.source)}: <b>${esc(c.value)}</b> (${Math.round(c.confidence * 100)}%)`).join("<br>");
+    return `<div class="card" data-id="${it.attribute_id}">
+      ${it.crop ? `<img src="/crops/${encodeURIComponent(it.crop)}" alt="">` : ""}
+      <div class="attr">#${it.track_id} · ${esc(it.name.replace(/_/g, " "))}</div>
+      <div class="reason">${esc(it.reason)}</div>
+      <div class="cands">${cands}</div>
+      <div class="row">${input}<button class="primary">Save</button></div>
+    </div>`;
+  }).join("") : '<div class="empty">Nothing to review.</div>';
+}
+
+$("cards").addEventListener("click", async (e) => {
+  if (e.target.tagName !== "BUTTON") return;
+  const card = e.target.closest(".card");
+  const value = card.querySelector("select, input").value;
+  e.target.disabled = true;
+  const r = await fetch(`/api/review/${card.dataset.id}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ value }),
+  });
+  if (r.ok) { card.remove(); $("count").textContent = `${document.querySelectorAll(".card").length} waiting`; }
+  else { e.target.disabled = false; alert("Save failed"); }
+});
+
+load();
+</script>
+</body>
+</html>
