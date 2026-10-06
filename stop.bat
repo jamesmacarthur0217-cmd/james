@@ -31,7 +31,8 @@ goto end
 echo       App stopped.
 :app_done
 
-echo [2/3] Stopping the database...
+echo [2/3] Backing up and stopping the database...
+.venv\Scripts\python.exe tools\backup_db.py --if-older-than-hours 20 --keep 7
 docker compose stop >nul 2>&1
 echo       Database stopped (your data is kept).
 

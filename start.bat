@@ -59,7 +59,8 @@ echo Starting the app. The browser opens in about 15 seconds: http://127.0.0.1:8
 echo To stop: the Stop button in the web page, stop.bat, or Ctrl+C in this window.
 echo.
 if not "%VL_NO_BROWSER%"=="1" start "" cmd /c "timeout /t 15 >nul & start http://127.0.0.1:8000"
-.venv\Scripts\python.exe run.py %*
+rem The supervisor restarts the app if it crashes; a normal stop ends it.
+.venv\Scripts\python.exe -m labeler.supervisor %*
 echo.
 echo VisionLabeler has stopped.
 pause

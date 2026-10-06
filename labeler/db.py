@@ -238,9 +238,15 @@ class Database:
 
     # --- reads for the web UI -----------------------------------------------------
 
-    def list_tracks(self, limit: int = 50, name: str | None = None, value: str | None = None) -> list[dict]:
+    def _camera_names(self, s: Session) -> dict[int, str]:
+        return {c.id: c.name for c in s.scalars(select(Camera))}
+
+    def list_tracks(self, limit: int = 50, name: str | None = None, value: str | None = None,
+                    camera: str | None = None) -> list[dict]:
         with self.Session() as s:
             q = select(Track).order_by(Track.id.desc())
+            if camera:
+                q = q.where(Track.camera_id.in_(select(Camera.id).where(Camera.name == camera)))
             if name and value:
                 match = select(Attribute.track_id).where(
                     Attribute.name == name,
@@ -249,13 +255,15 @@ class Database:
                 )
                 q = q.where(Track.id.in_(match))
             tracks = s.scalars(q.limit(limit)).all()
-            return [self._track_dict(t) for t in tracks]
+            names = self._camera_names(s)
+            return [self._track_dict(t, names) for t in tracks]
 
     @staticmethod
-    def _track_dict(t: Track) -> dict:
+    def _track_dict(t: Track, camera_names: dict[int, str] | None = None) -> dict:
         return {
             "id": t.id,
             "camera_id": t.camera_id,
+            "camera": (camera_names or {}).get(t.camera_id),
             "started_at": t.started_at.isoformat(timespec="seconds"),
             "ended_at": t.ended_at.isoformat(timespec="seconds") if t.ended_at else None,
             "status": t.status,
@@ -371,7 +379,8 @@ class Database:
         """Tracks in the given order."""
         with self.Session() as s:
             by_id = {t.id: t for t in s.scalars(select(Track).where(Track.id.in_(ids)))}
-            return [self._track_dict(by_id[i]) for i in ids if i in by_id]
+            names = self._camera_names(s)
+            return [self._track_dict(by_id[i], names) for i in ids if i in by_id]
 
     def stats(self) -> dict:
         from sqlalchemy import func
@@ -407,6 +416,15 @@ class Database:
                 for i in deleted:
                     self._vectors.pop(i, None)
         return deleted, paths
+
+    def close_stale_tracks(self) -> int:
+        """Mark people left "active" by an app that was killed (power cut, forced close) as finished."""
+        with self.Session.begin() as s:
+            stale = s.scalars(select(Track).where(Track.status == "active")).all()
+            for t in stale:
+                t.status = "finished"
+                t.ended_at = t.ended_at or t.started_at
+            return len(stale)
 
     def cleanup(self, retention_days: int) -> list[str]:
         """Delete tracks older than the retention window; returns their crop paths."""

@@ -52,8 +52,8 @@ DEFAULTS: dict = {
                 "skip_vlm_when_confident": True},
     "review": {"confidence_threshold": 0.6},
     "database": {"url": "sqlite:///data/vision.db"},
-    "storage": {"crop_dir": "data/crops", "save_face_crops": False, "retention_days": 30},
-    "web": {"host": "127.0.0.1", "port": 8000},
+    "storage": {"crop_dir": "data/crops", "save_face_crops": False, "retention_days": 30, "min_free_gb": 5},
+    "web": {"host": "127.0.0.1", "port": 8000, "username": "admin", "password": ""},
 }
 
 
@@ -78,15 +78,19 @@ def load_dotenv(path: Path = ROOT / ".env") -> None:
 
 
 def _expand(value):
-    """Replace ${VAR} in config strings with environment variables, so secrets stay in .env."""
+    """Replace ${VAR} (or ${VAR:-default}) in config strings with environment variables,
+    so secrets stay in .env."""
     if isinstance(value, dict):
         return {k: _expand(v) for k, v in value.items()}
     if isinstance(value, str):
         def sub(m: re.Match) -> str:
-            if m.group(1) not in os.environ:
-                raise KeyError(f"config uses ${{{m.group(1)}}} but it is not set (see .env)")
-            return os.environ[m.group(1)]
-        return re.sub(r"\$\{(\w+)\}", sub, value)
+            name, default = m.group(1), m.group(3)
+            if name in os.environ:
+                return os.environ[name]
+            if default is not None:
+                return default
+            raise KeyError(f"config uses ${{{name}}} but it is not set (see .env)")
+        return re.sub(r"\$\{(\w+)(:-([^}]*))?\}", sub, value)
     return value
 
 
@@ -98,9 +102,32 @@ def load_config(path: str | Path | None = None) -> dict:
         with open(path, encoding="utf-8") as f:
             _merge(cfg, yaml.safe_load(f) or {})
     cfg = _expand(cfg)
+    cfg["cameras"] = normalize_cameras(cfg)
     if cfg["mode"] not in ("kiosk", "security"):
         raise ValueError(f"mode must be 'kiosk' or 'security', got {cfg['mode']!r}")
     return cfg
+
+
+CAMERA_DEFAULTS = {"source": 0, "loop_files": True, "ignore_zones": []}
+
+
+def normalize_cameras(cfg: dict) -> list[dict]:
+    """The cameras to run: the `cameras:` list, or the single `camera:` block. Each gets a unique name
+    and a mode (its own, or the global one)."""
+    cams = cfg.get("cameras") or [cfg["camera"]]
+    out, names = [], set()
+    for i, cam in enumerate(cams):
+        c = {**CAMERA_DEFAULTS, **cam}
+        c.setdefault("name", f"cam{i + 1}")
+        c["name"] = str(c["name"])
+        if c["name"] in names:
+            raise ValueError(f"two cameras are named {c['name']!r}; names must be unique")
+        names.add(c["name"])
+        c.setdefault("mode", cfg["mode"])
+        if c["mode"] not in ("kiosk", "security"):
+            raise ValueError(f"camera {c['name']}: mode must be 'kiosk' or 'security'")
+        out.append(c)
+    return out
 
 
 def resolve(p: str | Path) -> Path:

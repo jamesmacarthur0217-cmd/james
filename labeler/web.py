@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import secrets
+import shutil
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -26,8 +29,53 @@ class DeleteIn(BaseModel):
     everything: bool = False
 
 
-def create_app(cfg: dict, db: Database, pipeline: Pipeline | None, embedder=None) -> FastAPI:
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def check_access(web: dict) -> None:
+    """Refuse to open the UI to the network without a password."""
+    if web["host"] not in LOCAL_HOSTS and not web.get("password"):
+        raise SystemExit(
+            f"web.host is {web['host']!r}, so other devices could open the app, but no password is set. "
+            "Add a line VL_WEB_PASSWORD=<a long password> to .env, or set web.host back to 127.0.0.1.")
+
+
+def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | None, embedder=None) -> FastAPI:
     app = FastAPI(title="VisionLabeler")
+
+    password = cfg["web"].get("password") or ""
+    if password:
+        username = cfg["web"].get("username") or "admin"
+
+        @app.middleware("http")
+        async def require_login(request: Request, call_next):
+            """Other devices must log in; this PC itself (stop.bat, the local browser) does not."""
+            client = request.client.host if request.client else ""
+            if client not in LOCAL_HOSTS:
+                ok = False
+                header = request.headers.get("authorization", "")
+                if header.startswith("Basic "):
+                    try:
+                        user, _, pw = base64.b64decode(header[6:]).decode("utf-8").partition(":")
+                        ok = secrets.compare_digest(user, username) and secrets.compare_digest(pw, password)
+                    except Exception:
+                        ok = False
+                if not ok:
+                    return Response("Login required", status_code=401,
+                                    headers={"WWW-Authenticate": 'Basic realm="VisionLabeler"'})
+            return await call_next(request)
+    if pipelines is None:
+        pipelines = []
+    elif isinstance(pipelines, Pipeline):
+        pipelines = [pipelines]
+    by_name = {p.name: p for p in pipelines}
+
+    def pick(camera: str | None) -> Pipeline | None:
+        if camera:
+            if camera not in by_name:
+                raise HTTPException(404, f"no camera named {camera!r}")
+            return by_name[camera]
+        return pipelines[0] if pipelines else None
     crop_dir = resolve(cfg["storage"]["crop_dir"])
     crop_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/crops", StaticFiles(directory=crop_dir), name="crops")
@@ -41,8 +89,14 @@ def create_app(cfg: dict, db: Database, pipeline: Pipeline | None, embedder=None
     def review_page():
         return FileResponse(STATIC / "review.html")
 
+    @app.get("/api/cameras")
+    def cameras():
+        return [{"name": p.name, "mode": p.mode, "source": str(p.cam["source"])} for p in pipelines]
+
     @app.get("/stream")
-    async def stream():
+    async def stream(camera: str | None = None):
+        pipeline = pick(camera)
+
         async def frames():
             last = None
             while True:
@@ -63,21 +117,30 @@ def create_app(cfg: dict, db: Database, pipeline: Pipeline | None, embedder=None
         return {"ok": True}
 
     @app.get("/api/live")
-    def live():
+    def live(camera: str | None = None):
         """People in view right now and their current labels."""
-        return {"people": pipeline.live() if pipeline else [],
+        pipeline = pick(camera)
+        return {"camera": pipeline.name if pipeline else None,
+                "people": pipeline.live() if pipeline else [],
                 "fps": round(pipeline.fps, 1) if pipeline else 0}
 
     @app.get("/api/live/thumb/{tracker_id}")
-    def live_thumb(tracker_id: int):
+    def live_thumb(tracker_id: int, camera: str | None = None):
+        pipeline = pick(camera)
         jpeg = pipeline.live_thumb(tracker_id) if pipeline else None
         if jpeg is None:
             raise HTTPException(404, "not in view")
         return Response(jpeg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
     @app.get("/api/status")
-    def status():
-        return {**(pipeline.status() if pipeline else {"mode": cfg["mode"]}), **db.stats()}
+    def status(camera: str | None = None):
+        pipeline = pick(camera)
+        free_gb = shutil.disk_usage(crop_dir).free / 1e9
+        return {**(pipeline.status() if pipeline else {"mode": cfg["mode"]}),
+                "cameras": [p.status() for p in pipelines],
+                "disk_free_gb": round(free_gb, 1),
+                "disk_low": free_gb < cfg["storage"]["min_free_gb"],
+                **db.stats()}
 
     @app.get("/api/schema")
     def get_schema():
@@ -89,15 +152,15 @@ def create_app(cfg: dict, db: Database, pipeline: Pipeline | None, embedder=None
         }
 
     @app.get("/api/tracks")
-    def tracks(limit: int = 50, name: str | None = None, value: str | None = None):
-        return db.list_tracks(limit=min(limit, 500), name=name, value=value)
+    def tracks(limit: int = 50, name: str | None = None, value: str | None = None, camera: str | None = None):
+        return db.list_tracks(limit=min(limit, 500), name=name, value=value, camera=camera)
 
     @app.post("/api/tracks/delete")
     def delete_tracks(body: DeleteIn):
         """Delete selected people (or everyone) with their pictures, labels and history."""
         deleted, paths = db.delete_tracks(body.ids, everything=body.everything)
-        if pipeline is not None:
-            pipeline.forget(deleted)
+        for p in pipelines:
+            p.forget(deleted)
         removed = 0
         for name in paths:
             path = crop_dir / name

@@ -17,6 +17,7 @@
   <section class="panel">
     <div class="panel-head">
       <h2><span class="live-dot" id="live-dot"></span>Live camera</h2>
+      <div class="cam-tabs" id="cam-tabs" hidden></div>
       <span class="muted" id="live-caption"></span>
       <button id="fullscreen" title="Show the live view full screen">Full screen</button>
     </div>
@@ -205,7 +206,7 @@ async function refresh() {
       <input type="checkbox" data-select="${t.id}" ${selected.has(t.id) ? "checked" : ""}
              aria-label="Select person ${t.id}">
       ${t.crop ? `<img src="/crops/${encodeURIComponent(t.crop)}?v=${t.n_frames}" alt="">` : `<img alt="">`}
-      <div><div class="meta">#${t.id} · ${when} · ${t.status}${t.low_light ? " · low light" : ""}${score(t)}</div>
+      <div><div class="meta">#${t.id}${cameraNames.length > 1 && t.camera ? ` · ${esc(t.camera)}` : ""} · ${when} · ${t.status}${t.low_light ? " · low light" : ""}${score(t)}</div>
       <div class="chips">${chips || '<span class="chip">labeling…</span>'}</div>
       <button class="link" data-similar="${t.id}">Look-alikes</button></div></div>`;
   }).join("") : '<div class="empty">No matching people.</div>';
@@ -219,8 +220,11 @@ function score(t) {
 
 async function status() {
   try {
-    const s = await (await fetch("/api/status")).json();
-    const warn = s.blank_picture ? '<b style="color:var(--warn)">no picture from camera</b> · ' : "";
+    const s = await (await fetch("/api/status?" + camParam())).json();
+    let warn = s.blank_picture ? '<b style="color:var(--warn)">no picture from camera</b> · ' : "";
+    if (s.disk_low) warn = `<b style="color:var(--warn)">disk almost full (${s.disk_free_gb} GB free)</b> · ` + warn;
+    const down = (s.cameras || []).filter(c => !c.running).map(c => c.camera);
+    if (down.length) warn = `<b style="color:var(--warn)">camera not running: ${down.map(esc).join(", ")}</b> · ` + warn;
     $("status").innerHTML = warn + `mode <b>${s.mode}</b> · <b>${s.fps ?? "-"}</b> fps · <b>${s.active_people ?? 0}</b> in view · `
       + `VLM queue <b>${s.vlm_enabled ? s.vlm_queue : "off"}</b> · <b>${s.tracks}</b> people · `
       + `<a href="/review"><b>${s.needs_review}</b> to review</a>`;
@@ -270,14 +274,14 @@ function liveCard(p) {
     const img = el.querySelector("img");
     const next = new Image();
     next.onload = () => { img.src = next.src; };
-    next.src = `/api/live/thumb/${p.tracker_id}?t=${Date.now()}`;
+    next.src = `/api/live/thumb/${p.tracker_id}?${camParam()}t=${Date.now()}`;
   }
   return el;
 }
 
 async function pollLive() {
   try {
-    const data = await (await fetch("/api/live")).json();
+    const data = await (await fetch("/api/live?" + camParam())).json();
     thumbTick++;
     const ids = new Set(data.people.map(p => p.tracker_id));
     for (const id of [...cards.keys()]) if (!ids.has(id)) { cards.get(id).remove(); cards.delete(id); }
@@ -295,6 +299,31 @@ async function pollLive() {
   }
 }
 
+// Cameras: tabs appear when there is more than one; the video and "In view now" follow the selected one.
+let camera = null;
+let cameraNames = [];
+function camParam() { return camera ? `camera=${encodeURIComponent(camera)}&` : ""; }
+
+function selectCamera(name) {
+  camera = name;
+  $("live").src = "/stream?" + camParam();
+  document.querySelectorAll("#cam-tabs button").forEach(b => b.classList.toggle("active", b.dataset.cam === name));
+  for (const el of cards.values()) el.remove();
+  cards.clear();
+  pollLive();
+}
+
+async function loadCameras() {
+  cameraNames = (await (await fetch("/api/cameras")).json()).map(c => c.name);
+  if (cameraNames.length > 1) {
+    $("cam-tabs").hidden = false;
+    $("cam-tabs").innerHTML = cameraNames.map(n => `<button data-cam="${esc(n)}">${esc(n)}</button>`).join("");
+    $("cam-tabs").onclick = (e) => { if (e.target.dataset.cam) selectCamera(e.target.dataset.cam); };
+    selectCamera(cameraNames[0]);
+  }
+}
+
+loadCameras().then(refresh);
 loadSchema().then(refresh);
 status();
 pollLive();

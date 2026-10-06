@@ -102,3 +102,11 @@ def test_retention_deletes_only_old_people(db, camera):
     assert db.cleanup(30) == ["old.jpg"]
     assert [t["id"] for t in db.list_tracks()] == [new]
     assert db.cleanup(0) == []
+
+
+def test_people_left_active_by_a_crash_are_closed(db, camera):
+    t = _person(db, camera)
+    assert db.close_stale_tracks() == 1
+    row = db.list_tracks()[0]
+    assert row["id"] == t and row["status"] == "finished" and row["ended_at"] is not None
+    assert db.close_stale_tracks() == 0

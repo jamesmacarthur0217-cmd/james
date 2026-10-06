@@ -66,18 +66,31 @@ class VLMClient:
             return False, f"model {self.model!r} is not pulled; run: ollama pull {self.model}"
         return True, "ok"
 
-    def label(self, person: np.ndarray, face: np.ndarray | None) -> dict[str, str]:
+    def label(self, person: np.ndarray, face: np.ndarray | None, mode: str | None = None) -> dict[str, str]:
+        """Label one person. Retries once if Ollama fails (it occasionally restarts its model process)."""
+        try:
+            return self._label(person, face, mode or self.mode)
+        except (requests.ConnectionError, requests.Timeout) as e:
+            log.warning("VLM request failed (%s); retrying once", e.__class__.__name__)
+        except requests.HTTPError as e:
+            if e.response is None or e.response.status_code < 500:
+                raise
+            log.warning("Ollama returned %s; retrying once", e.response.status_code)
+        time.sleep(2)
+        return self._label(person, face, mode or self.mode)
+
+    def _label(self, person: np.ndarray, face: np.ndarray | None, mode: str) -> dict[str, str]:
         images = [_b64(person, 512)]
-        if face is not None and self.mode == "kiosk":
+        if face is not None and mode == "kiosk":
             images.append(_b64(face, 256))
         body = {
             "model": self.model,
             "messages": [{
                 "role": "user",
-                "content": PROMPT_KIOSK if self.mode == "kiosk" else PROMPT_SECURITY,
+                "content": PROMPT_KIOSK if mode == "kiosk" else PROMPT_SECURITY,
                 "images": images,
             }],
-            "format": schema.json_schema(self.mode),
+            "format": schema.json_schema(mode),
             "stream": False,
             # The JSON answer is ~100 tokens; the cap stops a runaway generation early.
             "options": {"temperature": 0, "num_predict": 400},
@@ -93,10 +106,10 @@ class VLMClient:
             r = requests.post(f"{self.host}/api/chat", json=body, timeout=self.timeout)
         r.raise_for_status()
         content = r.json()["message"]["content"]
-        return schema.clean(json.loads(content), self.mode)
+        return schema.clean(json.loads(content), mode)
 
 
-Job = tuple[int, list[tuple[np.ndarray, np.ndarray | None]]]
+Job = tuple[int, list[tuple[np.ndarray, np.ndarray | None]], str | None]
 ResultCallback = Callable[[int, list[dict[str, str]]], None]
 
 
@@ -123,9 +136,10 @@ class VLMWorker:
         """Jobs waiting for a free slot (not counting the ones being labeled)."""
         return self.jobs.qsize()
 
-    def submit(self, track_id: int, frames: list[tuple[np.ndarray, np.ndarray | None]]) -> bool:
+    def submit(self, track_id: int, frames: list[tuple[np.ndarray, np.ndarray | None]],
+               mode: str | None = None) -> bool:
         try:
-            self.jobs.put_nowait((track_id, frames))
+            self.jobs.put_nowait((track_id, frames, mode))
             return True
         except queue.Full:
             log.warning("VLM queue full; track %s will only get color labels", track_id)
@@ -136,7 +150,7 @@ class VLMWorker:
             job = self.jobs.get()
             if job is None:
                 return
-            track_id, frames = job
+            track_id, frames, mode = job
             if not frames:
                 self._deliver(track_id, [])
                 continue
@@ -145,11 +159,11 @@ class VLMWorker:
                 self._jobs_in_flight += 1
             for i, (person, face) in enumerate(frames):
                 self._slots.acquire()   # waits here while all slots are busy, so the queue stays meaningful
-                self._pool.submit(self._label_one, track_id, i, person, face, state)
+                self._pool.submit(self._label_one, track_id, i, person, face, mode, state)
 
-    def _label_one(self, track_id: int, i: int, person, face, state: dict) -> None:
+    def _label_one(self, track_id: int, i: int, person, face, mode, state: dict) -> None:
         try:
-            state["results"][i] = self.client.label(person, face)
+            state["results"][i] = self.client.label(person, face, mode)
         except Exception as e:  # keep going on any model/network error
             log.error("VLM labeling failed for track %s: %s", track_id, e)
         finally:

@@ -73,9 +73,11 @@ class TrackState:
 
 class Pipeline:
     def __init__(self, cfg: dict, db: Database, vlm: VLMWorker | None, embedder: Embedder | None = None,
-                 student: Student | None = None):
+                 student: Student | None = None, camera: dict | None = None):
         self.cfg = cfg
-        self.mode = cfg["mode"]
+        self.cam = camera or cfg.get("cameras", [cfg.get("camera")])[0]
+        self.name = self.cam["name"]
+        self.mode = self.cam.get("mode", cfg["mode"])
         self.db = db
         self.vlm = vlm
         self.embedder = embedder
@@ -91,8 +93,9 @@ class Pipeline:
         if tracker_path.exists():  # project tracker settings; otherwise an Ultralytics built-in name
             det["tracker"] = str(tracker_path)
         self.det_cfg = det
-        cam = cfg["camera"]
+        cam = self.cam
         self.camera_id = db.get_or_create_camera(cam["name"], str(cam["source"]), self.mode)
+        self.owned_ids: set[int] = set()   # records created by this camera, for routing VLM results
 
         self.tracks: dict[int, TrackState] = {}
         self.by_db_id: dict[int, TrackState] = {}
@@ -110,6 +113,8 @@ class Pipeline:
         self.fps = 0.0
         self.frames = 0
         self.blank = False
+        self.running = False
+        self.crashed = False
         self.deleted_ids: set[int] = set()
         self._live_lock = threading.Lock()
         self._live: list[dict] = []
@@ -145,6 +150,8 @@ class Pipeline:
 
     def status(self) -> dict:
         return {
+            "camera": self.name,
+            "running": self.running,
             "mode": self.mode,
             "fps": round(self.fps, 1),
             "frames": self.frames,
@@ -158,10 +165,11 @@ class Pipeline:
         self.stop_event.set()
 
     def run(self, max_frames: int | None = None) -> None:
-        cam = self.cfg["camera"]
+        cam = self.cam
         source = FrameSource(cam["source"], loop=cam["loop_files"] and max_frames is None)
-        log.info("pipeline started: source=%s (%s), mode=%s", cam["source"], source.kind, self.mode)
+        log.info("[%s] pipeline started: source=%s (%s), mode=%s", self.name, cam["source"], source.kind, self.mode)
         t_last = time.monotonic()
+        self.running = True
         try:
             while not self.stop_event.is_set():
                 frame = source.read()
@@ -177,9 +185,11 @@ class Pipeline:
                 if max_frames and self.frames >= max_frames:
                     break
         except Exception:
-            log.exception("pipeline crashed")
+            self.crashed = True
+            log.exception("[%s] pipeline crashed", self.name)
             raise
         finally:
+            self.running = False
             source.release()
             for tid in list(self.tracks):
                 self._finish(tid)
@@ -299,6 +309,7 @@ class Pipeline:
     def _ensure_db(self, st: TrackState) -> int:
         if st.db_id is None:
             st.db_id = self.db.create_track(self.camera_id, st.tracker_id, st.started_at)
+            self.owned_ids.add(st.db_id)
             self.by_db_id[st.db_id] = st
         return st.db_id
 
@@ -367,7 +378,7 @@ class Pipeline:
             return
         n = self.cfg["vlm"]["frames_per_track"]
         frames = [(c.person, c.face) for c in st.candidates[:n]]
-        st.vlm_pending = self.vlm.submit(st.db_id, frames)
+        st.vlm_pending = self.vlm.submit(st.db_id, frames, self.mode)
 
     def _due_for_relabel(self, st: TrackState, now: float) -> bool:
         """Re-analyze a person who stays in view, so labels follow changes (glasses on, phone out).
@@ -381,7 +392,7 @@ class Pipeline:
     def _relabel(self, st: TrackState) -> None:
         frames = [(c.person, c.face) for c in st.recent[:1]]
         st.recent = []
-        st.vlm_pending = self.vlm.submit(st.db_id, frames)
+        st.vlm_pending = self.vlm.submit(st.db_id, frames, self.mode)
 
     def _try_relink(self, tid: int, new: TrackState, now: float) -> TrackState:
         """If this new track is a person who just left, continue their old record instead.

@@ -103,7 +103,7 @@ class FakeClient:
         self.active = self.peak = 0
         self.lock = threading.Lock()
 
-    def label(self, person, face):
+    def label(self, person, face, mode=None):
         with self.lock:
             self.active += 1
             self.peak = max(self.peak, self.active)

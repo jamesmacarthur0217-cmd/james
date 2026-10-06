@@ -1,15 +1,21 @@
 # VisionLabeler configuration.
 # Paths are relative to this folder unless absolute.
 
-camera:
-  name: cam1
-  # Webcam index (0, 1, ...), a video file path, an image path, or an rtsp:// URL.
-  source: 0                 # your USB webcam; use samples/bus.jpg for the demo image
-  loop_files: true        # restart video/image files when they end
-  # Areas of the picture to ignore, e.g. a monitor, TV or poster showing people.
-  # Each zone is [left, top, right, bottom] as fractions of the frame (0 to 1):
-  #   ignore_zones: [[0.28, 0.40, 0.45, 0.65]]
-  ignore_zones: []
+# One entry per camera. Each runs on its own; the vision model and database are shared.
+cameras:
+  - name: cam1                # unique name, shown in the web page
+    # Webcam index (0, 1, ...), a video file path, an image path, or an rtsp:// URL.
+    source: 0                 # your USB webcam; use samples/bus.jpg for the demo image
+    loop_files: true          # restart video/image files when they end
+    # Areas of the picture to ignore, e.g. a monitor, TV or poster showing people.
+    # Each zone is [left, top, right, bottom] as fractions of the frame (0 to 1):
+    #   ignore_zones: [[0.28, 0.40, 0.45, 0.65]]
+    ignore_zones: []
+    # mode: kiosk             # optional: overrides the global mode below for this camera
+  # A second camera, e.g. an IP camera at the entrance:
+  # - name: entrance
+  #   source: rtsp://user:password@192.168.1.50:554/stream1
+  #   mode: security
 
 # kiosk    = people close to the camera, facing it: age range, eyewear, face mask
 # security = people far away: clothing, bags, age group only
@@ -76,7 +82,11 @@ storage:
   crop_dir: data/crops
   save_face_crops: false      # face images are biometric data; off by default
   retention_days: 30          # tracks older than this are deleted on startup (0 = keep forever)
+  min_free_gb: 5              # warn when the disk has less free space than this
 
 web:
-  host: 127.0.0.1
+  host: 127.0.0.1             # this PC only. Use 0.0.0.0 to open it to other devices on your network,
+                              # which requires a password: add VL_WEB_PASSWORD=... to .env
   port: 8000
+  username: admin
+  password: ${VL_WEB_PASSWORD:-}   # from .env; asked from other devices only, never from this PC
