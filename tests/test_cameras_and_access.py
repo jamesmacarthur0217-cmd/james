@@ -126,3 +126,15 @@ def test_supervisor_does_not_restart_after_ctrl_c(monkeypatch):
     from labeler import supervisor
     monkeypatch.setattr(supervisor, "run_once", lambda argv: (1, True))
     assert supervisor.main([]) == 0
+
+
+def test_second_copy_is_refused_when_the_port_is_taken():
+    import socket
+    from run import _port_in_use
+    with socket.socket() as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen()
+        port = server.getsockname()[1]
+        assert _port_in_use("127.0.0.1", port)
+        assert _port_in_use("0.0.0.0", port)
+    assert not _port_in_use("127.0.0.1", port)

@@ -48,10 +48,10 @@ tracking:
 
 vlm:
   enabled: true
-  host: http://localhost:11434
+  host: http://127.0.0.1:11434    # not "localhost": on this PC that adds ~2 s to every request
   model: qwen3-vl:4b-instruct
-  workers: 2                  # requests sent at once; needs Ollama's OLLAMA_NUM_PARALLEL >= this.
-                              # Measured: 2 = 1.9x faster than 1; 3-4 add nothing on an RTX 4070 SUPER
+  workers: 1                  # requests sent at once. Measured on this PC: 1.8 s per person with 1;
+                              # 2 at once is no faster (the GPU is the limit) and makes each person wait longer
   frames_per_track: 2         # frames labeled per person; disagreement lowers confidence
   relabel_every_s: 15         # re-analyze people who stay in view (0 = label once only)
   history_frames: 4           # labels are a vote over this many recent answers per person

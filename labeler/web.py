@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import threading
 import secrets
 import shutil
 from datetime import datetime, timedelta
@@ -40,6 +41,11 @@ class RuleUpdate(BaseModel):
     enabled: bool
 
 
+class AskIn(BaseModel):
+    question: str
+    limit: int = 30
+
+
 def _day_range(start: str | None, end: str | None) -> tuple[datetime, datetime]:
     """Dates as YYYY-MM-DD (end inclusive); default today."""
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -65,8 +71,9 @@ def check_access(web: dict) -> None:
 
 
 def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | None, embedder=None,
-               alerts=None) -> FastAPI:
+               alerts=None, agent=None) -> FastAPI:
     app = FastAPI(title="VisionLabeler")
+    app.state.stopping = threading.Event()
 
     password = cfg["web"].get("password") or ""
     if password:
@@ -187,7 +194,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
 
         async def frames():
             last = None
-            while True:
+            # End when the app is stopping: an endless stream would otherwise keep the server from exiting.
+            while not app.state.stopping.is_set():
                 jpeg = pipeline.latest_jpeg if pipeline else None
                 if jpeg is not None and jpeg is not last:
                     last = jpeg
@@ -271,6 +279,15 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             t["similarity"] = round(sims[t["id"]], 4)
             t["match"] = round(embedder.match_probability(sims[t["id"]]), 4)
         return tracks
+
+    @app.post("/api/ask")
+    def ask(body: AskIn):
+        """Answer a question like "who wore a red top after 3pm?" (see labeler/agent.py)."""
+        if agent is None:
+            raise HTTPException(503, "questions need the VLM; it is disabled or not running")
+        if not body.question.strip():
+            raise HTTPException(400, "empty question")
+        return agent.run(body.question.strip()[:300], limit=min(body.limit, 100))
 
     @app.get("/api/tracks/{track_id}/similar")
     def similar(track_id: int, limit: int = 10):

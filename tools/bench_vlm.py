@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from labeler import schema  # noqa: E402
 from labeler.vlm import PROMPT_KIOSK, VLMClient, _b64  # noqa: E402
 
-CFG = {"host": "http://localhost:11434", "model": "qwen3-vl:4b-instruct", "timeout_s": 300}
+CFG = {"host": "http://127.0.0.1:11434", "model": "qwen3-vl:4b-instruct", "timeout_s": 300}
 
 
 def load_people(people_dir: Path, n: int, offset: int = 0) -> list[tuple[str, object]]:

@@ -508,15 +508,29 @@ class Database:
 
     # --- reports ----------------------------------------------------------------------
 
-    def people_between(self, start: datetime, end: datetime, camera: str | None = None) -> list[dict]:
-        """Everyone who appeared in [start, end), oldest first, with resolved attributes."""
+    def people_between(self, start: datetime, end: datetime, camera: str | None = None,
+                       limit: int | None = None, newest_first: bool = False) -> list[dict]:
+        """Everyone who appeared in [start, end) with resolved attributes (oldest first by default)."""
         with self.Session() as s:
             q = (select(Track).options(selectinload(Track.attributes))
-                 .where(Track.started_at >= start, Track.started_at < end).order_by(Track.started_at))
+                 .where(Track.started_at >= start, Track.started_at < end)
+                 .order_by(Track.started_at.desc() if newest_first else Track.started_at))
             if camera:
                 q = q.where(Track.camera_id.in_(select(Camera.id).where(Camera.name == camera)))
+            if limit:
+                q = q.limit(limit)
             names = self._camera_names(s)
             return [self._track_dict(t, names) for t in s.scalars(q)]
+
+    def vectors_for(self, ids: list[int], model: str) -> dict[int, np.ndarray]:
+        """Embeddings of the given people (those that have one)."""
+        out: dict[int, np.ndarray] = {}
+        with self.Session() as s:
+            for start in range(0, len(ids), 1000):
+                rows = s.execute(select(Embedding.track_id, Embedding.vector).where(
+                    Embedding.model == model, Embedding.track_id.in_(ids[start:start + 1000]))).all()
+                out.update({tid: v for tid, v in rows})
+        return out
 
     def close_stale_tracks(self) -> int:
         """Mark people left "active" by an app that was killed (power cut, forced close) as finished."""

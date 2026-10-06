@@ -19,6 +19,7 @@ os.environ.setdefault("OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS", "0")
 import argparse  # noqa: E402
 import logging  # noqa: E402
 import shutil  # noqa: E402
+import socket  # noqa: E402
 import sys  # noqa: E402
 import threading  # noqa: E402
 import time  # noqa: E402
@@ -67,6 +68,13 @@ def main() -> int:
         cfg["vlm"]["enabled"] = False
     if args.port:
         cfg["web"]["port"] = args.port
+
+    if not args.no_web and _port_in_use(cfg["web"]["host"], cfg["web"]["port"]):
+        # On Windows a second copy could otherwise share the port silently: two copies fighting over
+        # the camera and GPU, and stop.bat would only stop one of them.
+        log.error("VisionLabeler (or another program) is already using port %s. Open http://127.0.0.1:%s, "
+                  "or stop the running copy with stop.bat first.", cfg["web"]["port"], cfg["web"]["port"])
+        return 0
 
     crop_dir = resolve(cfg["storage"]["crop_dir"])
     crop_dir.mkdir(parents=True, exist_ok=True)
@@ -144,10 +152,21 @@ def main() -> int:
     check_access(web)   # refuses to open the UI to the network without a password
     for t in threads:
         t.start()
-    app = create_app(cfg, db, pipelines, embedder, alerts)
-    server = uvicorn.Server(uvicorn.Config(app, host=web["host"], port=web["port"], log_level="warning"))
-    # Short delay so the Stop request gets its reply before the web server closes.
-    app.state.request_shutdown = lambda: threading.Timer(0.5, setattr, (server, "should_exit", True)).start()
+    agent = None
+    if worker is not None:   # questions use the same local model as labeling
+        from labeler.agent import QueryAgent
+        agent = QueryAgent(cfg, db, embedder, [p.name for p in pipelines])
+    app = create_app(cfg, db, pipelines, embedder, alerts, agent)
+    # timeout_graceful_shutdown: don't wait forever for open connections (a browser showing the live video).
+    server = uvicorn.Server(uvicorn.Config(app, host=web["host"], port=web["port"], log_level="warning",
+                                           timeout_graceful_shutdown=3))
+
+    def request_shutdown() -> None:
+        app.state.stopping.set()   # ends live video streams
+        # Short delay so the Stop request gets its reply before the web server closes.
+        threading.Timer(0.5, setattr, (server, "should_exit", True)).start()
+
+    app.state.request_shutdown = request_shutdown
     exit_code = [0]
 
     def watchdog() -> None:
@@ -158,6 +177,7 @@ def main() -> int:
                 if p.crashed or (not t.is_alive() and not p.stop_event.is_set() and args.max_frames is None):
                     log.error("[%s] camera loop stopped unexpectedly; restarting the app", p.name)
                     exit_code[0] = EXIT_CRASHED
+                    app.state.stopping.set()
                     server.should_exit = True
                     return
             time.sleep(2)
@@ -171,6 +191,7 @@ def main() -> int:
     try:
         server.run()
     finally:
+        app.state.stopping.set()
         log.info("shutting down: saving the people still in view...")
         for p in pipelines:
             p.stop()
@@ -180,6 +201,13 @@ def main() -> int:
         pid_file.unlink(missing_ok=True)
         log.info("stopped")
     return exit_code[0]
+
+
+def _port_in_use(host: str, port: int) -> bool:
+    target = "127.0.0.1" if host in ("0.0.0.0", "::", "") else host
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex((target, port)) == 0
 
 
 def _check_disk(path, min_free_gb: float) -> None:

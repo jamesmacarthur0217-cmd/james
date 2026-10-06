@@ -38,10 +38,10 @@ DEFAULTS: dict = {
     },
     "vlm": {
         "enabled": True,
-        "host": "http://localhost:11434",
+        "host": "http://127.0.0.1:11434",   # not "localhost": on Windows that adds ~2 s per request
         "model": "qwen3-vl:4b-instruct",
         "frames_per_track": 2,
-        "workers": 2,
+        "workers": 1,
         "relabel_every_s": 15,
         "history_frames": 4,
         "timeout_s": 90,

@@ -33,8 +33,9 @@
   <section class="panel">
     <h2>People seen</h2>
     <form class="search" id="q-form">
-      <input id="q" placeholder="Describe a person, e.g. man in a beige coat" style="flex:1; min-width:180px">
-      <button class="primary">Search</button>
+      <input id="q" placeholder="Ask, e.g. who wore a red top after 3pm?  or describe: man in a beige coat"
+             style="flex:1; min-width:180px">
+      <button class="primary">Ask</button>
     </form>
     <div class="search">
       <select id="f-name"><option value="">Filter by attribute…</option></select>
@@ -81,7 +82,7 @@ let view = { kind: "recent" };
 $("q-form").onsubmit = (e) => {
   e.preventDefault();
   const q = $("q").value.trim();
-  view = q ? { kind: "search", q } : { kind: "recent" };
+  view = q ? { kind: "ask", q } : { kind: "recent" };
   refresh();
 };
 $("people").addEventListener("click", (e) => {
@@ -122,6 +123,18 @@ function phrases(a) {
 }
 
 async function fetchTracks() {
+  if (view.kind === "ask") {
+    $("banner").hidden = false;
+    $("banner").innerHTML = "Thinking…";
+    const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ question: view.q, limit: 30 }) });
+    if (r.ok) {
+      const res = await r.json();
+      view.explanation = `${res.explanation} · ${res.total} found`;
+      return res.people;
+    }
+    view = { kind: "search", q: view.q };   // no model: fall back to appearance search
+  }
   if (view.kind === "search") {
     const r = await fetch("/api/search?" + new URLSearchParams({ q: view.q, limit: 20 }));
     return r.ok ? r.json() : [];
@@ -197,6 +210,7 @@ async function refresh() {
   const back = ' <a href="#" data-back>Back to recent</a>';
   $("banner").hidden = view.kind === "recent";
   if (view.kind === "search") $("banner").innerHTML = `Best matches for “${esc(view.q)}”, closest first.` + back;
+  if (view.kind === "ask") $("banner").innerHTML = esc(view.explanation) + back;
   if (view.kind === "similar") $("banner").innerHTML = `People who look most like #${view.id}.` + back;
   $("people").innerHTML = tracks.length ? tracks.map(t => {
     const chips = phrases(t.attributes)
@@ -216,7 +230,8 @@ async function refresh() {
 
 function score(t) {
   if (t.similarity === undefined) return "";
-  return ` · <b>similarity ${t.similarity.toFixed(2)}</b>`;
+  const differ = t.labels_differ ? ' · <span style="color:var(--warn)">looks similar, labels differ</span>' : "";
+  return ` · <b>similarity ${t.similarity.toFixed(2)}</b>${differ}`;
 }
 
 async function status() {
