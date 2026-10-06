@@ -115,7 +115,11 @@ def main() -> int:
         else:
             log.warning("fast classifiers enabled but %s not found; train them with tools/train_attributes.py", path)
 
+    from labeler.alerts import AlertEngine
+    alerts = AlertEngine(db)
     pipelines.extend(Pipeline(cfg, db, worker, embedder, student, camera=cam) for cam in cfg["cameras"])
+    for p in pipelines:
+        p.alerts = alerts
     log.info("cameras: %s", ", ".join(f"{p.name} ({p.cam['source']}, {p.mode})" for p in pipelines))
 
     threads = [threading.Thread(target=p.run, kwargs={"max_frames": args.max_frames},
@@ -140,7 +144,7 @@ def main() -> int:
     check_access(web)   # refuses to open the UI to the network without a password
     for t in threads:
         t.start()
-    app = create_app(cfg, db, pipelines, embedder)
+    app = create_app(cfg, db, pipelines, embedder, alerts)
     server = uvicorn.Server(uvicorn.Config(app, host=web["host"], port=web["port"], log_level="warning"))
     # Short delay so the Stop request gets its reply before the web server closes.
     app.state.request_shutdown = lambda: threading.Timer(0.5, setattr, (server, "should_exit", True)).start()

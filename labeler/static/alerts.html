@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alerts</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .row label { color: var(--muted); font-size: 13px; min-width: 70px; }
+  .cond { display: flex; gap: 6px; margin-bottom: 6px; }
+  .rule { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .rule .what { flex: 1; }
+  .rule .what small { color: var(--muted); display: block; }
+  .event { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .event img { width: 48px; height: 64px; object-fit: cover; border-radius: 6px; background: var(--chip); flex: none; }
+  .event small { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>VisionLabeler</h1>
+  <nav><a href="/">Live</a><a href="/review">Review queue</a><a href="/reports">Reports</a><a href="/alerts" class="active">Alerts</a></nav>
+</header>
+<main class="cols">
+  <div>
+    <section class="panel">
+      <h2>New alert rule</h2>
+      <p class="hint">Get notified on the Live page when someone matching these conditions appears.
+        With no conditions, the rule matches anyone (e.g. a camera that should see nobody at night).</p>
+      <div class="row"><label for="name">Name</label><input id="name" placeholder="e.g. Red top with backpack" style="flex:1"></div>
+      <div class="row"><label for="camera">Camera</label><select id="camera"><option value="">Any camera</option></select></div>
+      <div id="conds"></div>
+      <div class="row"><button id="add-cond">+ Add condition</button><button class="primary" id="save">Save rule</button>
+        <span class="muted" id="msg"></span></div>
+    </section>
+    <section class="panel" style="margin-top:16px">
+      <h2>Rules</h2>
+      <div id="rules"><div class="empty">No rules yet.</div></div>
+    </section>
+  </div>
+  <section class="panel">
+    <h2>Recent alerts</h2>
+    <div id="events"><div class="empty">No alerts yet.</div></div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+let fields = {};
+
+function condRow() {
+  const div = document.createElement("div");
+  div.className = "cond";
+  const names = Object.keys(fields);
+  div.innerHTML = `<select class="c-name">${names.map(n => `<option value="${n}">${n.replace(/_/g, " ")}</option>`).join("")}</select>
+    <select class="c-value"></select><button class="c-del" title="Remove">✕</button>`;
+  const fill = () => {
+    const vals = fields[div.querySelector(".c-name").value].filter(v => v !== "unknown");
+    div.querySelector(".c-value").innerHTML = vals.map(v => `<option>${esc(v)}</option>`).join("");
+  };
+  div.querySelector(".c-name").onchange = fill;
+  div.querySelector(".c-del").onclick = () => div.remove();
+  fill();
+  $("conds").appendChild(div);
+}
+
+function describe(conds) {
+  return conds.length ? conds.map(([n, v]) => `${n.replace(/_/g, " ")} = ${v}`).join(", ") : "anyone";
+}
+
+async function loadRules() {
+  const rules = await (await fetch("/api/alerts/rules")).json();
+  $("rules").innerHTML = rules.length ? rules.map(r => `
+    <div class="rule" data-id="${r.id}">
+      <input type="checkbox" class="r-on" ${r.enabled ? "checked" : ""} title="Enabled">
+      <div class="what"><b>${esc(r.name)}</b><small>${esc(describe(r.conditions))} · ${esc(r.camera || "any camera")}</small></div>
+      <button class="r-del danger-quiet">Delete</button>
+    </div>`).join("") : '<div class="empty">No rules yet.</div>';
+}
+
+$("rules").addEventListener("change", async (e) => {
+  if (!e.target.matches(".r-on")) return;
+  const id = e.target.closest(".rule").dataset.id;
+  await fetch(`/api/alerts/rules/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled: e.target.checked }) });
+});
+$("rules").addEventListener("click", async (e) => {
+  if (!e.target.matches(".r-del")) return;
+  const rule = e.target.closest(".rule");
+  if (!confirm("Delete this rule and its alert history?")) return;
+  await fetch(`/api/alerts/rules/${rule.dataset.id}`, { method: "DELETE" });
+  loadRules(); loadEvents();
+});
+
+$("add-cond").onclick = condRow;
+$("save").onclick = async () => {
+  const conditions = [...document.querySelectorAll(".cond")].map(c =>
+    [c.querySelector(".c-name").value, c.querySelector(".c-value").value]);
+  const r = await fetch("/api/alerts/rules", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: $("name").value, camera: $("camera").value || null, conditions }) });
+  if (!r.ok) { $("msg").textContent = (await r.json()).detail || "Could not save"; return; }
+  $("msg").textContent = "Saved.";
+  $("name").value = ""; $("conds").innerHTML = "";
+  loadRules();
+};
+
+async function loadEvents() {
+  const data = await (await fetch("/api/alerts/events?limit=50")).json();
+  $("events").innerHTML = data.events.length ? data.events.map(e => `
+    <div class="event">${e.crop ? `<img src="/crops/${encodeURIComponent(e.crop)}" alt="">` : '<img alt="">'}
+      <div><b>${esc(e.message)}</b><br><small>person #${e.track_id} · ${esc(e.camera)} · ${esc(e.created_at.replace("T", " "))}</small></div>
+    </div>`).join("") : '<div class="empty">No alerts yet.</div>';
+}
+
+async function init() {
+  fields = (await (await fetch("/api/schema")).json()).all_fields;
+  for (const c of await (await fetch("/api/cameras")).json()) $("camera").add(new Option(c.name, c.name));
+  loadRules();
+  loadEvents();
+  setInterval(loadEvents, 5000);
+}
+init();
+</script>
+</body>
+</html>

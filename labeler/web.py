@@ -5,13 +5,14 @@ import asyncio
 import base64
 import secrets
 import shutil
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import schema
+from . import reports, schema
 from .config import ROOT, resolve
 from .db import Database
 from .pipeline import Pipeline
@@ -29,6 +30,29 @@ class DeleteIn(BaseModel):
     everything: bool = False
 
 
+class RuleIn(BaseModel):
+    name: str
+    camera: str | None = None
+    conditions: list[list[str]] = []
+
+
+class RuleUpdate(BaseModel):
+    enabled: bool
+
+
+def _day_range(start: str | None, end: str | None) -> tuple[datetime, datetime]:
+    """Dates as YYYY-MM-DD (end inclusive); default today."""
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    try:
+        s = datetime.fromisoformat(start) if start else today
+        e = datetime.fromisoformat(end) if end else s
+    except ValueError:
+        raise HTTPException(400, "dates must look like 2026-10-07")
+    if e < s:
+        raise HTTPException(400, "end is before start")
+    return s, e + timedelta(days=1)
+
+
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
@@ -40,7 +64,8 @@ def check_access(web: dict) -> None:
             "Add a line VL_WEB_PASSWORD=<a long password> to .env, or set web.host back to 127.0.0.1.")
 
 
-def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | None, embedder=None) -> FastAPI:
+def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | None, embedder=None,
+               alerts=None) -> FastAPI:
     app = FastAPI(title="VisionLabeler")
 
     password = cfg["web"].get("password") or ""
@@ -88,6 +113,69 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     @app.get("/review")
     def review_page():
         return FileResponse(STATIC / "review.html")
+
+    @app.get("/reports")
+    def reports_page():
+        return FileResponse(STATIC / "reports.html")
+
+    @app.get("/alerts")
+    def alerts_page():
+        return FileResponse(STATIC / "alerts.html")
+
+    # --- reports -------------------------------------------------------------------------
+
+    @app.get("/api/reports/summary")
+    def report_summary(start: str | None = None, end: str | None = None, camera: str | None = None):
+        s, e = _day_range(start, end)
+        return reports.summarize(db.people_between(s, e, camera), s, e)
+
+    @app.get("/api/reports/export.csv")
+    def report_csv(start: str | None = None, end: str | None = None, camera: str | None = None):
+        s, e = _day_range(start, end)
+        body = reports.to_csv(db.people_between(s, e, camera))
+        name = f"visionlabeler-{s:%Y%m%d}-{(e - timedelta(days=1)):%Y%m%d}.csv"
+        return Response("\ufeff" + body, media_type="text/csv",   # BOM so Excel reads UTF-8
+                        headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+    # --- alerts --------------------------------------------------------------------------
+
+    def _rules_changed():
+        if alerts is not None:
+            alerts.invalidate()
+
+    @app.get("/api/alerts/rules")
+    def list_rules():
+        return db.list_rules()
+
+    @app.post("/api/alerts/rules")
+    def add_rule(body: RuleIn):
+        allowed = {**schema.FIELDS, **{n: v + ["none"] for n, v in schema.LIST_FIELDS.items()}}
+        for cond in body.conditions:
+            if len(cond) != 2 or cond[0] not in allowed or cond[1] not in allowed[cond[0]]:
+                raise HTTPException(400, f"unknown condition {cond}")
+        if not body.name.strip():
+            raise HTTPException(400, "the rule needs a name")
+        rule = db.add_rule(body.name.strip()[:100], body.conditions, body.camera)
+        _rules_changed()
+        return rule
+
+    @app.patch("/api/alerts/rules/{rule_id}")
+    def update_rule(rule_id: int, body: RuleUpdate):
+        if not db.update_rule(rule_id, body.enabled):
+            raise HTTPException(404, "rule not found")
+        _rules_changed()
+        return {"ok": True}
+
+    @app.delete("/api/alerts/rules/{rule_id}")
+    def delete_rule(rule_id: int):
+        if not db.delete_rule(rule_id):
+            raise HTTPException(404, "rule not found")
+        _rules_changed()
+        return {"ok": True}
+
+    @app.get("/api/alerts/events")
+    def alert_events(since_id: int = 0, limit: int = 50):
+        return {"latest_id": db.latest_alert_id(), "events": db.list_alerts(since_id, min(limit, 200))}
 
     @app.get("/api/cameras")
     def cameras():
@@ -149,6 +237,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             "mode": cfg["mode"],
             "fields": {n: schema.allowed_values(n) or schema.LIST_FIELDS[n] + ["none"] for n in fields},
             "list_fields": list(schema.LIST_FIELDS),
+            # Every attribute of every mode, for alert rules (cameras can use different modes).
+            "all_fields": {**{n: v for n, v in schema.FIELDS.items()}, **schema.LIST_FIELDS},
         }
 
     @app.get("/api/tracks")

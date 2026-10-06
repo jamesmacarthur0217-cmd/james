@@ -82,6 +82,7 @@ class Pipeline:
         self.vlm = vlm
         self.embedder = embedder
         self.student = student if embedder is not None else None
+        self.alerts = None   # AlertEngine, set by run.py
         self.vlm_model_name = cfg["vlm"]["model"]
         self.threshold = cfg["review"]["confidence_threshold"]
         self.crop_dir = resolve(cfg["storage"]["crop_dir"])
@@ -326,11 +327,19 @@ class Pipeline:
             fields["face_path"] = face_name
         self.db.update_track(st.db_id, **fields)
 
+    def _check_alerts(self, db_id: int | None) -> None:
+        if self.alerts is not None and db_id is not None and db_id not in self.deleted_ids:
+            try:
+                self.alerts.check(db_id, self.name)
+            except Exception:
+                log.exception("checking alert rules failed")
+
     def _store_colors(self, st: TrackState) -> None:
         items = [(name, value, round(conf, 3)) for name, (value, conf) in st.colors().items()]
         if items:
             self.db.add_attributes(st.db_id, items, source="color_estimator", model="hsv-rules-v1",
                                    threshold=self.threshold)
+        self._check_alerts(st.db_id)
 
     def _store_embedding(self, st: TrackState) -> None:
         if self.embedder is None or not st.candidates:
@@ -361,6 +370,7 @@ class Pipeline:
         if trusted:
             self.db.add_attributes(st.db_id, [(n, v, round(c, 3)) for n, (v, c) in trusted.items()],
                                    source="student", model=self.student.name, threshold=self.threshold)
+            self._check_alerts(st.db_id)
 
     def _student_covers_all(self, st: TrackState) -> bool:
         return self.student is not None and all(n in st.student_labels for n in schema.MODE_FIELDS[self.mode])
@@ -491,6 +501,7 @@ class Pipeline:
         changed = st is not None and st.labels and any(
             st.labels.get(n, (None,))[0] != v for n, v, _ in items)
         self.db.add_attributes(db_id, items, source="vlm", model=self.vlm_model_name, threshold=self.threshold)
+        self._check_alerts(db_id)
         if st is not None:
             st.labels = {name: (value, conf) for name, value, conf in items}
         summary = ", ".join(f"{n}={v}" for n, v, _ in items if v not in ("unknown", "none"))

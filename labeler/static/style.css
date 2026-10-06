@@ -80,3 +80,9 @@ button.danger-quiet { margin-left: auto; color: #c9372c; border-color: transpare
 .cam-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
 .cam-tabs button { padding: 3px 10px; font-size: 12px; }
 .cam-tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 10; max-width: 340px; }
+.toast { display: flex; gap: 10px; background: var(--panel); border: 1px solid var(--warn); border-left: 4px solid var(--warn);
+  border-radius: 8px; padding: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.25); cursor: pointer; font-size: 13px; }
+.toast img { width: 44px; height: 58px; object-fit: cover; border-radius: 4px; flex: none; }
+.toast small { color: var(--muted); }
+.muted { color: var(--muted); font-size: 12px; }

@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reports</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .viz { --series-1: #2a78d6; --grid: #e6e6e3; }
+  @media (prefers-color-scheme: dark) { .viz { --series-1: #3987e5; --grid: #2e3440; } }
+  .filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .filters label { color: var(--muted); font-size: 13px; display: flex; gap: 6px; align-items: center; }
+  .tiles { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tile { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; min-width: 160px; }
+  .tile .num { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tile .lbl { color: var(--muted); font-size: 12px; }
+  .chart { position: relative; }
+  .chart svg { width: 100%; height: 220px; display: block; }
+  .chart .axis text { fill: var(--muted); font-size: 11px; }
+  .chart .grid line { stroke: var(--grid); }
+  .chart .bar { fill: var(--series-1); }
+  .chart .hit { fill: transparent; cursor: default; }
+  .chart .bar.hover { opacity: 0.75; }
+  .tip { position: absolute; pointer-events: none; background: var(--text); color: var(--bg); font-size: 12px;
+         padding: 4px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); display: none; }
+  .breakdowns { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .hbars { display: grid; grid-template-columns: max-content 1fr max-content; gap: 6px 8px; align-items: center; font-size: 13px; }
+  .hbars .track { height: 12px; }
+  .hbars .fill { height: 12px; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .hbars .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+  table.data { border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  table.data td, table.data th { border-bottom: 1px solid var(--border); padding: 3px 12px 3px 0; text-align: left; }
+  details { margin-top: 10px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>VisionLabeler</h1>
+  <nav><a href="/">Live</a><a href="/review">Review queue</a><a href="/reports" class="active">Reports</a><a href="/alerts">Alerts</a></nav>
+</header>
+<main class="viz">
+  <div class="filters">
+    <label>From <input type="date" id="start"></label>
+    <label>To <input type="date" id="end"></label>
+    <label>Camera <select id="camera"><option value="">All cameras</option></select></label>
+    <button id="today">Today</button>
+    <button id="week">Last 7 days</button>
+    <a id="csv" href="#"><button class="primary">Download CSV</button></a>
+  </div>
+  <div class="tiles" id="tiles"></div>
+  <section class="panel">
+    <h2 id="timeline-title">People per hour</h2>
+    <div class="chart" id="timeline"></div>
+    <details><summary>Show as a table</summary><div id="timeline-table"></div></details>
+  </section>
+  <h2 style="margin:18px 0 10px">What people looked like</h2>
+  <div class="breakdowns" id="breakdowns"></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+const NAMES = { apparent_gender: "Gender (apparent)", age_range: "Age range (apparent)", age_group: "Age group",
+  upper_color: "Top color", upper_type: "Top", lower_color: "Bottoms color", lower_type: "Bottoms",
+  headwear: "Headwear", eyewear: "Eyewear", carrying: "Carrying" };
+const iso = (d) => d.toISOString().slice(0, 10);
+function localDay(offset) { const d = new Date(); d.setDate(d.getDate() + offset); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return iso(d); }
+
+function params() {
+  const p = new URLSearchParams({ start: $("start").value, end: $("end").value });
+  if ($("camera").value) p.set("camera", $("camera").value);
+  return p;
+}
+
+function label(t, unit) {
+  const d = new Date(t);
+  return unit === "hour" ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                         : d.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+// Bar chart of people per hour/day: thin bars, 2px gaps, rounded top, one hover tooltip per bar.
+let lastData = null;
+function drawTimeline(data) {
+  lastData = data;
+  // Drawn at the panel's real pixel width, so text is never stretched.
+  const W = Math.max(320, $("timeline").clientWidth), H = 220, L = 34, B = 24, T = 10;
+  const rows = data.timeline, n = rows.length;
+  const max = Math.max(1, ...rows.map(r => r.count));
+  const step = Math.max(1, Math.ceil(max / 3));
+  const top = step * 3;
+  const bw = (W - L) / n;
+  const y = (v) => H - B - (H - B - T) * v / top;
+  let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="People per ${data.unit}">`;
+  svg += '<g class="grid">';
+  for (let v = 0; v <= top; v += step) svg += `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}"/>`;
+  svg += '</g><g class="axis">';
+  for (let v = 0; v <= top; v += step) svg += `<text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  const every = Math.ceil(n / Math.max(2, Math.floor((W - L) / 70)));   // a label every ~70 px
+  rows.forEach((r, i) => { if (i % every === 0)
+    svg += `<text x="${L + i * bw + bw / 2}" y="${H - 6}" text-anchor="middle">${esc(label(r.t, data.unit))}</text>`; });
+  svg += "</g>";
+  rows.forEach((r, i) => {
+    const x = L + i * bw + 1, w = Math.max(1, bw - 2), yy = y(r.count), h = H - B - yy;
+    const rad = Math.min(4, w / 2, h);
+    if (r.count) svg += `<path class="bar" data-i="${i}" d="M${x},${H - B} V${yy + rad} Q${x},${yy} ${x + rad},${yy} H${x + w - rad} Q${x + w},${yy} ${x + w},${yy + rad} V${H - B} Z"/>`;
+  });
+  // Hover areas on top of the bars, full column height so thin or short bars are easy to hit.
+  rows.forEach((r, i) => {
+    svg += `<rect class="hit" x="${L + i * bw}" y="${T}" width="${bw}" height="${H - B - T}" data-i="${i}"/>`;
+  });
+  svg += "</svg>";
+  $("timeline").innerHTML = svg + '<div class="tip" id="tip"></div>';
+  $("timeline").querySelectorAll(".hit").forEach(hit => {
+    hit.addEventListener("mousemove", (e) => {
+      const r = rows[hit.dataset.i];
+      const box = $("timeline").getBoundingClientRect();
+      $("tip").style.display = "block";
+      $("tip").style.left = (e.clientX - box.left) + "px";
+      $("tip").style.top = (e.clientY - box.top) + "px";
+      $("tip").textContent = `${label(r.t, data.unit)}: ${r.count} ${r.count === 1 ? "person" : "people"}`;
+      $("timeline").querySelectorAll(".bar").forEach(b => b.classList.toggle("hover", b.dataset.i === hit.dataset.i));
+    });
+    hit.addEventListener("mouseleave", () => {
+      $("tip").style.display = "none";
+      $("timeline").querySelectorAll(".bar.hover").forEach(b => b.classList.remove("hover"));
+    });
+  });
+  $("timeline-title").textContent = `People per ${data.unit}`;
+  $("timeline-table").innerHTML = '<table class="data"><tr><th>' + (data.unit === "hour" ? "Hour" : "Day")
+    + '</th><th>People</th></tr>' + rows.filter(r => r.count).map(r =>
+      `<tr><td>${esc(label(r.t, data.unit))}</td><td>${r.count}</td></tr>`).join("") + "</table>";
+}
+
+function drawBreakdowns(data) {
+  const blocks = Object.entries(data.attributes).map(([name, rows]) => {
+    const total = rows.reduce((a, r) => a + r.count, 0);
+    const max = rows[0].count;
+    const lines = rows.slice(0, 8).map(r => `
+      <span>${esc(r.value)}</span>
+      <div class="track" title="${esc(r.value)}: ${r.count} (${Math.round(r.count / total * 100)}%)">
+        <div class="fill" style="width:${r.count / max * 100}%"></div></div>
+      <span class="n">${r.count}</span>`).join("");
+    return `<section class="panel"><h2>${esc(NAMES[name] || name)}</h2><div class="hbars">${lines}</div></section>`;
+  });
+  $("breakdowns").innerHTML = blocks.join("") || '<div class="empty">No labeled people in this period.</div>';
+}
+
+async function load() {
+  $("csv").href = "/api/reports/export.csv?" + params();
+  const r = await fetch("/api/reports/summary?" + params());
+  if (!r.ok) { $("tiles").innerHTML = '<div class="empty">Could not load the report.</div>'; return; }
+  const data = await r.json();
+  const busiest = data.timeline.reduce((a, b) => (b.count > a.count ? b : a), { count: 0 });
+  $("tiles").innerHTML = `
+    <div class="tile"><div class="num">${data.total}</div><div class="lbl">people</div></div>
+    <div class="tile"><div class="num">${busiest.count ? esc(label(busiest.t, data.unit)) : "-"}</div>
+      <div class="lbl">busiest ${data.unit}${busiest.count ? ` (${busiest.count})` : ""}</div></div>
+    <div class="tile"><div class="num">${Object.keys(data.cameras).length}</div><div class="lbl">cameras with people</div></div>`;
+  drawTimeline(data);
+  drawBreakdowns(data);
+}
+
+async function init() {
+  const cams = await (await fetch("/api/cameras")).json();
+  for (const c of cams) $("camera").add(new Option(c.name, c.name));
+  $("start").value = $("end").value = localDay(0);
+  for (const id of ["start", "end", "camera"]) $(id).onchange = load;
+  $("today").onclick = () => { $("start").value = $("end").value = localDay(0); load(); };
+  $("week").onclick = () => { $("start").value = localDay(-6); $("end").value = localDay(0); load(); };
+  load();
+}
+let resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (lastData) drawTimeline(lastData); }, 150);
+});
+init();
+</script>
+</body>
+</html>

@@ -36,6 +36,8 @@ def make_pipeline(db, embedder=None):
     p.tracks, p.by_db_id, p.recently_lost = {}, {}, {}
     p.relink_cfg = p.cfg["tracking"]["relink"]
     p.deleted_ids = set()
+    p.alerts = None
+    p.name = "test-cam"
     return p
 
 
