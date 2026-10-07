@@ -102,15 +102,16 @@ attributes left out), scored with `tools/evaluate.py`:
 
 | | Qwen3-VL 4B (used) | 4B without face crop | Qwen3-VL 8B | fast classifiers |
 |---|---|---|---|---|
-| Mean accuracy | **88%** | 79%* | 70%* | 67%* |
-| Gender | 97% | 34%* | 44%* | 56%* |
-| Top color / type | 84% / 73% | 88% / 67% | 69% / 60% | 50% / 63% |
-| Bottoms type / color | 96% / 100% | 96% / 100% | 74% / 70% | 91% / 61% |
-| Headwear / eyewear / carrying | 100% / 87% / 90% | same | 92% / 87% / 87% | 86% / 78% / 77% |
+| Mean accuracy | **88%** | 79%* | 70%* | 75% |
+| Gender | 97% | 34%* | 44%* | 97% |
+| Top color / type | 84% / 73% | 88% / 67% | 69% / 60% | 50% / 67% |
+| Bottoms type / color | 96% / 100% | 96% / 100% | 74% / 70% | 91% / 65% |
+| Headwear / eyewear / carrying | 100% / 87% / 90% | same | 92% / 87% / 87% | 92% / 78% / 83% |
 | Time per person | 2.1 s | 1.8 s | 3.0 s | ~0 |
 
 \* before the gender prompt change. Overall = right answers out of all labels ("unknown" counts as wrong).
-The gender prompt change took gender from 44% to 97%.
+The gender prompt change took gender from 44% to 97%. Retraining the fast classifiers on labels made with
+the new prompt took them from 67% to 75% (gender 56% → 97%).
 
 **Age** on 300 FairFace faces (human-labeled age groups), `tools/bench_age.py`:
 
@@ -121,7 +122,8 @@ The gender prompt change took gender from 44% to 97%.
 | Qwen3-VL 8B | 50% | 90% | +0.34 (too old) | 0.99 s |
 
 The age model was trained on FairFace-style photos, which flatters it on that test. The Answer key page
-measures everything on your own camera; 50-100 labeled people give a useful score.
+measures everything on your own camera; 50-100 labeled people give a useful score. The score for one camera:
+`/api/answer-key/score?camera=cam1` (without `?camera=`, `cameras` lists each camera's mean score).
 
 ## Speed
 
@@ -175,8 +177,10 @@ For a quick test without Docker: `database.url: sqlite:///data/vision.db`.
 
 ## Training the fast classifiers
 
-They are saved in `models/attributes.joblib` and loaded at startup; there is no retraining on start. Their age
-classifier predates the decade age ranges and is ignored until retrained. To retrain after adding data
+They are saved in `models/attributes.joblib` and loaded at startup; there is no retraining on start. They give
+instant labels on the Live page until the vision model answers; the vision model is skipped only when they are
+confident about every attribute (with the current data: nobody, since luggage is too rare to learn). While the
+age model is loaded they give no age, because the age model measured better. To retrain after adding data
 (teacher labels and embeddings are cached, so only new people are labeled):
 
 ```bash
@@ -195,9 +199,9 @@ classifier predates the decade age ranges and is ignored until retrained. To ret
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-75 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
-the VLM worker and retries, classifiers, cameras, login, supervisor, alerts, reports, questions, answer key,
-and a syntax check of every page's script. Changes are tracked with git.
+78 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+the VLM worker and retries, classifiers, age source, cameras, login, supervisor, alerts, reports, questions,
+answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.
 
 ## Files
 

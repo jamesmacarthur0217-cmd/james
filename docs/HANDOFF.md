@@ -19,7 +19,12 @@ cameras** and **commercial use**. They have tested the current version and are h
 - Git: local repo, branch `main`, clean. Latest commits:
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
-- Tests: 75 pass (`.venv\Scripts\python.exe -m pytest -q`, ~12 s).
+- Tests: 78 pass (`.venv\Scripts\python.exe -m pytest -q`, ~20 s).
+- 2026-10-08, Phase 0 step 1 done: teacher labels redone with the current prompt (1,534 people, 57 min;
+  old labels kept as `data/datasets/coco_people/teacher.old-prompt.jsonl`), fast classifiers retrained:
+  answer key 67% → 75%, gender 56% → 97%. They still cover every attribute for 0% of people, so the VLM
+  labels everyone. While the age model is loaded they give no age (it would outrank the better age model).
+  Step 2 (the user labels 50–100 own people on the Answer key page) is waiting on the user.
 - Config: one camera (`cameras: [{name: cam1, source: 0}]`, the USB webcam), kiosk mode.
 - Database: holds ~55 test people from development (demo photo and webcam tests). The user can remove them
   with Delete all; don't delete them without asking.
@@ -121,8 +126,8 @@ Then open http://127.0.0.1:8001 (the browser pane works), and stop with
 
 Follow [ROADMAP.md](ROADMAP.md). In short:
 
-0. Retrain the fast classifiers (teacher labels were made with the old prompt and age ranges; their age part
-   is ignored for now). Ask the user to label 50–100 of their own people on the Answer key page.
+0. ~~Retrain the fast classifiers~~ (done 2026-10-08). Still open: the user labels 50–100 of their own people
+   on the Answer key page; record `GET /api/answer-key/score` (its `cameras` part) as the per-camera baseline.
 1. **Commercial licenses**: Ultralytics YOLO is AGPL-3.0. Ask the user: buy an Ultralytics license, or replace
    with RF-DETR + RTMPose (rtmlib) + supervision ByteTrack behind a new `labeler/detect.py` interface. Retrain
    the classifiers on the user's own data instead of COCO. Add LICENSES.md.

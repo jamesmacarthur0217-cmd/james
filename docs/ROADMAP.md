@@ -30,7 +30,8 @@ Each phase below is sized for one or two sessions and is independently shippable
 
 ## Phase 0: Carry-over (small, do first)
 
-1. **Retrain the fast classifiers** with the improved gender prompt and decade age ranges:
+1. **Done 2026-10-08** (answer key 67% → 75%; see HANDOFF.md). **Retrain the fast classifiers** with the
+   improved gender prompt and decade age ranges:
    `tools/teacher_label.py` (~1 h, re-label after moving the old `teacher.jsonl` aside), then
    `tools/train_attributes.py ... --no-balance`. Their old age classifier is currently ignored by the
    vocabulary guard in `labeler/student.py`.
