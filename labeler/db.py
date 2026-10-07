@@ -179,6 +179,23 @@ def resolve(attrs: list[Attribute]) -> dict[str, dict]:
     return out
 
 
+def _score(rows: list[tuple[AnswerKey, Track]]) -> dict[str, dict]:
+    """Per attribute: answer-key labels, how many the system answered, how many it got right."""
+    stats: dict[str, dict] = defaultdict(lambda: {"n": 0, "answered": 0, "right": 0})
+    for key_row, track in rows:
+        current = {n: a["value"] for n, a in resolve(track.attributes).items()}
+        for name, truth in json.loads(key_row.labels).items():
+            st = stats[name]
+            st["n"] += 1
+            guess = current.get(name, "unknown")
+            if guess != "unknown":
+                st["answered"] += 1
+                st["right"] += guess == truth
+    return {n: {**v, "accuracy": round(v["right"] / v["answered"], 3) if v["answered"] else None,
+                "overall": round(v["right"] / v["n"], 3) if v["n"] else None}
+            for n, v in sorted(stats.items())}
+
+
 class Database:
     def __init__(self, url: str):
         url = sqlite_url(url)
@@ -540,25 +557,25 @@ class Database:
             s.add(row)
             return True
 
-    def answer_key_score(self) -> dict:
-        """How often the system's current labels match the answer key, per attribute."""
+    def answer_key_score(self, camera: str | None = None) -> dict:
+        """How often the system's current labels match the answer key, per attribute (optionally for one
+        camera). `cameras` gives each camera's mean score: kiosk and security cameras differ a lot, so
+        each gets its own baseline."""
         with self.Session() as s:
+            names = self._camera_names(s)
             rows = s.execute(select(AnswerKey, Track).join(Track, Track.id == AnswerKey.track_id)
                              .options(selectinload(Track.attributes))).all()
-            stats: dict[str, dict] = defaultdict(lambda: {"n": 0, "answered": 0, "right": 0})
-            for key_row, track in rows:
-                current = {n: a["value"] for n, a in resolve(track.attributes).items()}
-                for name, truth in json.loads(key_row.labels).items():
-                    st = stats[name]
-                    st["n"] += 1
-                    guess = current.get(name, "unknown")
-                    if guess != "unknown":
-                        st["answered"] += 1
-                        st["right"] += guess == truth
-            return {"people": len(rows), "attributes": {
-                n: {**v, "accuracy": round(v["right"] / v["answered"], 3) if v["answered"] else None,
-                    "overall": round(v["right"] / v["n"], 3) if v["n"] else None}
-                for n, v in sorted(stats.items())}}
+            if camera is not None:
+                rows = [(k, t) for k, t in rows if names.get(t.camera_id) == camera]
+            by_camera: dict[str, list] = defaultdict(list)
+            for k, t in rows:
+                by_camera[names.get(t.camera_id, "?")].append((k, t))
+            cameras = {}
+            for name, cam_rows in sorted(by_camera.items()):
+                overall = [v["overall"] for v in _score(cam_rows).values() if v["overall"] is not None]
+                cameras[name] = {"people": len(cam_rows),
+                                 "mean_overall": round(sum(overall) / len(overall), 3) if overall else None}
+            return {"people": len(rows), "attributes": _score(rows), "cameras": cameras}
 
     # --- reports ----------------------------------------------------------------------
 

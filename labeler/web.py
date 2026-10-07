@@ -163,8 +163,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return {"ok": True}
 
     @app.get("/api/answer-key/score")
-    def answer_key_score():
-        return db.answer_key_score()
+    def answer_key_score(camera: str | None = None):
+        return db.answer_key_score(camera)
 
     # --- reports -------------------------------------------------------------------------
 

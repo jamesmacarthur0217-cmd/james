@@ -137,13 +137,6 @@ def test_age_model_answer_replaces_the_vlm_age(db, camera):
     st = TrackState(3, datetime.now(), 0.0, db_id=db.create_track(camera, 3, datetime.now()))
     st.candidates = [Candidate(0.9, np.zeros((10, 10, 3), np.uint8), np.zeros((64, 64, 3), np.uint8))]
     p.by_db_id[st.db_id] = st
-
-    class FakeAge:
-        name = "fake-age"
-
-        def estimate(self, faces):
-            return ("30-39", 0.7) if faces else None
-
     p.age = FakeAge()
     p._store_age(st)
     base = {f: "unknown" for f in schema.MODE_FIELDS["kiosk"]}
@@ -152,3 +145,53 @@ def test_age_model_answer_replaces_the_vlm_age(db, camera):
     assert attrs["age_range"]["value"] == "30-39" and attrs["age_range"]["source"] == "age_model"
     assert attrs["upper_color"]["value"] == "red"
     assert p._current_labels(st)["age_range"][2] == "age_model"
+
+
+class FakeAge:
+    name = "fake-age"
+
+    def estimate(self, faces):
+        return ("30-39", 0.7) if faces else None
+
+
+class FakeStudent:
+    """Confident about every kiosk attribute, including an age that disagrees with the age model."""
+    name = "fake-student"
+
+    def predict(self, vector, mode):
+        out = {f: ("none" if f == "carrying" else "unknown", 0.95, True) for f in schema.MODE_FIELDS[mode]}
+        out["age_range"] = ("50-59", 0.95, True)
+        return out
+
+
+def _person_with_face(db, camera):
+    st = TrackState(3, datetime.now(), 0.0, db_id=db.create_track(camera, 3, datetime.now()))
+    st.candidates = [Candidate(0.9, np.zeros((10, 10, 3), np.uint8), np.zeros((64, 64, 3), np.uint8))]
+    return st
+
+
+def test_student_gives_no_age_while_the_age_model_is_loaded(db, camera):
+    p = make_pipeline(db)
+    p.student, p.age = FakeStudent(), FakeAge()
+    st = _person_with_face(db, camera)
+    p._store_student(st, np.zeros(4, np.float32))
+    p._store_age(st)
+    attrs = db.list_tracks()[0]["attributes"]
+    assert "age_range" not in st.student_labels
+    assert attrs["age_range"]["value"] == "30-39" and attrs["age_range"]["source"] == "age_model"
+    assert not attrs["age_range"]["needs_review"]
+
+
+def test_student_skips_the_vlm_only_when_age_is_known(db, camera):
+    p = make_pipeline(db)
+    p.student, p.age = FakeStudent(), FakeAge()
+    st = _person_with_face(db, camera)
+    p._store_student(st, np.zeros(4, np.float32))
+    assert not p._student_covers_all(st)        # no age yet: the VLM still has to answer it
+    p._store_age(st)
+    assert p._student_covers_all(st)            # age from the age model, everything else from the student
+
+    p.age = None                                 # without an age model, the student's age is used
+    st2 = _person_with_face(db, camera)
+    p._store_student(st2, np.zeros(4, np.float32))
+    assert st2.student_labels["age_range"][0] == "50-59" and p._student_covers_all(st2)

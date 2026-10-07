@@ -141,3 +141,17 @@ def test_answer_key_flow_and_score(db, camera, tmp_path):
     assert s["attributes"]["apparent_gender"]["answered"] == 0        # the system said unknown
     db.delete_tracks([a])
     assert api.get("/api/answer-key/score").json()["people"] == 1
+
+
+def test_answer_key_score_per_camera(db, camera, tmp_path):
+    api = _api(db, tmp_path)
+    gate = db.get_or_create_camera("gate", "rtsp://x", "security")
+    right, wrong = _person(db, camera, upper_color="red"), _person(db, gate, upper_color="blue")
+    db.save_answer_key(right, {"upper_color": "red"})
+    db.save_answer_key(wrong, {"upper_color": "red"})
+    s = api.get("/api/answer-key/score").json()
+    assert s["people"] == 2 and s["attributes"]["upper_color"]["overall"] == 0.5
+    assert s["cameras"] == {"gate": {"people": 1, "mean_overall": 0.0},
+                            "test-cam": {"people": 1, "mean_overall": 1.0}}
+    g = api.get("/api/answer-key/score", params={"camera": "gate"}).json()
+    assert g["people"] == 1 and g["attributes"]["upper_color"]["right"] == 0 and list(g["cameras"]) == ["gate"]

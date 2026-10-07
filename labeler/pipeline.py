@@ -363,12 +363,18 @@ class Pipeline:
         except Exception:
             log.exception("student prediction failed")
             return
-        st.student_labels = {n: (v, c) for n, (v, c, trusted) in preds.items() if trusted}
+        st.student_labels = self._student_trusted(preds)
+
+    def _student_trusted(self, preds: dict[str, tuple[str, float, bool]]) -> dict[str, tuple[str, float]]:
+        """The student's trusted answers. While an age model is loaded the student gives no age: it learned
+        age from the VLM, and the age model measured better. Otherwise its confident age would outrank the
+        age model's (the highest confidence wins) and every disagreement would go to review."""
+        return {n: (v, c) for n, (v, c, ok) in preds.items()
+                if ok and not (self.age is not None and n in ("age_range", "age_group"))}
 
     def _store_student(self, st: TrackState, vector: np.ndarray) -> None:
         """Record the student's trusted labels for this person (from their best crops)."""
-        preds = self.student.predict(vector, self.mode)
-        trusted = {n: (v, c) for n, (v, c, ok) in preds.items() if ok}
+        trusted = self._student_trusted(self.student.predict(vector, self.mode))
         st.student_labels = trusted
         if trusted:
             self.db.add_attributes(st.db_id, [(n, v, round(c, 3)) for n, (v, c) in trusted.items()],
@@ -376,7 +382,12 @@ class Pipeline:
             self._check_alerts(st.db_id)
 
     def _student_covers_all(self, st: TrackState) -> bool:
-        return self.student is not None and all(n in st.student_labels for n in schema.MODE_FIELDS[self.mode])
+        """True when the VLM has nothing left to add: the student is confident about every attribute,
+        with age coming from the age model when it found a face."""
+        if self.student is None:
+            return False
+        covered = set(st.student_labels) | ({st.age_label[0]} if st.age_label else set())
+        return all(n in covered for n in schema.MODE_FIELDS[self.mode])
 
     def _store_age(self, st: TrackState) -> None:
         """Apparent age from the person's best face crops (the age model beats the VLM on age)."""
