@@ -72,7 +72,7 @@ fast classifiers were trained on **COCO photos with mixed Flickr licenses**. Fin
    `labeler/geometry.py:face_box`.
 5. **Done 2026-10-08** (plus hourly cleanup while running). Per-camera retention (`cameras[].retention_days`), and a documented erasure procedure (search the person,
    then Delete selected).
-6. Templates in `docs/`: camera notice sign text, short data-protection summary (what is stored, how long, who
+6. **Done 2026-10-08** (`docs/camera-notice.md`, `docs/data-protection.md`). Templates in `docs/`: camera notice sign text, short data-protection summary (what is stored, how long, who
    can see it). Recommend BitLocker on the PC for encryption at rest.
 
 ## Phase 3: Shared camera features (kiosk and security)

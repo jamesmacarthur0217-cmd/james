@@ -13,6 +13,12 @@ from __future__ import annotations
 
 import os
 
+from labeler.config import load_dotenv
+
+# .env first: some libraries read their settings once, when imported (e.g. HF_HUB_OFFLINE=1, which stops the
+# model update check at startup), and the imports below load them.
+load_dotenv()
+
 # Must be set before OpenCV opens a camera; otherwise many USB webcams take ~8 s to open.
 os.environ.setdefault("OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS", "0")
 

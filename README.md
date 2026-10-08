@@ -212,6 +212,13 @@ saves face close-ups), so nobody can see faces later; labeling still uses the un
 the Review and Answer key pages then show blurred faces. The blurred area comes from the head keypoints (larger
 than the face, to cover profiles); without them, the top of the person is blurred.
 
+**Privacy paperwork**: templates for a camera notice sign ([docs/camera-notice.md](docs/camera-notice.md)) and a
+data-protection summary — what is stored, where, how long, who can see it
+([docs/data-protection.md](docs/data-protection.md)). Turn on **BitLocker** on this PC so the pictures, database
+and backups are encrypted on disk. Pictures and labels never leave this PC; at startup the app only asks
+Hugging Face whether its models have updates (model names only); `HF_HUB_OFFLINE=1` in `.env` stops that once
+the models are downloaded.
+
 **How long people are kept**: `storage.retention_days` (30), or a camera's own `retention_days` (e.g. 7 for an
 entrance camera). Older people, their pictures and labels are deleted at startup and every hour while running.
 

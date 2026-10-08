@@ -20,6 +20,9 @@ cameras** and **commercial use**. They have tested the current version and are h
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
 - Tests: 117 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- 2026-10-08, Phase 2 step 6 done (Phase 2 complete): `docs/camera-notice.md`, `docs/data-protection.md`
+  (templates; keep them in line with the code when storage or access changes). run.py now loads `.env` before
+  any import, so `HF_HUB_OFFLINE=1` there works.
 - 2026-10-08, Phase 2 step 5 done: per-camera `retention_days`; retention now also runs every hour
   (`run.py:_retention_loop`), not only at startup. Erasure procedure in README ("Erasing one person's data").
 - 2026-10-08, Phase 2 step 4 done: face blurring (`labeler/privacy.py`, `geometry.head_box`): viewers get
