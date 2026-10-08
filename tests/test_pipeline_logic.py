@@ -134,6 +134,16 @@ def test_vlm_worker_runs_two_at_once_and_survives_errors():
     assert got[2] == [{"upper_color": "red"}] and got[9] == []
 
 
+def test_each_camera_can_have_its_own_detector_size(db, monkeypatch, tmp_path):
+    monkeypatch.setattr("labeler.pipeline.YOLO", lambda path: object())
+    cfg = copy.deepcopy(DEFAULTS)
+    cfg["storage"]["crop_dir"] = str(tmp_path)
+    cfg["clips"]["enabled"] = False
+    wide = Pipeline(cfg, db, None, camera={"name": "gate", "source": "rtsp://x", "mode": "security", "imgsz": 1280})
+    plain = Pipeline(cfg, db, None, camera={"name": "kiosk", "source": 0, "mode": "kiosk"})
+    assert wide.imgsz == 1280 and plain.imgsz == cfg["detector"]["imgsz"] == 640
+
+
 def test_night_frames_store_no_colors_but_everything_else(db, camera):
     p = make_pipeline(db)
     st = TrackState(3, datetime.now(), 0.0, db_id=db.create_track(camera, 3, datetime.now()))

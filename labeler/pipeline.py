@@ -107,6 +107,8 @@ class Pipeline:
             det["tracker"] = str(tracker_path)
         self.det_cfg = det
         cam = self.cam
+        # Per camera: a wide camera with far-away people may need a bigger detector picture (README, Detection).
+        self.imgsz = int(cam.get("imgsz") or det["imgsz"])
         self.camera_id = db.get_or_create_camera(cam["name"], str(cam["source"]), self.mode)
         self.owned_ids: set[int] = set()   # records created by this camera, for routing VLM results
         self.zone_counter = zones_mod.ZoneCounter(db.list_zones(self.name), cfg["zones"]["min_frames"])
@@ -235,7 +237,7 @@ class Pipeline:
         tcfg = self.cfg["tracking"]
         result = self.model.track(
             frame, persist=True, tracker=self.det_cfg["tracker"], classes=[0],
-            conf=self.det_cfg["conf"], imgsz=self.det_cfg["imgsz"], device=self.det_cfg["device"],
+            conf=self.det_cfg["conf"], imgsz=self.imgsz, device=self.det_cfg["device"],
             verbose=False,
         )[0]
         low_color = colors.is_low_color(frame)

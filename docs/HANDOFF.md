@@ -20,6 +20,9 @@ cameras** and **commercial use**. They have tested the current version and are h
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
 - Tests: 156 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- 2026-10-08, Phase 4 far-away people: measured on COCO val2017 (true boxes from Ultralytics'
+  coco2017labels.zip, downloaded with the user's OK to data/datasets/coco/labels/val2017). Tiling rejected (13x
+  false alarms); per-camera `imgsz` added, guided by the "found by height" table in README (Detection).
 - 2026-10-08, Phase 4 timeline done: `labeler/timeline.py` (look-alikes in time order, overlapping sightings
   removed), `/api/tracks/{id}/timeline`, Timeline button on Live. Threshold 0.8 not measured across cameras.
 - 2026-10-08, Phase 4 night mode done: mostly black-and-white frames (`Pipeline._is_night`) -> colors stored as

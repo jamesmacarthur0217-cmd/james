@@ -95,7 +95,7 @@ Kiosk:
   vocabulary refinements (coat vs jacket, polo, tank top) against the answer key.
 
 Security:
-- **Small, distant people**: per-camera `imgsz` and optional tiled detection (slicing) for 4 MP+ cameras;
+- **Done 2026-10-08** (per-camera imgsz; tiling measured and rejected). **Small, distant people**: per-camera `imgsz` and optional tiled detection (slicing) for 4 MP+ cameras;
   measure the recall gain on footage with far-away people.
 - **Done 2026-10-08.** **Night / infrared**: an IR mode that skips color attributes (low-color detection already exists in
   `labeler/colors.py:is_low_color`) and labels shape and carried items only.

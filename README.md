@@ -234,6 +234,24 @@ each time the person is labeled, so someone still in view when the camera switch
 real colors; guesses made at night never count. The live picture shows "LOW COLOR (IR/night)" meanwhile, and
 the person is marked "low light" in the people list.
 
+## Detection: how far can a camera see?
+
+Each frame is shrunk to `detector.imgsz` (640) pixels on its long side before people are looked for. What
+decides whether someone is found is how tall they are **in that shrunk picture** (COCO val2017, 10,777 people,
+confidence high enough to start a new person, measured 2026-10-08):
+
+| Person's height after shrinking | under 48 px | 48-64 | 64-96 | 96-128 | 128-192 | 192+ |
+|---|---|---|---|---|---|---|
+| Found | ~0-3% | 18% | 46% | 73% | 82% | 93% |
+
+So plan for people at least about **100-130 pixels tall** in the picture the detector sees. For a Full-HD
+(1920x1080) camera at 640, that is 300-400 pixels in the camera's own picture: about a third of its height. For a
+wide camera with people further away, give that camera `imgsz: 1280` (per camera in config.yaml): the same
+person is then twice as tall for the detector, from real camera pixels. Don't raise it for small pictures (a
+640x480 webcam): enlarging adds no detail, and on COCO 1280 found more medium-sized but fewer large people
+(48.2% vs 48.6% overall). Rejected after measuring: scanning 2x2 overlapping tiles: +5 points of people found
+on COCO, but 13 times as many false alarms (people cut in half at tile edges) and 4.6 times slower.
+
 ## Things that look like people
 
 Pictures of people (a monitor, reflection, poster, TV) are detected as people. In kiosk mode new people under

@@ -13,10 +13,12 @@ cameras:
     ignore_zones: []
     # mode: kiosk             # optional: overrides the global mode below for this camera
     # retention_days: 7       # optional: keep this camera's people this many days (else storage.retention_days)
+    # imgsz: 1280             # optional: detector picture size for this camera (else detector.imgsz)
   # A second camera, e.g. an IP camera at the entrance:
   # - name: entrance
   #   source: rtsp://user:password@192.168.1.50:554/stream1
   #   mode: security
+  #   imgsz: 1280             # a wide Full-HD camera with far-away people (see README, Detection)
 
 # kiosk    = people close to the camera, facing it: age range, eyewear, face mask
 # security = people far away: clothing, bags, age group only
@@ -25,7 +27,7 @@ mode: kiosk
 detector:
   model: yolo11s-pose.pt  # downloaded automatically on first run
   conf: 0.1               # low on purpose: weak detections only keep known people tracked
-  imgsz: 640
+  imgsz: 640              # the picture is shrunk to this size for detection; a camera can set its own
   device: 0               # GPU index, or "cpu"
   tracker: labeler/trackers/people.yaml   # ByteTrack tuned for people; see that file
   min_box_area:           # new people smaller than this share of the frame are ignored
