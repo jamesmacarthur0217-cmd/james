@@ -20,6 +20,9 @@ cameras** and **commercial use**. They have tested the current version and are h
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
 - Tests: 118 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- 2026-10-08, Phase 3 step 1 in progress: zones and counting lines (`labeler/zones.py`, tables `zones` and
+  `zone_events`, API `/api/zones`, drawn on the live picture). Next: drawing tool on the Live page, then
+  zone counts in Reports and an "entered zone" alert condition.
 - 2026-10-08, remote access for a second site: the user's config now has `web.host: 0.0.0.0` and
   `web.https: true`; plan is Tailscale on both PCs (README "From another site"). Without an account the app
   falls back to this PC only (`web.check_access`). BitLocker on C: turned on by the user (was encrypting).

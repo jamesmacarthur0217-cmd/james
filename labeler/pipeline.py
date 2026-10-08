@@ -6,13 +6,14 @@ import threading
 import time
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import cv2
 import numpy as np
 from ultralytics import YOLO
 
 from . import colors, geometry, privacy, schema
+from . import zones as zones_mod
 from .config import resolve
 from .db import Database
 from .embed import Embedder
@@ -64,6 +65,8 @@ class TrackState:
     student_labels: dict[str, tuple[str, float]] = field(default_factory=dict)  # trusted fast predictions
     deleted: bool = False          # the user deleted this person's record; stop recording them
     age_label: tuple[str, str, float] | None = None   # (attribute, value, confidence) from the age model
+    zones: zones_mod.PersonZones = field(default_factory=zones_mod.PersonZones)
+    zone_log: list[dict] = field(default_factory=list)   # zone events waiting for this person's record
 
     def colors(self) -> dict[str, tuple[str, float]]:
         out = {}
@@ -102,6 +105,7 @@ class Pipeline:
         cam = self.cam
         self.camera_id = db.get_or_create_camera(cam["name"], str(cam["source"]), self.mode)
         self.owned_ids: set[int] = set()   # records created by this camera, for routing VLM results
+        self.zone_counter = zones_mod.ZoneCounter(db.list_zones(self.name), cfg["zones"]["min_frames"])
 
         self.tracks: dict[int, TrackState] = {}
         self.by_db_id: dict[int, TrackState] = {}
@@ -179,6 +183,10 @@ class Pipeline:
 
     def stop(self) -> None:
         self.stop_event.set()
+
+    def reload_zones(self) -> None:
+        """Called by the web page after a zone was drawn or deleted."""
+        self.zone_counter.set_zones(self.db.list_zones(self.name))
 
     def run(self, max_frames: int | None = None) -> None:
         cam = self.cam
@@ -260,6 +268,10 @@ class Pipeline:
                     self._request_vlm(st)
                 elif self._due_for_relabel(st, now):
                     self._relabel(st)
+                if self.zone_counter.zones:
+                    st.zone_log += self.zone_counter.update(
+                        st.zones, zones_mod.anchor(st.box, frame.shape, self.mode), datetime.now())
+                    self._flush_zone_events(st)
 
         for tid, st in list(self.tracks.items()):
             if tid not in seen and now - st.last_seen > tcfg["lost_after_s"]:
@@ -361,6 +373,16 @@ class Pipeline:
             cv2.imwrite(str(self.crop_dir / face_name), best.face)
             fields["face_path"] = face_name
         self.db.update_track(st.db_id, **fields)
+
+    def _flush_zone_events(self, st: TrackState) -> None:
+        """Store this person's zone events once they have a record. Until then they wait, so a passing
+        flicker that never becomes a person (min_frames_keep) is not counted."""
+        if not st.zone_log or st.db_id is None:
+            return
+        events, st.zone_log = st.zone_log, []
+        self.db.add_zone_events(st.db_id, self.name, events)
+        if any(e["kind"] in ("enter", "in", "out") for e in events):
+            self._check_alerts(st.db_id)   # rules can ask for "entered zone X"
 
     def _check_alerts(self, db_id: int | None) -> None:
         if self.alerts is not None and db_id is not None and db_id not in self.deleted_ids:
@@ -506,6 +528,9 @@ class Pipeline:
         old.low_light_frames += new.low_light_frames
         old.last_seen, old.box = new.last_seen, new.box
         old.seen_since, old.kpts, old.thumb, old.recent = new.seen_since, new.kpts, new.thumb, new.recent
+        old.thumb_blurred = new.thumb_blurred
+        old.zones = new.zones          # their zones were closed when they left; where they are now
+        old.zone_log += new.zone_log   # events since they came back, stored under the old record
         old.upper_hist += new.upper_hist
         old.lower_hist += new.lower_hist
         k = self.cfg["tracking"]["best_frames"]
@@ -526,6 +551,10 @@ class Pipeline:
                 self.by_db_id.pop(st.db_id, None)
             return
         self._ensure_db(st)
+        # Leaving the view ends their stay in every area, at the moment they were last seen.
+        left_at = datetime.now() - timedelta(seconds=max(0.0, time.monotonic() - st.last_seen))
+        st.zone_log += self.zone_counter.leave(st.zones, left_at)
+        self._flush_zone_events(st)
         if not st.vlm_requested:
             self._request_vlm(st)
         else:
@@ -649,6 +678,8 @@ class Pipeline:
     def _draw(self, frame: np.ndarray, seen: set[int], low_color: bool, now: float) -> np.ndarray:
         out = frame.copy()
         h, w = out.shape[:2]
+        if self.zone_counter.zones:
+            self.zone_counter.draw(out, [self.tracks[t].zones for t in seen])
         for zx1, zy1, zx2, zy2 in self.ignore_zones:
             cv2.rectangle(out, (int(zx1 * w), int(zy1 * h)), (int(zx2 * w), int(zy2 * h)), (90, 90, 90), 1)
         for x1, y1, x2, y2, *why in self._ignored:

@@ -174,6 +174,31 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
+class Zone(Base):
+    """An area or counting line drawn on one camera's picture (see labeler/zones.py)."""
+    __tablename__ = "zones"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    camera: Mapped[str] = mapped_column(String(100), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    kind: Mapped[str] = mapped_column(String(10))       # area | line
+    points: Mapped[str] = mapped_column(Text)           # JSON [[x, y], ...], fractions of the frame
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class ZoneEvent(Base):
+    """A person entering/exiting an area or crossing a line. Keeps the zone's name, so counts survive
+    deleting or redrawing the zone."""
+    __tablename__ = "zone_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    track_id: Mapped[int] = mapped_column(ForeignKey("tracks.id", ondelete="CASCADE"), index=True)
+    camera: Mapped[str] = mapped_column(String(100))
+    zone_id: Mapped[int] = mapped_column(Integer)
+    zone_name: Mapped[str] = mapped_column(String(100), index=True)
+    kind: Mapped[str] = mapped_column(String(10))       # enter | exit (areas), in | out (lines)
+    at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    dwell_s: Mapped[float | None] = mapped_column(Float)   # on exit: time spent inside
+
+
 class AuditEntry(Base):
     """Who did what in the web pages: logins, viewing, searches, exports, deletes, rule changes, reviews.
     Frequent background requests (the Live page's polling) are not logged."""
@@ -512,6 +537,7 @@ class Database:
                 s.execute(delete(Embedding).where(Embedding.track_id.in_(chunk)))
                 s.execute(delete(AlertEvent).where(AlertEvent.track_id.in_(chunk)))
                 s.execute(delete(AnswerKey).where(AnswerKey.track_id.in_(chunk)))
+                s.execute(delete(ZoneEvent).where(ZoneEvent.track_id.in_(chunk)))
                 s.execute(delete(Track).where(Track.id.in_(chunk)))
         with self._vec_lock:
             if self._vectors is not None:
@@ -666,6 +692,77 @@ class Database:
         with self.Session.begin() as s:
             s.execute(delete(LoginSession).where(LoginSession.token_hash == _token_hash(token)))
 
+    # --- zones --------------------------------------------------------------------------
+
+    @staticmethod
+    def _zone_dict(z: Zone) -> dict:
+        return {"id": z.id, "camera": z.camera, "name": z.name, "kind": z.kind,
+                "points": [tuple(p) for p in json.loads(z.points)]}
+
+    def list_zones(self, camera: str | None = None) -> list[dict]:
+        q = select(Zone).order_by(Zone.camera, Zone.name)
+        if camera is not None:
+            q = q.where(Zone.camera == camera)
+        with self.Session() as s:
+            return [self._zone_dict(z) for z in s.scalars(q)]
+
+    def add_zone(self, camera: str, name: str, kind: str, points: list) -> dict:
+        from .zones import check_points
+        pts = check_points(kind, points)
+        name = name.strip()[:100]
+        if not name:
+            raise ValueError("the zone needs a name")
+        with self.Session.begin() as s:
+            if s.scalars(select(Zone).where(Zone.camera == camera, Zone.name == name)).first():
+                raise ValueError(f"camera {camera} already has a zone named {name!r}")
+            z = Zone(camera=camera, name=name, kind=kind, points=json.dumps([list(p) for p in pts]))
+            s.add(z)
+            s.flush()
+            return self._zone_dict(z)
+
+    def delete_zone(self, zone_id: int) -> dict | None:
+        """Delete a zone (its counted events stay, under its name). Returns the deleted zone."""
+        with self.Session.begin() as s:
+            z = s.get(Zone, zone_id)
+            if z is None:
+                return None
+            out = self._zone_dict(z)
+            s.delete(z)
+            return out
+
+    def add_zone_events(self, track_id: int, camera: str, events: list[dict]) -> None:
+        with self.Session.begin() as s:
+            s.add_all(ZoneEvent(track_id=track_id, camera=camera, zone_id=e["zone_id"], zone_name=e["zone_name"],
+                                kind=e["kind"], at=e["at"], dwell_s=e.get("dwell_s")) for e in events)
+
+    def zones_entered(self, track_id: int) -> list[str]:
+        """Names of the areas this person entered and the lines they crossed (either way)."""
+        with self.Session() as s:
+            return sorted(s.scalars(select(ZoneEvent.zone_name).distinct().where(
+                ZoneEvent.track_id == track_id, ZoneEvent.kind.in_(("enter", "in", "out")))))
+
+    def zone_counts(self, start: datetime, end: datetime, camera: str | None = None) -> list[dict]:
+        """Per camera and zone in [start, end): entries and average dwell (areas), ins and outs (lines)."""
+        q = select(ZoneEvent).where(ZoneEvent.at >= start, ZoneEvent.at < end)
+        if camera:
+            q = q.where(ZoneEvent.camera == camera)
+        stats: dict[tuple[str, str], dict] = {}
+        with self.Session() as s:
+            for e in s.scalars(q):
+                st = stats.setdefault((e.camera, e.zone_name), {"camera": e.camera, "zone": e.zone_name,
+                                                               "enter": 0, "exit": 0, "in": 0, "out": 0,
+                                                               "_dwell": []})
+                st[e.kind] += 1
+                if e.kind == "exit" and e.dwell_s is not None:
+                    st["_dwell"].append(e.dwell_s)
+        out = []
+        for key in sorted(stats):
+            st = stats[key]
+            dwell = st.pop("_dwell")
+            st["avg_dwell_s"] = round(sum(dwell) / len(dwell), 1) if dwell else None
+            out.append(st)
+        return out
+
     # --- audit log ----------------------------------------------------------------------
 
     def add_audit(self, username: str, role: str, address: str, action: str, detail: str = "") -> None:
@@ -795,6 +892,7 @@ class Database:
             if old:
                 s.execute(delete(AlertEvent).where(AlertEvent.track_id.in_([t.id for t in old])))
                 s.execute(delete(AnswerKey).where(AnswerKey.track_id.in_([t.id for t in old])))
+                s.execute(delete(ZoneEvent).where(ZoneEvent.track_id.in_([t.id for t in old])))
             for t in old:
                 s.delete(t)
         if old:

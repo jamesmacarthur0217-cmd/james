@@ -42,6 +42,13 @@ class RuleUpdate(BaseModel):
     enabled: bool
 
 
+class ZoneIn(BaseModel):
+    camera: str
+    name: str
+    kind: str                     # area | line
+    points: list[list[float]]
+
+
 class AnswerIn(BaseModel):
     labels: dict[str, str]
 
@@ -335,6 +342,40 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     @app.get("/api/alerts/events")
     def alert_events(since_id: int = 0, limit: int = 50):
         return {"latest_id": db.latest_alert_id(), "events": db.list_alerts(since_id, min(limit, 200))}
+
+    # --- zones and counting lines (admin) ------------------------------------------------
+
+    @app.get("/api/zones")
+    def list_zones(camera: str | None = None):
+        return db.list_zones(camera)
+
+    @app.post("/api/zones")
+    def add_zone(body: ZoneIn, request: Request):
+        if pipelines and body.camera not in by_name:
+            raise HTTPException(404, f"no camera named {body.camera!r}")
+        try:
+            zone = db.add_zone(body.camera, body.name, body.kind, body.points)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        if body.camera in by_name:
+            by_name[body.camera].reload_zones()
+        audit(request, "zone added", f"{zone['kind']} {zone['name']!r} on camera {zone['camera']}")
+        return zone
+
+    @app.delete("/api/zones/{zone_id}")
+    def delete_zone(zone_id: int, request: Request):
+        zone = db.delete_zone(zone_id)
+        if zone is None:
+            raise HTTPException(404, "zone not found")
+        if zone["camera"] in by_name:
+            by_name[zone["camera"]].reload_zones()
+        audit(request, "zone deleted", f"{zone['kind']} {zone['name']!r} on camera {zone['camera']}")
+        return {"ok": True}
+
+    @app.get("/api/zones/counts")
+    def zone_counts(start: str | None = None, end: str | None = None, camera: str | None = None):
+        s, e = _day_range(start, end)
+        return db.zone_counts(s, e, camera)
 
     @app.get("/api/cameras")
     def cameras():

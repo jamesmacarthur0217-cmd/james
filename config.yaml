@@ -47,6 +47,10 @@ tracking:
     short_gap_min_overlap: 0.2
     long_gap_min_similarity: 0.90   # longer gaps: appearance alone, so the bar is high
 
+# Areas and counting lines are drawn on the Live page (admin) and stored in the database.
+zones:
+  min_frames: 3               # a person must be in/out (or across a line) this many frames in a row to count
+
 vlm:
   enabled: true
   host: http://127.0.0.1:11434    # not "localhost": on this PC that adds ~2 s to every request
