@@ -102,16 +102,23 @@ attributes left out), scored with `tools/evaluate.py`:
 
 | | Qwen3-VL 4B (used) | 4B without face crop | Qwen3-VL 8B | fast classifiers |
 |---|---|---|---|---|
-| Mean accuracy | **88%** | 79%* | 70%* | 75% |
+| Mean accuracy | **85%** | 79%* | 70%* | 75% |
 | Gender | 97% | 34%* | 44%* | 97% |
-| Top color / type | 84% / 73% | 88% / 67% | 69% / 60% | 50% / 67% |
-| Bottoms type / color | 96% / 100% | 96% / 100% | 74% / 70% | 91% / 65% |
-| Headwear / eyewear / carrying | 100% / 87% / 90% | same | 92% / 87% / 87% | 92% / 78% / 83% |
-| Time per person | 2.1 s | 1.8 s | 3.0 s | ~0 |
+| Top color / type | 84% / 70% | 88% / 67% | 69% / 60% | 50% / 67% |
+| Bottoms type / color | 83% / 91% | 96% / 100% | 74% / 70% | 91% / 65% |
+| Headwear / eyewear / carrying | 100% / 91% / 90% | same | 92% / 87% / 87% | 92% / 78% / 83% |
+| Time per person | 2.0 s | 1.8 s | 3.0 s | ~0 |
 
 \* before the gender prompt change. Overall = right answers out of all labels ("unknown" counts as wrong).
 The gender prompt change took gender from 44% to 97%. Retraining the fast classifiers on labels made with
 the new prompt took them from 67% to 75% (gender 56% → 97%).
+
+**Kiosk prompt, 2026-10-08**: two sentences added (t-shirt has no collar, shirt has one; thin or clear
+glasses count as glasses). On 24 people from the user's own webcam (Answer key page, vision model only): mean
+80% → 86%, top type 64% → 91%, glasses 62% → 77%, nothing worse. On the COCO key above: 88% → 85%, because
+the model now answers "unknown" more often for legs (4 cases; no more wrong values) and its age (not used;
+the age model gives age) changed. Longer rewordings were tested and rejected: they turned jackets into
+shirts and sunglasses into glasses. The security prompt is unchanged.
 
 **Age** on 300 FairFace faces (human-labeled age groups), `tools/bench_age.py`:
 

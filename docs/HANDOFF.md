@@ -27,11 +27,14 @@ cameras** and **commercial use**. They have tested the current version and are h
   Step 2 (the user labels 50–100 own people on the Answer key page) is in progress: 26 people on cam1,
   mean 75% (2026-10-08; too few to trust yet). Weakest: upper_type 45%, eyewear 57%, upper_color 68%.
   (It first showed 65%: age was scored 0 because the page asks age_group and kiosk stores age_range; fixed.)
+- 2026-10-08, kiosk prompt: +2 sentences (t-shirt vs shirt, thin/clear glasses). Own webcam 80% → 86%,
+  COCO key 88% → 85% (more "unknown" for legs only). See README "Accuracy". The fast classifiers were trained
+  on labels from the previous prompt; re-run teacher_label + train_attributes (~1 h) to bring them in line.
 - Phase 1 (licenses) deferred by the user: not for commercial use yet. Don't start it until they say so.
 - Config: one camera (`cameras: [{name: cam1, source: 0}]`, the USB webcam), kiosk mode.
 - Database: holds ~55 test people from development (demo photo and webcam tests). The user can remove them
   with Delete all; don't delete them without asking.
-- Measured: 88% mean accuracy on a hand-made 39-person answer key; age model 60% exact / 96% within one
+- Measured: 85% mean accuracy on a hand-made 39-person answer key (88% before the 2026-10-08 prompt change); age model 60% exact / 96% within one
   group on 300 FairFace faces; ~2 s per person for full labels; ~30 fps detection.
 
 ## 3. Architecture

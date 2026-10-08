@@ -28,7 +28,9 @@ upper_* is clothing on the upper body, lower_* is clothing on the legs; use "unk
 If the head is visible and nothing is on it, headwear is "none". If the eyes are visible without glasses, eyewear is
 "none". If the face is visible and uncovered, face_mask is "no".
 For carrying, answer "yes" only for an item you can actually see the person holding or wearing as a bag.
-A lanyard, badge, tie or clothing is not a carried item."""
+A lanyard, badge, tie or clothing is not a carried item.
+A "t-shirt" has no collar and no buttons, with short or long sleeves; a "shirt" has a collar.
+Thin, rimless or clear glasses count as "glasses"; dark lenses are "sunglasses"."""
 
 PROMPT_SECURITY = """You are labeling a person seen by a surveillance camera.
 Describe only what is clearly visible. Answer "unknown" whenever something is not clearly visible.
