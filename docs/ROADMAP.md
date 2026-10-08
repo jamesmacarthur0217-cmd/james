@@ -40,6 +40,9 @@ Each phase below is sized for one or two sessions and is independently shippable
 
 ## Phase 1: Commercial license readiness
 
+**Deferred (user, 2026-10-08): not for commercial use yet.** Skip this phase until the user says the system
+will be sold or used commercially; then ask the decision below again.
+
 Blockers found: **Ultralytics YOLO is AGPL-3.0** (detection, pose and its ByteTrack implementation), and the
 fast classifiers were trained on **COCO photos with mixed Flickr licenses**. Fine: Qwen3-VL, SigLIP 2, age model
 (Apache-2.0), FairFace (CC BY 4.0, needs attribution), Postgres, FastAPI.

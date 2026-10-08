@@ -24,7 +24,9 @@ cameras** and **commercial use**. They have tested the current version and are h
   old labels kept as `data/datasets/coco_people/teacher.old-prompt.jsonl`), fast classifiers retrained:
   answer key 67% → 75%, gender 56% → 97%. They still cover every attribute for 0% of people, so the VLM
   labels everyone. While the age model is loaded they give no age (it would outrank the better age model).
-  Step 2 (the user labels 50–100 own people on the Answer key page) is waiting on the user.
+  Step 2 (the user labels 50–100 own people on the Answer key page) is in progress: 26 people on cam1,
+  mean 65% (2026-10-08; too few to trust yet, but well below the 88% on COCO).
+- Phase 1 (licenses) deferred by the user: not for commercial use yet. Don't start it until they say so.
 - Config: one camera (`cameras: [{name: cam1, source: 0}]`, the USB webcam), kiosk mode.
 - Database: holds ~55 test people from development (demo photo and webcam tests). The user can remove them
   with Delete all; don't delete them without asking.
@@ -128,7 +130,7 @@ Follow [ROADMAP.md](ROADMAP.md). In short:
 
 0. ~~Retrain the fast classifiers~~ (done 2026-10-08). Still open: the user labels 50–100 of their own people
    on the Answer key page; record `GET /api/answer-key/score` (its `cameras` part) as the per-camera baseline.
-1. **Commercial licenses**: Ultralytics YOLO is AGPL-3.0. Ask the user: buy an Ultralytics license, or replace
+1. **Commercial licenses** (deferred: not commercial yet): Ultralytics YOLO is AGPL-3.0. Ask the user: buy an Ultralytics license, or replace
    with RF-DETR + RTMPose (rtmlib) + supervision ByteTrack behind a new `labeler/detect.py` interface. Retrain
    the classifiers on the user's own data instead of COCO. Add LICENSES.md.
 2. Privacy/security: admin/viewer accounts, audit log, HTTPS, face blurring, per-camera retention.
