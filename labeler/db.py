@@ -13,6 +13,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, selectinload, sessionmaker
 
+from . import schema
 from .config import sqlite_url
 
 UNKNOWN = ("unknown", "none")
@@ -184,6 +185,9 @@ def _score(rows: list[tuple[AnswerKey, Track]]) -> dict[str, dict]:
     stats: dict[str, dict] = defaultdict(lambda: {"n": 0, "answered": 0, "right": 0})
     for key_row, track in rows:
         current = {n: a["value"] for n, a in resolve(track.attributes).items()}
+        # The Answer key page asks for an age group; a kiosk camera only stores an age range.
+        if "age_group" not in current and "age_range" in current:
+            current["age_group"] = schema.AGE_RANGE_TO_GROUP.get(current["age_range"], "unknown")
         for name, truth in json.loads(key_row.labels).items():
             st = stats[name]
             st["n"] += 1

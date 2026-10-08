@@ -15,14 +15,15 @@ import numpy as np
 import torch
 from PIL import Image
 
+from .schema import AGE_RANGE_TO_GROUP
+
 log = logging.getLogger(__name__)
 
 MODEL = "dima806/fairface_age_image_detection"
 # Classifier labels -> the app's decade age ranges (0-2 and 3-9 are merged).
 TO_RANGE = {"0-2": "0-9", "3-9": "0-9", "10-19": "10-19", "20-29": "20-29", "30-39": "30-39",
             "40-49": "40-49", "50-59": "50-59", "60-69": "60-69", "more than 70": "70+"}
-TO_GROUP = {"0-9": "child", "10-19": "teen", "20-29": "adult", "30-39": "adult", "40-49": "adult",
-            "50-59": "adult", "60-69": "senior", "70+": "senior"}
+TO_GROUP = AGE_RANGE_TO_GROUP
 MIN_FACE_PX = 40
 
 

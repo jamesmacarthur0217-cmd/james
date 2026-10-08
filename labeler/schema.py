@@ -21,6 +21,10 @@ FIELDS: dict[str, list[str]] = {
     "face_mask": ["yes", "no", "unknown"],
 }
 
+# Kiosk cameras store an age range, security cameras an age group; this converts one to the other.
+AGE_RANGE_TO_GROUP = {"0-9": "child", "10-19": "teen", "20-29": "adult", "30-39": "adult", "40-49": "adult",
+                      "50-59": "adult", "60-69": "senior", "70+": "senior"}
+
 # Multi-valued fields: stored as a sorted comma-separated string ("none" when empty).
 LIST_FIELDS: dict[str, list[str]] = {
     "carrying": ["backpack", "handbag", "shopping bag", "luggage", "phone", "umbrella"],

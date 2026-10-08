@@ -155,3 +155,12 @@ def test_answer_key_score_per_camera(db, camera, tmp_path):
                             "test-cam": {"people": 1, "mean_overall": 1.0}}
     g = api.get("/api/answer-key/score", params={"camera": "gate"}).json()
     assert g["people"] == 1 and g["attributes"]["upper_color"]["right"] == 0 and list(g["cameras"]) == ["gate"]
+
+
+def test_answer_key_age_group_scores_a_kiosk_age_range(db, camera):
+    # The Answer key page asks for an age group; a kiosk camera stores a range (30-39 = adult).
+    adult, unsure = _person(db, camera, age_range="30-39"), _person(db, camera, age_range="unknown")
+    db.save_answer_key(adult, {"age_group": "adult"})
+    db.save_answer_key(unsure, {"age_group": "adult"})
+    assert db.answer_key_score()["attributes"]["age_group"] == {
+        "n": 2, "answered": 1, "right": 1, "accuracy": 1.0, "overall": 0.5}
