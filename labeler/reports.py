@@ -30,6 +30,46 @@ def buckets(start: datetime, end: datetime) -> tuple[str, list[datetime]]:
     return unit, out
 
 
+GENDERS = ["man", "woman"]
+AGE_GROUPS = ["child", "teen", "adult", "senior"]
+# Time-in-view buckets: (from seconds, to seconds, label).
+DWELL_BINS = [(0, 10, "under 10 s"), (10, 30, "10-30 s"), (30, 60, "30 s - 1 min"), (60, 120, "1-2 min"),
+              (120, 300, "2-5 min"), (300, float("inf"), "5 min or more")]
+
+
+def age_group(attrs: dict) -> str | None:
+    """A person's age group: stored directly (security cameras) or from their age range (kiosk cameras)."""
+    group = attrs.get("age_group", {}).get("value")
+    if group in AGE_GROUPS:
+        return group
+    return schema.AGE_RANGE_TO_GROUP.get(attrs.get("age_range", {}).get("value"))
+
+
+def hours_of_day(people: list[dict]) -> list[dict]:
+    """Per hour of the day (0-23, over all days in the range): how many people, by gender and age group."""
+    rows = [{"hour": h, "people": 0, **{k: 0 for k in GENDERS + AGE_GROUPS}} for h in range(24)]
+    for p in people:
+        row = rows[datetime.fromisoformat(p["started_at"]).hour]
+        row["people"] += 1
+        gender = p["attributes"].get("apparent_gender", {}).get("value")
+        if gender in GENDERS:
+            row[gender] += 1
+        group = age_group(p["attributes"])
+        if group:
+            row[group] += 1
+    return rows
+
+
+def dwell_histogram(people: list[dict]) -> list[dict]:
+    """How many people stayed how long (only finished people have a time in view)."""
+    counts = Counter()
+    for p in people:
+        s = p.get("in_view_s")
+        if s:
+            counts[next(label for lo, hi, label in DWELL_BINS if lo <= s < hi)] += 1
+    return [{"label": label, "count": counts[label]} for _, _, label in DWELL_BINS]
+
+
 def engagement(people: list[dict], looked_s: float = 3.0) -> dict:
     """Time in view and facing the camera, over the people who have finished (only they have times)."""
     timed = [p for p in people if p.get("in_view_s")]
@@ -73,6 +113,9 @@ def summarize(people: list[dict], start: datetime, end: datetime, looked_s: floa
         "attributes": attributes,
         "cameras": dict(Counter(p.get("camera") or "?" for p in people)),
         "engagement": engagement(people, looked_s),
+        "days": max(1, round((end - start) / timedelta(days=1))),
+        "hours_of_day": hours_of_day(people),
+        "dwell": dwell_histogram(people),
     }
 
 

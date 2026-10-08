@@ -56,6 +56,35 @@ def test_engagement_summary_and_csv():
     assert lines[1].startswith("1,cam1,2026-10-08T10:00:00,,finished,12.5,0.0,")
 
 
+def _person(hour, gender=None, age_range=None, age_group=None, in_view_s=None):
+    attrs = {}
+    for name, value in (("apparent_gender", gender), ("age_range", age_range), ("age_group", age_group)):
+        if value:
+            attrs[name] = {"value": value}
+    return {"started_at": f"2026-10-08T{hour:02d}:15:00", "attributes": attrs, "in_view_s": in_view_s}
+
+
+def test_who_came_at_which_hour():
+    people = [_person(9, "man", age_range="30-39"), _person(9, "woman", age_range="60-69"),
+              _person(9, "unknown"), _person(14, "woman", age_group="teen")]      # security cameras store a group
+    rows = reports.hours_of_day(people)
+    assert len(rows) == 24
+    assert rows[9] == {"hour": 9, "people": 3, "man": 1, "woman": 1, "child": 0, "teen": 0, "adult": 1, "senior": 1}
+    assert rows[14]["teen"] == 1 and rows[0]["people"] == 0
+
+
+def test_how_long_people_stayed():
+    people = [_person(9, in_view_s=s) for s in (4, 9.9, 10, 45, 61, 400)] + [_person(9)]   # last: no time yet
+    assert [r["count"] for r in reports.dwell_histogram(people)] == [2, 1, 1, 1, 0, 1]
+
+
+def test_summary_counts_the_days():
+    from datetime import datetime, timedelta
+    start = datetime(2026, 10, 1)
+    assert reports.summarize([], start, start + timedelta(days=7))["days"] == 7
+    assert reports.summarize([], start, start + timedelta(days=1))["days"] == 1
+
+
 def test_new_columns_are_added_to_an_existing_database(tmp_path):
     path = tmp_path / "old.db"
     con = sqlite3.connect(path)          # the tracks table as the first release made it

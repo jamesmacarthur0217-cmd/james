@@ -173,6 +173,11 @@ only counts after `zones.min_frames` (3) frames in a row, so someone standing on
 again and again; very brief detections are never counted. Deleting a zone keeps its counts. Counts are removed
 with the people they belong to (delete, retention).
 
+**Reports by hour**: *Who came at which hour* (a table colored from light = few to dark = many: all people, by
+apparent gender and age group; kiosk age ranges are grouped), *How long people stayed* (under 10 s ... 5 min or
+more), and for a range of several days *A typical day* (average people per hour of the day), so the usual busy
+hours stand out.
+
 **Time in view and facing the camera**: for each person the app records how long they were actually in view
 (a gap while still tracked counts at most 1 s per frame; time away between visits is not counted) and how much
 of it they faced the camera: nose near the middle between the eyes and a straight enough face
@@ -329,7 +334,7 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-147 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+150 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, alerts,
 reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.

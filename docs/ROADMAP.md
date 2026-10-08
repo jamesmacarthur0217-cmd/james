@@ -89,7 +89,7 @@ fast classifiers were trained on **COCO photos with mixed Flickr licenses**. Fin
 ## Phase 4: Mode-specific features
 
 Kiosk:
-- Demographics report by hour (age group × gender), dwell histogram, busiest periods (extends
+- **Done 2026-10-08.** Demographics report by hour (age group × gender), dwell histogram, busiest periods (extends
   `labeler/reports.py`).
 - Higher-resolution upper-body crop for clothing; top type is the weakest attribute (73%), so also test
   vocabulary refinements (coat vs jacket, polo, tank top) against the answer key.

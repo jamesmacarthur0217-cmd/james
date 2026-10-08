@@ -19,7 +19,10 @@ cameras** and **commercial use**. They have tested the current version and are h
 - Git: local repo, branch `main`, clean. Latest commits:
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
-- Tests: 147 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- Tests: 150 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- 2026-10-08, Phase 4 kiosk step 1 done: Reports by hour (heatmap hour x gender/age group, time-in-view
+  histogram, typical day over several days; `reports.hours_of_day`, `reports.dwell_histogram`). Charts share
+  `drawBars` in reports.html; heatmap blues skip the middle steps so cell numbers keep >= 5.1:1 contrast.
 - 2026-10-08, Phase 3 step 4 done (Phase 3 complete): alert clips (`labeler/clips.py`; files
   `<crop_dir>/clips/alert_<id>.webm`, named after the alert, so no DB column; route `/clips/{name}`, admin).
   OpenCV here cannot write H.264 (no OpenH264 DLL); VP8 WebM works and plays in browsers.
