@@ -170,7 +170,11 @@ def main() -> int:
     if worker is not None:   # questions use the same local model as labeling
         from labeler.agent import QueryAgent
         agent = QueryAgent(cfg, db, embedder, [p.name for p in pipelines])
-    app = create_app(cfg, db, pipelines, embedder, alerts, agent)
+    health = None
+    if cfg["health"]["enabled"]:
+        from labeler.health import HealthMonitor
+        health = HealthMonitor(db, cfg["health"])
+    app = create_app(cfg, db, pipelines, embedder, alerts, agent, health)
     server = _web_servers(app, web)
 
     def request_shutdown() -> None:
@@ -197,6 +201,10 @@ def main() -> int:
     threading.Thread(target=watchdog, name="watchdog", daemon=True).start()
     threading.Thread(target=_retention_loop, args=(db, cfg, crop_dir, app.state.stopping),
                      name="retention", daemon=True).start()
+    if health is not None:
+        from labeler.health import health_loop
+        threading.Thread(target=health_loop, args=(health, pipelines, app.state.stopping),
+                         name="health", daemon=True).start()
     # stop.bat waits for this process to exit before stopping the database, so final saves complete.
     pid_file = resolve("data/app.pid")
     pid_file.parent.mkdir(parents=True, exist_ok=True)
@@ -238,6 +246,7 @@ def _apply_retention(db: Database, cfg: dict, crop_dir) -> None:
     old_audit = db.cleanup_audit(cfg["storage"]["audit_retention_days"])
     if old_audit:
         log.info("retention: deleted %d old audit log entries", old_audit)
+    db.cleanup_camera_events(cfg["storage"]["audit_retention_days"])   # camera problems: kept as long
 
 
 def _retention_loop(db: Database, cfg: dict, crop_dir, stop: threading.Event) -> None:

@@ -23,6 +23,7 @@
       <button id="zones-btn" class="admin-only" title="Draw areas and counting lines on this camera">Zones</button>
       <button id="fullscreen" title="Show the live view full screen">Full screen</button>
     </div>
+    <div class="banner problem" id="cam-problem" hidden></div>
     <div class="video" id="video">
       <img id="live" src="/stream" alt="Live camera feed with labels">
       <svg id="zone-draw" hidden></svg>
@@ -261,7 +262,30 @@ async function status() {
     $("status").innerHTML = warn + `mode <b>${s.mode}</b> · <b>${s.fps ?? "-"}</b> fps · <b>${s.active_people ?? 0}</b> in view · `
       + `VLM queue <b>${s.vlm_enabled ? s.vlm_queue : "off"}</b> · <b>${s.tracks}</b> people · `
       + `<a href="/review" class="admin-only"><b>${s.needs_review}</b> to review</a>`;
+    showCameraProblems(s.camera_problems || []);
   } catch { $("status").textContent = "disconnected"; }
+}
+
+// Camera problems (labeler/health.py): a banner while they last, a pop-up when a new one starts.
+const seenProblems = new Set();
+let problemsLoaded = false;
+function clock(iso) { return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
+function showCameraProblems(problems) {
+  $("cam-problem").hidden = !problems.length;
+  $("cam-problem").innerHTML = problems.map(p =>
+    `<b>Camera ${esc(p.camera)}:</b> ${esc(p.message)} (since ${clock(p.started_at)})`).join("<br>");
+  for (const p of problems) {
+    if (seenProblems.has(p.id)) continue;
+    seenProblems.add(p.id);
+    if (!problemsLoaded) continue;   // already going on when the page opened: banner only
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.innerHTML = `<div><b>Camera problem</b> · ${esc(p.camera)}<br>${esc(p.message)}</div>`;
+    t.onclick = () => t.remove();
+    $("toasts").prepend(t);
+    setTimeout(() => t.remove(), 20000);
+  }
+  problemsLoaded = true;
 }
 
 $("stop").onclick = async () => {

@@ -184,6 +184,14 @@ it on your own camera. People recorded before this version have no times.
 After updating the app, press Ctrl+F5 once on each device so the browser loads the new pages; from this
 version on, pages are always checked for updates.
 
+## Camera problems
+
+The app watches each camera and reports **no picture** (10 s without a frame, e.g. a network camera that
+went offline), a **blank picture** (10 s; lens covered or another app using the webcam) and **running slowly**
+(below 5 frames per second for 30 s). The first 30 s after start are ignored while cameras warm up. A problem
+shows as a pop-up and a banner above the live picture while it lasts; the Alerts page lists them with start
+and end times (kept `storage.audit_retention_days`). Settings: `health:` in config.yaml.
+
 ## Things that look like people
 
 Pictures of people (a monitor, reflection, poster, TV) are detected as people. In kiosk mode new people under
@@ -312,7 +320,7 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-134 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+141 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, alerts,
 reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.

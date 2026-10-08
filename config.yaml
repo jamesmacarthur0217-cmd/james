@@ -51,6 +51,15 @@ tracking:
 zones:
   min_frames: 3               # a person must be in/out (or across a line) this many frames in a row to count
 
+# Camera problems (shown on the Live page and the Alerts page). A problem must last this long to count.
+health:
+  enabled: true
+  offline_after_s: 10         # no picture at all
+  blank_after_s: 10           # a blank picture (lens covered, or another app is using the camera)
+  slow_after_s: 30            # below min_fps
+  min_fps: 5
+  startup_grace_s: 30         # ignore the first seconds after start (webcams warm up)
+
 # Time in view and time facing the camera (Reports). A frame counts as facing when the nose is near the middle
 # between the eyes and the face looks straight enough (0..1). Set from 6 people in two demo photos; check it
 # on your own camera.

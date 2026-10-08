@@ -201,6 +201,17 @@ class ZoneEvent(Base):
     dwell_s: Mapped[float | None] = mapped_column(Float)   # on exit: time spent inside
 
 
+class CameraEvent(Base):
+    """A camera problem (no picture, blank picture, slow), from when it started until it ended."""
+    __tablename__ = "camera_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    camera: Mapped[str] = mapped_column(String(100), index=True)
+    kind: Mapped[str] = mapped_column(String(20))          # offline | blank | slow (labeler/health.py)
+    message: Mapped[str] = mapped_column(String(300))
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
 class AuditEntry(Base):
     """Who did what in the web pages: logins, viewing, searches, exports, deletes, rule changes, reviews.
     Frequent background requests (the Live page's polling) are not logged."""
@@ -782,6 +793,46 @@ class Database:
             st["avg_dwell_s"] = round(sum(dwell) / len(dwell), 1) if dwell else None
             out.append(st)
         return out
+
+    # --- camera health ------------------------------------------------------------------
+
+    @staticmethod
+    def _camera_event_dict(e: CameraEvent) -> dict:
+        return {"id": e.id, "camera": e.camera, "kind": e.kind, "message": e.message,
+                "started_at": e.started_at.isoformat(timespec="seconds"),
+                "ended_at": e.ended_at.isoformat(timespec="seconds") if e.ended_at else None}
+
+    def open_camera_event(self, camera: str, kind: str, message: str) -> dict:
+        with self.Session.begin() as s:
+            e = CameraEvent(camera=camera, kind=kind, message=message[:300], started_at=datetime.now())
+            s.add(e)
+            s.flush()
+            return self._camera_event_dict(e)
+
+    def close_camera_event(self, event_id: int) -> None:
+        with self.Session.begin() as s:
+            e = s.get(CameraEvent, event_id)
+            if e is not None and e.ended_at is None:
+                e.ended_at = datetime.now()
+
+    def close_open_camera_events(self) -> int:
+        """At startup: problems still open were ended by the app stopping."""
+        from sqlalchemy import update
+        with self.Session.begin() as s:
+            return s.execute(update(CameraEvent).where(CameraEvent.ended_at.is_(None))
+                             .values(ended_at=datetime.now())).rowcount
+
+    def list_camera_events(self, limit: int = 50) -> list[dict]:
+        with self.Session() as s:
+            return [self._camera_event_dict(e) for e in
+                    s.scalars(select(CameraEvent).order_by(CameraEvent.id.desc()).limit(limit))]
+
+    def cleanup_camera_events(self, retention_days: int) -> int:
+        if retention_days <= 0:
+            return 0
+        with self.Session.begin() as s:
+            return s.execute(delete(CameraEvent).where(
+                CameraEvent.started_at < datetime.now() - timedelta(days=retention_days))).rowcount
 
     # --- audit log ----------------------------------------------------------------------
 

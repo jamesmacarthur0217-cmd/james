@@ -22,6 +22,8 @@ DEFAULTS: dict = {
     },
     "zones": {"min_frames": 3},
     "engagement": {"facing_min": 0.6, "looked_s": 3.0},
+    "health": {"enabled": True, "offline_after_s": 10, "blank_after_s": 10, "slow_after_s": 30, "min_fps": 5,
+               "startup_grace_s": 30},
     "tracking": {
         "min_frames_keep": 8,
         "min_frames_for_label": 20,

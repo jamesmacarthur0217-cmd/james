@@ -19,7 +19,10 @@ cameras** and **commercial use**. They have tested the current version and are h
 - Git: local repo, branch `main`, clean. Latest commits:
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
-- Tests: 134 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- Tests: 141 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- 2026-10-08, Phase 3 step 3 done: camera health (`labeler/health.py`, table `camera_events`, thread in
+  run.py, `camera_problems` in /api/status, banner + pop-up on Live, history on Alerts). A missing video *file*
+  still stops the app (setup error, restarted by start.bat); an unreachable camera is reported as offline.
 - 2026-10-08, Phase 3 step 2 done: time in view and facing the camera per person (`tracks.in_view_s`,
   `tracks.facing_s`, `geometry.facing_camera`), in Reports and the CSV. Facing threshold set from 6 demo people.
 - 2026-10-08, Phase 3 step 1 done: zones and counting lines (`labeler/zones.py`, tables `zones` and

@@ -107,7 +107,7 @@ def ensure_first_admin(db: Database, web: dict) -> None:
 
 
 def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | None, embedder=None,
-               alerts=None, agent=None) -> FastAPI:
+               alerts=None, agent=None, health=None) -> FastAPI:
     app = FastAPI(title="VisionLabeler")
     app.state.stopping = threading.Event()
     session_hours = cfg["web"].get("session_hours", 12)
@@ -384,6 +384,11 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         s, e = _day_range(start, end)
         return db.zone_counts(s, e, camera)
 
+    @app.get("/api/camera-events")
+    def camera_events(limit: int = 50):
+        """Camera problems, newest first (ongoing ones have no end)."""
+        return db.list_camera_events(min(limit, 200))
+
     @app.get("/api/cameras")
     def cameras():
         return [{"name": p.name, "mode": p.mode, "source": str(p.cam["source"])} for p in pipelines]
@@ -442,6 +447,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                 "cameras": [p.status() for p in pipelines],
                 "disk_free_gb": round(free_gb, 1),
                 "disk_low": free_gb < cfg["storage"]["min_free_gb"],
+                "camera_problems": health.current() if health is not None else [],
                 **db.stats()}
 
     @app.get("/api/schema")

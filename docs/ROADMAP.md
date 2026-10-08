@@ -81,7 +81,7 @@ fast classifiers were trained on **COCO photos with mixed Flickr licenses**. Fin
    and exits, time spent in each zone; store as `zone_events`. Alerts can use "entered zone X".
 2. **Done 2026-10-08.** **Dwell time and engagement**: time in view (already `started_at` / `ended_at`), share of time facing the
    camera (from `geometry.frontality`). Added to Reports.
-3. **Camera health**: alerts for camera offline, blank picture, or FPS drop (status already tracked in
+3. **Done 2026-10-08.** **Camera health**: alerts for camera offline, blank picture, or FPS drop (status already tracked in
    `Pipeline.status()`); shown on the Live page and in Alerts.
 4. **Event clips**: keep a ~10 s rolling buffer per camera and save a short clip around each alert; playable
    on the Alerts page. Counts toward retention.

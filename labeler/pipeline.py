@@ -127,6 +127,7 @@ class Pipeline:
         self.fps = 0.0
         self.frames = 0
         self.blank = False
+        self.started_mono = self.last_frame_at = time.monotonic()   # for the camera health check
         self.running = False
         self.crashed = False
         self.deleted_ids: set[int] = set()
@@ -194,7 +195,7 @@ class Pipeline:
         cam = self.cam
         source = FrameSource(cam["source"], loop=cam["loop_files"] and max_frames is None)
         log.info("[%s] pipeline started: source=%s (%s), mode=%s", self.name, cam["source"], source.kind, self.mode)
-        t_last = time.monotonic()
+        t_last = self.started_mono = self.last_frame_at = time.monotonic()
         self.running = True
         try:
             while not self.stop_event.is_set():
@@ -205,7 +206,7 @@ class Pipeline:
                     continue
                 self.process(frame)
                 self.frames += 1
-                now = time.monotonic()
+                now = self.last_frame_at = time.monotonic()
                 self.fps = 0.9 * self.fps + 0.1 * (1.0 / max(now - t_last, 1e-6))
                 t_last = now
                 if max_frames and self.frames >= max_frames:
