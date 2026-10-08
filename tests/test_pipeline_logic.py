@@ -40,6 +40,7 @@ def make_pipeline(db, embedder=None):
     p.name = "test-cam"
     p.age = None
     p.age_ids = set()
+    p.clips = None
     return p
 
 

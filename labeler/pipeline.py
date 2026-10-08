@@ -14,6 +14,7 @@ from ultralytics import YOLO
 
 from . import colors, geometry, privacy, schema
 from . import zones as zones_mod
+from .clips import ClipRecorder
 from .config import resolve
 from .db import Database
 from .embed import Embedder
@@ -108,6 +109,7 @@ class Pipeline:
         self.camera_id = db.get_or_create_camera(cam["name"], str(cam["source"]), self.mode)
         self.owned_ids: set[int] = set()   # records created by this camera, for routing VLM results
         self.zone_counter = zones_mod.ZoneCounter(db.list_zones(self.name), cfg["zones"]["min_frames"])
+        self.clips = ClipRecorder(self.crop_dir, cfg["clips"]) if cfg["clips"]["enabled"] else None
 
         self.tracks: dict[int, TrackState] = {}
         self.by_db_id: dict[int, TrackState] = {}
@@ -220,6 +222,8 @@ class Pipeline:
             source.release()
             for tid in list(self.tracks):
                 self._finish(tid)
+            if self.clips is not None:
+                self.clips.close()   # alerts that fired just before stopping get a shorter clip
             log.info("pipeline stopped after %d frames", self.frames)
 
     # --- per frame ----------------------------------------------------------------
@@ -284,7 +288,9 @@ class Pipeline:
             self.recently_lost = {k: v for k, v in self.recently_lost.items() if now - v[1] <= window}
 
         blurred = None
-        if self.cfg["web"].get("blur_faces_for_viewers", True) and now - self.viewer_watching_at < 5:
+        viewer_needs = self.cfg["web"].get("blur_faces_for_viewers", True) and now - self.viewer_watching_at < 5
+        clips_need = self.clips is not None and self.cfg["storage"].get("blur_faces", False)
+        if viewer_needs or clips_need:
             # Faces are blurred before the labels are drawn, so the labels stay readable.
             heads = [geometry.head_box(self.tracks[t].kpts, self.tracks[t].box) for t in seen]
             heads += [geometry.head_box(None, tuple(b[:4])) for b in self._ignored]
@@ -398,9 +404,13 @@ class Pipeline:
     def _check_alerts(self, db_id: int | None) -> None:
         if self.alerts is not None and db_id is not None and db_id not in self.deleted_ids:
             try:
-                self.alerts.check(db_id, self.name)
+                fired = self.alerts.check(db_id, self.name)
             except Exception:
                 log.exception("checking alert rules failed")
+                return
+            if self.clips is not None:
+                for event in fired:
+                    self.clips.request(event["id"])   # a clip around the moment the alert fired
 
     def _store_colors(self, st: TrackState) -> None:
         items = [(name, value, round(conf, 3)) for name, (value, conf) in st.colors().items()]
@@ -740,3 +750,8 @@ class Pipeline:
             if jpeg is not None:
                 self._jpeg = jpeg
             self._jpeg_blurred = jpeg_blurred
+        if self.clips is not None:
+            # With faces blurred on disk (storage.blur_faces), clips never contain a face either.
+            clip_frame = jpeg_blurred if self.cfg["storage"].get("blur_faces", False) else jpeg
+            if clip_frame is not None:
+                self.clips.add_frame(clip_frame)

@@ -116,11 +116,23 @@ $("save").onclick = async () => {
 
 async function loadEvents() {
   const data = await (await fetch("/api/alerts/events?limit=50")).json();
-  $("events").innerHTML = data.events.length ? data.events.map(e => `
+  // Keep an open clip playing: only redraw when the list changed.
+  const html = data.events.length ? data.events.map(e => `
     <div class="event">${e.crop ? `<img src="/crops/${encodeURIComponent(e.crop)}" alt="">` : '<img alt="">'}
-      <div><b>${esc(e.message)}</b><br><small>person #${e.track_id} · ${esc(e.camera)} · ${esc(e.created_at.replace("T", " "))}</small></div>
+      <div><b>${esc(e.message)}</b><br><small>person #${e.track_id} · ${esc(e.camera)} · ${esc(e.created_at.replace("T", " "))}</small>
+        ${e.clip ? `<br><button class="link play" data-clip="${esc(e.clip)}">▶ Play clip</button>` : ""}
+        <div class="clip-box"></div></div>
     </div>`).join("") : '<div class="empty">No alerts yet.</div>';
+  if ($("events").dataset.html !== html) { $("events").innerHTML = html; $("events").dataset.html = html; }
 }
+
+$("events").addEventListener("click", (e) => {
+  if (!e.target.matches(".play")) return;
+  const box = e.target.parentElement.querySelector(".clip-box");
+  if (box.firstChild) { box.innerHTML = ""; e.target.textContent = "▶ Play clip"; return; }
+  box.innerHTML = `<video src="/clips/${encodeURIComponent(e.target.dataset.clip)}" controls autoplay muted></video>`;
+  e.target.textContent = "Hide clip";
+});
 
 function when(iso) { return iso.replace("T", " ").slice(0, 16); }
 

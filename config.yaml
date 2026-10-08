@@ -51,6 +51,14 @@ tracking:
 zones:
   min_frames: 3               # a person must be in/out (or across a line) this many frames in a row to count
 
+# A short video around each alert (Alerts page, admins). Deleted with the person (retention, Delete).
+clips:
+  enabled: true
+  before_s: 5                 # seconds before the alert (kept in memory, about 5 MB per camera)
+  after_s: 5                  # seconds after
+  fps: 10
+  max_width: 960              # pixels; a 10 s clip is about 1-2 MB
+
 # Camera problems (shown on the Live page and the Alerts page). A problem must last this long to count.
 health:
   enabled: true

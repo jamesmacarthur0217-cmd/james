@@ -184,6 +184,15 @@ it on your own camera. People recorded before this version have no times.
 After updating the app, press Ctrl+F5 once on each device so the browser loads the new pages; from this
 version on, pages are always checked for updates.
 
+## Alert clips
+
+Each alert gets a short video: the 5 seconds before it fired and the 5 after (`clips:` in config.yaml), with the
+boxes and labels as on the Live page. On the Alerts page, **Play clip** shows it (admins only; watching is in
+the Audit log). Each camera keeps its last seconds in memory (about 5 MB); clips are WebM (VP8, built into
+OpenCV, plays in every current browser), at most 960 pixels wide and 10 frames per second, about 1.5-3 MB each,
+written in the background a few seconds after the alert. They are deleted with the person (Delete, retention)
+or with their alert rule. With `storage.blur_faces: true` clips are made from the blurred picture.
+
 ## Camera problems
 
 The app watches each camera and reports **no picture** (10 s without a frame, e.g. a network camera that
@@ -320,7 +329,7 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-141 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+147 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, alerts,
 reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.

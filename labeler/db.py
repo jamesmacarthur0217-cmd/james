@@ -16,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, selectinload, sessionmaker
 
 from . import schema
+from .clips import clip_name
 from .config import sqlite_url
 
 UNKNOWN = ("unknown", "none")
@@ -549,8 +550,9 @@ class Database:
             }
 
     def delete_tracks(self, ids: list[int] | None = None, everything: bool = False) -> tuple[list[int], list[str]]:
-        """Delete people and everything stored about them (labels, reviews, embeddings).
-        Returns (deleted ids, picture file names to remove). Bulk statements, so deleting thousands is quick."""
+        """Delete people and everything stored about them (labels, reviews, embeddings, alerts, zone events).
+        Returns (deleted ids, file names to remove: pictures and alert clips). Bulk statements, so deleting
+        thousands is quick."""
         if not everything and not ids:
             return [], []
         with self.Session.begin() as s:
@@ -566,6 +568,7 @@ class Database:
                 s.execute(delete(Review).where(Review.attribute_id.in_(attr_ids)))
                 s.execute(delete(Attribute).where(Attribute.track_id.in_(chunk)))
                 s.execute(delete(Embedding).where(Embedding.track_id.in_(chunk)))
+                paths += [clip_name(i) for i in s.scalars(select(AlertEvent.id).where(AlertEvent.track_id.in_(chunk)))]
                 s.execute(delete(AlertEvent).where(AlertEvent.track_id.in_(chunk)))
                 s.execute(delete(AnswerKey).where(AnswerKey.track_id.in_(chunk)))
                 s.execute(delete(ZoneEvent).where(ZoneEvent.track_id.in_(chunk)))
@@ -601,6 +604,11 @@ class Database:
                 return False
             r.enabled = enabled
             return True
+
+    def rule_clips(self, rule_id: int) -> list[str]:
+        """Clip file names of this rule's alerts (removed with the rule)."""
+        with self.Session() as s:
+            return [clip_name(i) for i in s.scalars(select(AlertEvent.id).where(AlertEvent.rule_id == rule_id))]
 
     def delete_rule(self, rule_id: int) -> bool:
         with self.Session.begin() as s:
@@ -949,7 +957,7 @@ class Database:
 
     def cleanup(self, retention_days: int, per_camera: dict[str, int] | None = None) -> list[str]:
         """Delete people older than their camera's retention window (`per_camera`: camera name -> days,
-        otherwise `retention_days`; 0 = keep forever). Returns their picture names."""
+        otherwise `retention_days`; 0 = keep forever). Returns their picture and alert clip names."""
         per_camera = per_camera or {}
         now = datetime.now()
         with self.Session.begin() as s:
@@ -961,6 +969,8 @@ class Database:
                                                          Track.started_at < now - timedelta(days=days))).all()
             paths = [p for t in old for p in (t.crop_path, t.face_path) if p]
             if old:
+                paths += [clip_name(i) for i in s.scalars(select(AlertEvent.id).where(
+                    AlertEvent.track_id.in_([t.id for t in old])))]
                 s.execute(delete(AlertEvent).where(AlertEvent.track_id.in_([t.id for t in old])))
                 s.execute(delete(AnswerKey).where(AnswerKey.track_id.in_([t.id for t in old])))
                 s.execute(delete(ZoneEvent).where(ZoneEvent.track_id.in_([t.id for t in old])))

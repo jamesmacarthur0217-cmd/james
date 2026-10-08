@@ -108,3 +108,5 @@ body:not(.is-admin) .admin-only { display: none !important; }
   padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; }
 /* Camera problems (labeler/health.py) above the live picture. */
 .banner.problem { background: var(--warn-bg); color: var(--warn); }
+/* Alert clips (Alerts page). */
+.clip-box video { display: block; width: 100%; max-width: 480px; margin-top: 6px; border-radius: 6px; background: #000; }

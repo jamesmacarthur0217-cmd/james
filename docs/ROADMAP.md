@@ -83,7 +83,7 @@ fast classifiers were trained on **COCO photos with mixed Flickr licenses**. Fin
    camera (from `geometry.frontality`). Added to Reports.
 3. **Done 2026-10-08.** **Camera health**: alerts for camera offline, blank picture, or FPS drop (status already tracked in
    `Pipeline.status()`); shown on the Live page and in Alerts.
-4. **Event clips**: keep a ~10 s rolling buffer per camera and save a short clip around each alert; playable
+4. **Done 2026-10-08** (WebM/VP8). **Event clips**: keep a ~10 s rolling buffer per camera and save a short clip around each alert; playable
    on the Alerts page. Counts toward retention.
 
 ## Phase 4: Mode-specific features

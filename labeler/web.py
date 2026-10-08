@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import threading
 import shutil
 from datetime import datetime, timedelta
@@ -15,12 +16,14 @@ from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from . import accounts, privacy, reports, schema
+from .clips import clip_name
 from .config import ROOT, resolve
 from .db import Database
 from .pipeline import Pipeline
 
 STATIC = ROOT / "labeler" / "static"
 log = logging.getLogger(__name__)
+CLIP_NAME = re.compile(r"alert_\d+\.webm")
 
 
 class ReviewIn(BaseModel):
@@ -128,7 +131,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         viewer may only do what accounts.VIEWER lists. A request passed on by a forwarding tool on this PC
         looks local but is not (is_this_pc), so it must log in too."""
         method, path = request.method, request.url.path
-        page = method == "GET" and not path.startswith(("/api/", "/stream", "/crops/", "/static/"))
+        page = method == "GET" and not path.startswith(("/api/", "/stream", "/crops/", "/clips/", "/static/"))
         if is_this_pc(request):
             request.state.user = LOCAL_USER
         else:
@@ -340,15 +343,31 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
 
     @app.delete("/api/alerts/rules/{rule_id}")
     def delete_rule(rule_id: int, request: Request):
+        clips = db.rule_clips(rule_id)
         if not db.delete_rule(rule_id):
             raise HTTPException(404, "rule not found")
+        for name in clips:
+            privacy.remove_picture(crop_dir, name)
         _rules_changed()
         audit(request, "alert rule deleted", f"rule #{rule_id}")
         return {"ok": True}
 
     @app.get("/api/alerts/events")
     def alert_events(since_id: int = 0, limit: int = 50):
-        return {"latest_id": db.latest_alert_id(), "events": db.list_alerts(since_id, min(limit, 200))}
+        events = db.list_alerts(since_id, min(limit, 200))
+        for e in events:   # a clip is there once it has been written (a few seconds after the alert)
+            name = clip_name(e["id"])
+            e["clip"] = name.split("/")[-1] if (crop_dir / name).is_file() else None
+        return {"latest_id": db.latest_alert_id(), "events": events}
+
+    @app.get("/clips/{name}")
+    def clip(name: str, request: Request):
+        """An alert's video clip (admins; viewers are not on the allowlist)."""
+        path = crop_dir / "clips" / name
+        if not CLIP_NAME.fullmatch(name) or not path.is_file():
+            raise HTTPException(404, "no such clip")
+        audit(request, "view clip", name)
+        return FileResponse(path, media_type="video/webm", headers={"Cache-Control": "private, max-age=3600"})
 
     # --- zones and counting lines (admin) ------------------------------------------------
 
