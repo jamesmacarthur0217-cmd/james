@@ -19,7 +19,7 @@ cameras** and **commercial use**. They have tested the current version and are h
 - Git: local repo, branch `main`, clean. Latest commits:
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
-- Tests: 78 pass (`.venv\Scripts\python.exe -m pytest -q`, ~20 s).
+- Tests: 80 pass (`.venv\Scripts\python.exe -m pytest -q`, ~20 s).
 - 2026-10-08, Phase 0 step 1 done: teacher labels redone with the current prompt (1,534 people, 57 min;
   old labels kept as `data/datasets/coco_people/teacher.old-prompt.jsonl`), fast classifiers retrained:
   answer key 67% → 75%, gender 56% → 97%. They still cover every attribute for 0% of people, so the VLM
@@ -28,8 +28,11 @@ cameras** and **commercial use**. They have tested the current version and are h
   mean 75% (2026-10-08; too few to trust yet). Weakest: upper_type 45%, eyewear 57%, upper_color 68%.
   (It first showed 65%: age was scored 0 because the page asks age_group and kiosk stores age_range; fixed.)
 - 2026-10-08, kiosk prompt: +2 sentences (t-shirt vs shirt, thin/clear glasses). Own webcam 80% → 86%,
-  COCO key 88% → 85% (more "unknown" for legs only). See README "Accuracy". The fast classifiers were trained
-  on labels from the previous prompt; re-run teacher_label + train_attributes (~1 h) to bring them in line.
+  COCO key 88% → 85% (more "unknown" for legs only). See README "Accuracy". Fast classifiers retrained on
+  labels from this prompt (51 min; previous labels kept as `teacher.before-tee-prompt.jsonl`).
+- The fast classifiers transfer poorly from COCO to the user's webcam, so a VLM answer now beats a student
+  answer in `db.resolve`. Real fix: Phase 1 step 4 (train them on the user's own reviewed people) once there
+  are enough; until then they mainly give early live labels.
 - Phase 1 (licenses) deferred by the user: not for commercial use yet. Don't start it until they say so.
 - Config: one camera (`cameras: [{name: cam1, source: 0}]`, the USB webcam), kiosk mode.
 - Database: holds ~55 test people from development (demo photo and webcam tests). The user can remove them

@@ -104,9 +104,9 @@ attributes left out), scored with `tools/evaluate.py`:
 |---|---|---|---|---|
 | Mean accuracy | **85%** | 79%* | 70%* | 75% |
 | Gender | 97% | 34%* | 44%* | 97% |
-| Top color / type | 84% / 70% | 88% / 67% | 69% / 60% | 50% / 67% |
-| Bottoms type / color | 83% / 91% | 96% / 100% | 74% / 70% | 91% / 65% |
-| Headwear / eyewear / carrying | 100% / 91% / 90% | same | 92% / 87% / 87% | 92% / 78% / 83% |
+| Top color / type | 84% / 70% | 88% / 67% | 69% / 60% | 53% / 73% |
+| Bottoms type / color | 83% / 91% | 96% / 100% | 74% / 70% | 83% / 65% |
+| Headwear / eyewear / carrying | 100% / 91% / 90% | same | 92% / 87% / 87% | 92% / 87% / 77% |
 | Time per person | 2.0 s | 1.8 s | 3.0 s | ~0 |
 
 \* before the gender prompt change. Overall = right answers out of all labels ("unknown" counts as wrong).
@@ -118,7 +118,13 @@ glasses count as glasses). On 24 people from the user's own webcam (Answer key p
 80% → 86%, top type 64% → 91%, glasses 62% → 77%, nothing worse. On the COCO key above: 88% → 85%, because
 the model now answers "unknown" more often for legs (4 cases; no more wrong values) and its age (not used;
 the age model gives age) changed. Longer rewordings were tested and rejected: they turned jackets into
-shirts and sunglasses into glasses. The security prompt is unchanged.
+shirts and sunglasses into glasses. The security prompt is unchanged. The fast classifiers were then
+retrained on labels from this prompt: COCO key unchanged at 75%; on the user's webcam (from stored
+embeddings) top type 27% → 82%, glasses 38% → 46%.
+
+The fast classifiers learned from COCO photos and transfer poorly to the webcam (top color 5%, carrying 25%
+there; their confident glasses answers right only 5 of 11). So once the vision model has answered an
+attribute, its answer is used over theirs, even at lower confidence (`resolve` in `labeler/db.py`).
 
 **Age** on 300 FairFace faces (human-labeled age groups), `tools/bench_age.py`:
 
@@ -206,7 +212,7 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-78 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+80 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, login, supervisor, alerts, reports, questions,
 answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.
 

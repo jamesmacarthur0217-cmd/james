@@ -23,6 +23,14 @@ def test_disagreement_between_sources_goes_to_review(db, camera):
     assert {c["value"] for c in item["candidates"]} == {"red", "blue"}
 
 
+def test_vlm_answer_beats_a_more_confident_student(db, camera):
+    t = _person(db, camera)
+    db.add_attributes(t, [("eyewear", "none", 0.9)], "student", "s", threshold=0.6)
+    assert db.resolved_values(t)["eyewear"] == "none"                    # student counts until the VLM answers
+    db.add_attributes(t, [("eyewear", "glasses", 0.5)], "vlm", "q", threshold=0.6)
+    assert db.resolved_values(t)["eyewear"] == "glasses"                 # VLM answered: it wins at lower confidence
+
+
 def test_low_confidence_goes_to_review_but_unknown_does_not(db, camera):
     t = _person(db, camera)
     db.add_attributes(t, [("age_range", "20-29", 0.5), ("eyewear", "unknown", 1.0)], "vlm", "qwen", threshold=0.6)

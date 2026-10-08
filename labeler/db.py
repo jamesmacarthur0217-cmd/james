@@ -163,14 +163,22 @@ class Review(Base):
 
 
 def resolve(attrs: list[Attribute]) -> dict[str, dict]:
-    """Pick one value per attribute name: human-verified first, then highest confidence."""
+    """Pick one value per attribute name: human-verified first, then highest confidence.
+
+    The fast classifiers ("student") only imitate the VLM, so once the VLM has answered they can only add
+    their own mistakes: on the user's webcam their confident glasses answers were right 5 of 11 times,
+    the VLM's 10 of 13. They still count until the VLM answers."""
     by_name: dict[str, list[Attribute]] = defaultdict(list)
     for a in attrs:
         by_name[a.name].append(a)
     out: dict[str, dict] = {}
     for name, items in by_name.items():
         verified = [a for a in items if a.review_status in ("confirmed", "corrected")]
-        best = verified[0] if verified else max(items, key=lambda a: a.confidence)
+        if any(a.source == "vlm" and a.value != "unknown" for a in items):
+            candidates = [a for a in items if a.source != "student"]
+        else:
+            candidates = items
+        best = verified[0] if verified else max(candidates, key=lambda a: a.confidence)
         out[name] = {
             "value": best.final_value,
             "confidence": 1.0 if verified else round(best.confidence, 2),
