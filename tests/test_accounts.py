@@ -58,6 +58,17 @@ def test_this_pc_needs_no_login(db, tmp_path):
     assert local.get("/api/me").json()["local"] is True
 
 
+def test_requests_forwarded_by_a_tool_on_this_pc_must_log_in(db, tmp_path):
+    """Cloudflare Tunnel, Tailscale Serve/Funnel or a reverse proxy on this PC: the request comes from
+    127.0.0.1 but the person is elsewhere."""
+    local = _client(db, tmp_path, address="127.0.0.1")
+    for header in [{"X-Forwarded-For": "203.0.113.9"}, {"Forwarded": "for=203.0.113.9"},
+                   {"CF-Connecting-IP": "203.0.113.9"}, {"Tailscale-User-Login": "someone@example.com"}]:
+        assert local.get("/api/tracks", headers=header).status_code == 401, header
+        assert local.post("/api/tracks/delete", json={"everything": True}, headers=header).status_code == 401
+    assert local.get("/api/tracks").status_code == 200                 # no forwarding: really this PC
+
+
 def test_viewer_gets_live_view_and_search_only(db, tmp_path):
     db.add_user("vic", accounts.hash_password(PW), "viewer")
     viewer = _client(db, tmp_path)

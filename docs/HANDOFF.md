@@ -19,7 +19,10 @@ cameras** and **commercial use**. They have tested the current version and are h
 - Git: local repo, branch `main`, clean. Latest commits:
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
-- Tests: 117 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- Tests: 118 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- 2026-10-08, remote access for a second site: the user's config now has `web.host: 0.0.0.0` and
+  `web.https: true`; plan is Tailscale on both PCs (README "From another site"). Without an account the app
+  falls back to this PC only (`web.check_access`). BitLocker on C: turned on by the user (was encrypting).
 - 2026-10-08, Phase 2 step 6 done (Phase 2 complete): `docs/camera-notice.md`, `docs/data-protection.md`
   (templates; keep them in line with the code when storage or access changes). run.py now loads `.env` before
   any import, so `HF_HUB_OFFLINE=1` there works.
@@ -71,8 +74,8 @@ camera(s) ─ labeler/sources.py (MSMF webcam, files, RTSP; latest-frame reader 
         tables: cameras, tracks, attributes, embeddings, reviews, alert_rules, alert_events, answer_key,
                 users, login_sessions, audit_log
    labeler/accounts.py  password hashing (scrypt), roles (admin/viewer allowlist), login lock-out;
-                        tools/users.py manages accounts. This PC (127.0.0.1) is always admin, so never put
-                        a reverse proxy on this PC in front of the app: every request would look local.
+                        tools/users.py manages accounts. This PC (127.0.0.1) is always admin, except requests
+                        carrying forwarding headers (web.is_this_pc): a proxy/tunnel on this PC must not be admin.
    └─ labeler/web.py FastAPI app + labeler/static/*.html (no build step)
         pages: / (Live), /review, /reports, /alerts, /answer-key, /audit, /login
         API: /stream, /api/live, /api/status, /api/tracks, /api/tracks/delete, /api/search, /api/ask,

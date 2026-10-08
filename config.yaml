@@ -94,12 +94,12 @@ storage:
   min_free_gb: 5              # warn when the disk has less free space than this
 
 web:
-  host: 127.0.0.1             # this PC only. Use 0.0.0.0 to open it to other devices on your network,
-                              # which requires a login account: tools\users.py add <name> --role admin
+  host: 0.0.0.0               # other devices may connect (they must log in). 127.0.0.1 = this PC only.
+                              # With no login account yet, the app stays on this PC only (see the warning)
   port: 8000
   session_hours: 12           # other devices log in again after this long; this PC never needs to log in
   blur_faces_for_viewers: true   # viewer accounts see blurred faces (live video and pictures); admins see faces
-  https: false                # true: other devices use https://<this PC>:8443 (encrypted); plain http then
+  https: true                 # true: other devices use https://<this PC>:8443 (encrypted); plain http then
                               # works only on this PC (http://127.0.0.1:8000, used by start.bat / stop.bat)
   https_port: 8443
   cert_file: data/tls/cert.pem   # made automatically (self-signed) if missing; or put your own here

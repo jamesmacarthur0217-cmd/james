@@ -163,7 +163,7 @@ def main() -> int:
 
     web = cfg["web"]
     ensure_first_admin(db, web)          # an old shared password becomes the first admin account
-    check_access(web, db.count_users())  # refuses to open the UI to the network while nobody can log in
+    check_access(web, db.count_users())  # while nobody can log in, stays on this PC only
     for t in threads:
         t.start()
     agent = None
@@ -202,9 +202,11 @@ def main() -> int:
     pid_file.parent.mkdir(parents=True, exist_ok=True)
     pid_file.write_text(str(os.getpid()))
     log.info("open http://127.0.0.1:%s on this PC  (stop: Stop button, stop.bat, or Ctrl+C)", web["port"])
-    if web.get("https"):
+    if web["host"] in ("127.0.0.1", "localhost", "::1"):
+        pass   # this PC only
+    elif web.get("https"):
         log.info("other devices: https://<this PC's name or address>:%s", web["https_port"])
-    elif web["host"] not in ("127.0.0.1", "localhost", "::1"):
+    else:
         log.info("other devices: http://<this PC's name or address>:%s (plain HTTP; see web.https)", web["port"])
     try:
         server.run()

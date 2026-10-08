@@ -176,9 +176,11 @@ are drawn as gray "ignored" boxes.
 
 ## Access from other devices
 
-By default only this PC can open the app. To allow other devices on your network, create login accounts and
-set `web.host: 0.0.0.0`. This PC never needs to log in (it is always admin); other devices see a login page.
-The app refuses to open to the network while there is no account.
+To allow other devices, create login accounts and set `web.host: 0.0.0.0`. This PC never needs to log in (it is
+always admin); other devices see a login page. While there is no account, the app stays on this PC only and
+says so in its window. A request passed on by a forwarding tool on this PC (reverse proxy, Cloudflare Tunnel,
+Tailscale Serve/Funnel) looks local, so the app recognizes their headers and asks it to log in like any other
+device.
 
 ```bash
 .venv\Scripts\python.exe tools\users.py add ann --role admin
@@ -200,9 +202,24 @@ open `https://<this PC's name or address>:8443`; plain HTTP stays on this PC onl
 used by start.bat and stop.bat), so nothing changes here. The app makes a self-signed certificate the first
 time (`data/tls/`, valid 825 days, for this PC's name and addresses). Browsers warn about it once per device:
 check that the fingerprint they show matches the "HTTPS certificate fingerprint" line in the app's window,
-then accept. You can put a certificate of your own in `web.cert_file` / `web.key_file` instead. Don't put a
-proxy on this PC in front of the app: every request would then look like it comes from this PC, which never
-logs in. Not meant to be exposed to the internet.
+then accept. You can put a certificate of your own in `web.cert_file` / `web.key_file` instead. Not meant to be
+exposed to the internet directly.
+
+**From another site** (another house or office): use a private network app instead of opening a port on the
+router. With [Tailscale](https://tailscale.com) (free for personal use) on this PC and the other PC, signed in
+to the same account (or the other person invited to your tailnet):
+
+1. Give the other person an account: `tools\users.py add <name> --role viewer`.
+2. Restart VisionLabeler. When Windows asks whether Python may use the network, allow **Private networks** only.
+3. Let Tailscale devices reach the HTTPS port. Tailscale's network counts as "public" in Windows, so in an
+   **administrator** PowerShell run once (only Tailscale addresses, only this port):
+   `New-NetFirewallRule -DisplayName "VisionLabeler HTTPS (Tailscale)" -Direction Inbound -Protocol TCP -LocalPort 8443 -RemoteAddress 100.64.0.0/10 -Action Allow -Profile Any`
+4. On the other PC open `https://<this PC's Tailscale name or 100.x address>:8443`, check the certificate
+   fingerprint, and log in.
+
+Don't use Tailscale Serve/Funnel, Cloudflare Tunnel or port forwarding for this, and don't give remote-desktop
+access (AnyDesk, TeamViewer) to this PC: that person would be "this PC", which is always admin. The live video
+uses a few Mbit/s of this site's upload speed while someone watches.
 
 **Face blurring**: viewer accounts see faces pixelated in the live video, the "in view now" thumbnails and all
 saved pictures (`web.blur_faces_for_viewers`, on by default); admins see faces. Each saved picture gets a
@@ -267,7 +284,7 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-117 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+118 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, alerts,
 reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.

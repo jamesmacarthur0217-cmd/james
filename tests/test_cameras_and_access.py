@@ -34,10 +34,11 @@ def test_env_default_syntax(monkeypatch):
 
 
 def test_network_access_needs_a_login_account():
-    check_access({"host": "127.0.0.1"}, n_users=0)
-    check_access({"host": "0.0.0.0"}, n_users=1)
-    with pytest.raises(SystemExit):
-        check_access({"host": "0.0.0.0"}, n_users=0)
+    web = {"host": "0.0.0.0"}
+    check_access(web, n_users=1)
+    assert web["host"] == "0.0.0.0"
+    check_access(web, n_users=0)                       # nobody can log in: this PC only, the app still runs
+    assert web["host"] == "127.0.0.1"
 
 
 def _app(db, tmp_path):

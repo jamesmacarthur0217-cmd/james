@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import threading
 import shutil
 from datetime import datetime, timedelta
@@ -19,6 +20,7 @@ from .db import Database
 from .pipeline import Pipeline
 
 STATIC = ROOT / "labeler" / "static"
+log = logging.getLogger(__name__)
 
 
 class ReviewIn(BaseModel):
@@ -64,6 +66,15 @@ def _day_range(start: str | None, end: str | None) -> tuple[datetime, datetime]:
 
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 LOCAL_USER = {"username": "this PC", "role": "admin", "local": True}
+# Headers that forwarding tools on this PC add (reverse proxies, Cloudflare Tunnel, Tailscale Serve/Funnel).
+# Such a request only looks local; the person is somewhere else, so they must log in.
+PROXY_HEADERS = ("x-forwarded-for", "forwarded", "x-real-ip", "cf-connecting-ip", "true-client-ip",
+                 "tailscale-user-login", "x-forwarded-host")
+
+
+def is_this_pc(request: Request) -> bool:
+    client = request.client.host if request.client else ""
+    return client in LOCAL_HOSTS and not any(h in request.headers for h in PROXY_HEADERS)
 COOKIE = "vl_session"
 
 
@@ -73,12 +84,13 @@ class LoginIn(BaseModel):
 
 
 def check_access(web: dict, n_users: int) -> None:
-    """Refuse to open the UI to the network while nobody can log in."""
+    """While nobody can log in, the app stays on this PC only, even if web.host would open it to the network
+    (changes `web` in place). The camera keeps working; other devices simply can't connect yet."""
     if web["host"] not in LOCAL_HOSTS and n_users == 0:
-        raise SystemExit(
-            f"web.host is {web['host']!r}, so other devices could open the app, but there is no login account. "
-            "Create one with: .venv\\Scripts\\python.exe tools\\users.py add <name> --role admin "
-            "(or set web.host back to 127.0.0.1).")
+        log.warning("web.host is %s, but there is no login account yet, so the app opens on this PC only. "
+                    "Create one with: .venv\\Scripts\\python.exe tools\\users.py add <name> --role viewer "
+                    "(then restart the app)", web["host"])
+        web["host"] = "127.0.0.1"
 
 
 def ensure_first_admin(db: Database, web: dict) -> None:
@@ -106,11 +118,10 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     @app.middleware("http")
     async def require_login(request: Request, call_next):
         """This PC itself (stop.bat, the local browser) is always admin. Other devices must log in, and a
-        viewer may only do what accounts.VIEWER lists. Behind a proxy every request would look local, so
-        HTTPS is served by the app itself, never through a proxy on this PC."""
-        client = request.client.host if request.client else ""
+        viewer may only do what accounts.VIEWER lists. A request passed on by a forwarding tool on this PC
+        looks local but is not (is_this_pc), so it must log in too."""
         method, path = request.method, request.url.path
-        if client in LOCAL_HOSTS:
+        if is_this_pc(request):
             request.state.user = LOCAL_USER
         else:
             user = await run_in_threadpool(db.session_user, request.cookies.get(COOKIE, ""))
