@@ -18,8 +18,12 @@ from . import schema
 
 log = logging.getLogger(__name__)
 
+# {images} names exactly the pictures sent. Measured 2026-10-08: listing them ("Images: 1 = ...; 2 = ...")
+# instead of "Image 2, if present, is ..." scored higher on both answer keys (see README, Accuracy).
+IMAGES_KIOSK = {False: "Images: 1 = the whole person.",
+                True: "Images: 1 = the whole person; 2 = a close-up of their face."}
 PROMPT_KIOSK = """You are labeling a person seen by a camera.
-Image 1 shows the person. Image 2, if present, is a close-up of their face.
+{images}
 Describe only what is clearly visible. Answer "unknown" whenever something is not clearly visible.
 age_range is an estimate of apparent age, not a fact.
 apparent_gender: answer "man" or "woman" when the face, hair, build or clothing make it reasonably clear;
@@ -87,11 +91,13 @@ class VLMClient:
         images = [_b64(person, 512)]
         if face is not None and mode == "kiosk":
             images.append(_b64(face, 256))
+        prompt = (PROMPT_KIOSK.replace("{images}", IMAGES_KIOSK[len(images) > 1]) if mode == "kiosk"
+                  else PROMPT_SECURITY)
         body = {
             "model": self.model,
             "messages": [{
                 "role": "user",
-                "content": PROMPT_KIOSK if mode == "kiosk" else PROMPT_SECURITY,
+                "content": prompt,
                 "images": images,
             }],
             "format": schema.json_schema(mode),

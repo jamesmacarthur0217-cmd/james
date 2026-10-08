@@ -102,12 +102,12 @@ attributes left out), scored with `tools/evaluate.py`:
 
 | | Qwen3-VL 4B (used) | 4B without face crop | Qwen3-VL 8B | fast classifiers |
 |---|---|---|---|---|
-| Mean accuracy | **85%** | 79%* | 70%* | 75% |
+| Mean accuracy | **86%** | 79%* | 70%* | 75% |
 | Gender | 97% | 34%* | 44%* | 97% |
-| Top color / type | 84% / 70% | 88% / 67% | 69% / 60% | 53% / 73% |
-| Bottoms type / color | 83% / 91% | 96% / 100% | 74% / 70% | 83% / 65% |
+| Top color / type | 88% / 63% | 88% / 67% | 69% / 60% | 53% / 73% |
+| Bottoms type / color | 91% / 96% | 96% / 100% | 74% / 70% | 83% / 65% |
 | Headwear / eyewear / carrying | 100% / 91% / 90% | same | 92% / 87% / 87% | 92% / 87% / 77% |
-| Time per person | 2.0 s | 1.8 s | 3.0 s | ~0 |
+| Time per person | 2.2 s | 1.8 s | 3.0 s | ~0 |
 
 \* before the gender prompt change. Overall = right answers out of all labels ("unknown" counts as wrong).
 The gender prompt change took gender from 44% to 97%. Retraining the fast classifiers on labels made with
@@ -121,6 +121,15 @@ the age model gives age) changed. Longer rewordings were tested and rejected: th
 shirts and sunglasses into glasses. The security prompt is unchanged. The fast classifiers were then
 retrained on labels from this prompt: COCO key unchanged at 75%; on the user's webcam (from stored
 embeddings) top type 27% → 82%, glasses 38% → 46%.
+
+**Kiosk prompt, naming the pictures (2026-10-08)**: "Images: 1 = the whole person; 2 = a close-up of their
+face" instead of "Image 2, if present, is a close-up of their face". Own webcam (24 people): 85.9% → 88.9%
+(gender 69% → 81%, glasses 77% → 85%, the rest unchanged). COCO key: 85% → 86% (without age, which the app
+does not take from the vision model: 88.3% → 89.5%; bottoms type 83% → 91%, color 91% → 96%, top color
+84% → 88%, but top type 70% → 63%, 2 people). Small samples; kept because both keys improved overall.
+**Rejected**: sending an extra close-up of the upper body for the top's type and color. Own webcam: no change
+in top type or color, slower (3.1 s vs 2.1 s per person); COCO: 89.9% → 86.1% (top type +1 person, bottoms
+type 91% → 78% and color 96% → 78%).
 
 The fast classifiers learned from COCO photos and transfer poorly to the webcam (top color 5%, carrying 25%
 there; their confident glasses answers right only 5 of 11). So once the vision model has answered an
@@ -205,6 +214,15 @@ went offline), a **blank picture** (10 s; lens covered or another app using the 
 (below 5 frames per second for 30 s). The first 30 s after start are ignored while cameras warm up. A problem
 shows as a pop-up and a banner above the live picture while it lasts; the Alerts page lists them with start
 and end times (kept `storage.audit_retention_days`). Settings: `health:` in config.yaml.
+
+## Night (infrared) pictures
+
+When most of a person's frames are black and white (an infrared camera at night), top and bottom **colors are
+stored as unknown** from every source: the vision model and the fast classifiers could only guess them from a
+gray picture. Clothing type, carried items, headwear and the rest are labeled as usual. This is decided again
+each time the person is labeled, so someone still in view when the camera switches back to color at dawn gets
+real colors; guesses made at night never count. The live picture shows "LOW COLOR (IR/night)" meanwhile, and
+the person is marked "low light" in the people list.
 
 ## Things that look like people
 

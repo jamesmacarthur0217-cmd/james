@@ -20,6 +20,13 @@ cameras** and **commercial use**. They have tested the current version and are h
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
 - Tests: 150 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- 2026-10-08, Phase 4 night mode done: mostly black-and-white frames (`Pipeline._is_night`) -> colors stored as
+  unknown from every source; night answers are blanked before joining the VLM history (no carry-over at dawn).
+- 2026-10-08, Phase 4 kiosk step 2 (clothing): an extra upper-body close-up for the VLM was measured and
+  REJECTED (own camera no gain and slower; COCO 89.9% -> 86.1%, bottoms worse). Kept instead: the kiosk prompt
+  now names the pictures sent (`vlm.IMAGES_KIOSK`): own camera 85.9% -> 88.9%, COCO (without age) 88.3% ->
+  89.5%, but COCO top type 70% -> 63% (2 people). Vocabulary refinements (coat, polo) not tried: the answer
+  keys don't have those values, so they can't be measured yet.
 - 2026-10-08, Phase 4 kiosk step 1 done: Reports by hour (heatmap hour x gender/age group, time-in-view
   histogram, typical day over several days; `reports.hours_of_day`, `reports.dwell_histogram`). Charts share
   `drawBars` in reports.html; heatmap blues skip the middle steps so cell numbers keep >= 5.1:1 contrast.

@@ -91,13 +91,13 @@ fast classifiers were trained on **COCO photos with mixed Flickr licenses**. Fin
 Kiosk:
 - **Done 2026-10-08.** Demographics report by hour (age group × gender), dwell histogram, busiest periods (extends
   `labeler/reports.py`).
-- Higher-resolution upper-body crop for clothing; top type is the weakest attribute (73%), so also test
+- **Tried 2026-10-08, rejected** (worse on COCO; see HANDOFF). Higher-resolution upper-body crop for clothing; top type is the weakest attribute (73%), so also test
   vocabulary refinements (coat vs jacket, polo, tank top) against the answer key.
 
 Security:
 - **Small, distant people**: per-camera `imgsz` and optional tiled detection (slicing) for 4 MP+ cameras;
   measure the recall gain on footage with far-away people.
-- **Night / infrared**: an IR mode that skips color attributes (low-color detection already exists in
+- **Done 2026-10-08.** **Night / infrared**: an IR mode that skips color attributes (low-color detection already exists in
   `labeler/colors.py:is_low_color`) and labels shape and carried items only.
 - **Person timeline across cameras**: "where was this person": look-alike search across cameras, ordered by
   time, with a time-plausibility filter. A dedicated re-identification model only after a license check.
