@@ -94,6 +94,11 @@ web:
                               # which requires a login account: tools\users.py add <name> --role admin
   port: 8000
   session_hours: 12           # other devices log in again after this long; this PC never needs to log in
+  https: false                # true: other devices use https://<this PC>:8443 (encrypted); plain http then
+                              # works only on this PC (http://127.0.0.1:8000, used by start.bat / stop.bat)
+  https_port: 8443
+  cert_file: data/tls/cert.pem   # made automatically (self-signed) if missing; or put your own here
+  key_file: data/tls/key.pem
   # Older setups: a shared password in .env (VL_WEB_PASSWORD) becomes the first admin account at startup.
   username: admin
   password: ${VL_WEB_PASSWORD:-}

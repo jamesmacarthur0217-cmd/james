@@ -8,6 +8,7 @@ requests
 sqlalchemy>=2.0
 fastapi>=0.110
 uvicorn>=0.29
+cryptography>=42        # self-signed HTTPS certificate (web.https)
 lap>=0.5.12
 transformers>=4.50
 sentencepiece

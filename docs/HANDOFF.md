@@ -19,9 +19,11 @@ cameras** and **commercial use**. They have tested the current version and are h
 - Git: local repo, branch `main`, clean. Latest commits:
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
-- Tests: 99 pass (`.venv\Scripts\python.exe -m pytest -q`, ~15 s).
-- 2026-10-08, Phase 2 steps 1–2 done: login accounts with admin/viewer roles replace the shared password;
-  audit log (table `audit_log`, admin page /audit, `audit()` calls in `labeler/web.py` endpoints).
+- Tests: 104 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- 2026-10-08, Phase 2 steps 1–3 done: login accounts with admin/viewer roles replace the shared password;
+  audit log (table `audit_log`, admin page /audit, `audit()` calls in `labeler/web.py` endpoints);
+  HTTPS (`web.https`, off by default): HTTPS on 8443 for the network + plain HTTP on 127.0.0.1 only
+  (`run.py:_web_servers`, `labeler/tls.py`). New package: `cryptography` (installed, in requirements.txt).
   The user's config has `web.host: 127.0.0.1` and no accounts, so nothing changes for them until they open
   the app to the network.
 - 2026-10-08, Phase 0 step 1 done: teacher labels redone with the current prompt (1,534 people, 57 min;

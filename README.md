@@ -193,7 +193,16 @@ Other commands: `users.py list`, `password <name>`, `role <name> admin|viewer`, 
 need 10+ characters and are stored only as salted scrypt hashes. A login lasts `web.session_hours` (12);
 changing a password or role logs that user out everywhere. Five wrong passwords from one device block it
 for 5 minutes. A shared password from older setups (`VL_WEB_PASSWORD` in `.env`) becomes the first admin
-account (user `admin`) at startup. It is plain HTTP: fine on a home or office network, not for the internet.
+account (user `admin`) at startup.
+
+**HTTPS** (encrypted, recommended whenever other devices use the app): set `web.https: true`. Other devices then
+open `https://<this PC's name or address>:8443`; plain HTTP stays on this PC only (`http://127.0.0.1:8000`,
+used by start.bat and stop.bat), so nothing changes here. The app makes a self-signed certificate the first
+time (`data/tls/`, valid 825 days, for this PC's name and addresses). Browsers warn about it once per device:
+check that the fingerprint they show matches the "HTTPS certificate fingerprint" line in the app's window,
+then accept. You can put a certificate of your own in `web.cert_file` / `web.key_file` instead. Don't put a
+proxy on this PC in front of the app: every request would then look like it comes from this PC, which never
+logs in. Not meant to be exposed to the internet.
 
 **Audit log** (admin page *Audit log*): who logged in (and failed), watched the live video, searched or asked,
 looked up look-alikes, viewed a report, exported CSV, deleted people, changed alert rules, reviewed labels,
@@ -233,8 +242,8 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-99 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
-the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, supervisor, alerts,
+104 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, supervisor, alerts,
 reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.
 
 ## Files

@@ -75,6 +75,9 @@ def main() -> int:
         log.error("VisionLabeler (or another program) is already using port %s. Open http://127.0.0.1:%s, "
                   "or stop the running copy with stop.bat first.", cfg["web"]["port"], cfg["web"]["port"])
         return 0
+    if not args.no_web and cfg["web"].get("https") and _port_in_use(cfg["web"]["host"], cfg["web"]["https_port"]):
+        log.error("another program is already using the HTTPS port %s (web.https_port)", cfg["web"]["https_port"])
+        return 1
 
     crop_dir = resolve(cfg["storage"]["crop_dir"])
     crop_dir.mkdir(parents=True, exist_ok=True)
@@ -157,7 +160,6 @@ def main() -> int:
         _finish_labeling(worker)
         return EXIT_CRASHED if any(p.crashed for p in pipelines) else 0
 
-    import uvicorn
     from labeler.web import check_access, create_app, ensure_first_admin
 
     web = cfg["web"]
@@ -170,9 +172,7 @@ def main() -> int:
         from labeler.agent import QueryAgent
         agent = QueryAgent(cfg, db, embedder, [p.name for p in pipelines])
     app = create_app(cfg, db, pipelines, embedder, alerts, agent)
-    # timeout_graceful_shutdown: don't wait forever for open connections (a browser showing the live video).
-    server = uvicorn.Server(uvicorn.Config(app, host=web["host"], port=web["port"], log_level="warning",
-                                           timeout_graceful_shutdown=3))
+    server = _web_servers(app, web)
 
     def request_shutdown() -> None:
         app.state.stopping.set()   # ends live video streams
@@ -200,7 +200,11 @@ def main() -> int:
     pid_file = resolve("data/app.pid")
     pid_file.parent.mkdir(parents=True, exist_ok=True)
     pid_file.write_text(str(os.getpid()))
-    log.info("open http://%s:%s  (stop: Stop button, stop.bat, or Ctrl+C)", web["host"], web["port"])
+    log.info("open http://127.0.0.1:%s on this PC  (stop: Stop button, stop.bat, or Ctrl+C)", web["port"])
+    if web.get("https"):
+        log.info("other devices: https://<this PC's name or address>:%s", web["https_port"])
+    elif web["host"] not in ("127.0.0.1", "localhost", "::1"):
+        log.info("other devices: http://<this PC's name or address>:%s (plain HTTP; see web.https)", web["port"])
     try:
         server.run()
     finally:
@@ -214,6 +218,61 @@ def main() -> int:
         pid_file.unlink(missing_ok=True)
         log.info("stopped")
     return exit_code[0]
+
+
+def _web_servers(app, web: dict):
+    """The web server; with web.https also an HTTPS server for other devices. Plain HTTP then listens on this
+    PC only (start.bat, stop.bat and the local browser use it, without certificate warnings)."""
+    import contextlib
+
+    import uvicorn
+    # timeout_graceful_shutdown: don't wait forever for open connections (a browser showing the live video).
+    common = {"log_level": "warning", "timeout_graceful_shutdown": 3}
+    if not web.get("https"):
+        return uvicorn.Server(uvicorn.Config(app, host=web["host"], port=web["port"], **common))
+
+    class FollowerServer(uvicorn.Server):
+        """Leaves Ctrl+C to the main server (signal handlers are per process); stops when it stops."""
+        @contextlib.contextmanager
+        def capture_signals(self):
+            yield
+
+    from labeler.tls import ensure_certificate
+    cert, key = resolve(web["cert_file"]), resolve(web["key_file"])
+    log.info("HTTPS certificate fingerprint (SHA-256): %s", ensure_certificate(cert, key))
+    plain = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=web["port"], **common))
+    secure = FollowerServer(uvicorn.Config(app, host=web["host"], port=web["https_port"],
+                                           ssl_certfile=str(cert), ssl_keyfile=str(key), **common))
+    return _ServerPair(plain, secure)
+
+
+class _ServerPair:
+    """Plain HTTP for this PC plus HTTPS for the network, started and stopped together. Has the same
+    `should_exit` / `run()` as one uvicorn server, so the Stop button and the watchdog work unchanged."""
+
+    def __init__(self, plain, secure):
+        self.plain, self.secure = plain, secure
+
+    @property
+    def should_exit(self) -> bool:
+        return self.plain.should_exit or self.secure.should_exit
+
+    @should_exit.setter
+    def should_exit(self, value: bool) -> None:
+        self.plain.should_exit = self.secure.should_exit = value
+
+    def run(self) -> None:
+        import asyncio
+
+        async def follow():
+            while not self.should_exit:
+                await asyncio.sleep(0.2)
+            self.should_exit = True
+
+        async def both():
+            await asyncio.gather(self.plain.serve(), self.secure.serve(), follow())
+
+        asyncio.run(both())
 
 
 def _port_in_use(host: str, port: int) -> bool:
