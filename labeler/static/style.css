@@ -94,3 +94,15 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .login h1 { font-size: 18px; margin: 0 0 4px; }
 .login label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
 .login .reason { color: var(--warn); }
+/* Zones: drawing layer over the live picture (index.html) and the zone list under it. */
+.video { position: relative; }
+#zone-draw { position: absolute; cursor: crosshair; }
+#zone-draw .zd-shape { fill: rgba(40, 200, 230, 0.18); stroke: #28c8e6; stroke-width: 2; }
+#zone-draw .zd-point { fill: #fff; stroke: #28c8e6; stroke-width: 2; }
+#zone-draw .zd-arrow { stroke: #28c8e6; stroke-width: 3; }
+#zone-draw .zd-tip { fill: #28c8e6; }
+#zone-draw .zd-text { fill: #28c8e6; font: 600 13px system-ui, sans-serif; }
+.zone-bar { margin-top: 10px; }
+.zone-list { display: flex; flex-direction: column; gap: 6px; }
+.zone-item { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; }

@@ -58,6 +58,13 @@ def test_this_pc_needs_no_login(db, tmp_path):
     assert local.get("/api/me").json()["local"] is True
 
 
+def test_pages_and_scripts_are_never_stale_after_an_update(db, tmp_path):
+    local = _client(db, tmp_path, address="127.0.0.1")
+    for path in ["/", "/static/session.js", "/static/style.css"]:
+        assert local.get(path).headers["cache-control"] == "no-cache", path
+    assert "no-cache" not in local.get("/api/tracks").headers.get("cache-control", "")
+
+
 def test_requests_forwarded_by_a_tool_on_this_pc_must_log_in(db, tmp_path):
     """Cloudflare Tunnel, Tailscale Serve/Funnel or a reverse proxy on this PC: the request comes from
     127.0.0.1 but the person is elsewhere."""

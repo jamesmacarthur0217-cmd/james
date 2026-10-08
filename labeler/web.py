@@ -128,12 +128,12 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         viewer may only do what accounts.VIEWER lists. A request passed on by a forwarding tool on this PC
         looks local but is not (is_this_pc), so it must log in too."""
         method, path = request.method, request.url.path
+        page = method == "GET" and not path.startswith(("/api/", "/stream", "/crops/", "/static/"))
         if is_this_pc(request):
             request.state.user = LOCAL_USER
         else:
             user = await run_in_threadpool(db.session_user, request.cookies.get(COOKIE, ""))
             request.state.user = user
-            page = method == "GET" and not path.startswith(("/api/", "/stream", "/crops/", "/static/"))
             if user is None:
                 if not accounts.is_public(method, path):
                     if page:
@@ -143,7 +143,12 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                 if page:
                     return RedirectResponse("/", status_code=303)   # a viewer opening an admin page
                 return JSONResponse({"detail": "your account may not do this"}, status_code=403)
-        return await call_next(request)
+        response = await call_next(request)
+        # Pages, scripts and styles: always ask whether there is a newer version (an unchanged file is a
+        # quick "not modified"), so a browser never keeps showing a page from before an update.
+        if (page or path.startswith("/static/")) and "cache-control" not in response.headers:
+            response.headers["Cache-Control"] = "no-cache"
+        return response
 
     @app.get("/login")
     def login_page():

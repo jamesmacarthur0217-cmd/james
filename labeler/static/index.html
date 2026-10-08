@@ -20,10 +20,26 @@
       <h2><span class="live-dot" id="live-dot"></span>Live camera</h2>
       <div class="cam-tabs" id="cam-tabs" hidden></div>
       <span class="muted" id="live-caption"></span>
+      <button id="zones-btn" class="admin-only" title="Draw areas and counting lines on this camera">Zones</button>
       <button id="fullscreen" title="Show the live view full screen">Full screen</button>
     </div>
     <div class="video" id="video">
       <img id="live" src="/stream" alt="Live camera feed with labels">
+      <svg id="zone-draw" hidden></svg>
+    </div>
+    <div class="zone-bar" id="zone-bar" hidden>
+      <p class="hint" id="zone-hint"></p>
+      <div class="search">
+        <select id="zone-kind">
+          <option value="area">Area: click its corners</option>
+          <option value="line">Counting line: click 2 points</option>
+        </select>
+        <input id="zone-name" placeholder="Name, e.g. door" maxlength="100">
+        <button id="zone-undo">Undo point</button>
+        <button id="zone-save" class="primary" disabled>Save</button>
+        <span class="muted" id="zone-msg"></span>
+      </div>
+      <div class="zone-list" id="zone-list"></div>
     </div>
   </section>
   <div class="side">
@@ -261,6 +277,104 @@ $("fullscreen").onclick = () => {
   else $("video").requestFullscreen().catch(() => {});
 };
 
+// Zones (admin): click on the live picture to draw an area or a counting line. Points are stored as
+// fractions of the picture. The picture keeps its shape inside the frame (black bars), so clicks are
+// measured against where the picture really is.
+const zoneDraw = { on: false, points: [] };
+const ZONE_HINT = {
+  area: "Click the corners of the area on the picture, then name it and Save. People in it are counted, with how long they stay.",
+  line: "Click 2 points across the way people walk. The arrow shows the \"in\" direction; click the points the other way round to flip it.",
+};
+function zoneCamera() { return camera || cameraNames[0] || "cam1"; }
+
+function pictureBox() {
+  const img = $("live"), r = img.getBoundingClientRect(), v = $("video").getBoundingClientRect();
+  const iw = img.naturalWidth || 16, ih = img.naturalHeight || 9;
+  const scale = Math.min(r.width / iw, r.height / ih);
+  const w = iw * scale, h = ih * scale;
+  return { left: r.left - v.left + (r.width - w) / 2, top: r.top - v.top + (r.height - h) / 2, width: w, height: h };
+}
+
+function drawZonePreview() {
+  const svg = $("zone-draw"), b = pictureBox();
+  Object.assign(svg.style, { left: b.left + "px", top: b.top + "px", width: b.width + "px", height: b.height + "px" });
+  svg.setAttribute("viewBox", `0 0 ${b.width} ${b.height}`);
+  const px = zoneDraw.points.map(([x, y]) => [x * b.width, y * b.height]);
+  const kind = $("zone-kind").value;
+  let html = "";
+  if (px.length > 1) {
+    const pts = px.map(p => p.join(",")).join(" ");
+    html += kind === "area" && px.length > 2 ? `<polygon points="${pts}" class="zd-shape"/>`
+                                             : `<polyline points="${pts}" class="zd-shape"/>`;
+  }
+  if (kind === "line" && px.length === 2) {
+    const [[ax, ay], [bx, by]] = px, mx = (ax + bx) / 2, my = (ay + by) / 2;
+    const nx = -(by - ay), ny = bx - ax, n = Math.hypot(nx, ny) || 1;
+    const tx = mx + nx / n * 34, ty = my + ny / n * 34;
+    html += `<line x1="${mx}" y1="${my}" x2="${tx}" y2="${ty}" class="zd-arrow"/>`
+         + `<circle cx="${tx}" cy="${ty}" r="4" class="zd-tip"/><text x="${tx + 6}" y="${ty + 4}" class="zd-text">in</text>`;
+  }
+  html += px.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" class="zd-point"/>`).join("");
+  svg.innerHTML = html;
+  const enough = kind === "area" ? zoneDraw.points.length >= 3 : zoneDraw.points.length === 2;
+  $("zone-save").disabled = !enough || !$("zone-name").value.trim();
+  $("zone-hint").textContent = ZONE_HINT[kind];
+}
+
+$("zone-draw").addEventListener("click", (e) => {
+  const r = $("zone-draw").getBoundingClientRect();
+  const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+  if ($("zone-kind").value === "line" && zoneDraw.points.length >= 2) zoneDraw.points = [];
+  zoneDraw.points.push([+x.toFixed(4), +y.toFixed(4)]);
+  drawZonePreview();
+});
+$("zone-kind").onchange = () => { zoneDraw.points = []; drawZonePreview(); };
+$("zone-name").oninput = drawZonePreview;
+$("zone-undo").onclick = () => { zoneDraw.points.pop(); drawZonePreview(); };
+document.addEventListener("keydown", (e) => {
+  if (zoneDraw.on && e.key === "Escape") { zoneDraw.points = []; drawZonePreview(); }
+});
+new ResizeObserver(() => { if (zoneDraw.on) drawZonePreview(); }).observe($("live"));
+
+async function loadZoneList() {
+  const zones = await (await fetch("/api/zones?camera=" + encodeURIComponent(zoneCamera()))).json();
+  $("zone-list").innerHTML = zones.length
+    ? zones.map(z => `<div class="zone-item"><span><b>${esc(z.name)}</b> <span class="muted">${z.kind === "line"
+        ? "counting line" : "area"}</span></span><button class="danger-quiet" data-id="${z.id}"
+        data-name="${esc(z.name)}">Delete</button></div>`).join("")
+    : '<div class="muted">No zones on this camera yet.</div>';
+}
+
+$("zone-list").onclick = async (e) => {
+  const id = e.target.dataset.id;
+  if (!id || !confirm(`Delete "${e.target.dataset.name}"? Counts already made stay in Reports.`)) return;
+  await fetch(`/api/zones/${id}`, { method: "DELETE" });
+  loadZoneList();
+};
+
+$("zone-save").onclick = async () => {
+  const r = await fetch("/api/zones", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ camera: zoneCamera(), name: $("zone-name").value.trim(),
+                           kind: $("zone-kind").value, points: zoneDraw.points }) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { $("zone-msg").textContent = data.detail || "Could not save."; return; }
+  $("zone-msg").textContent = `Saved "${data.name}".`;
+  zoneDraw.points = [];
+  $("zone-name").value = "";
+  drawZonePreview();
+  loadZoneList();
+};
+
+$("zones-btn").onclick = () => {
+  zoneDraw.on = !zoneDraw.on;
+  zoneDraw.points = [];
+  $("zones-btn").classList.toggle("primary", zoneDraw.on);
+  $("zone-draw").hidden = $("zone-bar").hidden = !zoneDraw.on;
+  $("zone-msg").textContent = "";
+  if (zoneDraw.on) { drawZonePreview(); loadZoneList(); }
+};
+
 // "In view now": one card per person on screen, updated several times a second.
 // Cards are kept and updated in place so thumbnails don't flicker.
 const STATUS_TEXT = { observing: "observing…", labeling: "analyzing…", updating: "re-analyzing…",
@@ -328,6 +442,7 @@ function selectCamera(name) {
   for (const el of cards.values()) el.remove();
   cards.clear();
   pollLive();
+  if (zoneDraw.on) { zoneDraw.points = []; drawZonePreview(); loadZoneList(); }
 }
 
 async function loadCameras() {

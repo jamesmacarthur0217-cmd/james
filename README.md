@@ -156,6 +156,23 @@ detection and colors run every frame for everyone. Things that turned out to mat
   ≥ 0.75), or within 30 s looking very similar (≥ 0.90), continues the same record. Tested: 2 s and 10 s gaps
   → 1 record (before: 2); 40 s → 2 records, as intended.
 
+## Zones and counting lines
+
+On the Live page (admin), **Zones** lets you draw on the camera picture:
+
+- an **area** (click its corners): people in it are counted, with how long they stay (dwell time);
+- a **counting line** (click 2 points across the way people walk): crossings are counted as *in* (the arrow's
+  direction) and *out*. Click the points the other way round to flip the arrow.
+
+Zones are drawn on the live picture, with how many people are in each area now. Where a person "is" is the
+middle of them on kiosk cameras (feet are usually out of view) and their feet on security cameras. A change
+only counts after `zones.min_frames` (3) frames in a row, so someone standing on a border is not counted
+again and again; very brief detections are never counted. Deleting a zone keeps its counts. Counts are removed
+with the people they belong to (delete, retention).
+
+After updating the app, press Ctrl+F5 once on each device so the browser loads the new pages; from this
+version on, pages are always checked for updates.
+
 ## Things that look like people
 
 Pictures of people (a monitor, reflection, poster, TV) are detected as people. In kiosk mode new people under
