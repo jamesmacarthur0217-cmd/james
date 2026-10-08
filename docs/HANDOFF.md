@@ -19,7 +19,9 @@ cameras** and **commercial use**. They have tested the current version and are h
 - Git: local repo, branch `main`, clean. Latest commits:
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
-- Tests: 129 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- Tests: 134 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- 2026-10-08, Phase 3 step 2 done: time in view and facing the camera per person (`tracks.in_view_s`,
+  `tracks.facing_s`, `geometry.facing_camera`), in Reports and the CSV. Facing threshold set from 6 demo people.
 - 2026-10-08, Phase 3 step 1 done: zones and counting lines (`labeler/zones.py`, tables `zones` and
   `zone_events`, API `/api/zones`, drawing tool on the Live page, counts in Reports, alert condition
   `["zone", name]` in `labeler/alerts.py`). Pages are now sent with Cache-Control: no-cache.
@@ -144,6 +146,12 @@ Then open http://127.0.0.1:8001 (the browser pane works), and stop with
    test on port 8001.
 6. **Privacy**: when checking the webcam, prefer the API/logs over screenshots; delete any test recordings.
 7. **Batch files** must keep CRLF line endings (`.gitattributes` enforces this).
+8. **Commit messages with double quotes** fail from PowerShell 5.1 (it splits them into extra arguments):
+   write the message to a file and use `git commit -F <file>`.
+9. **Test runs** of the app use a scratch config (database, pictures and certificate outside `data/`) with
+   `web.host: 127.0.0.1` and `web.https: false`: the real config opens the app to the network with HTTPS.
+10. **Schema changes**: new tables appear by themselves (`create_all`); new columns on existing tables go in
+   `db.NEW_COLUMNS` (added at startup).
 
 ## 7. Conventions
 

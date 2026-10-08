@@ -290,7 +290,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         s, e = _day_range(start, end)
         audit(request, "view report", f"{s:%Y-%m-%d} to {(e - timedelta(days=1)):%Y-%m-%d}"
                                       + (f", camera {camera}" if camera else ""))
-        return {**reports.summarize(db.people_between(s, e, camera), s, e), "zones": db.zone_counts(s, e, camera)}
+        return {**reports.summarize(db.people_between(s, e, camera), s, e, cfg["engagement"]["looked_s"]),
+                "zones": db.zone_counts(s, e, camera)}
 
     @app.get("/api/reports/export.csv")
     def report_csv(request: Request, start: str | None = None, end: str | None = None, camera: str | None = None):

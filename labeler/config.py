@@ -21,6 +21,7 @@ DEFAULTS: dict = {
         "min_box_area": {"kiosk": 0.03, "security": 0.0},
     },
     "zones": {"min_frames": 3},
+    "engagement": {"facing_min": 0.6, "looked_s": 3.0},
     "tracking": {
         "min_frames_keep": 8,
         "min_frames_for_label": 20,

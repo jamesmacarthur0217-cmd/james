@@ -67,6 +67,8 @@ class TrackState:
     age_label: tuple[str, str, float] | None = None   # (attribute, value, confidence) from the age model
     zones: zones_mod.PersonZones = field(default_factory=zones_mod.PersonZones)
     zone_log: list[dict] = field(default_factory=list)   # zone events waiting for this person's record
+    in_view_s: float = 0.0     # time actually seen (a gap while tracked counts at most 1 s per frame)
+    facing_s: float = 0.0      # of which facing the camera (geometry.frontality)
 
     def colors(self) -> dict[str, tuple[str, float]]:
         out = {}
@@ -300,8 +302,16 @@ class Pipeline:
         cx, cy = (x1 + x2) / 2 / w, (y1 + y2) / 2 / h
         return any(zx1 <= cx <= zx2 and zy1 <= cy <= zy2 for zx1, zy1, zx2, zy2 in self.ignore_zones)
 
+    def _count_time(self, st: TrackState, kpts: np.ndarray | None, now: float) -> None:
+        """Time in view and time facing the camera, from the gap since this person's previous frame."""
+        dt = min(1.0, max(0.0, now - st.last_seen))
+        st.in_view_s += dt
+        if geometry.facing_camera(kpts, self.cfg["engagement"]["facing_min"]):
+            st.facing_s += dt
+
     def _update(self, st: TrackState, frame: np.ndarray, box: tuple, kpts: np.ndarray | None,
                 now: float, low_color: bool, tcfg: dict) -> None:
+        self._count_time(st, kpts, now)
         st.n_frames += 1
         st.last_seen = now
         st.box = box
@@ -531,6 +541,8 @@ class Pipeline:
         old.thumb_blurred = new.thumb_blurred
         old.zones = new.zones          # their zones were closed when they left; where they are now
         old.zone_log += new.zone_log   # events since they came back, stored under the old record
+        old.in_view_s += new.in_view_s
+        old.facing_s += new.facing_s
         old.upper_hist += new.upper_hist
         old.lower_hist += new.lower_hist
         k = self.cfg["tracking"]["best_frames"]
@@ -566,6 +578,7 @@ class Pipeline:
         self.db.update_track(
             st.db_id, status="finished", ended_at=datetime.now(), n_frames=st.n_frames,
             low_light=st.low_light_frames > st.n_frames / 2,
+            in_view_s=round(st.in_view_s, 1), facing_s=round(st.facing_s, 1),
         )
         # A VLM result arriving after this point is still written to the database.
         self.by_db_id.pop(st.db_id, None)

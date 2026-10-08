@@ -79,7 +79,7 @@ fast classifiers were trained on **COCO photos with mixed Flickr licenses**. Fin
 
 1. **Done 2026-10-08** (stored in the database, not config). **Zones and counting lines** per camera (config plus a small drawing tool on the Live page): count entries
    and exits, time spent in each zone; store as `zone_events`. Alerts can use "entered zone X".
-2. **Dwell time and engagement**: time in view (already `started_at` / `ended_at`), share of time facing the
+2. **Done 2026-10-08.** **Dwell time and engagement**: time in view (already `started_at` / `ended_at`), share of time facing the
    camera (from `geometry.frontality`). Added to Reports.
 3. **Camera health**: alerts for camera offline, blank picture, or FPS drop (status already tracked in
    `Pipeline.status()`); shown on the Live page and in Alerts.

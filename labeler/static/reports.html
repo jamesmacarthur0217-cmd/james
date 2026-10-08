@@ -179,6 +179,13 @@ async function load() {
     <div class="tile"><div class="num">${busiest.count ? esc(label(busiest.t, data.unit)) : "-"}</div>
       <div class="lbl">busiest ${data.unit}${busiest.count ? ` (${busiest.count})` : ""}</div></div>
     <div class="tile"><div class="num">${Object.keys(data.cameras).length}</div><div class="lbl">cameras with people</div></div>`;
+  const g = data.engagement;
+  if (g && g.people) $("tiles").innerHTML += `
+    <div class="tile"><div class="num">${duration(g.avg_in_view_s)}</div><div class="lbl">average time in view</div></div>
+    <div class="tile"><div class="num">${Math.round(g.facing_share * 100)}%</div>
+      <div class="lbl">of that time facing the camera</div></div>
+    <div class="tile"><div class="num">${g.looked} <small>of ${g.people}</small></div>
+      <div class="lbl">looked at the camera ${g.looked_s} s or more</div></div>`;
   drawTimeline(data);
   drawZones(data);
   drawBreakdowns(data);

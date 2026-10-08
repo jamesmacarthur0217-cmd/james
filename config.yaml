@@ -51,6 +51,13 @@ tracking:
 zones:
   min_frames: 3               # a person must be in/out (or across a line) this many frames in a row to count
 
+# Time in view and time facing the camera (Reports). A frame counts as facing when the nose is near the middle
+# between the eyes and the face looks straight enough (0..1). Set from 6 people in two demo photos; check it
+# on your own camera.
+engagement:
+  facing_min: 0.6
+  looked_s: 3                 # "looked at the camera" = facing it at least this many seconds in total
+
 vlm:
   enabled: true
   host: http://127.0.0.1:11434    # not "localhost": on this PC that adds ~2 s to every request

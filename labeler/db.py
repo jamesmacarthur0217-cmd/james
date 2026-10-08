@@ -84,6 +84,8 @@ class Track(Base):
     crop_path: Mapped[str | None] = mapped_column(String(300))
     face_path: Mapped[str | None] = mapped_column(String(300))
     low_light: Mapped[bool] = mapped_column(Boolean, default=False)
+    in_view_s: Mapped[float | None] = mapped_column(Float)   # time actually in view (gaps not counted)
+    facing_s: Mapped[float | None] = mapped_column(Float)    # of which facing the camera
     attributes: Mapped[list[Attribute]] = relationship(back_populates="track", cascade="all, delete-orphan")
     embeddings: Mapped[list[Embedding]] = relationship(cascade="all, delete-orphan")
 
@@ -247,6 +249,11 @@ def resolve(attrs: list[Attribute]) -> dict[str, dict]:
     return out
 
 
+# Columns added to existing tables after the first release. create_all() makes new tables but never changes
+# existing ones, so these are added at startup when missing (FLOAT works on SQLite and PostgreSQL).
+NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT"}}
+
+
 def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
@@ -291,6 +298,7 @@ class Database:
             with self.engine.begin() as conn:
                 conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         Base.metadata.create_all(self.engine)
+        self._add_missing_columns()
         if self.is_postgres:
             # Approximate nearest-neighbour index, so search stays fast with millions of people.
             with self.engine.begin() as conn:
@@ -320,6 +328,16 @@ class Database:
             s.add(t)
             s.flush()
             return t.id
+
+    def _add_missing_columns(self) -> None:
+        from sqlalchemy import inspect
+        insp = inspect(self.engine)
+        with self.engine.begin() as conn:
+            for table, columns in NEW_COLUMNS.items():
+                have = {c["name"] for c in insp.get_columns(table)}
+                for name, sql_type in columns.items():
+                    if name not in have:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}"))
 
     def update_track(self, track_id: int, **fields) -> None:
         with self.Session.begin() as s:
@@ -395,6 +413,8 @@ class Database:
             "n_frames": t.n_frames,
             "crop": t.crop_path,
             "low_light": t.low_light,
+            "in_view_s": t.in_view_s,
+            "facing_s": t.facing_s,
             "attributes": resolve(t.attributes),
         }
 

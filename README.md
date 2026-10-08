@@ -173,6 +173,14 @@ only counts after `zones.min_frames` (3) frames in a row, so someone standing on
 again and again; very brief detections are never counted. Deleting a zone keeps its counts. Counts are removed
 with the people they belong to (delete, retention).
 
+**Time in view and facing the camera**: for each person the app records how long they were actually in view
+(a gap while still tracked counts at most 1 s per frame; time away between visits is not counted) and how much
+of it they faced the camera: nose near the middle between the eyes and a straight enough face
+(`engagement.facing_min`, 0.6). Reports shows the average time in view, the share of it spent facing the camera,
+and how many people faced it at least `engagement.looked_s` (3) seconds; the CSV has both times per person.
+The facing check was set from 6 people in two demo photos (it rejects a head turned about 50 degrees), so check
+it on your own camera. People recorded before this version have no times.
+
 After updating the app, press Ctrl+F5 once on each device so the browser loads the new pages; from this
 version on, pages are always checked for updates.
 
@@ -304,7 +312,7 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-129 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+134 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, alerts,
 reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.
