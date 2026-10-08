@@ -19,7 +19,10 @@ cameras** and **commercial use**. They have tested the current version and are h
 - Git: local repo, branch `main`, clean. Latest commits:
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
-- Tests: 156 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- Tests: 157 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- 2026-10-08, Phase 4 capacity measured (Phase 4 complete): 2 cameras at full 15 fps, 4 at ~10 fps each, 6-8 at
+  5-7 fps with a growing labeling queue (README "How many cameras?"). GPU 65-79% busy, so the limit is probably
+  the single Python process; batching or one process per camera not done yet.
 - 2026-10-08, Phase 4 far-away people: measured on COCO val2017 (true boxes from Ultralytics'
   coco2017labels.zip, downloaded with the user's OK to data/datasets/coco/labels/val2017). Tiling rejected (13x
   false alarms); per-camera `imgsz` added, guided by the "found by height" table in README (Detection).

@@ -101,7 +101,7 @@ Security:
   `labeler/colors.py:is_low_color`) and labels shape and carried items only.
 - **Done 2026-10-08.** **Person timeline across cameras**: "where was this person": look-alike search across cameras, ordered by
   time, with a time-plausibility filter. A dedicated re-identification model only after a license check.
-- **Capacity**: GPU video decoding and batched detection across cameras; document how many cameras the
+- **Measured 2026-10-08** (README "How many cameras?"; batching / GPU decoding not done). **Capacity**: GPU video decoding and batched detection across cameras; document how many cameras the
   4070 SUPER handles.
 
 ## Phase 5: Accuracy loop

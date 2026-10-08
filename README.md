@@ -252,6 +252,25 @@ person is then twice as tall for the detector, from real camera pixels. Don't ra
 (48.2% vs 48.6% overall). Rejected after measuring: scanning 2x2 overlapping tiles: +5 points of people found
 on COCO, but 13 times as many false alarms (people cut in half at tile edges) and 4.6 times slower.
 
+## How many cameras?
+
+Measured on this PC (RTX 4070 SUPER), the full app with N cameras, each showing a busy scene (the 4-person bus
+photo at a camera's 15 frames per second), 2026-10-08:
+
+| Cameras | Frames per second, each | Total | GPU busy | Labeling queue |
+|---|---|---|---|---|
+| 1 | 15.4 (full speed) | 15 | 43% | 0 |
+| 2 | 14.2 | 28 | 76% | 0 |
+| 4 | 9.6 | 38 | 65% | 2 |
+| 6 | 6.6 | 40 | 75% | 10 |
+| 8 | 5.5 | 44 | 79% | 19 |
+
+So: **2 cameras at full speed, 4 at about 10 frames per second each** (enough for tracking people). From 6 on,
+each camera slows to 5-7 fps (near the "running slowly" warning at 5) and people wait longer for their labels.
+Quieter scenes need less. The GPU was never fully busy, so the limit is probably the Python side (all cameras
+share one process for tracking, drawing and encoding pictures); batching cameras or one process per camera
+would be the next step if more cameras are needed. GPU memory: about 7-8 GB in use, mostly the vision model.
+
 ## Things that look like people
 
 Pictures of people (a monitor, reflection, poster, TV) are detected as people. In kiosk mode new people under
@@ -380,7 +399,7 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-156 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+157 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, alerts,
 reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.
