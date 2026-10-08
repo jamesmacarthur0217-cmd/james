@@ -68,7 +68,7 @@ fast classifiers were trained on **COCO photos with mixed Flickr licenses**. Fin
    table; session cookie; login page.
 2. **Done 2026-10-08.** **Audit log** table: who viewed, searched, exported, deleted, changed rules, with time and IP. Admin page.
 3. **Done 2026-10-08** (self-signed, built in; no Caddy: a local proxy would bypass the login). **HTTPS** for network access (self-signed certificate generated on setup, or Caddy in docker-compose).
-4. **Face blurring option** for viewers and for saved crops (`storage.blur_faces`), using the face box from
+4. **Done 2026-10-08.** **Face blurring option** for viewers and for saved crops (`storage.blur_faces`), using the face box from
    `labeler/geometry.py:face_box`.
 5. Per-camera retention (`cameras[].retention_days`), and a documented erasure procedure (search the person,
    then Delete selected).

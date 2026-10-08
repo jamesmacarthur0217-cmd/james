@@ -87,9 +87,10 @@ def main() -> int:
     stale = db.close_stale_tracks()
     if stale:
         log.info("marked %d people left active by an earlier unclean stop as finished", stale)
+    from labeler.privacy import remove_picture
     removed = db.cleanup(cfg["storage"]["retention_days"])
     for name in removed:
-        (crop_dir / name).unlink(missing_ok=True)
+        remove_picture(crop_dir, name)   # and its blurred copy
     if removed:
         log.info("retention: deleted %d old crop files", len(removed))
     old_audit = db.cleanup_audit(cfg["storage"]["audit_retention_days"])

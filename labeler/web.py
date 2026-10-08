@@ -6,13 +6,14 @@ import threading
 import shutil
 from datetime import datetime, timedelta
 
+import cv2
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from . import accounts, reports, schema
+from . import accounts, privacy, reports, schema
 from .config import ROOT, resolve
 from .db import Database
 from .pipeline import Pipeline
@@ -181,8 +182,32 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return pipelines[0] if pipelines else None
     crop_dir = resolve(cfg["storage"]["crop_dir"])
     crop_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/crops", StaticFiles(directory=crop_dir), name="crops")
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+    def blur_for(request: Request) -> bool:
+        """Viewers see blurred faces (web.blur_faces_for_viewers); admins see faces."""
+        user = getattr(request.state, "user", None) or {}
+        return cfg["web"].get("blur_faces_for_viewers", True) and user.get("role") != "admin"
+
+    # Same address, different picture for admins and viewers: never let a shared browser cache mix them up.
+    PICTURE_HEADERS = {"Cache-Control": "private, max-age=60", "Vary": "Cookie"}
+
+    @app.get("/crops/{name}")
+    def picture(name: str, request: Request):
+        path = crop_dir / name
+        if not privacy.PICTURE_NAME.fullmatch(name) or not path.is_file():
+            raise HTTPException(404, "no such picture")
+        if blur_for(request):
+            blurred = privacy.blurred_path(crop_dir, name)
+            if blurred.is_file():
+                return FileResponse(blurred, headers=PICTURE_HEADERS)
+            # Saved before blurring existed (or a face close-up): the face position is unknown, blur it all.
+            image = cv2.imread(str(path))
+            if image is None:
+                raise HTTPException(404, "no such picture")
+            return Response(privacy.encode_jpeg(privacy.blur_whole(image)), media_type="image/jpeg",
+                            headers=PICTURE_HEADERS)
+        return FileResponse(path, headers=PICTURE_HEADERS)
 
     @app.get("/")
     def index():
@@ -308,12 +333,16 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     async def stream(request: Request, camera: str | None = None):
         pipeline = pick(camera)
         await run_in_threadpool(audit, request, "view live", f"camera {pipeline.name}" if pipeline else "")
+        blurred = blur_for(request)
 
         async def frames():
             last = None
             # End when the app is stopping: an endless stream would otherwise keep the server from exiting.
             while not app.state.stopping.is_set():
-                jpeg = pipeline.latest_jpeg if pipeline else None
+                if pipeline is None:
+                    jpeg = None
+                else:
+                    jpeg = pipeline.latest_jpeg_blurred() if blurred else pipeline.latest_jpeg
                 if jpeg is not None and jpeg is not last:
                     last = jpeg
                     yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
@@ -339,9 +368,9 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                 "fps": round(pipeline.fps, 1) if pipeline else 0}
 
     @app.get("/api/live/thumb/{tracker_id}")
-    def live_thumb(tracker_id: int, camera: str | None = None):
+    def live_thumb(tracker_id: int, request: Request, camera: str | None = None):
         pipeline = pick(camera)
-        jpeg = pipeline.live_thumb(tracker_id) if pipeline else None
+        jpeg = pipeline.live_thumb(tracker_id, blurred=blur_for(request)) if pipeline else None
         if jpeg is None:
             raise HTTPException(404, "not in view")
         return Response(jpeg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
@@ -380,12 +409,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             audit(request, "delete", ("everyone: " if body.everything else "") + f"{len(deleted)} people ({shown})")
         for p in pipelines:
             p.forget(deleted)
-        removed = 0
-        for name in paths:
-            path = crop_dir / name
-            if path.is_file():
-                path.unlink(missing_ok=True)
-                removed += 1
+        removed = sum(privacy.remove_picture(crop_dir, name) for name in paths)
         return {"deleted": len(deleted), "pictures_removed": removed}
 
     @app.get("/api/search")

@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-from . import colors, geometry, schema
+from . import colors, geometry, privacy, schema
 from .config import resolve
 from .db import Database
 from .embed import Embedder
@@ -33,6 +33,7 @@ class Candidate:
     score: float
     person: np.ndarray
     face: np.ndarray | None
+    head: tuple | None = None     # where to blur in `person` for privacy (geometry.head_box, crop coordinates)
 
 
 @dataclass
@@ -56,6 +57,7 @@ class TrackState:
     kpts: np.ndarray | None = None                            # latest pose, for the overlay skeleton
     recent: list[Candidate] = field(default_factory=list)     # best frames since the last labeling
     thumb: np.ndarray | None = None                           # latest small crop for the live panel
+    thumb_blurred: np.ndarray | None = None                   # the same with the face blurred, for viewers
     vlm_pending: bool = False
     last_labeled: float | None = None
     vlm_history: list[dict[str, str]] = field(default_factory=list)   # recent per-frame VLM answers
@@ -114,6 +116,8 @@ class Pipeline:
         self.stop_event = threading.Event()
         self._jpeg_lock = threading.Lock()
         self._jpeg: bytes | None = None
+        self._jpeg_blurred: bytes | None = None
+        self.viewer_watching_at = -1e9    # a viewer's live video wants blurred frames (privacy.py)
         self.fps = 0.0
         self.frames = 0
         self.blank = False
@@ -123,6 +127,7 @@ class Pipeline:
         self._live_lock = threading.Lock()
         self._live: list[dict] = []
         self._thumbs: dict[int, bytes] = {}
+        self._thumbs_blurred: dict[int, bytes] = {}
 
     # --- public -------------------------------------------------------------------
 
@@ -131,14 +136,21 @@ class Pipeline:
         with self._jpeg_lock:
             return self._jpeg
 
+    def latest_jpeg_blurred(self) -> bytes | None:
+        """The live frame with faces blurred, for viewers. Made only while a viewer is watching, so each
+        call keeps it coming for a few more seconds."""
+        self.viewer_watching_at = time.monotonic()
+        with self._jpeg_lock:
+            return self._jpeg_blurred
+
     def live(self) -> list[dict]:
         """People in view right now, with their current labels (updated every frame)."""
         with self._live_lock:
             return list(self._live)
 
-    def live_thumb(self, tracker_id: int) -> bytes | None:
+    def live_thumb(self, tracker_id: int, blurred: bool = False) -> bytes | None:
         with self._live_lock:
-            return self._thumbs.get(tracker_id)
+            return (self._thumbs_blurred if blurred else self._thumbs).get(tracker_id)
 
     def forget(self, db_ids: list[int]) -> None:
         """Called when the user deletes records. A deleted person still in view is not recorded again
@@ -256,7 +268,13 @@ class Pipeline:
             window = self.relink_cfg["window_s"]
             self.recently_lost = {k: v for k, v in self.recently_lost.items() if now - v[1] <= window}
 
-        self._publish(self._draw(frame, seen, low_color, now))
+        blurred = None
+        if self.cfg["web"].get("blur_faces_for_viewers", True) and now - self.viewer_watching_at < 5:
+            # Faces are blurred before the labels are drawn, so the labels stay readable.
+            heads = [geometry.head_box(self.tracks[t].kpts, self.tracks[t].box) for t in seen]
+            heads += [geometry.head_box(None, tuple(b[:4])) for b in self._ignored]
+            blurred = self._draw(privacy.blur_boxes(frame, heads), seen, low_color, now)
+        self._publish(self._draw(frame, seen, low_color, now), blurred)
         self._publish_live(seen, now)
 
     def _should_ignore(self, box: tuple, shape: tuple) -> bool:
@@ -294,14 +312,20 @@ class Pipeline:
         person = geometry.crop(frame, box, pad=0.05)
         if person is None:
             return
+        ox, oy = geometry.crop_origin(frame, box, pad=0.05)
+        hx1, hy1, hx2, hy2 = geometry.head_box(kpts, box)
+        head = (hx1 - ox, hy1 - oy, hx2 - ox, hy2 - oy)
         if thumb_wanted:
             h, w = person.shape[:2]
-            st.thumb = cv2.resize(person, (max(1, int(w * 160 / h)), 160), interpolation=cv2.INTER_AREA)
+            size = (max(1, int(w * 160 / h)), 160)
+            st.thumb = cv2.resize(person, size, interpolation=cv2.INTER_AREA)
+            if self.cfg["web"].get("blur_faces_for_viewers", True):
+                st.thumb_blurred = cv2.resize(privacy.blur_boxes(person, [head]), size, interpolation=cv2.INTER_AREA)
         if self.student is not None and st.n_frames % self.cfg["student"]["every_n_frames"] == 1:
             self._student_update(st, person)
         if best_wanted or recent_wanted:
             face = geometry.crop(frame, geometry.face_box(kpts), pad=0.1)
-            cand = Candidate(score, person.copy(), face.copy() if face is not None else None)
+            cand = Candidate(score, person.copy(), face.copy() if face is not None else None, head)
             for pool, size, wanted in ((st.candidates, k, best_wanted), (st.recent, 2, recent_wanted)):
                 if wanted:
                     pool.append(cand)
@@ -322,9 +346,17 @@ class Pipeline:
             return
         best = st.candidates[0]
         name = f"{st.db_id}.jpg"
-        cv2.imwrite(str(self.crop_dir / name), best.person)
+        blurred = (privacy.blur_boxes(best.person, [best.head]) if best.head is not None
+                   else privacy.blur_whole(best.person))
+        blur_on_disk = self.cfg["storage"].get("blur_faces", False)
+        cv2.imwrite(str(self.crop_dir / name), blurred if blur_on_disk else best.person)
+        if self.cfg["web"].get("blur_faces_for_viewers", True) and not blur_on_disk:
+            path = privacy.blurred_path(self.crop_dir, name)
+            path.parent.mkdir(exist_ok=True)
+            cv2.imwrite(str(path), blurred)
         fields = {"crop_path": name}
-        if self.cfg["storage"]["save_face_crops"] and best.face is not None:
+        # A face close-up would defeat blurred pictures, so it is never saved then.
+        if self.cfg["storage"]["save_face_crops"] and best.face is not None and not blur_on_disk:
             face_name = f"{st.db_id}_face.jpg"
             cv2.imwrite(str(self.crop_dir / face_name), best.face)
             fields["face_path"] = face_name
@@ -585,19 +617,19 @@ class Pipeline:
                 "attributes": {n: {"value": v, "confidence": c, "source": src, "needs_review": False}
                                for n, (v, c, src) in self._current_labels(st).items()},
             })
-        thumbs = None
+        thumbs = thumbs_blurred = None
         if self.frames % 10 == 0:
-            thumbs = {}
+            thumbs, thumbs_blurred = {}, {}
             for tid in seen:
-                thumb = self.tracks[tid].thumb
-                if thumb is not None:
-                    ok, buf = cv2.imencode(".jpg", thumb, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                    if ok:
-                        thumbs[tid] = buf.tobytes()
+                for image, out in ((self.tracks[tid].thumb, thumbs), (self.tracks[tid].thumb_blurred, thumbs_blurred)):
+                    if image is not None:
+                        ok, buf = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                        if ok:
+                            out[tid] = buf.tobytes()
         with self._live_lock:
             self._live = people
             if thumbs is not None:
-                self._thumbs = thumbs
+                self._thumbs, self._thumbs_blurred = thumbs, thumbs_blurred
 
     # --- drawing ------------------------------------------------------------------
 
@@ -649,11 +681,17 @@ class Pipeline:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 255), 2, cv2.LINE_AA)
         return out
 
-    def _publish(self, frame: np.ndarray) -> None:
-        h, w = frame.shape[:2]
-        if w > 1280:
-            frame = cv2.resize(frame, (1280, int(h * 1280 / w)))
-        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-        if ok:
-            with self._jpeg_lock:
-                self._jpeg = buf.tobytes()
+    def _publish(self, frame: np.ndarray, blurred: np.ndarray | None = None) -> None:
+        def encode(img: np.ndarray) -> bytes | None:
+            h, w = img.shape[:2]
+            if w > 1280:
+                img = cv2.resize(img, (1280, int(h * 1280 / w)))
+            ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            return buf.tobytes() if ok else None
+
+        jpeg = encode(frame)
+        jpeg_blurred = encode(blurred) if blurred is not None else None
+        with self._jpeg_lock:
+            if jpeg is not None:
+                self._jpeg = jpeg
+            self._jpeg_blurred = jpeg_blurred

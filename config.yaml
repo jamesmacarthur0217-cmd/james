@@ -85,6 +85,8 @@ database:
 storage:
   crop_dir: data/crops
   save_face_crops: false      # face images are biometric data; off by default
+  blur_faces: false           # true: faces are blurred in the saved pictures, so nobody (admins too) sees them
+                              # later; labeling is not affected, but Review/Answer key can't show faces
   retention_days: 30          # tracks older than this are deleted on startup (0 = keep forever)
   audit_retention_days: 365   # audit log entries (who viewed, searched, deleted...) kept this long (0 = forever)
   min_free_gb: 5              # warn when the disk has less free space than this
@@ -94,6 +96,7 @@ web:
                               # which requires a login account: tools\users.py add <name> --role admin
   port: 8000
   session_hours: 12           # other devices log in again after this long; this PC never needs to log in
+  blur_faces_for_viewers: true   # viewer accounts see blurred faces (live video and pictures); admins see faces
   https: false                # true: other devices use https://<this PC>:8443 (encrypted); plain http then
                               # works only on this PC (http://127.0.0.1:8000, used by start.bat / stop.bat)
   https_port: 8443

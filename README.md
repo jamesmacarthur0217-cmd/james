@@ -204,6 +204,14 @@ then accept. You can put a certificate of your own in `web.cert_file` / `web.key
 proxy on this PC in front of the app: every request would then look like it comes from this PC, which never
 logs in. Not meant to be exposed to the internet.
 
+**Face blurring**: viewer accounts see faces pixelated in the live video, the "in view now" thumbnails and all
+saved pictures (`web.blur_faces_for_viewers`, on by default); admins see faces. Each saved picture gets a
+blurred copy in `data/crops/blurred/`; pictures saved before this existed are shown to viewers blurred all over.
+For the strongest privacy, `storage.blur_faces: true` blurs faces in the saved pictures themselves (and never
+saves face close-ups), so nobody can see faces later; labeling still uses the unblurred frames in memory, but
+the Review and Answer key pages then show blurred faces. The blurred area comes from the head keypoints (larger
+than the face, to cover profiles); without them, the top of the person is blurred.
+
 **Audit log** (admin page *Audit log*): who logged in (and failed), watched the live video, searched or asked,
 looked up look-alikes, viewed a report, exported CSV, deleted people, changed alert rules, reviewed labels,
 used the answer key, stopped the app, and account changes made with `users.py`, with time and address.
@@ -242,8 +250,9 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-104 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
-the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, supervisor, alerts,
+114 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
+blurring, supervisor, alerts,
 reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.
 
 ## Files

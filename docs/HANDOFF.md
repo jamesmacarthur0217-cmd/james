@@ -19,7 +19,10 @@ cameras** and **commercial use**. They have tested the current version and are h
 - Git: local repo, branch `main`, clean. Latest commits:
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
-- Tests: 104 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- Tests: 114 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- 2026-10-08, Phase 2 step 4 done: face blurring (`labeler/privacy.py`, `geometry.head_box`): viewers get
+  blurred live video/thumbnails/pictures (`web.blur_faces_for_viewers`, default on; blurred copies in
+  `data/crops/blurred/`, served by the `/crops/{name}` route); `storage.blur_faces` blurs saved pictures on disk.
 - 2026-10-08, Phase 2 steps 1–3 done: login accounts with admin/viewer roles replace the shared password;
   audit log (table `audit_log`, admin page /audit, `audit()` calls in `labeler/web.py` endpoints);
   HTTPS (`web.https`, off by default): HTTPS on 8443 for the network + plain HTTP on 127.0.0.1 only

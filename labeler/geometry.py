@@ -94,6 +94,30 @@ def face_box(kpts: np.ndarray | None) -> Box | None:
     return (cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2)
 
 
+def head_box(kpts: np.ndarray | None, box: Box) -> Box:
+    """Where to blur for privacy: larger than face_box so profiles, hair and chin are covered. Always returns
+    a box: without head keypoints, the top of the person box (rather blur too much than leave a face)."""
+    x1, y1, x2, y2 = box
+    bw, bh = x2 - x1, y2 - y1
+    pts = [p for p in (_pt(kpts, i, 0.3) for i in (NOSE, L_EYE, R_EYE, L_EAR, R_EAR)) if p]
+    if pts:
+        xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+        cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+        size = max(1.6 * (max(xs) - min(xs)), 0.3 * bw, 16.0)
+        le, re = _pt(kpts, L_EYE, 0.3), _pt(kpts, R_EYE, 0.3)
+        if le and re:
+            size = max(size, 3.2 * float(np.hypot(le[0] - re[0], le[1] - re[1])))
+        return (cx - size / 2, cy - 0.65 * size, cx + size / 2, cy + 0.5 * size)
+    top = min(0.2 * bh, bw) if bh > 1.2 * bw else 0.35 * bh    # standing: head at the top; else be generous
+    return (x1, y1, x2, y1 + top)
+
+
+def crop_origin(frame: np.ndarray, box: Box, pad: float = 0.0) -> tuple[int, int]:
+    """Top-left corner of what crop() cuts out, to move boxes into the crop's coordinates."""
+    x1, y1, x2, y2 = box
+    return max(0, int(x1 - (x2 - x1) * pad)), max(0, int(y1 - (y2 - y1) * pad))
+
+
 def frontality(kpts: np.ndarray | None) -> float:
     """0..1: how clearly the face is visible and facing the camera."""
     if kpts is None:
