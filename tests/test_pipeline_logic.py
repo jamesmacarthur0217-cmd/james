@@ -41,6 +41,7 @@ def make_pipeline(db, embedder=None):
     p.age = None
     p.age_ids = set()
     p.clips = None
+    p.night_ids = set()
     return p
 
 
@@ -131,6 +132,30 @@ def test_vlm_worker_runs_two_at_once_and_survives_errors():
     assert client.peak == 2
     assert sorted(got) == [0, 1, 2, 3, 9]
     assert got[2] == [{"upper_color": "red"}] and got[9] == []
+
+
+def test_night_frames_store_no_colors_but_everything_else(db, camera):
+    p = make_pipeline(db)
+    st = TrackState(3, datetime.now(), 0.0, db_id=db.create_track(camera, 3, datetime.now()))
+    st.n_frames, st.low_light_frames = 30, 25                    # mostly black and white (infrared)
+    p.by_db_id[st.db_id] = st
+    p._mark_night(st)
+    base = {f: "unknown" for f in schema.MODE_FIELDS["kiosk"]}
+    p.on_vlm_result(st.db_id, [dict(base, upper_color="gray", lower_color="black", upper_type="jacket")])
+    attrs = db.list_tracks()[0]["attributes"]
+    assert attrs["upper_color"]["value"] == "unknown" and attrs["lower_color"]["value"] == "unknown"
+    assert attrs["upper_type"]["value"] == "jacket"
+    st.low_light_frames = 5                                      # dawn: the camera shows color again
+    p._mark_night(st)
+    p.on_vlm_result(st.db_id, [dict(base, upper_color="red")])
+    assert db.list_tracks()[0]["attributes"]["upper_color"]["value"] == "red"
+
+
+def test_student_gives_no_colors_at_night(db):
+    p = make_pipeline(db)
+    preds = {"upper_color": ("black", 0.9, True), "upper_type": ("jacket", 0.9, True)}
+    assert set(p._student_trusted(preds, night=True)) == {"upper_type"}
+    assert set(p._student_trusted(preds)) == {"upper_color", "upper_type"}
 
 
 def test_age_model_answer_replaces_the_vlm_age(db, camera):

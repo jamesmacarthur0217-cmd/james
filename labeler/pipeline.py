@@ -28,6 +28,7 @@ log = logging.getLogger(__name__)
 SKELETON = [(5, 6), (5, 7), (7, 9), (6, 8), (8, 10), (5, 11), (6, 12), (11, 12),
             (11, 13), (13, 15), (12, 14), (14, 16), (0, 1), (0, 2), (1, 3), (2, 4)]
 HIDDEN_VALUES = ("unknown", "none", "no")
+COLOR_FIELDS = ("upper_color", "lower_color")   # not stored from black-and-white (night) frames
 
 
 @dataclass
@@ -133,6 +134,7 @@ class Pipeline:
         self.running = False
         self.crashed = False
         self.deleted_ids: set[int] = set()
+        self.night_ids: set[int] = set()   # people labeled from black-and-white frames (_is_night)
         self._live_lock = threading.Lock()
         self._live: list[dict] = []
         self._thumbs: dict[int, bytes] = {}
@@ -431,6 +433,16 @@ class Pipeline:
         except Exception:
             log.exception("embedding track %s failed", st.db_id)
 
+    def _is_night(self, st: TrackState) -> bool:
+        """Most of this person's frames are black and white (an infrared camera at night): colors cannot be
+        told, so no source may store one. Shape, clothing type and carried items are still labeled."""
+        return st.n_frames > 0 and st.low_light_frames > st.n_frames / 2
+
+    def _mark_night(self, st: TrackState) -> None:
+        """Decided again each time the person is sent for labeling: at dawn the camera switches to color."""
+        if st.db_id is not None:
+            (self.night_ids.add if self._is_night(st) else self.night_ids.discard)(st.db_id)
+
     def _student_update(self, st: TrackState, person: np.ndarray) -> None:
         """Instant labels for the live view from the latest crop (trusted predictions only)."""
         try:
@@ -438,18 +450,20 @@ class Pipeline:
         except Exception:
             log.exception("student prediction failed")
             return
-        st.student_labels = self._student_trusted(preds)
+        st.student_labels = self._student_trusted(preds, self._is_night(st))
 
-    def _student_trusted(self, preds: dict[str, tuple[str, float, bool]]) -> dict[str, tuple[str, float]]:
+    def _student_trusted(self, preds: dict[str, tuple[str, float, bool]],
+                         night: bool = False) -> dict[str, tuple[str, float]]:
         """The student's trusted answers. While an age model is loaded the student gives no age: it learned
         age from the VLM, and the age model measured better. Otherwise its confident age would outrank the
-        age model's (the highest confidence wins) and every disagreement would go to review."""
-        return {n: (v, c) for n, (v, c, ok) in preds.items()
-                if ok and not (self.age is not None and n in ("age_range", "age_group"))}
+        age model's (the highest confidence wins) and every disagreement would go to review. At night (black
+        and white frames) it gives no colors."""
+        skip = (("age_range", "age_group") if self.age is not None else ()) + (COLOR_FIELDS if night else ())
+        return {n: (v, c) for n, (v, c, ok) in preds.items() if ok and n not in skip}
 
     def _store_student(self, st: TrackState, vector: np.ndarray) -> None:
         """Record the student's trusted labels for this person (from their best crops)."""
-        trusted = self._student_trusted(self.student.predict(vector, self.mode))
+        trusted = self._student_trusted(self.student.predict(vector, self.mode), self._is_night(st))
         st.student_labels = trusted
         if trusted:
             self.db.add_attributes(st.db_id, [(n, v, round(c, 3)) for n, (v, c) in trusted.items()],
@@ -499,6 +513,7 @@ class Pipeline:
             return
         n = self.cfg["vlm"]["frames_per_track"]
         frames = [(c.person, c.face) for c in st.candidates[:n]]
+        self._mark_night(st)
         st.vlm_pending = self.vlm.submit(st.db_id, frames, self.mode)
 
     def _due_for_relabel(self, st: TrackState, now: float) -> bool:
@@ -513,6 +528,7 @@ class Pipeline:
     def _relabel(self, st: TrackState) -> None:
         frames = [(c.person, c.face) for c in st.recent[:1]]
         st.recent = []
+        self._mark_night(st)
         st.vlm_pending = self.vlm.submit(st.db_id, frames, self.mode)
 
     def _try_relink(self, tid: int, new: TrackState, now: float) -> TrackState:
@@ -607,6 +623,10 @@ class Pipeline:
             st.last_labeled = time.monotonic()
         if not results:
             return
+        if db_id in self.night_ids:
+            # Black and white picture: the VLM can only guess colors. Blanked before they join the history,
+            # so a guess made at night does not outvote the real color once the camera shows color again.
+            results = [{**r, **{f: "unknown" for f in COLOR_FIELDS}} for r in results]
         if st is not None:
             st.vlm_history = (st.vlm_history + results)[-self.cfg["vlm"]["history_frames"]:]
             pool = st.vlm_history
