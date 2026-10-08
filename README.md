@@ -195,12 +195,18 @@ changing a password or role logs that user out everywhere. Five wrong passwords 
 for 5 minutes. A shared password from older setups (`VL_WEB_PASSWORD` in `.env`) becomes the first admin
 account (user `admin`) at startup. It is plain HTTP: fine on a home or office network, not for the internet.
 
+**Audit log** (admin page *Audit log*): who logged in (and failed), watched the live video, searched or asked,
+looked up look-alikes, viewed a report, exported CSV, deleted people, changed alert rules, reviewed labels,
+used the answer key, stopped the app, and account changes made with `users.py`, with time and address.
+Someone at this PC is recorded as "this PC". The Live page's once-a-second updates are not recorded. Entries
+older than `storage.audit_retention_days` (365) are deleted at startup.
+
 ## Database
 
 PostgreSQL 17 with pgvector in Docker (`docker-compose.yml`), on 127.0.0.1:5432, data in the Docker volume
 `visionlabeler_pgdata`, password in `.env` (keep it private). Tables: `cameras`, `tracks`, `attributes`,
 `embeddings` (`vector(768)` with an HNSW index), `reviews`, `alert_rules`, `alert_events`, `answer_key`,
-`users` (password hashes), `login_sessions` (hashed cookie tokens).
+`users` (password hashes), `login_sessions` (hashed cookie tokens), `audit_log`.
 For a quick test without Docker: `database.url: sqlite:///data/vision.db`.
 
 ## Training the fast classifiers
@@ -227,9 +233,9 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-91 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
-the VLM worker and retries, classifiers, age source, cameras, accounts and roles, supervisor, alerts, reports,
-questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.
+99 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, supervisor, alerts,
+reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.
 
 ## Files
 

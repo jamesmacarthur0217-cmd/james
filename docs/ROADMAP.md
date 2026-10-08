@@ -66,7 +66,7 @@ fast classifiers were trained on **COCO photos with mixed Flickr licenses**. Fin
 1. **Done 2026-10-08.** **Accounts and roles** replacing the single Basic-auth password in `labeler/web.py`: `admin` (delete,
    export, rules, settings) and `viewer` (live view and search only). Hashed passwords in a new `users`
    table; session cookie; login page.
-2. **Audit log** table: who viewed, searched, exported, deleted, changed rules, with time and IP. Admin page.
+2. **Done 2026-10-08.** **Audit log** table: who viewed, searched, exported, deleted, changed rules, with time and IP. Admin page.
 3. **HTTPS** for network access (self-signed certificate generated on setup, or Caddy in docker-compose).
 4. **Face blurring option** for viewers and for saved crops (`storage.blur_faces`), using the face box from
    `labeler/geometry.py:face_box`.

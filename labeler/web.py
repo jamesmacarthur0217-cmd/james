@@ -22,7 +22,6 @@ STATIC = ROOT / "labeler" / "static"
 
 class ReviewIn(BaseModel):
     value: str
-    reviewer: str = "reviewer"
 
 
 class DeleteIn(BaseModel):
@@ -94,6 +93,15 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     session_hours = cfg["web"].get("session_hours", 12)
     limiter = accounts.LoginLimiter()
 
+    def audit(request: Request, action: str, detail: str = "", username: str | None = None) -> None:
+        """Record who did what (shown on the admin-only Audit log page)."""
+        user = getattr(request.state, "user", None) or {}
+        db.add_audit(username or user.get("username", "?"), user.get("role", ""),
+                     request.client.host if request.client else "", action, detail)
+
+    def who(request: Request) -> str:
+        return (getattr(request.state, "user", None) or {}).get("username", "?")
+
     @app.middleware("http")
     async def require_login(request: Request, call_next):
         """This PC itself (stop.bat, the local browser) is always admin. Other devices must log in, and a
@@ -125,16 +133,21 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     @app.post("/api/login")
     def login(body: LoginIn, request: Request, response: Response):
         address = request.client.host if request.client else ""
+        name = body.username.strip()
         wait = limiter.blocked_for(address)
         if wait:
+            audit(request, "login blocked", "too many wrong passwords", username=name)
             raise HTTPException(429, f"Too many wrong passwords. Try again in {int(wait // 60) + 1} min.")
-        user = db.get_user(body.username.strip())
+        user = db.get_user(name)
         # A wrong name is checked against a dummy hash, so it takes as long as a wrong password.
         ok = accounts.verify_password(body.password, user["password_hash"] if user else accounts.DUMMY_HASH)
         if not (ok and user):
             limiter.failed(address)
+            audit(request, "login failed", "" if user else "no such user", username=name)
             raise HTTPException(401, "Wrong user name or password.")
         limiter.succeeded(address)
+        request.state.user = {"username": user["username"], "role": user["role"]}
+        audit(request, "login")
         token = db.create_session(user["id"], session_hours)
         response.set_cookie(COOKIE, token, max_age=int(session_hours * 3600), httponly=True, samesite="strict",
                             secure=request.url.scheme == "https")
@@ -145,6 +158,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         token = request.cookies.get(COOKIE)
         if token:
             db.end_session(token)
+            audit(request, "logout")
         response.delete_cookie(COOKIE)
         return {"ok": True}
 
@@ -196,7 +210,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return {"person": db.next_for_answer_key(exclude)}
 
     @app.post("/api/answer-key/{track_id}")
-    def answer_key_save(track_id: int, body: AnswerIn):
+    def answer_key_save(track_id: int, body: AnswerIn, request: Request):
         allowed = {**schema.FIELDS, **{n: v + ["none"] for n, v in schema.LIST_FIELDS.items()}}
         labels = {}
         for name, value in body.labels.items():
@@ -211,8 +225,9 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                 labels[name] = value
             else:
                 raise HTTPException(400, f"{value!r} is not a value of {name}")
-        if not db.save_answer_key(track_id, labels):
+        if not db.save_answer_key(track_id, labels, labeled_by=who(request)):
             raise HTTPException(404, "person not found")
+        audit(request, "answer key", f"person #{track_id}")
         return {"ok": True}
 
     @app.get("/api/answer-key/score")
@@ -222,14 +237,20 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     # --- reports -------------------------------------------------------------------------
 
     @app.get("/api/reports/summary")
-    def report_summary(start: str | None = None, end: str | None = None, camera: str | None = None):
+    def report_summary(request: Request, start: str | None = None, end: str | None = None,
+                       camera: str | None = None):
         s, e = _day_range(start, end)
+        audit(request, "view report", f"{s:%Y-%m-%d} to {(e - timedelta(days=1)):%Y-%m-%d}"
+                                      + (f", camera {camera}" if camera else ""))
         return reports.summarize(db.people_between(s, e, camera), s, e)
 
     @app.get("/api/reports/export.csv")
-    def report_csv(start: str | None = None, end: str | None = None, camera: str | None = None):
+    def report_csv(request: Request, start: str | None = None, end: str | None = None, camera: str | None = None):
         s, e = _day_range(start, end)
-        body = reports.to_csv(db.people_between(s, e, camera))
+        people = db.people_between(s, e, camera)
+        audit(request, "export CSV", f"{len(people)} people, {s:%Y-%m-%d} to {(e - timedelta(days=1)):%Y-%m-%d}"
+                                     + (f", camera {camera}" if camera else ""))
+        body = reports.to_csv(people)
         name = f"visionlabeler-{s:%Y%m%d}-{(e - timedelta(days=1)):%Y%m%d}.csv"
         return Response("\ufeff" + body, media_type="text/csv",   # BOM so Excel reads UTF-8
                         headers={"Content-Disposition": f'attachment; filename="{name}"'})
@@ -245,7 +266,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return db.list_rules()
 
     @app.post("/api/alerts/rules")
-    def add_rule(body: RuleIn):
+    def add_rule(body: RuleIn, request: Request):
         allowed = {**schema.FIELDS, **{n: v + ["none"] for n, v in schema.LIST_FIELDS.items()}}
         for cond in body.conditions:
             if len(cond) != 2 or cond[0] not in allowed or cond[1] not in allowed[cond[0]]:
@@ -254,20 +275,25 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             raise HTTPException(400, "the rule needs a name")
         rule = db.add_rule(body.name.strip()[:100], body.conditions, body.camera)
         _rules_changed()
+        audit(request, "alert rule added", f"{body.name.strip()[:100]}: "
+              + (", ".join(f"{n} = {v}" for n, v in body.conditions) or "anyone")
+              + (f" (camera {body.camera})" if body.camera else ""))
         return rule
 
     @app.patch("/api/alerts/rules/{rule_id}")
-    def update_rule(rule_id: int, body: RuleUpdate):
+    def update_rule(rule_id: int, body: RuleUpdate, request: Request):
         if not db.update_rule(rule_id, body.enabled):
             raise HTTPException(404, "rule not found")
         _rules_changed()
+        audit(request, "alert rule " + ("enabled" if body.enabled else "disabled"), f"rule #{rule_id}")
         return {"ok": True}
 
     @app.delete("/api/alerts/rules/{rule_id}")
-    def delete_rule(rule_id: int):
+    def delete_rule(rule_id: int, request: Request):
         if not db.delete_rule(rule_id):
             raise HTTPException(404, "rule not found")
         _rules_changed()
+        audit(request, "alert rule deleted", f"rule #{rule_id}")
         return {"ok": True}
 
     @app.get("/api/alerts/events")
@@ -279,8 +305,9 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return [{"name": p.name, "mode": p.mode, "source": str(p.cam["source"])} for p in pipelines]
 
     @app.get("/stream")
-    async def stream(camera: str | None = None):
+    async def stream(request: Request, camera: str | None = None):
         pipeline = pick(camera)
+        await run_in_threadpool(audit, request, "view live", f"camera {pipeline.name}" if pipeline else "")
 
         async def frames():
             last = None
@@ -294,12 +321,13 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return StreamingResponse(frames(), media_type="multipart/x-mixed-replace; boundary=frame")
 
     @app.post("/api/shutdown")
-    def shutdown():
+    def shutdown(request: Request):
         """Stop the app cleanly: finish current people, save their labels, then exit."""
-        request = getattr(app.state, "request_shutdown", None)
-        if request is None:
+        stop = getattr(app.state, "request_shutdown", None)
+        if stop is None:
             raise HTTPException(501, "shutdown is not available in this mode")
-        request()
+        audit(request, "stop app")
+        stop()
         return {"ok": True}
 
     @app.get("/api/live")
@@ -344,9 +372,12 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return db.list_tracks(limit=min(limit, 500), name=name, value=value, camera=camera)
 
     @app.post("/api/tracks/delete")
-    def delete_tracks(body: DeleteIn):
+    def delete_tracks(body: DeleteIn, request: Request):
         """Delete selected people (or everyone) with their pictures, labels and history."""
         deleted, paths = db.delete_tracks(body.ids, everything=body.everything)
+        if deleted:
+            shown = ", ".join(f"#{i}" for i in sorted(deleted)[:50]) + (" …" if len(deleted) > 50 else "")
+            audit(request, "delete", ("everyone: " if body.everything else "") + f"{len(deleted)} people ({shown})")
         for p in pipelines:
             p.forget(deleted)
         removed = 0
@@ -358,10 +389,11 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return {"deleted": len(deleted), "pictures_removed": removed}
 
     @app.get("/api/search")
-    def search(q: str, limit: int = 20):
+    def search(q: str, request: Request, limit: int = 20):
         """Find people by a free-text description, e.g. "man in a beige coat"."""
         if embedder is None:
             raise HTTPException(503, "embeddings are disabled in config.yaml")
+        audit(request, "search", q[:300])
         hits = db.nearest(embedder.text(q), embedder.model_name, limit=min(limit, 100))
         tracks = db.get_tracks([tid for tid, _ in hits])
         sims = dict(hits)
@@ -371,19 +403,21 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return tracks
 
     @app.post("/api/ask")
-    def ask(body: AskIn):
+    def ask(body: AskIn, request: Request):
         """Answer a question like "who wore a red top after 3pm?" (see labeler/agent.py)."""
         if agent is None:
             raise HTTPException(503, "questions need the VLM; it is disabled or not running")
         if not body.question.strip():
             raise HTTPException(400, "empty question")
+        audit(request, "question", body.question.strip()[:300])
         return agent.run(body.question.strip()[:300], limit=min(body.limit, 100))
 
     @app.get("/api/tracks/{track_id}/similar")
-    def similar(track_id: int, limit: int = 10):
+    def similar(track_id: int, request: Request, limit: int = 10):
         """People who look most like this one (same clothes; across cameras too)."""
         if embedder is None:
             raise HTTPException(503, "embeddings are disabled in config.yaml")
+        audit(request, "look-alike search", f"person #{track_id}")
         vector = db.get_embedding(track_id, embedder.model_name)
         if vector is None:
             raise HTTPException(404, "no embedding for this person yet")
@@ -402,11 +436,23 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return items
 
     @app.post("/api/review/{attribute_id}")
-    def review(attribute_id: int, body: ReviewIn):
+    def review(attribute_id: int, body: ReviewIn, request: Request):
+        value = body.value.strip().lower()
         try:
-            db.apply_review(attribute_id, body.value.strip().lower(), body.reviewer)
+            db.apply_review(attribute_id, value, who(request))   # the logged-in user, not what the page says
         except KeyError:
             raise HTTPException(404, "attribute not found")
+        audit(request, "review", f"label #{attribute_id} = {value}")
         return {"ok": True}
+
+    @app.get("/audit")
+    def audit_page():
+        return FileResponse(STATIC / "audit.html")
+
+    @app.get("/api/audit")
+    def audit_log(limit: int = 100, user: str | None = None, action: str | None = None,
+                  before_id: int | None = None):
+        return {"entries": db.list_audit(min(limit, 500), user or None, action or None, before_id),
+                **db.audit_choices()}
 
     return app

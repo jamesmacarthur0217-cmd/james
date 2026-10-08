@@ -31,7 +31,15 @@ def ask_password() -> str:
 
 
 def run(db: Database, args: argparse.Namespace, ask=ask_password) -> str:
-    """Do one command; returns the message to print. Raises ValueError for a mistake by the user."""
+    """Do one command; returns the message to print. Raises ValueError for a mistake by the user.
+    Changes are recorded in the audit log as done by "this PC"."""
+    message = _run(db, args, ask)
+    if args.command != "list":
+        db.add_audit("this PC", "admin", "tools/users.py", "account change", message)
+    return message
+
+
+def _run(db: Database, args: argparse.Namespace, ask) -> str:
     if args.command == "list":
         users = db.list_users()
         return "\n".join(f"{u['username']:20s} {u['role']:7s} since {u['created_at']}" for u in users) or "no accounts"

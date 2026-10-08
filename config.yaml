@@ -86,6 +86,7 @@ storage:
   crop_dir: data/crops
   save_face_crops: false      # face images are biometric data; off by default
   retention_days: 30          # tracks older than this are deleted on startup (0 = keep forever)
+  audit_retention_days: 365   # audit log entries (who viewed, searched, deleted...) kept this long (0 = forever)
   min_free_gb: 5              # warn when the disk has less free space than this
 
 web:

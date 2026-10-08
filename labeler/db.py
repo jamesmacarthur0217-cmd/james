@@ -174,6 +174,19 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
+class AuditEntry(Base):
+    """Who did what in the web pages: logins, viewing, searches, exports, deletes, rule changes, reviews.
+    Frequent background requests (the Live page's polling) are not logged."""
+    __tablename__ = "audit_log"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+    username: Mapped[str] = mapped_column(String(100), index=True)
+    role: Mapped[str] = mapped_column(String(20))
+    address: Mapped[str] = mapped_column(String(64))
+    action: Mapped[str] = mapped_column(String(50), index=True)
+    detail: Mapped[str] = mapped_column(Text, default="")
+
+
 class LoginSession(Base):
     """A logged-in browser. The cookie holds a random token; only its SHA-256 is stored here."""
     __tablename__ = "login_sessions"
@@ -652,6 +665,41 @@ class Database:
     def end_session(self, token: str) -> None:
         with self.Session.begin() as s:
             s.execute(delete(LoginSession).where(LoginSession.token_hash == _token_hash(token)))
+
+    # --- audit log ----------------------------------------------------------------------
+
+    def add_audit(self, username: str, role: str, address: str, action: str, detail: str = "") -> None:
+        with self.Session.begin() as s:
+            s.add(AuditEntry(username=username[:100], role=role[:20], address=address[:64], action=action[:50],
+                             detail=detail[:1000]))
+
+    def list_audit(self, limit: int = 100, username: str | None = None, action: str | None = None,
+                   before_id: int | None = None) -> list[dict]:
+        """Newest first. `before_id` pages back through older entries."""
+        q = select(AuditEntry).order_by(AuditEntry.id.desc()).limit(limit)
+        if username:
+            q = q.where(AuditEntry.username == username)
+        if action:
+            q = q.where(AuditEntry.action == action)
+        if before_id:
+            q = q.where(AuditEntry.id < before_id)
+        with self.Session() as s:
+            return [{"id": e.id, "time": e.created_at.isoformat(timespec="seconds"), "username": e.username,
+                     "role": e.role, "address": e.address, "action": e.action, "detail": e.detail}
+                    for e in s.scalars(q)]
+
+    def audit_choices(self) -> dict[str, list[str]]:
+        """The user names and actions that appear in the log, for the page's filters."""
+        with self.Session() as s:
+            return {"users": sorted(s.scalars(select(AuditEntry.username).distinct())),
+                    "actions": sorted(s.scalars(select(AuditEntry.action).distinct()))}
+
+    def cleanup_audit(self, retention_days: int) -> int:
+        if retention_days <= 0:
+            return 0
+        with self.Session.begin() as s:
+            return s.execute(delete(AuditEntry).where(
+                AuditEntry.created_at < datetime.now() - timedelta(days=retention_days))).rowcount
 
     # --- answer key ---------------------------------------------------------------------
 

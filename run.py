@@ -89,6 +89,9 @@ def main() -> int:
         (crop_dir / name).unlink(missing_ok=True)
     if removed:
         log.info("retention: deleted %d old crop files", len(removed))
+    old_audit = db.cleanup_audit(cfg["storage"]["audit_retention_days"])
+    if old_audit:
+        log.info("retention: deleted %d old audit log entries", old_audit)
 
     pipelines: list[Pipeline] = []
 

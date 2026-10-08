@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit log</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/session.js"></script>
+<style>
+  .filters { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .log { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  td.time { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
+  td.detail { word-break: break-word; }
+  .bad { color: var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>VisionLabeler</h1>
+  <nav><a href="/">Live</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/audit" class="active admin-only">Audit log</a></nav>
+</header>
+<main>
+  <section class="panel">
+    <h2>Audit log</h2>
+    <p class="hint">Who logged in, watched, searched, exported, deleted or changed something, newest first.
+      "this PC" means someone at this computer, which never needs to log in.</p>
+    <div class="filters">
+      <select id="user"><option value="">All users</option></select>
+      <select id="action"><option value="">All actions</option></select>
+      <span class="muted" id="count"></span>
+    </div>
+    <div class="log">
+      <table>
+        <thead><tr><th>Time</th><th>User</th><th>Address</th><th>Action</th><th>Detail</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty" hidden>Nothing recorded yet.</div>
+    <p><button id="older" hidden>Older entries</button></p>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const PAGE = 100;
+let shown = 0;
+let lastId = null;
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function fillSelect(sel, values) {
+  const keep = sel.value;
+  while (sel.options.length > 1) sel.remove(1);
+  for (const v of values) sel.add(new Option(v, v));
+  sel.value = values.includes(keep) ? keep : "";
+}
+
+async function load(more) {
+  const p = new URLSearchParams({ limit: PAGE });
+  if ($("user").value) p.set("user", $("user").value);
+  if ($("action").value) p.set("action", $("action").value);
+  if (more && lastId) p.set("before_id", lastId);
+  const data = await (await fetch("/api/audit?" + p)).json();
+  fillSelect($("user"), data.users);
+  fillSelect($("action"), data.actions);
+  if (!more) { $("rows").innerHTML = ""; shown = 0; }
+  for (const e of data.entries) {
+    const bad = e.action.startsWith("login failed") || e.action.startsWith("login blocked");
+    $("rows").insertAdjacentHTML("beforeend",
+      `<tr><td class="time">${esc(e.time.replace("T", " "))}</td>`
+      + `<td>${esc(e.username)}${e.role ? ` <span class="muted">${esc(e.role)}</span>` : ""}</td>`
+      + `<td>${esc(e.address)}</td><td class="${bad ? "bad" : ""}">${esc(e.action)}</td>`
+      + `<td class="detail">${esc(e.detail)}</td></tr>`);
+  }
+  shown += data.entries.length;
+  if (data.entries.length) lastId = data.entries[data.entries.length - 1].id;
+  $("empty").hidden = shown > 0;
+  $("older").hidden = data.entries.length < PAGE;
+  $("count").textContent = shown ? `${shown} shown` : "";
+}
+
+$("user").addEventListener("change", () => load(false));
+$("action").addEventListener("change", () => load(false));
+$("older").addEventListener("click", () => load(true));
+load(false);
+</script>
+</body>
+</html>
