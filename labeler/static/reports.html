@@ -54,6 +54,10 @@
     <div class="chart" id="timeline"></div>
     <details><summary>Show as a table</summary><div id="timeline-table"></div></details>
   </section>
+  <section class="panel" id="zones-panel" style="margin-top:14px" hidden>
+    <h2>Zones and counting lines</h2>
+    <div id="zones"></div>
+  </section>
   <h2 style="margin:18px 0 10px">What people looked like</h2>
   <div class="breakdowns" id="breakdowns"></div>
 </main>
@@ -131,6 +135,25 @@ function drawTimeline(data) {
       `<tr><td>${esc(label(r.t, data.unit))}</td><td>${r.count}</td></tr>`).join("") + "</table>";
 }
 
+function duration(s) {
+  if (s == null) return "-";
+  s = Math.round(s);
+  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
+}
+
+// Areas count entries and the average stay; lines count crossings each way.
+function drawZones(data) {
+  const rows = data.zones || [];
+  $("zones-panel").hidden = !rows.length;
+  $("zones").innerHTML = '<table class="data"><tr><th>Zone</th><th>Camera</th><th>Entered / in</th>'
+    + '<th>Left / out</th><th>Average stay</th></tr>' + rows.map(z => {
+      const line = z.in + z.out > 0 && z.enter === 0;
+      return `<tr><td>${esc(z.zone)}</td><td>${esc(z.camera)}</td>`
+        + (line ? `<td>${z.in} in</td><td>${z.out} out</td><td>-</td>`
+                : `<td>${z.enter}</td><td>${z.exit}</td><td>${duration(z.avg_dwell_s)}</td>`) + "</tr>";
+    }).join("") + "</table>";
+}
+
 function drawBreakdowns(data) {
   const blocks = Object.entries(data.attributes).map(([name, rows]) => {
     const total = rows.reduce((a, r) => a + r.count, 0);
@@ -157,6 +180,7 @@ async function load() {
       <div class="lbl">busiest ${data.unit}${busiest.count ? ` (${busiest.count})` : ""}</div></div>
     <div class="tile"><div class="num">${Object.keys(data.cameras).length}</div><div class="lbl">cameras with people</div></div>`;
   drawTimeline(data);
+  drawZones(data);
   drawBreakdowns(data);
 }
 

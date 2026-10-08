@@ -97,6 +97,32 @@ def test_zone_storage_counts_and_deleting(db, camera):
     assert db.zone_counts(T0, T0 + timedelta(days=1)) == []              # deleting people removes their events
 
 
+def test_alert_rule_can_ask_for_entering_a_zone(db, camera):
+    from labeler.alerts import AlertEngine, describe
+    engine = AlertEngine(db)
+    db.add_rule("at the door", [["zone", "door"], ["upper_color", "red"]])
+    t = db.create_track(camera, 1, T0)
+    db.add_attributes(t, [("upper_color", "red", 1.0)], "vlm", "q", threshold=0.6)
+    assert engine.check(t, "test-cam") == []                                    # red, but not at the door yet
+    db.add_zone_events(t, "test-cam", [{"zone_id": 1, "zone_name": "door", "kind": "in", "at": T0}])
+    assert [e["message"] for e in engine.check(t, "test-cam")] == ["at the door: in zone door, upper color = red"]
+    assert describe([["zone", "door"]]) == "in zone door"
+
+
+def test_rules_and_reports_know_the_zones(db, camera, tmp_path):
+    cfg = copy.deepcopy(DEFAULTS)
+    cfg["storage"]["crop_dir"] = str(tmp_path)
+    admin = TestClient(create_app(cfg, db, None), client=("127.0.0.1", 5000))
+    rule = {"name": "door", "conditions": [["zone", "door"]]}
+    assert admin.post("/api/alerts/rules", json=rule).status_code == 400          # no zone "door" yet
+    db.add_zone("test-cam", "door", "line", DOOR["points"])
+    assert admin.post("/api/alerts/rules", json=rule).status_code == 200
+    t = db.create_track(camera, 1, datetime.now())
+    db.add_zone_events(t, "test-cam", [{"zone_id": 1, "zone_name": "door", "kind": "out", "at": datetime.now()}])
+    zones_ = admin.get("/api/reports/summary").json()["zones"]
+    assert [(z["zone"], z["in"], z["out"]) for z in zones_] == [("door", 0, 1)]
+
+
 def test_zone_api_is_admin_only_and_audited(db, tmp_path):
     cfg = copy.deepcopy(DEFAULTS)
     cfg["storage"]["crop_dir"] = str(tmp_path)

@@ -290,7 +290,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         s, e = _day_range(start, end)
         audit(request, "view report", f"{s:%Y-%m-%d} to {(e - timedelta(days=1)):%Y-%m-%d}"
                                       + (f", camera {camera}" if camera else ""))
-        return reports.summarize(db.people_between(s, e, camera), s, e)
+        return {**reports.summarize(db.people_between(s, e, camera), s, e), "zones": db.zone_counts(s, e, camera)}
 
     @app.get("/api/reports/export.csv")
     def report_csv(request: Request, start: str | None = None, end: str | None = None, camera: str | None = None):
@@ -315,7 +315,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
 
     @app.post("/api/alerts/rules")
     def add_rule(body: RuleIn, request: Request):
-        allowed = {**schema.FIELDS, **{n: v + ["none"] for n, v in schema.LIST_FIELDS.items()}}
+        allowed = {**schema.FIELDS, **{n: v + ["none"] for n, v in schema.LIST_FIELDS.items()},
+                   "zone": sorted({z["name"] for z in db.list_zones()})}
         for cond in body.conditions:
             if len(cond) != 2 or cond[0] not in allowed or cond[1] not in allowed[cond[0]]:
                 raise HTTPException(400, f"unknown condition {cond}")

@@ -164,7 +164,10 @@ On the Live page (admin), **Zones** lets you draw on the camera picture:
 - a **counting line** (click 2 points across the way people walk): crossings are counted as *in* (the arrow's
   direction) and *out*. Click the points the other way round to flip the arrow.
 
-Zones are drawn on the live picture, with how many people are in each area now. Where a person "is" is the
+Zones are drawn on the live picture, with how many people are in each area now. **Reports** shows, per zone,
+how many entered and left and the average stay (areas) or how many crossed in and out (lines). On the
+**Alerts** page, "entered zone" is a condition like any other, e.g. *entered zone = door* and *carrying =
+backpack*; it also fires for crossing a line either way. Where a person "is" is the
 middle of them on kiosk cameras (feet are usually out of view) and their feet on security cameras. A change
 only counts after `zones.min_frames` (3) frames in a row, so someone standing on a border is not counted
 again and again; very brief detections are never counted. Deleting a zone keeps its counts. Counts are removed
@@ -301,7 +304,7 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-118 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+129 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, alerts,
 reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.
