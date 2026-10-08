@@ -63,7 +63,7 @@ fast classifiers were trained on **COCO photos with mixed Flickr licenses**. Fin
 
 ## Phase 2: Privacy and security for business use
 
-1. **Accounts and roles** replacing the single Basic-auth password in `labeler/web.py`: `admin` (delete,
+1. **Done 2026-10-08.** **Accounts and roles** replacing the single Basic-auth password in `labeler/web.py`: `admin` (delete,
    export, rules, settings) and `viewer` (live view and search only). Hashed passwords in a new `users`
    table; session cookie; login page.
 2. **Audit log** table: who viewed, searched, exported, deleted, changed rules, with time and IP. Admin page.

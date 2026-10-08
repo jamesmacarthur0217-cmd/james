@@ -17,3 +17,10 @@ def test_page_script_parses(page, tmp_path):
     script.write_text(js, encoding="utf-8")
     result = subprocess.run(["node", "--check", str(script)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node.js not installed")
+@pytest.mark.parametrize("name", sorted(p.name for p in STATIC.glob("*.js")))
+def test_shared_script_parses(name):
+    result = subprocess.run(["node", "--check", str(STATIC / name)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr

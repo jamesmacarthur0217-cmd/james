@@ -1,5 +1,4 @@
-"""Camera list, login for other devices, config defaults, VLM retry."""
-import base64
+"""Camera list, network access check, config defaults, VLM retry. Logins: tests/test_accounts.py."""
 import copy
 
 import pytest
@@ -34,43 +33,21 @@ def test_env_default_syntax(monkeypatch):
     assert _expand("${VL_NOT_SET:-fallback}") == "real"
 
 
-def test_network_access_needs_a_password():
-    check_access({"host": "127.0.0.1", "password": ""})
-    check_access({"host": "0.0.0.0", "password": "long-password"})
+def test_network_access_needs_a_login_account():
+    check_access({"host": "127.0.0.1"}, n_users=0)
+    check_access({"host": "0.0.0.0"}, n_users=1)
     with pytest.raises(SystemExit):
-        check_access({"host": "0.0.0.0", "password": ""})
+        check_access({"host": "0.0.0.0"}, n_users=0)
 
 
-def _app(db, tmp_path, password=""):
+def _app(db, tmp_path):
     cfg = copy.deepcopy(DEFAULTS)
     cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
-    cfg["web"]["password"] = password
     return create_app(cfg, db, None)
 
 
-def _auth(user, pw):
-    return {"Authorization": "Basic " + base64.b64encode(f"{user}:{pw}".encode()).decode()}
-
-
-def test_other_devices_must_log_in(db, tmp_path):
-    remote = TestClient(_app(db, tmp_path, password="s3cret"), client=("192.168.1.20", 5000))
-    assert remote.get("/api/tracks").status_code == 401
-    assert remote.get("/api/tracks", headers=_auth("admin", "wrong")).status_code == 401
-    assert remote.get("/api/tracks", headers=_auth("admin", "s3cret")).status_code == 200
-
-
-def test_this_pc_needs_no_login(db, tmp_path):
-    local = TestClient(_app(db, tmp_path, password="s3cret"), client=("127.0.0.1", 5000))
-    assert local.get("/api/tracks").status_code == 200
-
-
-def test_no_password_means_no_login(db, tmp_path):
-    remote = TestClient(_app(db, tmp_path), client=("192.168.1.20", 5000))
-    assert remote.get("/api/tracks").status_code == 200
-
-
 def test_status_reports_disk_space(db, tmp_path):
-    s = TestClient(_app(db, tmp_path)).get("/api/status").json()
+    s = TestClient(_app(db, tmp_path), client=("127.0.0.1", 5000)).get("/api/status").json()
     assert s["disk_free_gb"] > 0 and isinstance(s["disk_low"], bool) and s["cameras"] == []
 
 

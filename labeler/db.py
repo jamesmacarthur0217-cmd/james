@@ -1,7 +1,9 @@
 """Database models and queries. SQLite by default; the same models work on PostgreSQL."""
 from __future__ import annotations
 
+import hashlib
 import json
+import secrets
 import threading
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
@@ -162,6 +164,25 @@ class Review(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
+class User(Base):
+    """A login for the web pages (see labeler/accounts.py). Only a salted hash of the password is stored."""
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(100), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(300))
+    role: Mapped[str] = mapped_column(String(20))      # admin | viewer
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class LoginSession(Base):
+    """A logged-in browser. The cookie holds a random token; only its SHA-256 is stored here."""
+    __tablename__ = "login_sessions"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+
+
 def resolve(attrs: list[Attribute]) -> dict[str, dict]:
     """Pick one value per attribute name: human-verified first, then highest confidence.
 
@@ -186,6 +207,10 @@ def resolve(attrs: list[Attribute]) -> dict[str, dict]:
             "needs_review": any(a.review_status == "needs_review" for a in items),
         }
     return out
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def _score(rows: list[tuple[AnswerKey, Track]]) -> dict[str, dict]:
@@ -545,6 +570,88 @@ class Database:
         from sqlalchemy import func
         with self.Session() as s:
             return s.scalar(select(func.max(AlertEvent.id))) or 0
+
+    # --- users and logins ---------------------------------------------------------------
+
+    def count_users(self) -> int:
+        from sqlalchemy import func
+        with self.Session() as s:
+            return s.scalar(select(func.count(User.id))) or 0
+
+    def list_users(self) -> list[dict]:
+        with self.Session() as s:
+            return [{"username": u.username, "role": u.role, "created_at": u.created_at.isoformat(timespec="seconds")}
+                    for u in s.scalars(select(User).order_by(User.username))]
+
+    def get_user(self, username: str) -> dict | None:
+        with self.Session() as s:
+            u = s.scalars(select(User).where(User.username == username)).first()
+            return None if u is None else {"id": u.id, "username": u.username, "role": u.role,
+                                           "password_hash": u.password_hash}
+
+    def add_user(self, username: str, password_hash: str, role: str) -> int:
+        from .accounts import ROLES
+        if role not in ROLES:
+            raise ValueError(f"role must be one of {', '.join(ROLES)}")
+        if not username.strip():
+            raise ValueError("the user name is empty")
+        with self.Session.begin() as s:
+            if s.scalars(select(User).where(User.username == username)).first() is not None:
+                raise ValueError(f"user {username!r} already exists")
+            u = User(username=username, password_hash=password_hash, role=role)
+            s.add(u)
+            s.flush()
+            return u.id
+
+    def update_user(self, username: str, password_hash: str | None = None, role: str | None = None) -> bool:
+        """Change a password or role. The user is logged out everywhere, so the change applies at once."""
+        from .accounts import ROLES
+        if role is not None and role not in ROLES:
+            raise ValueError(f"role must be one of {', '.join(ROLES)}")
+        with self.Session.begin() as s:
+            u = s.scalars(select(User).where(User.username == username)).first()
+            if u is None:
+                return False
+            if password_hash is not None:
+                u.password_hash = password_hash
+            if role is not None:
+                u.role = role
+            s.execute(delete(LoginSession).where(LoginSession.user_id == u.id))
+            return True
+
+    def delete_user(self, username: str) -> bool:
+        with self.Session.begin() as s:
+            u = s.scalars(select(User).where(User.username == username)).first()
+            if u is None:
+                return False
+            s.execute(delete(LoginSession).where(LoginSession.user_id == u.id))
+            s.delete(u)
+            return True
+
+    def create_session(self, user_id: int, hours: float) -> str:
+        """Log a user in; returns the token for the cookie. Expired sessions are cleaned up here."""
+        token = secrets.token_urlsafe(32)
+        now = datetime.now()
+        with self.Session.begin() as s:
+            s.execute(delete(LoginSession).where(LoginSession.expires_at < now))
+            s.add(LoginSession(token_hash=_token_hash(token), user_id=user_id, created_at=now,
+                               expires_at=now + timedelta(hours=hours)))
+        return token
+
+    def session_user(self, token: str) -> dict | None:
+        """The logged-in user for a cookie token, or None (unknown or expired)."""
+        if not token:
+            return None
+        with self.Session() as s:
+            row = s.execute(select(LoginSession, User).join(User, User.id == LoginSession.user_id)
+                            .where(LoginSession.token_hash == _token_hash(token))).first()
+            if row is None or row[0].expires_at < datetime.now():
+                return None
+            return {"username": row[1].username, "role": row[1].role}
+
+    def end_session(self, token: str) -> None:
+        with self.Session.begin() as s:
+            s.execute(delete(LoginSession).where(LoginSession.token_hash == _token_hash(token)))
 
     # --- answer key ---------------------------------------------------------------------
 

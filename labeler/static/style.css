@@ -86,3 +86,11 @@ button.danger-quiet { margin-left: auto; color: #c9372c; border-color: transpare
 .toast img { width: 44px; height: 58px; object-fit: cover; border-radius: 4px; flex: none; }
 .toast small { color: var(--muted); }
 .muted { color: var(--muted); font-size: 12px; }
+/* Accounts: admin controls are hidden until the page knows the user is an admin (static/session.js). */
+body:not(.is-admin) .admin-only { display: none !important; }
+.who { color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.login { display: flex; justify-content: center; padding-top: 12vh; }
+.login form { display: flex; flex-direction: column; gap: 12px; width: min(340px, 100%); }
+.login h1 { font-size: 18px; margin: 0 0 4px; }
+.login label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
+.login .reason { color: var(--warn); }

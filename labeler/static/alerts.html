@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alerts</title>
 <link rel="stylesheet" href="/static/style.css">
+<script src="/static/session.js"></script>
 <style>
   .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
   @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
@@ -22,7 +23,7 @@
 <body>
 <header>
   <h1>VisionLabeler</h1>
-  <nav><a href="/">Live</a><a href="/review">Review queue</a><a href="/reports">Reports</a><a href="/alerts" class="active">Alerts</a><a href="/answer-key">Answer key</a></nav>
+  <nav><a href="/">Live</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="active admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a></nav>
 </header>
 <main class="cols">
   <div>

@@ -176,16 +176,31 @@ are drawn as gray "ignored" boxes.
 
 ## Access from other devices
 
-By default only this PC can open the app. To allow other devices on your network, add
-`VL_WEB_PASSWORD=<a long password>` to `.env` and set `web.host: 0.0.0.0`. Other devices then log in
-(user `admin`); this PC never needs to. The app refuses to open to the network without a password.
-It is plain HTTP: fine on a home or office network, not for the internet.
+By default only this PC can open the app. To allow other devices on your network, create login accounts and
+set `web.host: 0.0.0.0`. This PC never needs to log in (it is always admin); other devices see a login page.
+The app refuses to open to the network while there is no account.
+
+```bash
+.venv\Scripts\python.exe tools\users.py add ann --role admin
+```
+
+| Role | May |
+|---|---|
+| `admin` | everything: review, reports and CSV export, alert rules, answer key, delete, stop |
+| `viewer` | Live page, search and questions, alert pop-ups; nothing else |
+
+Other commands: `users.py list`, `password <name>`, `role <name> admin|viewer`, `remove <name>`. Passwords
+need 10+ characters and are stored only as salted scrypt hashes. A login lasts `web.session_hours` (12);
+changing a password or role logs that user out everywhere. Five wrong passwords from one device block it
+for 5 minutes. A shared password from older setups (`VL_WEB_PASSWORD` in `.env`) becomes the first admin
+account (user `admin`) at startup. It is plain HTTP: fine on a home or office network, not for the internet.
 
 ## Database
 
 PostgreSQL 17 with pgvector in Docker (`docker-compose.yml`), on 127.0.0.1:5432, data in the Docker volume
 `visionlabeler_pgdata`, password in `.env` (keep it private). Tables: `cameras`, `tracks`, `attributes`,
-`embeddings` (`vector(768)` with an HNSW index), `reviews`, `alert_rules`, `alert_events`, `answer_key`.
+`embeddings` (`vector(768)` with an HNSW index), `reviews`, `alert_rules`, `alert_events`, `answer_key`,
+`users` (password hashes), `login_sessions` (hashed cookie tokens).
 For a quick test without Docker: `database.url: sqlite:///data/vision.db`.
 
 ## Training the fast classifiers
@@ -212,9 +227,9 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-80 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
-the VLM worker and retries, classifiers, age source, cameras, login, supervisor, alerts, reports, questions,
-answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.
+91 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+the VLM worker and retries, classifiers, age source, cameras, accounts and roles, supervisor, alerts, reports,
+questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.
 
 ## Files
 

@@ -5,13 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VisionLabeler</title>
 <link rel="stylesheet" href="/static/style.css">
+<script src="/static/session.js"></script>
 </head>
 <body>
 <header>
   <h1>VisionLabeler</h1>
-  <nav><a href="/" class="active">Live</a><a href="/review">Review queue</a><a href="/reports">Reports</a><a href="/alerts">Alerts</a><a href="/answer-key">Answer key</a></nav>
+  <nav><a href="/" class="active">Live</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a></nav>
   <div class="status" id="status">connecting…</div>
-  <button id="stop" title="Finish labeling the people in view, save, and close the app">Stop</button>
+  <button id="stop" class="admin-only" title="Finish labeling the people in view, save, and close the app">Stop</button>
 </header>
 <main class="layout">
   <section class="panel">
@@ -43,7 +44,7 @@
       <button id="f-clear">Clear</button>
     </div>
     <div class="banner" id="banner" hidden></div>
-    <div class="select-bar">
+    <div class="select-bar admin-only">
       <label><input type="checkbox" id="sel-all"> Select all shown</label>
       <button id="del-selected" class="danger" disabled>Delete selected</button>
       <button id="del-all" class="danger-quiet" title="Delete every recorded person">Delete all…</button>
@@ -243,7 +244,7 @@ async function status() {
     if (down.length) warn = `<b style="color:var(--warn)">camera not running: ${down.map(esc).join(", ")}</b> · ` + warn;
     $("status").innerHTML = warn + `mode <b>${s.mode}</b> · <b>${s.fps ?? "-"}</b> fps · <b>${s.active_people ?? 0}</b> in view · `
       + `VLM queue <b>${s.vlm_enabled ? s.vlm_queue : "off"}</b> · <b>${s.tracks}</b> people · `
-      + `<a href="/review"><b>${s.needs_review}</b> to review</a>`;
+      + `<a href="/review" class="admin-only"><b>${s.needs_review}</b> to review</a>`;
   } catch { $("status").textContent = "disconnected"; }
 }
 

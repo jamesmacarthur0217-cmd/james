@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log in · VisionLabeler</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main class="login">
+  <form class="panel" id="form">
+    <h1>VisionLabeler</h1>
+    <label>User name <input id="username" autocomplete="username" required autofocus></label>
+    <label>Password <input id="password" type="password" autocomplete="current-password" required></label>
+    <div class="reason" id="error" hidden></div>
+    <button class="primary" id="go">Log in</button>
+  </form>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("go").disabled = true;
+  $("error").hidden = true;
+  try {
+    const r = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: $("username").value, password: $("password").value }) });
+    if (r.ok) { location.href = "/"; return; }
+    const data = await r.json().catch(() => ({}));
+    $("error").textContent = data.detail || "Could not log in.";
+  } catch {
+    $("error").textContent = "The app is not reachable.";
+  }
+  $("error").hidden = false;
+  $("password").value = "";
+  $("password").focus();
+  $("go").disabled = false;
+});
+</script>
+</body>
+</html>

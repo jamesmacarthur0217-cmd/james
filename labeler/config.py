@@ -54,7 +54,7 @@ DEFAULTS: dict = {
     "review": {"confidence_threshold": 0.6},
     "database": {"url": "sqlite:///data/vision.db"},
     "storage": {"crop_dir": "data/crops", "save_face_crops": False, "retention_days": 30, "min_free_gb": 5},
-    "web": {"host": "127.0.0.1", "port": 8000, "username": "admin", "password": ""},
+    "web": {"host": "127.0.0.1", "port": 8000, "username": "admin", "password": "", "session_hours": 12},
 }
 
 

@@ -54,7 +54,7 @@ def test_student_refuses_a_different_embedding_model(tmp_path):
 def client(db, tmp_path):
     cfg = copy.deepcopy(DEFAULTS)
     cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
-    return TestClient(create_app(cfg, db, None)), tmp_path / "crops"
+    return TestClient(create_app(cfg, db, None), client=("127.0.0.1", 5000)), tmp_path / "crops"   # this PC
 
 
 def test_delete_api_removes_records_and_pictures(client, db, camera):

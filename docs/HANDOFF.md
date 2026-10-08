@@ -19,7 +19,10 @@ cameras** and **commercial use**. They have tested the current version and are h
 - Git: local repo, branch `main`, clean. Latest commits:
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
-- Tests: 80 pass (`.venv\Scripts\python.exe -m pytest -q`, ~20 s).
+- Tests: 91 pass (`.venv\Scripts\python.exe -m pytest -q`, ~15 s).
+- 2026-10-08, Phase 2 step 1 done: login accounts with admin/viewer roles replace the shared password.
+  The user's config has `web.host: 127.0.0.1` and no accounts, so nothing changes for them until they open
+  the app to the network.
 - 2026-10-08, Phase 0 step 1 done: teacher labels redone with the current prompt (1,534 people, 57 min;
   old labels kept as `data/datasets/coco_people/teacher.old-prompt.jsonl`), fast classifiers retrained:
   answer key 67% → 75%, gender 56% → 97%. They still cover every attribute for 0% of people, so the VLM
@@ -54,7 +57,11 @@ camera(s) ─ labeler/sources.py (MSMF webcam, files, RTSP; latest-frame reader 
                     VLM job (labeler/vlm.py → Ollama qwen3-vl:4b-instruct), re-analysis every 15 s,
                     alert check (labeler/alerts.py)
    └─ labeler/db.py  SQLAlchemy models + queries (Postgres+pgvector; SQLite works for tests)
-        tables: cameras, tracks, attributes, embeddings, reviews, alert_rules, alert_events, answer_key
+        tables: cameras, tracks, attributes, embeddings, reviews, alert_rules, alert_events, answer_key,
+                users, login_sessions
+   labeler/accounts.py  password hashing (scrypt), roles (admin/viewer allowlist), login lock-out;
+                        tools/users.py manages accounts. This PC (127.0.0.1) is always admin, so never put
+                        a reverse proxy on this PC in front of the app: every request would look local.
    └─ labeler/web.py FastAPI app + labeler/static/*.html (no build step)
         pages: / (Live), /review, /reports, /alerts, /answer-key
         API: /stream, /api/live, /api/status, /api/tracks, /api/tracks/delete, /api/search, /api/ask,

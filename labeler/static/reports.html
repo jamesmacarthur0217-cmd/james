@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Reports</title>
 <link rel="stylesheet" href="/static/style.css">
+<script src="/static/session.js"></script>
 <style>
   .viz { --series-1: #2a78d6; --grid: #e6e6e3; }
   @media (prefers-color-scheme: dark) { .viz { --series-1: #3987e5; --grid: #2e3440; } }
@@ -36,7 +37,7 @@
 <body>
 <header>
   <h1>VisionLabeler</h1>
-  <nav><a href="/">Live</a><a href="/review">Review queue</a><a href="/reports" class="active">Reports</a><a href="/alerts">Alerts</a><a href="/answer-key">Answer key</a></nav>
+  <nav><a href="/">Live</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="active admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a></nav>
 </header>
 <main class="viz">
   <div class="filters">

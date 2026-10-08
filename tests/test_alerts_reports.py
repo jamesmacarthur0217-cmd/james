@@ -94,7 +94,7 @@ def test_csv_has_one_column_per_attribute():
 def _api(db, tmp_path):
     cfg = copy.deepcopy(DEFAULTS)
     cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
-    return TestClient(create_app(cfg, db, None, None, AlertEngine(db)))
+    return TestClient(create_app(cfg, db, None, None, AlertEngine(db)), client=("127.0.0.1", 5000))   # this PC
 
 
 def test_alert_rule_api(db, tmp_path):

@@ -90,7 +90,9 @@ storage:
 
 web:
   host: 127.0.0.1             # this PC only. Use 0.0.0.0 to open it to other devices on your network,
-                              # which requires a password: add VL_WEB_PASSWORD=... to .env
+                              # which requires a login account: tools\users.py add <name> --role admin
   port: 8000
+  session_hours: 12           # other devices log in again after this long; this PC never needs to log in
+  # Older setups: a shared password in .env (VL_WEB_PASSWORD) becomes the first admin account at startup.
   username: admin
-  password: ${VL_WEB_PASSWORD:-}   # from .env; asked from other devices only, never from this PC
+  password: ${VL_WEB_PASSWORD:-}

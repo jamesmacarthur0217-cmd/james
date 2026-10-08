@@ -2,18 +2,17 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import threading
-import secrets
 import shutil
 from datetime import datetime, timedelta
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
-from . import reports, schema
+from . import accounts, reports, schema
 from .config import ROOT, resolve
 from .db import Database
 from .pipeline import Pipeline
@@ -64,42 +63,96 @@ def _day_range(start: str | None, end: str | None) -> tuple[datetime, datetime]:
 
 
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+LOCAL_USER = {"username": "this PC", "role": "admin", "local": True}
+COOKIE = "vl_session"
 
 
-def check_access(web: dict) -> None:
-    """Refuse to open the UI to the network without a password."""
-    if web["host"] not in LOCAL_HOSTS and not web.get("password"):
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+
+def check_access(web: dict, n_users: int) -> None:
+    """Refuse to open the UI to the network while nobody can log in."""
+    if web["host"] not in LOCAL_HOSTS and n_users == 0:
         raise SystemExit(
-            f"web.host is {web['host']!r}, so other devices could open the app, but no password is set. "
-            "Add a line VL_WEB_PASSWORD=<a long password> to .env, or set web.host back to 127.0.0.1.")
+            f"web.host is {web['host']!r}, so other devices could open the app, but there is no login account. "
+            "Create one with: .venv\\Scripts\\python.exe tools\\users.py add <name> --role admin "
+            "(or set web.host back to 127.0.0.1).")
+
+
+def ensure_first_admin(db: Database, web: dict) -> None:
+    """Older setups had one shared password (VL_WEB_PASSWORD): it becomes the first admin account."""
+    if web.get("password") and db.count_users() == 0:
+        db.add_user(web.get("username") or "admin", accounts.hash_password(web["password"]), "admin")
 
 
 def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | None, embedder=None,
                alerts=None, agent=None) -> FastAPI:
     app = FastAPI(title="VisionLabeler")
     app.state.stopping = threading.Event()
+    session_hours = cfg["web"].get("session_hours", 12)
+    limiter = accounts.LoginLimiter()
 
-    password = cfg["web"].get("password") or ""
-    if password:
-        username = cfg["web"].get("username") or "admin"
+    @app.middleware("http")
+    async def require_login(request: Request, call_next):
+        """This PC itself (stop.bat, the local browser) is always admin. Other devices must log in, and a
+        viewer may only do what accounts.VIEWER lists. Behind a proxy every request would look local, so
+        HTTPS is served by the app itself, never through a proxy on this PC."""
+        client = request.client.host if request.client else ""
+        method, path = request.method, request.url.path
+        if client in LOCAL_HOSTS:
+            request.state.user = LOCAL_USER
+        else:
+            user = await run_in_threadpool(db.session_user, request.cookies.get(COOKIE, ""))
+            request.state.user = user
+            page = method == "GET" and not path.startswith(("/api/", "/stream", "/crops/", "/static/"))
+            if user is None:
+                if not accounts.is_public(method, path):
+                    if page:
+                        return RedirectResponse("/login", status_code=303)
+                    return JSONResponse({"detail": "login required"}, status_code=401)
+            elif not accounts.allowed(user["role"], method, path):
+                if page:
+                    return RedirectResponse("/", status_code=303)   # a viewer opening an admin page
+                return JSONResponse({"detail": "your account may not do this"}, status_code=403)
+        return await call_next(request)
 
-        @app.middleware("http")
-        async def require_login(request: Request, call_next):
-            """Other devices must log in; this PC itself (stop.bat, the local browser) does not."""
-            client = request.client.host if request.client else ""
-            if client not in LOCAL_HOSTS:
-                ok = False
-                header = request.headers.get("authorization", "")
-                if header.startswith("Basic "):
-                    try:
-                        user, _, pw = base64.b64decode(header[6:]).decode("utf-8").partition(":")
-                        ok = secrets.compare_digest(user, username) and secrets.compare_digest(pw, password)
-                    except Exception:
-                        ok = False
-                if not ok:
-                    return Response("Login required", status_code=401,
-                                    headers={"WWW-Authenticate": 'Basic realm="VisionLabeler"'})
-            return await call_next(request)
+    @app.get("/login")
+    def login_page():
+        return FileResponse(STATIC / "login.html")
+
+    @app.post("/api/login")
+    def login(body: LoginIn, request: Request, response: Response):
+        address = request.client.host if request.client else ""
+        wait = limiter.blocked_for(address)
+        if wait:
+            raise HTTPException(429, f"Too many wrong passwords. Try again in {int(wait // 60) + 1} min.")
+        user = db.get_user(body.username.strip())
+        # A wrong name is checked against a dummy hash, so it takes as long as a wrong password.
+        ok = accounts.verify_password(body.password, user["password_hash"] if user else accounts.DUMMY_HASH)
+        if not (ok and user):
+            limiter.failed(address)
+            raise HTTPException(401, "Wrong user name or password.")
+        limiter.succeeded(address)
+        token = db.create_session(user["id"], session_hours)
+        response.set_cookie(COOKIE, token, max_age=int(session_hours * 3600), httponly=True, samesite="strict",
+                            secure=request.url.scheme == "https")
+        return {"username": user["username"], "role": user["role"]}
+
+    @app.post("/api/logout")
+    def logout(request: Request, response: Response):
+        token = request.cookies.get(COOKIE)
+        if token:
+            db.end_session(token)
+        response.delete_cookie(COOKIE)
+        return {"ok": True}
+
+    @app.get("/api/me")
+    def me(request: Request):
+        user = request.state.user
+        return {**user, "local": user.get("local", False)} if user else None
+
     if pipelines is None:
         pipelines = []
     elif isinstance(pipelines, Pipeline):

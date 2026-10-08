@@ -155,10 +155,11 @@ def main() -> int:
         return EXIT_CRASHED if any(p.crashed for p in pipelines) else 0
 
     import uvicorn
-    from labeler.web import check_access, create_app
+    from labeler.web import check_access, create_app, ensure_first_admin
 
     web = cfg["web"]
-    check_access(web)   # refuses to open the UI to the network without a password
+    ensure_first_admin(db, web)          # an old shared password becomes the first admin account
+    check_access(web, db.count_users())  # refuses to open the UI to the network while nobody can log in
     for t in threads:
         t.start()
     agent = None
