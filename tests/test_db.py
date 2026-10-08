@@ -112,6 +112,38 @@ def test_retention_deletes_only_old_people(db, camera):
     assert db.cleanup(0) == []
 
 
+def test_each_camera_can_keep_people_for_its_own_time(db, camera):
+    gate = db.get_or_create_camera("gate", "rtsp://x", "security")
+    db.create_track(camera, 1, datetime.now() - timedelta(days=10))
+    gate_10 = db.create_track(gate, 1, datetime.now() - timedelta(days=10))
+    db.create_track(gate, 1, datetime.now() - timedelta(days=40))
+    db.cleanup(30, {"test-cam": 7})                                              # kiosk 7 days, others 30
+    assert [t["id"] for t in db.list_tracks()] == [gate_10]
+    db.cleanup(0, {"gate": 5})                                                   # default keep forever
+    assert db.list_tracks() == []
+
+
+def test_retention_removes_pictures_and_blurred_copies(db, camera, tmp_path):
+    from labeler import privacy
+    from run import _apply_retention
+    old = db.create_track(camera, 1, datetime.now() - timedelta(days=40))
+    db.update_track(old, crop_path=f"{old}.jpg")
+    (tmp_path / f"{old}.jpg").write_bytes(b"x")
+    privacy.blurred_path(tmp_path, f"{old}.jpg").parent.mkdir()
+    privacy.blurred_path(tmp_path, f"{old}.jpg").write_bytes(b"x")
+    cfg = {"cameras": [{"name": "test-cam"}], "storage": {"retention_days": 30, "audit_retention_days": 365}}
+    _apply_retention(db, cfg, tmp_path)
+    assert db.list_tracks() == [] and list(tmp_path.rglob("*.jpg")) == []
+
+
+def test_hourly_retention_stops_with_the_app(db, tmp_path):
+    import threading
+    from run import _retention_loop
+    stop = threading.Event()
+    stop.set()
+    _retention_loop(db, {}, tmp_path, stop)                                      # returns at once
+
+
 def test_people_left_active_by_a_crash_are_closed(db, camera):
     t = _person(db, camera)
     assert db.close_stale_tracks() == 1

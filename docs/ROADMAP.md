@@ -70,7 +70,7 @@ fast classifiers were trained on **COCO photos with mixed Flickr licenses**. Fin
 3. **Done 2026-10-08** (self-signed, built in; no Caddy: a local proxy would bypass the login). **HTTPS** for network access (self-signed certificate generated on setup, or Caddy in docker-compose).
 4. **Done 2026-10-08.** **Face blurring option** for viewers and for saved crops (`storage.blur_faces`), using the face box from
    `labeler/geometry.py:face_box`.
-5. Per-camera retention (`cameras[].retention_days`), and a documented erasure procedure (search the person,
+5. **Done 2026-10-08** (plus hourly cleanup while running). Per-camera retention (`cameras[].retention_days`), and a documented erasure procedure (search the person,
    then Delete selected).
 6. Templates in `docs/`: camera notice sign text, short data-protection summary (what is stored, how long, who
    can see it). Recommend BitLocker on the PC for encryption at rest.

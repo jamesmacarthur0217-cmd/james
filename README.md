@@ -212,6 +212,16 @@ saves face close-ups), so nobody can see faces later; labeling still uses the un
 the Review and Answer key pages then show blurred faces. The blurred area comes from the head keypoints (larger
 than the face, to cover profiles); without them, the top of the person is blurred.
 
+**How long people are kept**: `storage.retention_days` (30), or a camera's own `retention_days` (e.g. 7 for an
+entrance camera). Older people, their pictures and labels are deleted at startup and every hour while running.
+
+**Erasing one person's data** (e.g. someone asks to be removed): on the Live page, find them with the Ask box
+(a description such as "woman in a red coat yesterday afternoon") or with an attribute filter; open a likely
+match's look-alikes to find their other visits, also on other cameras; tick every record of them, then
+*Delete selected*. Their pictures (and blurred copies), labels, review history, embeddings and alerts are
+removed, and the Audit log records the deletion. Backups made by stop.bat (`data/backups`, the last 7, at most
+one a day) still contain them until they are rotated out; the same holds for people past their retention time.
+
 **Audit log** (admin page *Audit log*): who logged in (and failed), watched the live video, searched or asked,
 looked up look-alikes, viewed a report, exported CSV, deleted people, changed alert rules, reviewed labels,
 used the answer key, stopped the app, and account changes made with `users.py`, with time and address.
@@ -250,7 +260,7 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-114 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+117 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, alerts,
 reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.

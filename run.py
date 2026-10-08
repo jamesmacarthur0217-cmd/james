@@ -87,15 +87,7 @@ def main() -> int:
     stale = db.close_stale_tracks()
     if stale:
         log.info("marked %d people left active by an earlier unclean stop as finished", stale)
-    from labeler.privacy import remove_picture
-    removed = db.cleanup(cfg["storage"]["retention_days"])
-    for name in removed:
-        remove_picture(crop_dir, name)   # and its blurred copy
-    if removed:
-        log.info("retention: deleted %d old crop files", len(removed))
-    old_audit = db.cleanup_audit(cfg["storage"]["audit_retention_days"])
-    if old_audit:
-        log.info("retention: deleted %d old audit log entries", old_audit)
+    _apply_retention(db, cfg, crop_dir)
 
     pipelines: list[Pipeline] = []
 
@@ -197,6 +189,8 @@ def main() -> int:
             time.sleep(2)
 
     threading.Thread(target=watchdog, name="watchdog", daemon=True).start()
+    threading.Thread(target=_retention_loop, args=(db, cfg, crop_dir, app.state.stopping),
+                     name="retention", daemon=True).start()
     # stop.bat waits for this process to exit before stopping the database, so final saves complete.
     pid_file = resolve("data/app.pid")
     pid_file.parent.mkdir(parents=True, exist_ok=True)
@@ -219,6 +213,32 @@ def main() -> int:
         pid_file.unlink(missing_ok=True)
         log.info("stopped")
     return exit_code[0]
+
+
+RETENTION_EVERY_S = 3600
+
+
+def _apply_retention(db: Database, cfg: dict, crop_dir) -> None:
+    """Delete people (and their pictures) older than their camera's retention_days, and old audit entries."""
+    from labeler.privacy import remove_picture
+    per_camera = {c["name"]: c["retention_days"] for c in cfg["cameras"] if c.get("retention_days") is not None}
+    removed = db.cleanup(cfg["storage"]["retention_days"], per_camera)
+    for name in removed:
+        remove_picture(crop_dir, name)   # and its blurred copy
+    if removed:
+        log.info("retention: deleted %d old pictures", len(removed))
+    old_audit = db.cleanup_audit(cfg["storage"]["audit_retention_days"])
+    if old_audit:
+        log.info("retention: deleted %d old audit log entries", old_audit)
+
+
+def _retention_loop(db: Database, cfg: dict, crop_dir, stop: threading.Event) -> None:
+    """Also apply retention while running: a camera running for weeks must not keep people longer."""
+    while not stop.wait(RETENTION_EVERY_S):
+        try:
+            _apply_retention(db, cfg, crop_dir)
+        except Exception:
+            log.exception("retention cleanup failed; trying again in an hour")
 
 
 def _web_servers(app, web: dict):

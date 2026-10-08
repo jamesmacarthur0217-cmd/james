@@ -779,13 +779,18 @@ class Database:
                 t.ended_at = t.ended_at or t.started_at
             return len(stale)
 
-    def cleanup(self, retention_days: int) -> list[str]:
-        """Delete tracks older than the retention window; returns their crop paths."""
-        if retention_days <= 0:
-            return []
-        cutoff = datetime.now() - timedelta(days=retention_days)
+    def cleanup(self, retention_days: int, per_camera: dict[str, int] | None = None) -> list[str]:
+        """Delete people older than their camera's retention window (`per_camera`: camera name -> days,
+        otherwise `retention_days`; 0 = keep forever). Returns their picture names."""
+        per_camera = per_camera or {}
+        now = datetime.now()
         with self.Session.begin() as s:
-            old = s.scalars(select(Track).where(Track.started_at < cutoff)).all()
+            old = []
+            for cam in s.scalars(select(Camera)):
+                days = per_camera.get(cam.name, retention_days)
+                if days and days > 0:
+                    old += s.scalars(select(Track).where(Track.camera_id == cam.id,
+                                                         Track.started_at < now - timedelta(days=days))).all()
             paths = [p for t in old for p in (t.crop_path, t.face_path) if p]
             if old:
                 s.execute(delete(AlertEvent).where(AlertEvent.track_id.in_([t.id for t in old])))

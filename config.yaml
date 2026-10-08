@@ -12,6 +12,7 @@ cameras:
     #   ignore_zones: [[0.28, 0.40, 0.45, 0.65]]
     ignore_zones: []
     # mode: kiosk             # optional: overrides the global mode below for this camera
+    # retention_days: 7       # optional: keep this camera's people this many days (else storage.retention_days)
   # A second camera, e.g. an IP camera at the entrance:
   # - name: entrance
   #   source: rtsp://user:password@192.168.1.50:554/stream1
@@ -87,7 +88,8 @@ storage:
   save_face_crops: false      # face images are biometric data; off by default
   blur_faces: false           # true: faces are blurred in the saved pictures, so nobody (admins too) sees them
                               # later; labeling is not affected, but Review/Answer key can't show faces
-  retention_days: 30          # tracks older than this are deleted on startup (0 = keep forever)
+  retention_days: 30          # people older than this are deleted, at startup and every hour (0 = keep forever);
+                              # a camera can set its own retention_days
   audit_retention_days: 365   # audit log entries (who viewed, searched, deleted...) kept this long (0 = forever)
   min_free_gb: 5              # warn when the disk has less free space than this
 
