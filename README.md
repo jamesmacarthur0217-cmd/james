@@ -215,6 +215,16 @@ went offline), a **blank picture** (10 s; lens covered or another app using the 
 shows as a pop-up and a banner above the live picture while it lasts; the Alerts page lists them with start
 and end times (kept `storage.audit_retention_days`). Settings: `health:` in config.yaml.
 
+## Where was this person? (timeline)
+
+In the people list, **Timeline** (next to *Look-alikes*) shows where a person may have been seen, in time order:
+their look-alikes from all cameras within `timeline.window_h` (24) hours, similarity at least
+`timeline.min_similarity` (0.8), with how long after the previous sighting. Nobody can be in two places at
+once, so a look-alike seen at the same time as an already chosen sighting (on another camera, or a second
+person on the same one) is left out; the most similar ones are chosen first. It compares appearance, mostly
+clothing, so it is a lead, not proof: two people in the same clothes look alike. The 0.8 threshold is not yet
+measured across different cameras. Viewers may use it (it is part of searching); each use is in the Audit log.
+
 ## Night (infrared) pictures
 
 When most of a person's frames are black and white (an infrared camera at night), top and bottom **colors are
@@ -352,7 +362,7 @@ age model is loaded they give no age, because the age model measured better. To 
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-150 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+156 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, alerts,
 reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.

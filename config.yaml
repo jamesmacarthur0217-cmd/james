@@ -51,6 +51,11 @@ tracking:
 zones:
   min_frames: 3               # a person must be in/out (or across a line) this many frames in a row to count
 
+# "Timeline" on the Live page: where a person was seen, from look-alikes on all cameras in time order.
+timeline:
+  min_similarity: 0.8         # how alike (0..1, mostly clothing); not measured across different cameras yet
+  window_h: 24                # only sightings within this many hours of the person
+
 # A short video around each alert (Alerts page, admins). Deleted with the person (retention, Delete).
 clips:
   enabled: true

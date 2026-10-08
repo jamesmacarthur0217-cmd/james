@@ -71,8 +71,8 @@ def allowed(role: str, method: str, path: str) -> bool:
     if role == "admin":
         return True
     if role == "viewer":
-        if method == "GET" and path.startswith("/api/tracks/") and not path.endswith("/similar"):
-            return False   # only the look-alike search below a person, nothing else about one person
+        if method == "GET" and path.startswith("/api/tracks/") and not path.endswith(("/similar", "/timeline")):
+            return False   # only look-alikes and the timeline below a person, nothing else about one person
         return _match(path, VIEWER.get(method, []))
     return False
 

@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from . import accounts, privacy, reports, schema
+from . import timeline as timeline_mod
 from .clips import clip_name
 from .config import ROOT, resolve
 from .db import Database
@@ -535,6 +536,25 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         for t in tracks:
             t["similarity"] = round(sims[t["id"]], 4)
         return tracks
+
+    @app.get("/api/tracks/{track_id}/timeline")
+    def timeline(track_id: int, request: Request, min_similarity: float | None = None):
+        """Where this person was seen: look-alikes from all cameras in time order (labeler/timeline.py)."""
+        if embedder is None:
+            raise HTTPException(503, "embeddings are disabled in config.yaml")
+        vector = db.get_embedding(track_id, embedder.model_name)
+        if vector is None:
+            raise HTTPException(404, "no embedding for this person yet")
+        tcfg = cfg["timeline"]
+        floor = tcfg["min_similarity"] if min_similarity is None else min_similarity
+        hits = [(tid, sim) for tid, sim in db.nearest(vector, embedder.model_name, limit=200, exclude=track_id)
+                if sim >= floor]
+        sims = dict(hits)
+        found = db.get_tracks([track_id] + [tid for tid, _ in hits])
+        anchor = next(t for t in found if t["id"] == track_id)
+        candidates = [dict(t, similarity=round(sims[t["id"]], 4)) for t in found if t["id"] != track_id]
+        audit(request, "timeline", f"person #{track_id}")
+        return timeline_mod.plausible(anchor, candidates, tcfg["window_h"])
 
     @app.get("/api/review")
     def review_queue(limit: int = 50):

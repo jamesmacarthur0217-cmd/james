@@ -104,8 +104,9 @@ $("q-form").onsubmit = (e) => {
   refresh();
 };
 $("people").addEventListener("click", (e) => {
-  const id = e.target.dataset.similar;
+  const id = e.target.dataset.similar, tl = e.target.dataset.timeline;
   if (id) { view = { kind: "similar", id: Number(id) }; refresh(); }
+  if (tl) { view = { kind: "timeline", id: Number(tl) }; refresh(); }
 });
 $("banner").addEventListener("click", (e) => {
   if (e.target.dataset.back !== undefined) { view = { kind: "recent" }; $("q").value = ""; refresh(); }
@@ -159,6 +160,10 @@ async function fetchTracks() {
   }
   if (view.kind === "similar") {
     const r = await fetch(`/api/tracks/${view.id}/similar?limit=10`);
+    return r.ok ? r.json() : [];
+  }
+  if (view.kind === "timeline") {
+    const r = await fetch(`/api/tracks/${view.id}/timeline`);
     return r.ok ? r.json() : [];
   }
   const p = new URLSearchParams({ limit: 30 });
@@ -230,6 +235,9 @@ async function refresh() {
   if (view.kind === "search") $("banner").innerHTML = `Best matches for “${esc(view.q)}”, closest first.` + back;
   if (view.kind === "ask") $("banner").innerHTML = esc(view.explanation) + back;
   if (view.kind === "similar") $("banner").innerHTML = `People who look most like #${view.id}.` + back;
+  if (view.kind === "timeline") $("banner").innerHTML = `Where #${view.id} may have been seen, in time order: `
+    + "look-alikes from all cameras, without ones seen elsewhere at the same time. Same clothes can be a "
+    + "different person." + back;
   $("people").innerHTML = tracks.length ? tracks.map(t => {
     const chips = phrases(t.attributes)
       .map(p => `<span class="chip ${p.review ? "review" : ""} ${p.human ? "human" : ""}"
@@ -241,12 +249,22 @@ async function refresh() {
       ${t.crop ? `<img src="/crops/${encodeURIComponent(t.crop)}?v=${t.n_frames}" alt="">` : `<img alt="">`}
       <div><div class="meta">#${t.id}${cameraNames.length > 1 && t.camera ? ` · ${esc(t.camera)}` : ""} · ${when} · ${t.status}${t.low_light ? " · low light" : ""}${score(t)}</div>
       <div class="chips">${chips || '<span class="chip">labeling…</span>'}</div>
-      <button class="link" data-similar="${t.id}">Look-alikes</button></div></div>`;
+      <button class="link" data-similar="${t.id}">Look-alikes</button>
+      <button class="link" data-timeline="${t.id}">Timeline</button></div></div>`;
   }).join("") : '<div class="empty">No matching people.</div>';
   updateSelectBar();
 }
 
+function gap(s) {
+  if (s == null) return "";
+  if (s < 60) return " · right after";
+  if (s < 3600) return ` · ${Math.round(s / 60)} min later`;
+  return ` · ${(s / 3600).toFixed(1)} h later`;
+}
+
 function score(t) {
+  if (view.kind === "timeline") return t.anchor ? `${gap(t.gap_s)} · <b>this person</b>`
+                                                : `${gap(t.gap_s)} · <b>similarity ${t.similarity.toFixed(2)}</b>`;
   if (t.similarity === undefined) return "";
   const differ = t.labels_differ ? ' · <span style="color:var(--warn)">looks similar, labels differ</span>' : "";
   return ` · <b>similarity ${t.similarity.toFixed(2)}</b>${differ}`;
