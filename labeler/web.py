@@ -579,7 +579,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
 
     @app.get("/api/review")
     def review_queue(limit: int = 50):
-        items = db.review_queue(limit=min(limit, 200))
+        items = db.review_queue(limit=min(limit, 200), spot_every=cfg["review"].get("spot_check_every", 0))
         for item in items:
             item["allowed"] = schema.allowed_values(item["name"])
         return items

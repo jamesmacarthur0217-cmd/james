@@ -456,9 +456,60 @@ class Database:
             "attributes": resolve(t.attributes),
         }
 
-    def review_queue(self, limit: int = 50) -> list[dict]:
+    def review_queue(self, limit: int = 50, spot_every: int = 0) -> list[dict]:
         """One item per (track, attribute name) that needs a human decision, most uncertain first:
-        disagreements between models, then the lowest confidence."""
+        disagreements between models, then the lowest confidence. With spot_every = N, every Nth item is a
+        spot check: a confident label nobody checked yet, spread over cameras, attributes and values, so
+        corrections also cover what the system is sure about (and Phase 5 retraining learns from them)."""
+        items = self._uncertain_items(limit)
+        if spot_every < 2:
+            return items
+        spots = self._spot_checks(max(1, limit // spot_every), {(i["track_id"], i["name"]) for i in items})
+        merged = []
+        for item in items:
+            if spots and len(merged) % spot_every == spot_every - 1:
+                merged.append(spots.pop(0))
+            merged.append(item)
+        return (merged + spots)[:limit]
+
+    def _spot_checks(self, n: int, exclude: set[tuple[int, str]]) -> list[dict]:
+        """n confident, unchecked labels of finished people from the last 30 days: one per (camera, attribute,
+        value) first, so they vary. The order only changes once a day, so the queue doesn't jump around."""
+        day = datetime.now().date().isoformat()
+        with self.Session() as s:
+            rows = s.execute(
+                select(Attribute, Track.camera_id, Track.crop_path).join(Track, Track.id == Attribute.track_id)
+                .where(Track.status == "finished", Track.crop_path.is_not(None), Attribute.review_status == "auto",
+                       Attribute.value != "unknown", Attribute.source.in_(("vlm", "age_model", "color_estimator")),
+                       Track.started_at >= datetime.now() - timedelta(days=30))
+                .order_by(Attribute.id.desc()).limit(5000)).all()
+            best: dict[tuple[int, str], tuple] = {}
+            for a, camera_id, crop in rows:
+                key = (a.track_id, a.name)
+                if key not in exclude and (key not in best or a.confidence > best[key][0].confidence):
+                    best[key] = (a, camera_id, crop)
+            groups: dict[tuple, list] = defaultdict(list)
+            stamp = lambda k: hashlib.md5(f"{day}:{k[0]}:{k[1]}".encode()).hexdigest()   # noqa: E731
+            for key in sorted(best, key=stamp):
+                a, camera_id, _ = best[key]
+                groups[(camera_id, a.name, a.value)].append(key)
+            picked = []
+            while len(picked) < n and any(groups.values()):
+                for g in sorted(groups, key=lambda g: stamp((str(g), ""))):
+                    if groups[g] and len(picked) < n:
+                        picked.append(groups[g].pop(0))
+            out = []
+            for key in picked:
+                a, _, crop = best[key]
+                others = s.scalars(select(Attribute).where(Attribute.track_id == a.track_id, Attribute.name == a.name))
+                out.append({"attribute_id": a.id, "track_id": a.track_id, "crop": crop, "name": a.name,
+                            "value": a.value, "reason": "spot check: a confident label, picked to check",
+                            "priority": 0.0, "spot_check": True,
+                            "candidates": [{"source": o.source, "value": o.value, "confidence": round(o.confidence, 2)}
+                                           for o in others]})
+            return out
+
+    def _uncertain_items(self, limit: int) -> list[dict]:
         with self.Session() as s:
             flagged = s.execute(select(Attribute.track_id, Attribute.name)
                                 .where(Attribute.review_status == "needs_review").distinct()).all()

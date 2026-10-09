@@ -31,6 +31,40 @@ def test_vlm_answer_beats_a_more_confident_student(db, camera):
     assert db.resolved_values(t)["eyewear"] == "glasses"                 # VLM answered: it wins at lower confidence
 
 
+def _finished(db, camera, i, **labels):
+    t = db.create_track(camera, i, datetime.now())
+    db.update_track(t, status="finished", crop_path=f"{t}.jpg")
+    db.add_attributes(t, [(n, v, 0.95) for n, v in labels.items()], "vlm", "q", threshold=0.6)
+    return t
+
+
+def test_review_queue_mixes_in_varied_spot_checks(db, camera):
+    unsure = []
+    for i in range(8):
+        t = db.create_track(camera, i, datetime.now())
+        db.update_track(t, status="finished", crop_path=f"{t}.jpg")
+        db.add_attributes(t, [("age_range", "20-29", 0.3)], "vlm", "q", threshold=0.6)
+        unsure.append(t)
+    for i in range(6):
+        _finished(db, camera, 100 + i, upper_color="red", eyewear="none")
+    items = db.review_queue(limit=20, spot_every=5)
+    kinds = ["spot" if it.get("spot_check") else "unsure" for it in items]
+    assert kinds[:5] == ["unsure"] * 4 + ["spot"] and kinds.count("unsure") == 8
+    spots = [it for it in items if it.get("spot_check")]
+    assert {s["name"] for s in spots[:2]} == {"upper_color", "eyewear"}      # varied: one of each kind first
+    assert db.review_queue(limit=20, spot_every=5) == items                 # stable while the day lasts
+    assert all(not it.get("spot_check") for it in db.review_queue(limit=20))  # off by default
+
+
+def test_a_checked_spot_label_is_not_asked_again(db, camera):
+    t = _finished(db, camera, 1, upper_color="red")
+    spot = db.review_queue(limit=10, spot_every=2)[0]
+    assert spot["spot_check"] and spot["track_id"] == t
+    db.apply_review(spot["attribute_id"], "red", "ann")
+    assert db.review_queue(limit=10, spot_every=2) == []
+    assert db.stats()["needs_review"] == 0                                  # spot checks are not "to review"
+
+
 def test_low_confidence_goes_to_review_but_unknown_does_not(db, camera):
     t = _person(db, camera)
     db.add_attributes(t, [("age_range", "20-29", 0.5), ("eyewear", "unknown", 1.0)], "vlm", "qwen", threshold=0.6)

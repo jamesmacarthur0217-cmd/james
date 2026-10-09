@@ -32,7 +32,7 @@ async function load() {
     return `<div class="card" data-id="${it.attribute_id}">
       ${it.crop ? `<img src="/crops/${encodeURIComponent(it.crop)}" alt="">` : ""}
       <div class="attr">#${it.track_id} · ${esc(it.name.replace(/_/g, " "))}</div>
-      <div class="reason">${esc(it.reason)}</div>
+      <div class="reason${it.spot_check ? " spot" : ""}">${esc(it.reason)}</div>
       <div class="cands">${cands}</div>
       <div class="row">${input}<button class="primary">Save</button></div>
     </div>`;

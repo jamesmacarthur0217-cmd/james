@@ -393,6 +393,11 @@ age model is loaded they give no age, because the age model measured better. To 
 
 `export_dataset.py` exports human-verified labels from the database as a dataset.
 
+**Spot checks in the Review queue**: every 5th item (`review.spot_check_every`) is a confident label nobody
+has checked yet, from people of the last 30 days, spread over cameras, attributes and values, so your answers
+also cover what the system is sure about (and the retraining learns from them). The selection stays the same
+for a day. Spot checks are not counted in "to review".
+
 **Weekly retraining on your own cameras** (`retrain:` in config.yaml): every 7 days, at night, the fast
 classifiers are retrained on the COCO practice people plus the finished people from your cameras (their labels:
 your Review corrections where you made one, otherwise the vision model's; never the classifiers' own guesses),
@@ -411,7 +416,7 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-163 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+165 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, alerts,
 reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.

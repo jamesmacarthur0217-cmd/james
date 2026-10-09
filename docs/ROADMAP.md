@@ -108,7 +108,7 @@ Security:
 
 - **Done 2026-10-09.** Scheduled retraining of the fast classifiers from reviewed labels (weekly), keeping the previous model if
   the answer-key score drops.
-- Review queue picks varied people, not just uncertain ones, so corrections cover more situations.
+- **Done 2026-10-09** (spot checks). Review queue picks varied people, not just uncertain ones, so corrections cover more situations.
 - **Done 2026-10-09.** Per-camera accuracy history from the answer key, shown on the Answer key page.
 
 ## Phase 6: Operations

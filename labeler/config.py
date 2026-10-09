@@ -59,7 +59,7 @@ DEFAULTS: dict = {
                 "skip_vlm_when_confident": True, "retrained_path": "data/models/attributes.joblib"},
     "retrain": {"enabled": True, "every_days": 7, "hour": 3, "own_weight": 3.0, "min_own_people": 30,
                 "min_answer_key": 10, "target": 0.9, "coco_dir": "data/datasets/coco_people"},
-    "review": {"confidence_threshold": 0.6},
+    "review": {"confidence_threshold": 0.6, "spot_check_every": 5},
     "database": {"url": "sqlite:///data/vision.db"},
     "storage": {"crop_dir": "data/crops", "save_face_crops": False, "retention_days": 30, "min_free_gb": 5,
                 "audit_retention_days": 365, "blur_faces": False},

@@ -19,7 +19,9 @@ cameras** and **commercial use**. They have tested the current version and are h
 - Git: local repo, branch `main`, clean. Latest commits:
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
-- Tests: 163 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- Tests: 165 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- 2026-10-09, Phase 5 complete: spot checks in the Review queue (`db.review_queue(spot_every=...)`,
+  `db._spot_checks`). Not tried on the real Postgres data: Docker was not running at the time.
 - 2026-10-09, Phase 5 retraining + accuracy history done: `labeler/training.py` (shared with
   tools/train_attributes.py; refactor reproduces the shipped model exactly), `labeler/retrain.py` (weekly at
   night, quality gate on the answer key, writes data/models/attributes.joblib, swaps the cameras' classifiers),

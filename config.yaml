@@ -124,6 +124,7 @@ retrain:
 
 review:
   confidence_threshold: 0.6   # below this, an attribute goes to the review queue
+  spot_check_every: 5         # every 5th item is a confident label picked to check, for variety (0 = off)
 
 database:
   # PostgreSQL + pgvector in Docker (start it with: docker compose up -d).

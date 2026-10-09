@@ -110,3 +110,5 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .banner.problem { background: var(--warn-bg); color: var(--warn); }
 /* Alert clips (Alerts page). */
 .clip-box video { display: block; width: 100%; max-width: 480px; margin-top: 6px; border-radius: 6px; background: #000; }
+/* Review queue: spot checks are not problems, so they are not shown in the warning color. */
+.card .reason.spot { color: var(--muted); }
