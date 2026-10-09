@@ -108,6 +108,19 @@ student:                      # fast attribute classifiers trained from VLM labe
   model_path: models/attributes.joblib
   every_n_frames: 15          # instant labels for the live view, refreshed this often per person
   skip_vlm_when_confident: true   # skip the VLM when every attribute is confident (rare with current data)
+  retrained_path: data/models/attributes.joblib   # written by the weekly retraining; used when present
+
+# Weekly retraining of the fast classifiers on your own cameras (Answer key page shows each run).
+# A new version is kept only if it scores at least as well on the answer key.
+retrain:
+  enabled: true
+  every_days: 7
+  hour: 3                     # not before this hour (night)
+  own_weight: 3               # a person from your cameras counts this many times a COCO practice person
+  min_own_people: 30          # finished people from your cameras (not in the answer key) needed to train
+  min_answer_key: 10          # answer-key people needed to check a new version
+  target: 0.9
+  coco_dir: data/datasets/coco_people
 
 review:
   confidence_threshold: 0.6   # below this, an attribute goes to the review queue

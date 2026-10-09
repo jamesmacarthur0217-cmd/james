@@ -121,8 +121,9 @@ def main() -> int:
 
     student = None
     if cfg["student"]["enabled"] and embedder is not None:
+        from labeler.retrain import student_path
         from labeler.student import Student
-        path = resolve(cfg["student"]["model_path"])
+        path = student_path(cfg)   # the weekly retrained classifiers when there are any
         if path.exists():
             student = Student(path, embedder.model_name)
         else:
@@ -174,7 +175,9 @@ def main() -> int:
     if cfg["health"]["enabled"]:
         from labeler.health import HealthMonitor
         health = HealthMonitor(db, cfg["health"])
-    app = create_app(cfg, db, pipelines, embedder, alerts, agent, health)
+    from labeler.retrain import Retrainer
+    retrainer = Retrainer(db, cfg, pipelines)
+    app = create_app(cfg, db, pipelines, embedder, alerts, agent, health, retrainer)
     server = _web_servers(app, web)
 
     def request_shutdown() -> None:
@@ -201,6 +204,7 @@ def main() -> int:
     threading.Thread(target=watchdog, name="watchdog", daemon=True).start()
     threading.Thread(target=_retention_loop, args=(db, cfg, crop_dir, app.state.stopping),
                      name="retention", daemon=True).start()
+    threading.Thread(target=retrainer.loop, args=(app.state.stopping,), name="retrain-check", daemon=True).start()
     if health is not None:
         from labeler.health import health_loop
         threading.Thread(target=health_loop, args=(health, pipelines, app.state.stopping),

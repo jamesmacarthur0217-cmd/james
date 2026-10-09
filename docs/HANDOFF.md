@@ -19,7 +19,12 @@ cameras** and **commercial use**. They have tested the current version and are h
 - Git: local repo, branch `main`, clean. Latest commits:
   `5912ff8` roadmap · `43d5238` docs · `fe031af` accuracy · `c323fb0` questions + fixes ·
   `b903945` reports/alerts · `99a6f26` cameras/reliability/login · `430bfd1` delete + tests · `cd13ef6` baseline.
-- Tests: 157 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- Tests: 163 pass (`.venv\Scripts\python.exe -m pytest -q`, ~25 s).
+- 2026-10-09, Phase 5 retraining + accuracy history done: `labeler/training.py` (shared with
+  tools/train_attributes.py; refactor reproduces the shipped model exactly), `labeler/retrain.py` (weekly at
+  night, quality gate on the answer key, writes data/models/attributes.joblib, swaps the cameras' classifiers),
+  tables `model_history`, `accuracy_history`, Answer key page panels. On the user's data nothing can be learned
+  yet: 26 of their 27 people are in the answer key (the test); needs 30 more finished people.
 - 2026-10-08, Phase 4 capacity measured (Phase 4 complete): 2 cameras at full 15 fps, 4 at ~10 fps each, 6-8 at
   5-7 fps with a growing labeling queue (README "How many cameras?"). GPU 65-79% busy, so the limit is probably
   the single Python process; batching or one process per camera not done yet.

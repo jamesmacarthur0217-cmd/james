@@ -202,6 +202,32 @@ class ZoneEvent(Base):
     dwell_s: Mapped[float | None] = mapped_column(Float)   # on exit: time spent inside
 
 
+class ModelHistory(Base):
+    """One run of the weekly retraining of the fast classifiers (labeler/retrain.py), kept or not."""
+    __tablename__ = "model_history"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+    own_people: Mapped[int] = mapped_column(Integer)          # trained on: people from the user's cameras
+    coco_people: Mapped[int] = mapped_column(Integer)         # ... and COCO practice people
+    key_people: Mapped[int] = mapped_column(Integer)          # checked on: answer-key people
+    score_before: Mapped[float | None] = mapped_column(Float)
+    score_after: Mapped[float | None] = mapped_column(Float)
+    kept: Mapped[bool] = mapped_column(Boolean, default=False)
+    note: Mapped[str] = mapped_column(String(300), default="")
+
+
+class AccuracyHistory(Base):
+    """The answer-key score of one camera on one day, to see whether changes help."""
+    __tablename__ = "accuracy_history"
+    __table_args__ = (UniqueConstraint("day", "camera"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    day: Mapped[datetime] = mapped_column(DateTime, index=True)
+    camera: Mapped[str] = mapped_column(String(100))
+    people: Mapped[int] = mapped_column(Integer)
+    mean_overall: Mapped[float | None] = mapped_column(Float)
+    attributes: Mapped[str] = mapped_column(Text, default="{}")   # JSON {attribute: overall}
+
+
 class CameraEvent(Base):
     """A camera problem (no picture, blank picture, slow), from when it started until it ended."""
     __tablename__ = "camera_events"
@@ -801,6 +827,76 @@ class Database:
             st["avg_dwell_s"] = round(sum(dwell) / len(dwell), 1) if dwell else None
             out.append(st)
         return out
+
+    # --- learning from the user's cameras (labeler/retrain.py) ---------------------------
+
+    def training_people(self, model: str) -> list[tuple[int, np.ndarray, dict[str, str]]]:
+        """Finished people with an embedding, not in the answer key (that is the test), with their labels:
+        a human-verified value if there is one, else the VLM's (never the fast classifiers' own guesses)."""
+        with self.Session() as s:
+            rows = s.execute(select(Track, Embedding.vector).join(Embedding, Embedding.track_id == Track.id)
+                             .where(Embedding.model == model, Track.status == "finished",
+                                    Track.id.not_in(select(AnswerKey.track_id)))
+                             .options(selectinload(Track.attributes))).all()
+            out = []
+            for t, vector in rows:
+                labels: dict[str, str] = {}
+                for a in t.attributes:
+                    if a.review_status in ("confirmed", "corrected"):
+                        labels[a.name] = a.final_value          # the person's answer settles it
+                    elif a.source == "vlm" and a.value != "unknown" and a.name not in labels:
+                        labels[a.name] = a.value
+                if labels:
+                    out.append((t.id, np.asarray(vector, dtype=np.float32), labels))
+            return out
+
+    def answer_key_people(self, model: str) -> list[tuple[int, np.ndarray, dict[str, str]]]:
+        with self.Session() as s:
+            rows = s.execute(select(AnswerKey, Embedding.vector).join(Embedding, Embedding.track_id == AnswerKey.track_id)
+                             .where(Embedding.model == model)).all()
+            return [(k.track_id, np.asarray(v, dtype=np.float32), json.loads(k.labels)) for k, v in rows]
+
+    def add_model_history(self, **fields) -> dict:
+        with self.Session.begin() as s:
+            row = ModelHistory(**fields)
+            s.add(row)
+            s.flush()
+            return self._history_dict(row)
+
+    @staticmethod
+    def _history_dict(r: ModelHistory) -> dict:
+        return {"id": r.id, "created_at": r.created_at.isoformat(timespec="minutes"), "own_people": r.own_people,
+                "coco_people": r.coco_people, "key_people": r.key_people, "score_before": r.score_before,
+                "score_after": r.score_after, "kept": r.kept, "note": r.note}
+
+    def list_model_history(self, limit: int = 20) -> list[dict]:
+        with self.Session() as s:
+            return [self._history_dict(r) for r in
+                    s.scalars(select(ModelHistory).order_by(ModelHistory.id.desc()).limit(limit))]
+
+    def record_accuracy(self, day: datetime) -> int:
+        """Store today's answer-key score per camera (replacing an earlier one from the same day)."""
+        day = day.replace(hour=0, minute=0, second=0, microsecond=0)
+        n = 0
+        for camera, info in self.answer_key_score()["cameras"].items():
+            attrs = self.answer_key_score(camera)["attributes"]
+            with self.Session.begin() as s:
+                row = s.scalars(select(AccuracyHistory).where(AccuracyHistory.day == day,
+                                                              AccuracyHistory.camera == camera)).first()
+                row = row or AccuracyHistory(day=day, camera=camera)
+                row.people, row.mean_overall = info["people"], info["mean_overall"]
+                row.attributes = json.dumps({k: v["overall"] for k, v in attrs.items()})
+                s.add(row)
+            n += 1
+        return n
+
+    def accuracy_history(self, days: int = 365) -> list[dict]:
+        since = datetime.now() - timedelta(days=days)
+        with self.Session() as s:
+            return [{"day": r.day.date().isoformat(), "camera": r.camera, "people": r.people,
+                     "mean_overall": r.mean_overall, "attributes": json.loads(r.attributes)}
+                    for r in s.scalars(select(AccuracyHistory).where(AccuracyHistory.day >= since)
+                                       .order_by(AccuracyHistory.day, AccuracyHistory.camera))]
 
     # --- camera health ------------------------------------------------------------------
 

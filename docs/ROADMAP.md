@@ -106,10 +106,10 @@ Security:
 
 ## Phase 5: Accuracy loop
 
-- Scheduled retraining of the fast classifiers from reviewed labels (weekly), keeping the previous model if
+- **Done 2026-10-09.** Scheduled retraining of the fast classifiers from reviewed labels (weekly), keeping the previous model if
   the answer-key score drops.
 - Review queue picks varied people, not just uncertain ones, so corrections cover more situations.
-- Per-camera accuracy history from the answer key, shown on the Answer key page.
+- **Done 2026-10-09.** Per-camera accuracy history from the answer key, shown on the Answer key page.
 
 ## Phase 6: Operations
 

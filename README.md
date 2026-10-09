@@ -393,13 +393,25 @@ age model is loaded they give no age, because the age model measured better. To 
 
 `export_dataset.py` exports human-verified labels from the database as a dataset.
 
+**Weekly retraining on your own cameras** (`retrain:` in config.yaml): every 7 days, at night, the fast
+classifiers are retrained on the COCO practice people plus the finished people from your cameras (their labels:
+your Review corrections where you made one, otherwise the vision model's; never the classifiers' own guesses),
+yours counting 3 times as much. Answer-key people are never trained on: they are the test. The new version
+replaces the current one only if it scores at least as well on the answer key (otherwise it is thrown away),
+and the cameras switch to it at once. It needs 30 finished people from your cameras outside the answer key and
+10 answer-key people; until then each run is recorded as "not enough people" and nothing changes. The Answer
+key page lists every run (trained on, score before and after, kept or not) and has **Retrain now**. Files:
+`data/models/attributes.joblib` (current), `attributes.prev.joblib` (the one before); the shipped
+`models/attributes.joblib` is used until the first kept retraining. The answer-key score of each camera is also
+recorded once a day and shown as a chart (**Accuracy over time**), so you can see whether changes help.
+
 ## Tests
 
 ```bash
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-157 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+163 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, alerts,
 reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.

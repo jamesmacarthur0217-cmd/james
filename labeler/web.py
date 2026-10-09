@@ -111,7 +111,7 @@ def ensure_first_admin(db: Database, web: dict) -> None:
 
 
 def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | None, embedder=None,
-               alerts=None, agent=None, health=None) -> FastAPI:
+               alerts=None, agent=None, health=None, retrainer=None) -> FastAPI:
     app = FastAPI(title="VisionLabeler")
     app.state.stopping = threading.Event()
     session_hours = cfg["web"].get("session_hours", 12)
@@ -285,6 +285,27 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     @app.get("/api/answer-key/score")
     def answer_key_score(camera: str | None = None):
         return db.answer_key_score(camera)
+
+    @app.get("/api/answer-key/history")
+    def accuracy_history(days: int = 365):
+        return db.accuracy_history(min(days, 3650))
+
+    # --- learning from the user's cameras (labeler/retrain.py) -----------------------------
+
+    @app.get("/api/retrain")
+    def retrain_status():
+        return {"running": bool(retrainer and retrainer.running.is_set()), "available": retrainer is not None,
+                "history": db.list_model_history(), "settings": {
+                    k: cfg["retrain"][k] for k in ("enabled", "every_days", "min_own_people", "min_answer_key")}}
+
+    @app.post("/api/retrain")
+    def retrain_now(request: Request):
+        if retrainer is None:
+            raise HTTPException(503, "retraining runs only inside the app")
+        if not retrainer.run_now():
+            raise HTTPException(409, "a retraining is already running")
+        audit(request, "retrain")
+        return {"ok": True}
 
     # --- reports -------------------------------------------------------------------------
 
