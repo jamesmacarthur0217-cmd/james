@@ -18,6 +18,9 @@ Keep the black `start.bat` window open while you use the system. Closing it stop
 **If the app crashes**, it restarts by itself after 5 seconds (the window says so). After 5 crashes within
 10 minutes it stops trying and leaves the error message on screen.
 
+**To read messages after the window is closed**, open `C:\VisionLabeler\data\logs\visionlabeler.log` in
+Notepad (newest lines at the bottom). `supervisor.log` in the same folder lists every crash and restart.
+
 **If you double-click `start.bat` twice**, the second one says "already using port 8000" and closes; only
 one copy ever runs.
 

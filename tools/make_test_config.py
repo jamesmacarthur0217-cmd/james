@@ -2,7 +2,7 @@
 
     python tools/make_test_config.py <folder> [--https] [--network] [--two-cameras] [--fast-health]
 
-Copies config.yaml with the database (SQLite), pictures and HTTPS certificate inside <folder>, and the app on
+Copies config.yaml with the database (SQLite), pictures, log files and HTTPS certificate inside <folder>, and the app on
 this PC only (web.host 127.0.0.1, web.https false): the real config opens the app to the network with HTTPS.
 Then:  python run.py --config <folder>/test_config.yaml --source samples/bus.jpg --port 8001
 Stop:  curl -X POST http://127.0.0.1:8001/api/shutdown   (and check no python.exe run.py is left running)
@@ -31,6 +31,7 @@ def main() -> None:
     cfg["database"]["url"] = "sqlite:///" + (folder / "test.db").as_posix()
     cfg.setdefault("storage", {})["crop_dir"] = (folder / "crops").as_posix()
     cfg["web"].update({"host": "127.0.0.1", "https": False})
+    cfg.setdefault("logs", {})["dir"] = (folder / "logs").as_posix()
     cfg.setdefault("student", {})["retrained_path"] = (folder / "models" / "attributes.joblib").as_posix()
     if args.https:
         cfg["web"].update({"https": True, "https_port": 8444, "cert_file": (folder / "tls" / "cert.pem").as_posix(),

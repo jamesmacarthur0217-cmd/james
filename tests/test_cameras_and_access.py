@@ -84,24 +84,19 @@ def test_vlm_does_not_retry_a_bad_request(monkeypatch):
         client.label(None, None)
 
 
-def test_supervisor_restarts_crashes_but_not_normal_stops(monkeypatch):
-    from labeler import supervisor
+def test_supervisor_restarts_crashes_but_not_normal_stops(monkeypatch, supervisor):
     runs = iter([(3, False), (1, False), (0, False)])           # crash, crash, then a normal stop
     monkeypatch.setattr(supervisor, "run_once", lambda argv: next(runs))
-    monkeypatch.setattr(supervisor.time, "sleep", lambda s: None)
     assert supervisor.main([]) == 0
 
 
-def test_supervisor_gives_up_after_repeated_crashes(monkeypatch):
-    from labeler import supervisor
+def test_supervisor_gives_up_after_repeated_crashes(monkeypatch, supervisor):
     calls = []
     monkeypatch.setattr(supervisor, "run_once", lambda argv: calls.append(1) or (3, False))
-    monkeypatch.setattr(supervisor.time, "sleep", lambda s: None)
     assert supervisor.main([]) == 3 and len(calls) == supervisor.MAX_CRASHES
 
 
-def test_supervisor_does_not_restart_after_ctrl_c(monkeypatch):
-    from labeler import supervisor
+def test_supervisor_does_not_restart_after_ctrl_c(monkeypatch, supervisor):
     monkeypatch.setattr(supervisor, "run_once", lambda argv: (1, True))
     assert supervisor.main([]) == 0
 

@@ -281,6 +281,10 @@ are drawn as gray "ignored" boxes.
 
 - **Crash recovery**: the supervisor restarts the app after a crash; a watchdog exits if a camera loop dies;
   after 5 crashes in 10 minutes it stops and shows the error.
+- **Log files**: everything the window shows is also in `data\logs\visionlabeler.log` (with the date), and the
+  supervisor's restarts in `data\logs\supervisor.log`, so a crash at night can be read after the window was
+  closed. A file is renamed `.1`, `.2`, … at 10 MB and 5 old files are kept (`logs:` in config.yaml), so logs
+  never use more than about 60 MB.
 - **Single copy**: a second copy refuses to start ("already using port 8000").
 - **Clean stop**: Stop / `stop.bat` / Ctrl+C save the people in view first; an open Live page no longer
   blocks shutdown.
@@ -416,10 +420,11 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-165 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+251 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, alerts,
-reports, questions, answer key (also per camera), and a syntax check of every page's script. Changes are tracked with git.
+blurring, supervisor, log files, alerts, reports, questions, answer key (also per camera), a syntax check of
+every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
+Changes are tracked with git.
 
 ## Files
 
@@ -433,11 +438,11 @@ reports, questions, answer key (also per camera), and a syntax check of every pa
 | `labeler/alerts.py`, `labeler/reports.py` | alert rules, report summaries |
 | `labeler/db.py` | database tables and queries |
 | `labeler/web.py`, `labeler/static/` | web UI |
-| `labeler/supervisor.py` | restart after crashes |
+| `labeler/supervisor.py`, `labeler/logs.py` | restart after crashes; log files |
 | `run.py`, `start.bat`, `stop.bat` | starting and stopping |
 | `tools/` | benchmarks, evaluation, training, backups |
 | `tests/` | automated tests |
-| `data/` | person pictures, backups, datasets (not in git) |
+| `data/` | person pictures, backups, log files, datasets (not in git) |
 
 ## Privacy
 

@@ -120,7 +120,7 @@ Security:
 **Approved plan: [PHASE6-PLAN.md](PHASE6-PLAN.md)** (user's choices: console window kept, no service; Settings
 page for common settings; health check; installer; private GitHub with tests). Earlier outline:
 
-1. Log files with rotation (`data/logs`, for run.py and the supervisor), plus a `/api/health` endpoint
+1. **Done 2026-10-09** (log files; health check is plan step 2). Log files with rotation (`data/logs`, for run.py and the supervisor), plus a `/api/health` endpoint
    (app, database, Ollama, each camera; also usable from a monitoring tool).
 2. Run as a Windows service (e.g. NSSM wrapping `python -m labeler.supervisor` — a download, ask first — or a
    Task Scheduler "at startup" task without a window) instead of a console window. It must keep start.bat's

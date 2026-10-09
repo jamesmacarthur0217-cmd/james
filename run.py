@@ -61,9 +61,9 @@ def main() -> int:
             print("  no cameras found")
         return 0
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-                        datefmt="%H:%M:%S")
     cfg = load_config(args.config)
+    from labeler import logs
+    log.info("log file: %s", logs.setup(cfg["logs"]))
     if args.source is not None:
         cfg["cameras"] = [{**cfg["cameras"][0], "source": args.source}]
     if args.mode:
@@ -269,7 +269,8 @@ def _web_servers(app, web: dict):
 
     import uvicorn
     # timeout_graceful_shutdown: don't wait forever for open connections (a browser showing the live video).
-    common = {"log_level": "warning", "timeout_graceful_shutdown": 3}
+    # log_config None: its warnings go through our handlers (console and the log file), in our format.
+    common = {"log_level": "warning", "timeout_graceful_shutdown": 3, "log_config": None}
     if not web.get("https"):
         return uvicorn.Server(uvicorn.Config(app, host=web["host"], port=web["port"], **common))
 

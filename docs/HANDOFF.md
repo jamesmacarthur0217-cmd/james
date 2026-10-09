@@ -24,7 +24,8 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **165 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
+- Tests: **251 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
+- Phase 6 progress: step 1 (log files) done.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
   second site over Tailscale, not set up yet: see README "From another site"); one viewer account `TIXUAN`.
 - The user's database: 27 people, 26 of them in the answer key (their own labels; mean ~75% before the
@@ -71,6 +72,7 @@ labeler/agent.py     Ask box: question → validated search plan (local model) �
 run.py               builds everything; .env loaded first; retention (startup + hourly), health, retrain
                      threads; one server or HTTPS pair (_web_servers); watchdog; exit 3 = crash
 labeler/supervisor.py restarts run.py after crashes (5 in 10 min → gives up); used by start.bat
+labeler/logs.py      console + data/logs/visionlabeler.log (10 MB × 5) + supervisor.log; RecentErrors
 start.bat / stop.bat daily start/stop (wait for Docker + Ollama; stop waits for app exit, backs up DB)
 tools/               evaluate.py (COCO answer key), bench_vlm.py, bench_age.py, teacher_label.py,
                      train_attributes.py, extract_people.py, backup_db.py, users.py, make_test_config.py
