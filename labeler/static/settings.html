@@ -73,6 +73,20 @@
   </section>
 
   <section class="panel">
+    <h2>Backups</h2>
+    <div class="grid">
+      <label for="backup_enabled">Daily backup</label>
+      <div><input type="checkbox" id="backup_enabled"> <span class="hint">The database is backed up every night
+        while the app runs (stop.bat also makes one). The newest 7 are kept in data\backups; once a week the newest
+        is test-restored. The Health page shows how old the newest is.</span></div>
+      <label for="backup_copy_to">Second copy in folder</label>
+      <div><input type="text" id="backup_copy_to" style="width:min(100%,420px)" placeholder="e.g. E:\VisionLabelerBackups (empty = none)"
+        spellcheck="false"> <span class="hint">Another disk or a USB drive: a backup on the same disk is lost with
+        the disk. The folder must exist.</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
     <h2>Privacy and access</h2>
     <div class="grid">
       <label for="blur_faces_for_viewers">Viewers see blurred faces</label>
@@ -110,7 +124,8 @@
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
-const SIMPLE = ["retention_days", "audit_retention_days", "blur_faces", "blur_faces_for_viewers", "https", "retrain_enabled"];
+const SIMPLE = ["retention_days", "audit_retention_days", "blur_faces", "blur_faces_for_viewers", "https", "retrain_enabled",
+                "backup_enabled", "backup_copy_to"];
 let loaded = null;        // values as saved (what the next start uses)
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
@@ -138,7 +153,8 @@ function readForm() {
   const v = {};
   for (const k of SIMPLE) {
     const el = $(k);
-    v[k] = el.type === "checkbox" ? el.checked : (el.value === "" ? null : Number(el.value));
+    v[k] = el.type === "checkbox" ? el.checked : el.type === "text" ? el.value.trim()
+      : (el.value === "" ? null : Number(el.value));
   }
   v.cameras = [...$("cams").children].map(tr => {
     const days = tr.querySelector(".days").value, size = tr.querySelector(".imgsz").value;

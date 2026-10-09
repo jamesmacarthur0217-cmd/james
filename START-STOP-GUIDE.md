@@ -49,7 +49,8 @@ you log in to Windows. Undo with **`remove-autostart.bat`**.
 Double-click **`stop.bat`**. It:
 
 1. stops the app, after it saves the people in view and finishes their labels;
-2. backs up the database (at most once a day; the last 7 backups are kept in `data\backups`);
+2. backs up the database (at most once a day; the app also makes one every night while it runs; the last 7
+   backups are kept in `data\backups`);
 3. stops the database (your data is kept);
 4. frees the GPU memory used by the vision model.
 

@@ -111,7 +111,7 @@ or another app (Teams, Discord) holding the camera.
 | **Reports** | People per hour/day, attribute breakdowns, date range and camera filters, **Download CSV** |
 | **Alerts** | Rules like "red top + backpack" or "anyone" (per camera); each fires once per person |
 | **Answer key** | Label recorded people yourself, blind, and see how accurate the system is on this camera |
-| **Settings** (admin) | Cameras, how long data is kept, face blurring, HTTPS, weekly retraining; **Restart now** |
+| **Settings** (admin) | Cameras, how long data is kept, backups, face blurring, HTTPS, weekly retraining; **Restart now** |
 | **Health** | Whether the database, Ollama, cameras, disk and backups work (see Reliability) |
 
 ### Settings page
@@ -347,7 +347,14 @@ are drawn as gray "ignored" boxes.
 - **Clean stop**: Stop / `stop.bat` / Ctrl+C save the people in view first; an open Live page no longer
   blocks shutdown.
 - **Ollama errors**: each request is retried once.
-- **Backups**: `stop.bat` runs `tools/backup_db.py` (at most daily, keeps 7) into `data/backups`.
+- **Backups**: the app backs up the database every night while it runs (`backup.hour`, 2:00; a PC that
+  was off catches up later that day), and `stop.bat` makes one when it stops the app; at most one a day,
+  the newest 7 kept in `data\backups` (`tools/backup_db.py`). `backup.copy_to` (Settings page: *Second copy
+  in folder*) also copies each one to another disk or a USB drive. Once a week the newest backup is restored
+  into a separate test database and its people counted, so a broken backup is noticed; the Health page shows
+  the newest backup's age (a warning after 2 days), the second copy and the last restore check. By hand:
+  `tools\backup_db.py --verify-only`. Before 2026-10-10 only `stop.bat` made backups, so a PC that was never
+  stopped had none.
 - **Disk space**: warning at startup and in the page header below `storage.min_free_gb` (5 GB).
 - **Auto-start**: `install-autostart.bat` / `remove-autostart.bat`.
 
@@ -478,9 +485,9 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-314 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+329 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 

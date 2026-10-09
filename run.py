@@ -222,6 +222,8 @@ def main() -> int:
     threading.Thread(target=_retention_loop, args=(db, cfg, crop_dir, app.state.stopping),
                      name="retention", daemon=True).start()
     threading.Thread(target=retrainer.loop, args=(app.state.stopping,), name="retrain-check", daemon=True).start()
+    from labeler import backups
+    threading.Thread(target=backups.loop, args=(cfg, db, app.state.stopping), name="backup", daemon=True).start()
     if health is not None:
         from labeler.health import health_loop
         threading.Thread(target=health_loop, args=(health, pipelines, app.state.stopping),

@@ -5,7 +5,8 @@ the values changed on the page go to data/settings.yaml, which load_config() mer
 to go back to config.yaml. Changes apply after a restart (the page has a Restart now button).
 
 Only the common settings are editable here, each validated: cameras (add, remove, source, mode, retention,
-detector size), how long people and the audit log are kept, face blurring, HTTPS, weekly retraining. Zones and
+detector size), how long people and the audit log are kept, face blurring, HTTPS, weekly retraining, the
+daily database backup and its second copy. Zones and
 alert rules have their own pages; accounts are managed with tools/users.py.
 
 A camera keeps its name for good (zones, alert rules and recorded people refer to it); removing a camera keeps
@@ -72,6 +73,17 @@ class SettingsIn(BaseModel):
     blur_faces_for_viewers: bool
     https: bool
     retrain_enabled: bool
+    backup_enabled: bool
+    backup_copy_to: str = Field(default="", max_length=260)
+
+    @field_validator("backup_copy_to")
+    @classmethod
+    def _copy_to(cls, v: str) -> str:
+        v = v.strip()
+        if v and ("${" in v or not Path(v).is_absolute() or not Path(v).is_dir()):
+            raise ValueError("the second-copy folder must be an existing folder with its full path, e.g. "
+                             "E:\\VisionLabelerBackups (or empty)")
+        return v
 
 
 # Page field -> (section, key) in the config.
@@ -82,6 +94,8 @@ SIMPLE = {
     "blur_faces_for_viewers": ("web", "blur_faces_for_viewers"),
     "https": ("web", "https"),
     "retrain_enabled": ("retrain", "enabled"),
+    "backup_enabled": ("backup", "enabled"),
+    "backup_copy_to": ("backup", "copy_to"),
 }
 CAMERA_FIELDS = ("name", "source", "mode", "retention_days", "imgsz")
 

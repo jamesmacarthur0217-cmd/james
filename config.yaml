@@ -134,6 +134,14 @@ database:
   #   url: sqlite:///data/vision.db
   url: ${DATABASE_URL}
 
+# Database backups (PostgreSQL) into data/backups: daily while the app runs, and when stop.bat stops it.
+backup:
+  enabled: true               # the daily backup while running (stop.bat backs up either way)
+  hour: 2                     # not before this hour (night); a PC that is off then catches up later in the day
+  keep: 7                     # newest backups kept
+  copy_to: ""                 # also copy each backup to this folder, e.g. E:/VisionLabelerBackups (another disk
+                              # or a USB drive: a backup on the same disk is lost with the disk)
+
 # Everything the app window shows is also written here, so messages can be read after the window is closed.
 logs:
   dir: data/logs              # visionlabeler.log (the app) and supervisor.log (restarts after crashes)

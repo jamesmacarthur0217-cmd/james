@@ -18,11 +18,12 @@ from pathlib import Path
 
 import requests
 
-from . import logs
+from . import backups, logs
 from .config import ROOT, mask_password, resolve
 
-BACKUP_WARN_DAYS = 7          # stop.bat backs up at most daily; a week without one is worth a look
-BACKUP_DIR = "data/backups"
+# The newest backup is "worth a look" after this many days: with the daily backup the app makes one every night;
+# without it only stop.bat makes them.
+BACKUP_WARN_DAYS = {True: 2, False: 7}
 
 
 def _version() -> str | None:
@@ -101,19 +102,39 @@ def check_disk(cfg: dict) -> dict:
     return _check("disk", "ok", f"{free_gb:.0f} GB free")
 
 
-def check_backup(db, now: float, folder: Path | None = None) -> dict:
+def check_backup(db, now: float, folder: Path | None = None, bcfg: dict | None = None) -> dict:
+    """The newest backup's age, the second copy (backup.copy_to) and the last restore check."""
     if not db.is_postgres:
-        return _check("database backup", "off", "only for the PostgreSQL database (stop.bat makes them)")
-    folder = folder or resolve(BACKUP_DIR)
-    newest = max(folder.glob("visionlabeler-*.dump"), key=lambda p: p.stat().st_mtime, default=None)
+        return _check("database backup", "off", "only for the PostgreSQL database")
+    bcfg = bcfg or {"enabled": True, "hour": 2, "copy_to": ""}
+    daily = bool(bcfg.get("enabled"))
+    maker = f"the app makes one every day from {int(bcfg.get('hour', 2))}:00" if daily else \
+        "stop.bat makes one when it stops the app (the daily backup is off)"
+    folder = folder or backups.folder()
+    newest = backups.newest(folder)
     if newest is None:
-        return _check("database backup", "warning", "no backup yet; stop.bat makes one when it stops the app")
+        return _check("database backup", "warning", f"no backup yet; {maker}")
     age_d = (now - newest.stat().st_mtime) / 86400
-    level = "warning" if age_d > BACKUP_WARN_DAYS else "ok"
-    detail = f"newest is {age_d:.1f} days old ({newest.name})"
+    level = "warning" if age_d > BACKUP_WARN_DAYS[daily] else "ok"
+    parts = [f"newest is {age_d:.1f} days old ({newest.name})"]
     if level == "warning":
-        detail += "; stop.bat makes a new one"
-    return _check("database backup", level, detail)
+        parts.append(maker + "; see the log if it failed")
+    copy_to = bcfg.get("copy_to")
+    if copy_to:
+        if not (Path(copy_to) / newest.name).is_file():
+            level = "warning"
+            parts.append(f"no second copy of it in {copy_to} (drive not plugged in?)")
+        else:
+            parts.append(f"second copy in {copy_to}")
+    verify = backups.last_verify(folder)
+    if verify is None:
+        parts.append("not restore-checked yet (weekly)")
+    elif verify.get("ok"):
+        parts.append(f"restore check {verify['at'][:10]} OK")
+    else:
+        level = "warning"
+        parts.append(f"restore check {verify.get('at', '?')[:10]} FAILED: {verify.get('message', '')}")
+    return _check("database backup", level, "; ".join(parts))
 
 
 def check_retraining(cfg: dict, db) -> dict:
@@ -143,7 +164,7 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
     now_mono, now = time.monotonic(), time.time()
     errors_check, latest_errors = check_errors(now)
     checks = [check_database(db), check_ollama(cfg, pipelines), *check_cameras(cfg, pipelines, camera_health, now_mono),
-              check_disk(cfg), check_backup(db, now), check_retraining(cfg, db), errors_check]
+              check_disk(cfg), check_backup(db, now, bcfg=cfg["backup"]), check_retraining(cfg, db), errors_check]
     if cfg.get("_settings_error"):   # the app started with config.yaml only
         checks.append(_check("Settings page file", "warning", cfg["_settings_error"]))
     problems = [f"{c['name']}: {c['detail']}" for c in checks if c["level"] == "problem"]

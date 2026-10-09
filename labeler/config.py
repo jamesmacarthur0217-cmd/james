@@ -62,6 +62,7 @@ DEFAULTS: dict = {
     "review": {"confidence_threshold": 0.6, "spot_check_every": 5},
     "database": {"url": "sqlite:///data/vision.db"},
     "logs": {"dir": "data/logs", "max_mb": 10, "keep": 5},
+    "backup": {"enabled": True, "hour": 2, "keep": 7, "copy_to": ""},
     "storage": {"crop_dir": "data/crops", "save_face_crops": False, "retention_days": 30, "min_free_gb": 5,
                 "audit_retention_days": 365, "blur_faces": False},
     "web": {"host": "127.0.0.1", "port": 8000, "username": "admin", "password": "", "session_hours": 12,
