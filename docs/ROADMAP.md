@@ -4,7 +4,7 @@
 
 **Phases 0 and 2-6 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
-commercially yet. The next round is being planned with the user. 314 tests pass.
+commercially yet. **Phase 7 is next** (approved plan: [PHASE7-PLAN.md](PHASE7-PLAN.md)). 314 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -134,6 +134,15 @@ page for common settings; health check; installer; private GitHub with tests). E
    private GitHub repo with CI running the test suite (ask first).
 
 Then: switch to planning mode and propose the next round (open items: HANDOFF section 8).
+
+## Phase 7: Backups, second site, recorded videos (next)
+
+**Approved plan: [PHASE7-PLAN.md](PHASE7-PLAN.md)** (user's choices 2026-10-10; no phone alerts).
+
+1. Daily database backup while the app runs, with an optional second copy and a weekly restore check.
+2. Second site over Tailscale: self-checks on the Health page and a plain guide; the user connects the other PC.
+3. Import recorded videos on a new Import page: fast (no waiting, every k-th frame) and with real recording
+   times (file name, MP4 metadata, or typed), kept until deleted by default.
 
 ## Critical files
 

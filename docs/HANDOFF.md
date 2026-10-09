@@ -178,11 +178,9 @@ database/account checks with Docker running.
 Also found and fixed on the way: `stop.bat` held a bell character instead of `\a` in `data\app.pid` (it never
 found the app's process); `/api/cameras` (open to viewers) returned camera addresses with their passwords.
 
-Next: the round after Phase 6 is being planned with the user (planning mode). Open items known so far:
+**Next: Phase 7**, approved 2026-10-10: [PHASE7-PLAN.md](PHASE7-PLAN.md) (daily backup, second site, import
+recorded videos; the user said no phone alerts). Other open items:
 - Phase 1 licenses (only when the use becomes commercial; ask the user then).
-- Import recorded videos fast and with real times (proposal card exists).
-- Database backups happen only in `stop.bat`: a PC that is never stopped gets none (the Health page warns
-  after 7 days). A daily backup while running would close that gap.
 - More cameras than ~4: batching or one process per camera (README "How many cameras?").
 - Measure the timeline threshold (0.8) and the facing threshold across real cameras when there are some.
 - The user keeps labeling on the Answer key page (aim 50-100); retraining starts helping after 30 more people.
@@ -193,5 +191,5 @@ Next: the round after Phase 6 is being planned with the user (planning mode). Op
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then do Phase 6 step by step following
-> docs/PHASE6-PLAN.md. When Phase 6 is finished, switch to planning mode and propose the next steps.
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then do Phase 7 step by step following
+> docs/PHASE7-PLAN.md. When Phase 7 is finished, switch to planning mode and propose the next steps.
