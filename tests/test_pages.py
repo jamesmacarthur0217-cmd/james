@@ -24,3 +24,18 @@ def test_page_script_parses(page, tmp_path):
 def test_shared_script_parses(name):
     result = subprocess.run(["node", "--check", str(STATIC / name)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
+
+
+ROOT = STATIC.parent.parent
+TEXT_FILES = [p for pattern in ("*.bat", "*.ps1", "*.py", "*.yaml", "*.yml", "*.md", "labeler/**/*.py",
+                                "labeler/static/*", "tools/*", "tests/*.py", "docs/*", ".github/**/*")
+              for p in ROOT.glob(pattern) if p.is_file() and ".venv" not in p.parts]
+
+
+@pytest.mark.parametrize("path", sorted({p.relative_to(ROOT).as_posix() for p in TEXT_FILES}))
+def test_no_control_characters(path):
+    """A shell that turns "\\a" into a bell character once broke stop.bat (data\\app.pid became data<BEL>pp.pid,
+    so it never found the app's process). Text files must hold no control characters except tab and newlines."""
+    data = (ROOT / path).read_bytes()
+    bad = [i for i, c in enumerate(data) if c < 32 and c not in (9, 10, 13)]
+    assert not bad, f"control character {data[bad[0]]:#04x} at byte {bad[0]}"

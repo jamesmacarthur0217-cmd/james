@@ -9,7 +9,7 @@ echo ============================================
 
 echo [1/3] Stopping the app (people in view are saved and their labeling finishes first)...
 set "APP_PID="
-if exist "datapp.pid" set /p APP_PID=<"datapp.pid"
+if exist "data\app.pid" set /p APP_PID=<"data\app.pid"
 curl -sf -X POST http://127.0.0.1:8000/api/shutdown >nul 2>&1
 if errorlevel 1 (
   echo       The app was not running.
