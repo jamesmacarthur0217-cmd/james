@@ -150,6 +150,11 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
 
 ## 8. Next: Phase 6 (operations), then planning
 
+**The approved, detailed plan is [PHASE6-PLAN.md](PHASE6-PLAN.md)** (2026-10-09). The user chose: keep the
+console window (no Windows service), a Settings page for the common settings (stored in `data/settings.yaml`
+over config.yaml), a health check, an installer for a new PC, and a private GitHub backup with tests. Follow that
+plan; the list below is the earlier outline.
+
 Do Phase 6 from [ROADMAP.md](ROADMAP.md) step by step, each tested and committed:
 
 1. **Log files** with rotation (`data/logs/`, e.g. 10 MB × 5) for run.py and the supervisor, plus
@@ -179,5 +184,5 @@ Deferred / open items:
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then do Phase 6 of the roadmap step by
-> step. When Phase 6 is finished, switch to planning mode and propose the next steps.
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then do Phase 6 step by step following
+> docs/PHASE6-PLAN.md. When Phase 6 is finished, switch to planning mode and propose the next steps.

@@ -117,7 +117,8 @@ Security:
 
 ## Phase 6: Operations (next)
 
-Suggested order (each step tested and committed on its own):
+**Approved plan: [PHASE6-PLAN.md](PHASE6-PLAN.md)** (user's choices: console window kept, no service; Settings
+page for common settings; health check; installer; private GitHub with tests). Earlier outline:
 
 1. Log files with rotation (`data/logs`, for run.py and the supervisor), plus a `/api/health` endpoint
    (app, database, Ollama, each camera; also usable from a monitoring tool).
