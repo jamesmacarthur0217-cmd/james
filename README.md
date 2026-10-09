@@ -33,6 +33,38 @@ Two modes, global (`mode:`) or per camera:
 | Face attributes | eyewear, face mask | none |
 | Minimum person size | 3% of the frame | none |
 
+## Installing on a new PC
+
+Copy the `VisionLabeler` folder to the new PC (Windows 10/11, NVIDIA GPU with 8 GB or more) and double-click
+**`install.bat`**. It asks before each big step and is safe to run again (finished steps are skipped):
+
+1. checks Windows and the GPU driver (`nvidia-smi`);
+2. installs Python 3.13, Ollama and Docker Desktop with `winget` if they are missing (after Docker Desktop is
+   installed, Windows may need a restart and Docker Desktop must be opened once; then run `install.bat` again);
+3. makes `.venv` with CUDA PyTorch and `requirements.txt` (about 4 GB);
+4. writes `.env` with a new random database password (an existing `.env` is never overwritten);
+5. starts the database (`docker compose up`);
+6. downloads the models: detector, SigLIP 2, age model (`tools\models.py download`) and the vision model
+   (`ollama pull`), about 5 GB;
+7. offers a login account for other devices (this PC never needs one) and the start-at-login shortcut;
+8. starts the app and shows the health check.
+
+`install.bat -CheckOnly` only reports what is installed or missing and changes nothing (exit code 1 when
+something is missing). `tools\models.py check` lists the models alone.
+
+**Without internet**: on a PC where VisionLabeler works, build an offline package (about 10 GB):
+
+```bash
+powershell -ExecutionPolicy Bypass -File tools\pack_offline.ps1 -Out D:\vl-offline
+```
+
+It holds the exact Python package versions of this PC (`pip freeze`, downloaded once more as files), the
+models copied from this PC (detector, SigLIP 2, age model, the Ollama model) and the database image
+(`docker save`; Docker must be running). On the new PC install Python 3.13 (64-bit), Docker Desktop and Ollama
+from their setup files (not in the package), then run `install.bat -Offline D:\vl-offline`. Checked on this PC:
+the models part was packed (5.2 GB in 5 s) and unpacked into empty model folders, the vision model's file
+matched its checksum, and both Hugging Face models loaded with networking turned off.
+
 ## Running it
 
 Docker Desktop must be running (it holds the database). Double-click `start.bat`: it waits for Docker and
@@ -446,9 +478,9 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-298 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+313 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 
@@ -468,6 +500,7 @@ Changes are tracked with git.
 | `labeler/healthcheck.py` | the Health page and `/api/health` |
 | `labeler/settings.py` | the Settings page (`data/settings.yaml` over config.yaml) |
 | `run.py`, `start.bat`, `stop.bat` | starting and stopping |
+| `install.bat` / `install.ps1`, `tools/models.py`, `tools/pack_offline.ps1` | installing on a new PC, offline package |
 | `tools/` | benchmarks, evaluation, training, backups |
 | `tests/` | automated tests |
 | `data/` | person pictures, backups, log files, datasets (not in git) |

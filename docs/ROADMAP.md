@@ -129,7 +129,7 @@ page for common settings; health check; installer; private GitHub with tests). E
    already have their own pages), replacing hand-edited `config.yaml`. Keep config.yaml as commented defaults
    and store changes separately (a file or the database) so comments are never lost; validate every value;
    say when a restart is needed.
-4. An installer script for a new PC: Python venv, Docker, Ollama and model downloads, first admin account,
+4. **Done 2026-10-09** (`install.bat`, `tools/pack_offline.ps1`). An installer script for a new PC: Python venv, Docker, Ollama and model downloads, first admin account,
    with offline model packaging for sites without internet.
 5. Optional: push to a private GitHub repo with CI running the test suite (ask first).
 

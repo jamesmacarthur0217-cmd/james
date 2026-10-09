@@ -24,8 +24,8 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **298 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
-- Phase 6 progress: steps 1 (log files), 2 (health check) and 3 (Settings page + restart) done.
+- Tests: **313 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
+- Phase 6 progress: steps 1 (log files), 2 (health check), 3 (Settings page + restart) and 4 (installer) done.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
   second site over Tailscale, not set up yet: see README "From another site"); one viewer account `TIXUAN`.
 - The user's database: 27 people, 26 of them in the answer key (their own labels; mean ~75% before the
@@ -79,6 +79,10 @@ labeler/settings.py  Settings page: data/settings.yaml merged over config.yaml i
                      project's config.yaml, or a config naming settings_file:); validated; masked passwords;
                      POST /api/restart → exit 4 → supervisor restarts at once (VL_SUPERVISED=1 from it)
 start.bat / stop.bat daily start/stop (wait for Docker + Ollama; stop waits for app exit, backs up DB)
+install.bat/.ps1     new PC: winget Python/Docker/Ollama, .venv, .env, DB, models, admin, autostart,
+                     health; -CheckOnly, -Offline <pkg>; PowerShell 5.1 + ASCII only (tests check)
+tools/models.py      check / download / pack / unpack models (HF cache, Ollama manifest+blobs, YOLO)
+tools/pack_offline.ps1 offline package: pip freeze wheels (cu128 index), models, docker save
 tools/               evaluate.py (COCO answer key), bench_vlm.py, bench_age.py, teacher_label.py,
                      train_attributes.py, extract_people.py, backup_db.py, users.py, make_test_config.py
 ```
