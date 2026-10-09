@@ -1,0 +1,35 @@
+# Runs the test suite on every push: a check that nothing broke, independent of this PC.
+# The tests use SQLite and no GPU, so a plain Linux machine with CPU PyTorch is enough.
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: System libraries for OpenCV
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0
+
+      - name: Python packages (CPU PyTorch)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt pytest
+
+      - name: Tests
+        env:
+          HF_HUB_OFFLINE: "1"   # the tests never need a model download
+        run: python -m pytest -q
