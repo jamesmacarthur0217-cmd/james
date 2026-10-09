@@ -10,7 +10,7 @@
 <body>
 <header>
   <h1>VisionLabeler</h1>
-  <nav><a href="/" class="active">Live</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/audit" class="admin-only">Audit log</a></nav>
+  <nav><a href="/" class="active">Live</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/audit" class="admin-only">Audit log</a><a href="/health">Health</a></nav>
   <div class="status" id="status">connecting…</div>
   <button id="stop" class="admin-only" title="Finish labeling the people in view, save, and close the app">Stop</button>
 </header>
@@ -270,6 +270,17 @@ function score(t) {
   return ` · <b>similarity ${t.similarity.toFixed(2)}</b>${differ}`;
 }
 
+// The health check (labeler/healthcheck.py) as a link to the Health page; every 30 s, as it also asks Ollama.
+let healthLink = "";
+async function healthStatus() {
+  try {
+    const h = await (await fetch("/api/health")).json();
+    const n = h.problems.length;
+    healthLink = n ? `<a href="/health" style="color:var(--warn)"><b>${n} ${n === 1 ? "problem" : "problems"}</b></a> · `
+      : `<a href="/health" style="color:inherit">health OK</a> · `;
+  } catch { healthLink = ""; }
+}
+
 async function status() {
   try {
     const s = await (await fetch("/api/status?" + camParam())).json();
@@ -277,7 +288,7 @@ async function status() {
     if (s.disk_low) warn = `<b style="color:var(--warn)">disk almost full (${s.disk_free_gb} GB free)</b> · ` + warn;
     const down = (s.cameras || []).filter(c => !c.running).map(c => c.camera);
     if (down.length) warn = `<b style="color:var(--warn)">camera not running: ${down.map(esc).join(", ")}</b> · ` + warn;
-    $("status").innerHTML = warn + `mode <b>${s.mode}</b> · <b>${s.fps ?? "-"}</b> fps · <b>${s.active_people ?? 0}</b> in view · `
+    $("status").innerHTML = healthLink + warn + `mode <b>${s.mode}</b> · <b>${s.fps ?? "-"}</b> fps · <b>${s.active_people ?? 0}</b> in view · `
       + `VLM queue <b>${s.vlm_enabled ? s.vlm_queue : "off"}</b> · <b>${s.tracks}</b> people · `
       + `<a href="/review" class="admin-only"><b>${s.needs_review}</b> to review</a>`;
     showCameraProblems(s.camera_problems || []);
@@ -525,6 +536,8 @@ pollLive();
 setInterval(pollLive, 400);
 setInterval(() => { if (view.kind === "recent") refresh(); }, 3000);
 setInterval(status, 1000);
+healthStatus();
+setInterval(healthStatus, 30000);
 </script>
 </body>
 </html>

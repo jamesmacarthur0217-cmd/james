@@ -5,6 +5,7 @@ import hashlib
 import json
 import secrets
 import threading
+import time
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
@@ -323,7 +324,9 @@ class Database:
         self.is_postgres = url.startswith("postgresql")
         self.engine = create_engine(
             url, pool_pre_ping=True,
-            connect_args={"check_same_thread": False, "timeout": 30} if is_sqlite else {},
+            # PostgreSQL: give up connecting after 10 s (e.g. Docker still starting), rather than waiting forever.
+            connect_args={"check_same_thread": False, "timeout": 30} if is_sqlite
+            else {"connect_timeout": 10} if self.is_postgres else {},
         )
         if is_sqlite:
             @event.listens_for(self.engine, "connect")
@@ -919,6 +922,13 @@ class Database:
         return {"id": r.id, "created_at": r.created_at.isoformat(timespec="minutes"), "own_people": r.own_people,
                 "coco_people": r.coco_people, "key_people": r.key_people, "score_before": r.score_before,
                 "score_after": r.score_after, "kept": r.kept, "note": r.note}
+
+    def ping(self) -> float:
+        """Milliseconds the database takes to answer a trivial query (raises if it does not answer)."""
+        t = time.perf_counter()
+        with self.engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return (time.perf_counter() - t) * 1000
 
     def list_model_history(self, limit: int = 20) -> list[dict]:
         with self.Session() as s:

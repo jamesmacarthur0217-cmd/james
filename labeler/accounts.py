@@ -51,10 +51,11 @@ def check_new_password(password: str) -> None:
 # Open to anyone, logged in or not: the login page itself.
 PUBLIC = {("GET", "/login"), ("POST", "/api/login"), ("GET", "/static/style.css"), ("GET", "/static/session.js")}
 
-# Viewer: the Live page, search and questions, alert pop-ups. Exact paths, or prefixes ending in "/".
+# Viewer: the Live page, search and questions, alert pop-ups, the health check. Exact paths, or prefixes ending in "/".
 VIEWER = {
     "GET": ["/", "/stream", "/api/live", "/api/live/thumb/", "/api/status", "/api/schema", "/api/cameras",
-            "/api/tracks", "/api/tracks/", "/api/search", "/api/alerts/events", "/api/me", "/crops/", "/static/"],
+            "/api/tracks", "/api/tracks/", "/api/search", "/api/alerts/events", "/api/me", "/crops/", "/static/",
+            "/health", "/api/health"],
     "POST": ["/api/ask", "/api/logout"],
 }
 

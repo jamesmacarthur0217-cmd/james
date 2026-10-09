@@ -4,8 +4,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import secrets
 import threading
 import shutil
+import time
 from datetime import datetime, timedelta
 
 import cv2
@@ -15,10 +17,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from . import accounts, privacy, reports, schema
+from . import accounts, healthcheck, privacy, reports, schema
 from . import timeline as timeline_mod
 from .clips import clip_name
-from .config import ROOT, resolve
+from .config import ROOT, mask_password, resolve
 from .db import Database
 from .pipeline import Pipeline
 
@@ -77,6 +79,8 @@ def _day_range(start: str | None, end: str | None) -> tuple[datetime, datetime]:
 
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 LOCAL_USER = {"username": "this PC", "role": "admin", "local": True}
+# A monitoring tool calling /api/health?token=... (web.health_token): that one request, status only.
+MONITOR_USER = {"username": "health monitor", "role": "monitor"}
 # Headers that forwarding tools on this PC add (reverse proxies, Cloudflare Tunnel, Tailscale Serve/Funnel).
 # Such a request only looks local; the person is somewhere else, so they must log in.
 PROXY_HEADERS = ("x-forwarded-for", "forwarded", "x-real-ip", "cf-connecting-ip", "true-client-ip",
@@ -114,6 +118,11 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                alerts=None, agent=None, health=None, retrainer=None) -> FastAPI:
     app = FastAPI(title="VisionLabeler")
     app.state.stopping = threading.Event()
+    app.state.started_at = time.time()
+    health_token = str(cfg["web"].get("health_token") or "")
+    if health_token and len(health_token) < 16:
+        log.warning("web.health_token is short (%d characters); use a long random one, e.g. 32 characters",
+                    len(health_token))
     session_hours = cfg["web"].get("session_hours", 12)
     limiter = accounts.LoginLimiter()
 
@@ -132,6 +141,12 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         viewer may only do what accounts.VIEWER lists. A request passed on by a forwarding tool on this PC
         looks local but is not (is_this_pc), so it must log in too."""
         method, path = request.method, request.url.path
+        if path == "/api/health" and "token" in request.query_params:
+            given = request.query_params["token"].encode()
+            if not health_token or not secrets.compare_digest(given, health_token.encode()):
+                return JSONResponse({"detail": "wrong health token"}, status_code=401)
+            request.state.user = MONITOR_USER
+            return await call_next(request)
         page = method == "GET" and not path.startswith(("/api/", "/stream", "/crops/", "/clips/", "/static/"))
         if is_this_pc(request):
             request.state.user = LOCAL_USER
@@ -432,7 +447,21 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
 
     @app.get("/api/cameras")
     def cameras():
-        return [{"name": p.name, "mode": p.mode, "source": str(p.cam["source"])} for p in pipelines]
+        # Masked: viewers may call this, and an IP camera address can hold its password.
+        return [{"name": p.name, "mode": p.mode, "source": mask_password(p.cam["source"])} for p in pipelines]
+
+    @app.get("/health")
+    def health_page():
+        return FileResponse(STATIC / "health.html")
+
+    @app.get("/api/health")
+    def health_check(request: Request):
+        """Is everything working? 200 if so, 503 if not (labeler/healthcheck.py). Admins get the log's error
+        messages too; viewers and a monitoring tool (?token=, web.health_token) only what is wrong."""
+        role = (getattr(request.state, "user", None) or {}).get("role")
+        detail = {"admin": "full", "monitor": "status"}.get(role, "viewer")
+        result = healthcheck.run_checks(cfg, db, pipelines, health, app.state.started_at, detail)
+        return JSONResponse(result, status_code=200 if result["ok"] else 503, headers={"Cache-Control": "no-store"})
 
     @app.get("/stream")
     async def stream(request: Request, camera: str | None = None):

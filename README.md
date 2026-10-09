@@ -285,6 +285,14 @@ are drawn as gray "ignored" boxes.
   supervisor's restarts in `data\logs\supervisor.log`, so a crash at night can be read after the window was
   closed. A file is renamed `.1`, `.2`, … at 10 MB and 5 old files are kept (`logs:` in config.yaml), so logs
   never use more than about 60 MB.
+- **Health check**: the **Health** page (also "health OK" / "2 problems" in the Live page's status line) and
+  `GET /api/health` check the database, Ollama (reachable, model pulled, and used by the app: it connects only
+  at start), each camera (running, pictures arriving, current camera problems), free disk space, the newest
+  database backup (a warning after 7 days), the last weekly retraining, and errors in the log in the last 24 h.
+  `/api/health` answers **200** when nothing is broken and **503** when something is, with the reasons, so a
+  monitoring tool (e.g. Uptime Kuma) can alert on the code. Viewers may use it; a tool without an account uses
+  `?token=` with `web.health_token` (`VL_HEALTH_TOKEN` in `.env`) and gets only the problem list. Camera
+  addresses are never shown (they can hold a password), and passwords in addresses are masked on every page.
 - **Single copy**: a second copy refuses to start ("already using port 8000").
 - **Clean stop**: Stop / `stop.bat` / Ctrl+C save the people in view first; an open Live page no longer
   blocks shutdown.
@@ -420,9 +428,9 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-251 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+272 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 
@@ -439,6 +447,7 @@ Changes are tracked with git.
 | `labeler/db.py` | database tables and queries |
 | `labeler/web.py`, `labeler/static/` | web UI |
 | `labeler/supervisor.py`, `labeler/logs.py` | restart after crashes; log files |
+| `labeler/healthcheck.py` | the Health page and `/api/health` |
 | `run.py`, `start.bat`, `stop.bat` | starting and stopping |
 | `tools/` | benchmarks, evaluation, training, backups |
 | `tests/` | automated tests |

@@ -159,6 +159,9 @@ web:
   https_port: 8443
   cert_file: data/tls/cert.pem   # made automatically (self-signed) if missing; or put your own here
   key_file: data/tls/key.pem
+  # A monitoring tool may call /api/health?token=<this> without logging in (status only: 200 OK, 503 problem).
+  # Empty = only logged-in users. Put a long random value in .env as VL_HEALTH_TOKEN=...
+  health_token: ${VL_HEALTH_TOKEN:-}
   # Older setups: a shared password in .env (VL_WEB_PASSWORD) becomes the first admin account at startup.
   username: admin
   password: ${VL_WEB_PASSWORD:-}

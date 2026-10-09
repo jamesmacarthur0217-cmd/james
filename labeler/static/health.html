@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Health</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/session.js"></script>
+<style>
+  .overall { font-size: 18px; font-weight: 600; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+  .checks { display: flex; flex-direction: column; gap: 6px; max-width: 900px; }
+  .check { display: grid; grid-template-columns: 14px minmax(140px, 220px) 1fr; gap: 10px; align-items: baseline;
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; }
+  .check .name { font-weight: 600; }
+  .check .detail { color: var(--muted); word-break: break-word; }
+  .check.problem { border-color: #c9372c; }
+  .check.problem .detail { color: var(--text); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: var(--muted); }
+  .dot.ok { background: var(--ok); }
+  .dot.warning { background: var(--warn); }
+  .dot.problem { background: #c9372c; }
+  .dot.off { background: transparent; border: 2px solid var(--muted); width: 10px; height: 10px; }
+  .errors { font-size: 13px; max-width: 900px; }
+  .errors li { margin-bottom: 4px; word-break: break-word; }
+  .errors time { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 8px; }
+  code { background: var(--chip); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .panel + .panel { margin-top: 16px; }
+  @media (max-width: 600px) { .check { grid-template-columns: 14px 1fr; } .check .detail { grid-column: 2; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>VisionLabeler</h1>
+  <nav><a href="/">Live</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/audit" class="admin-only">Audit log</a><a href="/health" class="active">Health</a></nav>
+</header>
+<main>
+  <section class="panel">
+    <p class="overall"><span class="dot" id="overall-dot"></span><span id="overall">Checking…</span></p>
+    <p class="hint" id="meta"></p>
+    <div class="checks" id="checks"></div>
+  </section>
+  <section class="panel admin-only" id="errors-panel" hidden>
+    <h2>Latest errors in the log</h2>
+    <ul class="errors" id="errors"></ul>
+  </section>
+  <section class="panel admin-only">
+    <h2>For a monitoring tool</h2>
+    <p class="hint">A monitoring tool (for example Uptime Kuma, or a phone app that checks a web address) can call
+      <code>/api/health</code>: the answer is <b>200</b> when everything works and <b>503</b> when something does
+      not, with the problems listed. Without logging in, it needs the token from <code>web.health_token</code>
+      (config.yaml): <code>https://&lt;this PC&gt;:8443/api/health?token=…</code>. It then sees only what is
+      wrong, never pictures or camera addresses.</p>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const NAMES = { ok: "OK", warning: "worth a look", problem: "not working", off: "off" };
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function duration(s) {
+  if (s == null) return "?";
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`;
+}
+
+async function load() {
+  let h;
+  try {
+    const r = await fetch("/api/health");
+    h = await r.json();
+  } catch {
+    $("overall").textContent = "The app does not answer (stopped, or the network is down).";
+    $("overall-dot").className = "dot problem";
+    return;
+  }
+  const n = h.problems.length, w = h.warnings.length;
+  $("overall").textContent = n ? `${n} ${n === 1 ? "thing does" : "things do"} not work`
+    : w ? `Everything works (${w} ${w === 1 ? "thing" : "things"} worth a look)` : "Everything works";
+  $("overall-dot").className = "dot " + (n ? "problem" : w ? "warning" : "ok");
+  const app = h.app || {};
+  $("meta").textContent = `Checked ${new Date(h.checked_at).toLocaleTimeString()} (every 30 s) · running for `
+    + `${duration(app.uptime_s)}` + (app.version ? ` · version ${app.version}` : "");
+  $("checks").innerHTML = (h.checks || []).map(c => `
+    <div class="check ${c.level}" title="${NAMES[c.level] || c.level}">
+      <span class="dot ${c.level}"></span><span class="name">${esc(c.name)}</span>
+      <span class="detail">${esc(c.detail)}</span>
+    </div>`).join("");
+  const errors = h.latest_errors || [];
+  $("errors-panel").hidden = !errors.length;
+  $("errors").innerHTML = errors.map(e => `<li><time>${esc(e.at.replace("T", " "))}</time>${esc(e.message)}</li>`).join("");
+}
+
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>

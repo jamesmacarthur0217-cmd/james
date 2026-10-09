@@ -66,8 +66,16 @@ DEFAULTS: dict = {
                 "audit_retention_days": 365, "blur_faces": False},
     "web": {"host": "127.0.0.1", "port": 8000, "username": "admin", "password": "", "session_hours": 12,
             "https": False, "https_port": 8443, "cert_file": "data/tls/cert.pem", "key_file": "data/tls/key.pem",
-            "blur_faces_for_viewers": True},
+            "blur_faces_for_viewers": True, "health_token": ""},
 }
+
+MASK = "•••"
+_URL_PASSWORD = re.compile(r"(\b[a-z][a-z0-9+.-]*://[^:/@\s]*:)([^@\s]+)(@)", re.I)
+
+
+def mask_password(text: str) -> str:
+    """rtsp://user:secret@host/... → rtsp://user:•••@host/... (for pages, the audit log and the health check)."""
+    return _URL_PASSWORD.sub(lambda m: m.group(1) + MASK + m.group(3), str(text))
 
 
 def _merge(base: dict, override: dict) -> dict:

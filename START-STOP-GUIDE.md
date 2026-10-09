@@ -21,6 +21,9 @@ Keep the black `start.bat` window open while you use the system. Closing it stop
 **To read messages after the window is closed**, open `C:\VisionLabeler\data\logs\visionlabeler.log` in
 Notepad (newest lines at the bottom). `supervisor.log` in the same folder lists every crash and restart.
 
+**To check that everything works**, open the **Health** page (top menu, or click "health OK" on the Live
+page). Each line is green when it works; red lines say what is wrong and what to do.
+
 **If you double-click `start.bat` twice**, the second one says "already using port 8000" and closes; only
 one copy ever runs.
 
