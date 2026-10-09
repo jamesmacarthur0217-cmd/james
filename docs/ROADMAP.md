@@ -139,7 +139,7 @@ Then: switch to planning mode and propose the next round (open items: HANDOFF se
 
 **Approved plan: [PHASE7-PLAN.md](PHASE7-PLAN.md)** (user's choices 2026-10-10; no phone alerts).
 
-1. **Done 2026-10-10** (real restore check waits for Docker). Daily database backup while the app runs, with
+1. **Done 2026-10-10** (real backup + restore check: 27 of 27 people, 2 s). Daily database backup while the app runs, with
    an optional second copy and a weekly restore check.
 2. Second site over Tailscale: self-checks on the Health page and a plain guide; the user connects the other PC.
 3. Import recorded videos on a new Import page: fast (no waiting, every k-th frame) and with real recording

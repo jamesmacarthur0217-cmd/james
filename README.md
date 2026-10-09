@@ -353,7 +353,8 @@ are drawn as gray "ignored" boxes.
   in folder*) also copies each one to another disk or a USB drive. Once a week the newest backup is restored
   into a separate test database and its people counted, so a broken backup is noticed; the Health page shows
   the newest backup's age (a warning after 2 days), the second copy and the last restore check. By hand:
-  `tools\backup_db.py --verify-only`. Before 2026-10-10 only `stop.bat` made backups, so a PC that was never
+  `tools\backup_db.py --verify-only`. Measured here: backup and restore check of the 27-person database
+  took 2 s (0.2 MB). Before 2026-10-10 only `stop.bat` made backups, so a PC that was never
   stopped had none.
 - **Disk space**: warning at startup and in the page header below `storage.min_free_gb` (5 GB).
 - **Auto-start**: `install-autostart.bat` / `remove-autostart.bat`.
