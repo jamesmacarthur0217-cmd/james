@@ -1,5 +1,7 @@
 # VisionLabeler configuration.
 # Paths are relative to this folder unless absolute.
+# Changes made on the Settings page (cameras, retention, blurring, HTTPS, retraining) are saved in
+# data/settings.yaml and win over the values here; delete that file to use only this one.
 
 # One entry per camera. Each runs on its own; the vision model and database are shared.
 cameras:

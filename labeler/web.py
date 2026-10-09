@@ -14,13 +14,14 @@ import cv2
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from . import accounts, healthcheck, privacy, reports, schema
+from . import settings as settings_mod
 from . import timeline as timeline_mod
 from .clips import clip_name
-from .config import ROOT, mask_password, resolve
+from .config import ROOT, load_config, mask_password, resolve
 from .db import Database
 from .pipeline import Pipeline
 
@@ -621,6 +622,66 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         except KeyError:
             raise HTTPException(404, "attribute not found")
         audit(request, "review", f"label #{attribute_id} = {value}")
+        return {"ok": True}
+
+    # --- settings (admin; labeler/settings.py) ------------------------------------------------
+
+    @app.get("/settings")
+    def settings_page():
+        return FileResponse(STATIC / "settings.html")
+
+    def settings_configs():
+        """(settings file, config.yaml alone, config.yaml + settings file): read fresh, as the next start will."""
+        path = settings_mod.settings_path(cfg)
+        if path is None or not cfg.get("_config_path"):
+            raise HTTPException(503, "this app was started with a config without a settings file (settings_file:)")
+        base = load_config(cfg["_config_path"], use_settings=False)
+        return path, base, load_config(cfg["_config_path"])
+
+    def restart_needed(path) -> bool:
+        try:
+            saved = settings_mod.read(path)
+        except (OSError, ValueError):
+            return True
+        return saved != (cfg.get("_settings_loaded") or {})
+
+    @app.get("/api/settings")
+    def get_settings():
+        path, _, effective = settings_configs()
+        return {"values": settings_mod.current(effective),    # what the next start uses
+                "running": settings_mod.current(cfg),          # what runs now
+                "restart_needed": restart_needed(path),
+                "restart_available": settings_mod.restart_available()
+                and getattr(app.state, "request_restart", None) is not None,
+                "cli_source": bool(cfg.get("_cli_source")),
+                "file": str(path), "error": effective.get("_settings_error"),
+                "ignored": effective.get("_settings_ignored", [])}
+
+    @app.post("/api/settings")
+    def save_settings(body: dict, request: Request):
+        try:
+            parsed = settings_mod.SettingsIn.model_validate(body)
+        except ValidationError as e:
+            raise HTTPException(400, settings_mod.validation_message(e))
+        path, base, effective = settings_configs()
+        try:
+            overlay, changes = settings_mod.build(parsed, base, effective)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        if changes:
+            settings_mod.write(path, overlay)
+            audit(request, "settings changed", mask_password("; ".join(changes))[:2000])
+        return {"ok": True, "changes": changes, "restart_needed": restart_needed(path)}
+
+    @app.post("/api/restart")
+    def restart(request: Request):
+        """Stop cleanly and start again (needs the supervisor, i.e. start.bat), e.g. to apply new settings."""
+        do = getattr(app.state, "request_restart", None)
+        if do is None or not settings_mod.restart_available():
+            raise HTTPException(409, "this copy was not started with start.bat, so it cannot start itself again: "
+                                     "stop it, then start it again by hand")
+        audit(request, "restart app")
+        do()
         return {"ok": True}
 
     @app.get("/audit")

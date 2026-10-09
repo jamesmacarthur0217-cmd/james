@@ -122,10 +122,10 @@ page for common settings; health check; installer; private GitHub with tests). E
 
 1. **Done 2026-10-09** (log files; health check with a Health page and a monitoring token). Log files with rotation (`data/logs`, for run.py and the supervisor), plus a `/api/health` endpoint
    (app, database, Ollama, each camera; also usable from a monitoring tool).
-2. Run as a Windows service (e.g. NSSM wrapping `python -m labeler.supervisor` — a download, ask first — or a
+2. **Not done, by the user's choice** (console window kept; see PHASE6-PLAN.md). Run as a Windows service (e.g. NSSM wrapping `python -m labeler.supervisor` — a download, ask first — or a
    Task Scheduler "at startup" task without a window) instead of a console window. It must keep start.bat's
    waits (Docker, Ollama) and stop.bat's clean stop (shutdown API, final saves, DB backup).
-3. A settings page (admin, audited) for cameras, retention, HTTPS, blurring, retraining (zones and rules
+3. **Done 2026-10-09** (`data/settings.yaml`, Restart now). A settings page (admin, audited) for cameras, retention, HTTPS, blurring, retraining (zones and rules
    already have their own pages), replacing hand-edited `config.yaml`. Keep config.yaml as commented defaults
    and store changes separately (a file or the database) so comments are never lost; validate every value;
    say when a restart is needed.

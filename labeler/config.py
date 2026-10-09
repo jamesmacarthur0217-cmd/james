@@ -115,14 +115,33 @@ def _expand(value):
     return value
 
 
-def load_config(path: str | Path | None = None) -> dict:
+def load_config(path: str | Path | None = None, use_settings: bool = True) -> dict:
+    """config.yaml (or `path`) over the defaults, then the Settings page's changes (labeler/settings.py) over
+    that. The settings file is data/settings.yaml for the project's own config.yaml; another config uses one only
+    if it names it (`settings_file:`), so a test config never picks up the real one."""
     load_dotenv()
     cfg = copy.deepcopy(DEFAULTS)
-    path = Path(path) if path else ROOT / "config.yaml"
+    path = Path(path).resolve() if path else ROOT / "config.yaml"
     if path.exists():
         with open(path, encoding="utf-8") as f:
             _merge(cfg, yaml.safe_load(f) or {})
     cfg = _expand(cfg)
+    cfg["_config_path"] = str(path)
+    settings_file = cfg.get("settings_file") or ("data/settings.yaml" if path == ROOT / "config.yaml" else None)
+    if settings_file:
+        from . import settings
+        cfg["_settings_path"] = str(resolve(settings_file))
+        if use_settings:
+            # Not expanded: values from the page are stored as typed, never read as ${VARIABLES}. Tried on a copy
+            # first: a broken (hand-edited) settings file must not stop the app from starting.
+            try:
+                overlay = settings.read(resolve(settings_file))
+                trial = settings.apply(copy.deepcopy(cfg), overlay)
+                normalize_cameras(trial)
+                cfg = trial
+                cfg["_settings_loaded"] = overlay   # to tell later whether the file changed (restart needed)
+            except Exception as e:
+                cfg["_settings_error"] = f"{settings_file} could not be used ({e}); using config.yaml only"
     cfg["cameras"] = normalize_cameras(cfg)
     if cfg["mode"] not in ("kiosk", "security"):
         raise ValueError(f"mode must be 'kiosk' or 'security', got {cfg['mode']!r}")

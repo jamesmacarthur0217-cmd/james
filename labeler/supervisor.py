@@ -3,13 +3,15 @@
     python -m labeler.supervisor [run.py arguments]
 
 A normal stop (Stop button, stop.bat, Ctrl+C) ends it. A crash restarts the app after 5 seconds; after
-5 crashes within 10 minutes it gives up, since something needs fixing (the log above says what).
+5 crashes within 10 minutes it gives up, since something needs fixing (the log above says what). "Restart now"
+on the Settings page (exit code 4) starts it again at once and is not counted as a crash.
 Its own messages also go to data/logs/supervisor.log (the app's to visionlabeler.log), so a crash at night
 can be read in the morning even after the window was closed.
 """
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -19,13 +21,16 @@ ROOT = Path(__file__).resolve().parent.parent
 MAX_CRASHES = 5
 WINDOW_S = 600
 RESTART_DELAY_S = 5
+EXIT_RESTART = 4      # run.py: a restart was asked for (Settings page)
 
 log = logging.getLogger("supervisor")
 
 
 def run_once(argv: list[str]) -> tuple[int, bool]:
     """Run the app until it exits. Returns (exit code, whether the user pressed Ctrl+C)."""
-    proc = subprocess.Popen([sys.executable, str(ROOT / "run.py"), *argv], cwd=ROOT)
+    # VL_SUPERVISED tells the app that "Restart now" works (someone is here to start it again).
+    proc = subprocess.Popen([sys.executable, str(ROOT / "run.py"), *argv], cwd=ROOT,
+                            env={**os.environ, "VL_SUPERVISED": "1"})
     interrupted = False
     while True:
         try:
@@ -75,6 +80,9 @@ def main(argv: list[str]) -> int:
         if code == 0 or interrupted:
             log.info("the app stopped normally (exit code %s)", code)
             return 0
+        if code == EXIT_RESTART:
+            say("\nRestarting the app (asked for on the Settings page)...\n")
+            continue
         now = time.monotonic()
         crashes = [t for t in crashes if now - t < WINDOW_S] + [now]
         if len(crashes) >= MAX_CRASHES:

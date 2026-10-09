@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/session.js"></script>
+<style>
+  .panel + .panel { margin-top: 16px; }
+  .cams { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { color: var(--muted); font-weight: 500; white-space: nowrap; }
+  td input[type=text] { width: 100%; min-width: 120px; }
+  td input.name { min-width: 90px; max-width: 140px; }
+  td input.source { min-width: 240px; }
+  td input[type=number] { width: 80px; }
+  td input[readonly] { background: var(--chip); color: var(--muted); }
+  .grid { display: grid; grid-template-columns: max-content 1fr; gap: 10px 16px; align-items: center; max-width: 900px; }
+  .grid label { font-weight: 600; }
+  .grid .hint { margin: 0; }
+  .grid input[type=number] { width: 90px; }
+  .actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+  .msg { font-size: 13px; }
+  .msg.bad { color: #c9372c; }
+  .msg.good { color: var(--ok); }
+  .restart { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 10px 12px; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .restart[hidden] { display: none; }
+  .restart b { color: inherit; }
+  .unsaved { color: var(--warn); font-size: 13px; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>VisionLabeler</h1>
+  <nav><a href="/">Live</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/audit" class="admin-only">Audit log</a><a href="/settings" class="active admin-only">Settings</a><a href="/health">Health</a></nav>
+</header>
+<main>
+  <div class="restart" id="restart" hidden>
+    <span id="restart-text"><b>Saved.</b> The changes take effect after a restart.</span>
+    <button class="primary" id="restart-now" hidden>Restart now</button>
+  </div>
+  <div class="banner" id="note" hidden></div>
+
+  <section class="panel">
+    <h2>Cameras</h2>
+    <p class="hint">Source: a webcam number (0, 1, …), a video or picture file, or a camera address
+      (<code>rtsp://user:password@192.168.1.50:554/stream1</code>). A saved password shows as •••; leave it to keep
+      it. A camera's name cannot be changed later (zones, alert rules and recorded people use it). Removing a camera
+      keeps its recorded people until their retention ends. Empty "Keep days" and "Detector size" use the
+      general values below.</p>
+    <div class="cams">
+      <table>
+        <thead><tr><th>Name</th><th>Source</th><th>Mode</th><th>Keep days</th><th>Detector size</th><th></th></tr></thead>
+        <tbody id="cams"></tbody>
+      </table>
+    </div>
+    <p><button id="add">Add camera</button></p>
+  </section>
+
+  <section class="panel">
+    <h2>Keeping data</h2>
+    <div class="grid">
+      <label for="retention_days">Keep people (days)</label>
+      <div><input type="number" id="retention_days" min="0" max="3650"> <span class="hint">0 = keep forever. Older
+        people, their pictures and clips are deleted every hour.</span></div>
+      <label for="audit_retention_days">Keep the audit log (days)</label>
+      <div><input type="number" id="audit_retention_days" min="0" max="3650"> <span class="hint">0 = keep forever.</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Privacy and access</h2>
+    <div class="grid">
+      <label for="blur_faces_for_viewers">Viewers see blurred faces</label>
+      <div><input type="checkbox" id="blur_faces_for_viewers"> <span class="hint">Viewer accounts see blurred faces in
+        the live video and pictures; admins see faces.</span></div>
+      <label for="blur_faces">Blur faces in saved pictures</label>
+      <div><input type="checkbox" id="blur_faces"> <span class="hint">Nobody (admins too) sees faces in pictures saved
+        from now on. Labeling still works; the Review and Answer key pages cannot show faces.</span></div>
+      <label for="https">HTTPS for other devices</label>
+      <div><input type="checkbox" id="https"> <span class="hint">Other devices use https://&lt;this PC&gt;:8443
+        (encrypted); plain http then works on this PC only.</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Learning</h2>
+    <div class="grid">
+      <label for="retrain_enabled">Weekly retraining</label>
+      <div><input type="checkbox" id="retrain_enabled"> <span class="hint">Retrains the fast classifiers on your
+        cameras' people once a week; a new version is kept only if it scores at least as well on the answer key.</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="actions">
+      <button class="primary" id="save">Save</button>
+      <span class="unsaved" id="unsaved" hidden>Unsaved changes</span>
+      <span class="msg" id="msg"></span>
+    </div>
+    <p class="hint" style="margin-top:12px">Elsewhere: zones and counting lines are drawn on the <a href="/">Live</a>
+      page; alert rules are on the <a href="/alerts">Alerts</a> page; login accounts are managed with
+      <code>tools\users.py</code>. Everything else is in <code>config.yaml</code>. Saved changes are kept in
+      <code id="file"></code>; delete that file to go back to config.yaml.</p>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const SIMPLE = ["retention_days", "audit_retention_days", "blur_faces", "blur_faces_for_viewers", "https", "retrain_enabled"];
+let loaded = null;        // values as saved (what the next start uses)
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function camRow(c, isNew) {
+  const tr = document.createElement("tr");
+  const opt = (v, label, cur) => `<option value="${v}"${String(cur ?? "") === String(v) ? " selected" : ""}>${label}</option>`;
+  tr.innerHTML = `
+    <td><input type="text" class="name" value="${esc(c.name)}" ${isNew ? "" : "readonly title=\"A camera's name cannot be changed\""}></td>
+    <td><input type="text" class="source" value="${esc(c.source)}" spellcheck="false" autocomplete="off"></td>
+    <td><select class="mode">${opt("kiosk", "kiosk", c.mode)}${opt("security", "security", c.mode)}</select></td>
+    <td><input type="number" class="days" min="0" max="3650" value="${c.retention_days ?? ""}" placeholder="general"></td>
+    <td><select class="imgsz">${opt("", "general", c.imgsz)}${opt(640, "640", c.imgsz)}${opt(960, "960", c.imgsz)}${opt(1280, "1280", c.imgsz)}</select></td>
+    <td><button class="danger-quiet remove">Remove</button></td>`;
+  tr.querySelector(".remove").addEventListener("click", () => {
+    if ($("cams").children.length <= 1) { showMsg("At least one camera is needed.", false); return; }
+    tr.remove(); changed();
+  });
+  tr.addEventListener("input", changed);
+  tr.addEventListener("change", changed);
+  return tr;
+}
+
+function readForm() {
+  const v = {};
+  for (const k of SIMPLE) {
+    const el = $(k);
+    v[k] = el.type === "checkbox" ? el.checked : (el.value === "" ? null : Number(el.value));
+  }
+  v.cameras = [...$("cams").children].map(tr => {
+    const days = tr.querySelector(".days").value, size = tr.querySelector(".imgsz").value;
+    const source = tr.querySelector(".source").value.trim();
+    return { name: tr.querySelector(".name").value.trim(), source: /^\d+$/.test(source) ? Number(source) : source,
+             mode: tr.querySelector(".mode").value, retention_days: days === "" ? null : Number(days),
+             imgsz: size === "" ? null : Number(size) };
+  });
+  return v;
+}
+
+function fill(values) {
+  for (const k of SIMPLE) {
+    const el = $(k);
+    if (el.type === "checkbox") el.checked = !!values[k]; else el.value = values[k];
+  }
+  $("cams").replaceChildren(...values.cameras.map(c => camRow(c, false)));
+}
+
+function changed() {
+  $("unsaved").hidden = JSON.stringify(readForm()) === JSON.stringify(loaded);
+  $("msg").textContent = "";
+}
+
+function showMsg(text, good) {
+  $("msg").textContent = text;
+  $("msg").className = "msg " + (good ? "good" : "bad");
+}
+
+function showRestart(needed, available) {
+  $("restart").hidden = !needed;
+  $("restart-now").hidden = !available;
+  $("restart-text").innerHTML = "<b>Saved.</b> The changes take effect after a restart"
+    + (available ? "." : ": stop the app (Stop button or stop.bat), then start it again with start.bat.");
+}
+
+async function load() {
+  const r = await fetch("/api/settings");
+  const s = await r.json();
+  if (!r.ok) { showMsg(s.detail || "Could not load the settings.", false); $("save").disabled = true; return; }
+  fill(s.values);
+  loaded = readForm();
+  $("file").textContent = s.file;
+  showRestart(s.restart_needed, s.restart_available);
+  const notes = [];
+  if (s.error) notes.push(esc(s.error));
+  if (s.ignored && s.ignored.length) notes.push("Not used from the settings file (not a setting of this page): " + esc(s.ignored.join(", ")));
+  if (s.cli_source) notes.push("This copy was started with <code>--source</code>, which replaces the cameras below while it runs.");
+  $("note").innerHTML = notes.join("<br>");
+  $("note").hidden = !notes.length;
+  changed();
+}
+
+$("add").addEventListener("click", () => {
+  const names = new Set([...$("cams").querySelectorAll(".name")].map(i => i.value));
+  let n = $("cams").children.length + 1;
+  while (names.has(`cam${n}`)) n++;
+  const tr = camRow({ name: `cam${n}`, source: "", mode: loaded?.cameras[0]?.mode || "kiosk" }, true);
+  $("cams").append(tr);
+  tr.querySelector(".source").focus();
+  changed();
+});
+
+$("save").addEventListener("click", async () => {
+  $("save").disabled = true;
+  try {
+    const r = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify(readForm()) });
+    const out = await r.json();
+    if (!r.ok) { showMsg(out.detail || "Not saved.", false); return; }
+    await load();
+    showMsg(out.changes.length ? `Saved: ${out.changes.join("; ")}` : "Nothing changed.", true);
+  } catch { showMsg("Not saved: the app does not answer.", false); }
+  finally { $("save").disabled = false; }
+});
+
+$("restart-now").addEventListener("click", async () => {
+  if (!$("unsaved").hidden && !confirm("There are unsaved changes; restart anyway (they are lost)?")) return;
+  $("restart-now").disabled = true;
+  $("unsaved").hidden = true;   // already confirmed: no "leave page?" question when it reloads
+  const r = await fetch("/api/restart", { method: "POST" });
+  if (!r.ok) { $("restart-now").disabled = false; showMsg((await r.json()).detail || "Could not restart.", false); return; }
+  $("restart-text").innerHTML = "<b>Restarting…</b> people in view are saved first; this page reloads when the app is back (about a minute).";
+  // Wait until the app has gone away, then until it answers again.
+  let wentDown = false;
+  for (let i = 0; i < 300; i++) {
+    await new Promise(res => setTimeout(res, 1000));
+    try {
+      const ok = (await fetch("/api/me", { cache: "no-store" })).ok;
+      if (ok && wentDown) { location.reload(); return; }
+    } catch { wentDown = true; }
+  }
+  $("restart-text").innerHTML = "<b>The app has not come back after 5 minutes.</b> Check its window.";
+});
+
+window.addEventListener("beforeunload", (e) => { if (!$("unsaved").hidden) e.preventDefault(); });
+load();
+</script>
+</body>
+</html>

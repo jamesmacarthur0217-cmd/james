@@ -53,8 +53,8 @@ Options: `--source` (one camera with this source), `--mode`, `--no-vlm` (colors 
 
 ### Cameras
 
-`cameras:` in `config.yaml` lists every camera; each runs its own detection loop, and the vision model,
-embeddings and database are shared. The web page shows a tab per camera.
+`cameras:` in `config.yaml` lists every camera (or add them on the **Settings** page); each runs its own
+detection loop, and the vision model, embeddings and database are shared. The web page shows a tab per camera.
 
 ```yaml
 cameras:
@@ -79,6 +79,24 @@ or another app (Teams, Discord) holding the camera.
 | **Reports** | People per hour/day, attribute breakdowns, date range and camera filters, **Download CSV** |
 | **Alerts** | Rules like "red top + backpack" or "anyone" (per camera); each fires once per person |
 | **Answer key** | Label recorded people yourself, blind, and see how accurate the system is on this camera |
+| **Settings** (admin) | Cameras, how long data is kept, face blurring, HTTPS, weekly retraining; **Restart now** |
+| **Health** | Whether the database, Ollama, cameras, disk and backups work (see Reliability) |
+
+### Settings page
+
+The common settings can be changed on the **Settings** page instead of editing `config.yaml`: cameras (add,
+remove, source, mode, own retention, detector size), how long people and the audit log are kept, face blurring
+(for viewers, and in saved pictures), HTTPS, and the weekly retraining. Every value is checked before it is
+saved (a webcam number 0-9, a file that exists, or a camera address with a host; detector size 640/960/1280;
+0-3650 days), and every change is in the Audit log. Only the changed values are saved, in `data\settings.yaml`
+(config.yaml keeps its comments and stays the list of defaults; delete the file to go back to it).
+
+Changes take effect after a restart: **Restart now** stops the app cleanly (people in view are saved) and the
+supervisor started by `start.bat` starts it again at once; this is not counted as a crash. A copy started
+without `start.bat` says to restart by hand. A camera's name cannot be changed (zones, rules and recorded people
+use it); a removed camera's people stay until their retention ends. Camera passwords are shown as `•••`;
+leaving the mask keeps the stored password, and the Audit log never contains it. Zones are drawn on the Live
+page, alert rules are on the Alerts page, and accounts are managed with `tools\users.py`.
 
 ### Asking questions
 
@@ -428,9 +446,9 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-272 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+298 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 
@@ -448,6 +466,7 @@ Changes are tracked with git.
 | `labeler/web.py`, `labeler/static/` | web UI |
 | `labeler/supervisor.py`, `labeler/logs.py` | restart after crashes; log files |
 | `labeler/healthcheck.py` | the Health page and `/api/health` |
+| `labeler/settings.py` | the Settings page (`data/settings.yaml` over config.yaml) |
 | `run.py`, `start.bat`, `stop.bat` | starting and stopping |
 | `tools/` | benchmarks, evaluation, training, backups |
 | `tests/` | automated tests |

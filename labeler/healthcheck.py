@@ -144,6 +144,8 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
     errors_check, latest_errors = check_errors(now)
     checks = [check_database(db), check_ollama(cfg, pipelines), *check_cameras(cfg, pipelines, camera_health, now_mono),
               check_disk(cfg), check_backup(db, now), check_retraining(cfg, db), errors_check]
+    if cfg.get("_settings_error"):   # the app started with config.yaml only
+        checks.append(_check("Settings page file", "warning", cfg["_settings_error"]))
     problems = [f"{c['name']}: {c['detail']}" for c in checks if c["level"] == "problem"]
     warnings = [f"{c['name']}: {c['detail']}" for c in checks if c["level"] == "warning"]
     out = {"ok": not problems, "checked_at": datetime.now().isoformat(timespec="seconds"),

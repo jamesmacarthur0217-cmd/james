@@ -7,7 +7,8 @@
     python run.py --list-cameras           # which webcam numbers give a picture
 
 Stop with the Stop button in the web page, stop.bat, or Ctrl+C in this window.
-Exit codes: 0 = stopped normally; 3 = a camera loop crashed (start.bat restarts the app); 1 = error.
+Exit codes: 0 = stopped normally; 3 = a camera loop crashed (start.bat restarts the app); 4 = restart asked for
+(Settings page; restarted at once, not counted as a crash); 1 = error.
 """
 from __future__ import annotations
 
@@ -37,6 +38,7 @@ from labeler.vlm import VLMClient, VLMWorker  # noqa: E402
 
 log = logging.getLogger("run")
 EXIT_CRASHED = 3
+EXIT_RESTART = 4   # "Restart now" on the Settings page: the supervisor starts the app again at once
 
 
 def main() -> int:
@@ -64,8 +66,16 @@ def main() -> int:
     cfg = load_config(args.config)
     from labeler import logs
     log.info("log file: %s", logs.setup(cfg["logs"]))
+    if cfg.get("_settings_error"):
+        log.error("Settings page file: %s", cfg["_settings_error"])
+    elif cfg.get("_settings_loaded"):
+        log.info("using the changes made on the Settings page (%s)", cfg["_settings_path"])
+    if cfg.get("_settings_ignored"):
+        log.warning("ignored in %s (not a Settings page setting): %s", cfg["_settings_path"],
+                    ", ".join(cfg["_settings_ignored"]))
     if args.source is not None:
         cfg["cameras"] = [{**cfg["cameras"][0], "source": args.source}]
+        cfg["_cli_source"] = True   # the Settings page says the cameras running now came from --source
     if args.mode:
         cfg["mode"] = args.mode
         for cam in cfg["cameras"]:
@@ -187,6 +197,13 @@ def main() -> int:
 
     app.state.request_shutdown = request_shutdown
     exit_code = [0]
+
+    def request_restart() -> None:
+        """A clean stop (people saved, labeling finished) that tells the supervisor to start the app again."""
+        exit_code[0] = EXIT_RESTART
+        request_shutdown()
+
+    app.state.request_restart = request_restart
 
     def watchdog() -> None:
         """If a camera loop crashes, stop the app with a code that makes start.bat restart it,
