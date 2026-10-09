@@ -391,7 +391,9 @@ then accept. You can put a certificate of your own in `web.cert_file` / `web.key
 exposed to the internet directly.
 
 **From another site** (another house or office): use a private network app instead of opening a port on the
-router. With [Tailscale](https://tailscale.com) (free for personal use) on this PC and the other PC, signed in
+router. The step-by-step guide is [docs/SECOND-SITE.md](docs/SECOND-SITE.md); the Health page checks each
+step (this PC's Tailscale address and how many other devices are in the network, the firewall rule for the
+HTTPS port, the certificate fingerprint, the last login over Tailscale), only reading, every 5 minutes. With [Tailscale](https://tailscale.com) (free for personal use) on this PC and the other PC, signed in
 to the same account (or the other person invited to your tailnet):
 
 1. Give the other person an account: `tools\users.py add <name> --role viewer`.
@@ -486,9 +488,9 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-329 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+345 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the second-site checks, alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 

@@ -44,6 +44,12 @@
     <ul class="errors" id="errors"></ul>
   </section>
   <section class="panel admin-only">
+    <h2>Watching from another site</h2>
+    <p class="hint">The lines "other devices", "Tailscale (another site)" and "firewall for Tailscale" above follow
+      the steps in <code>docs\SECOND-SITE.md</code> (in the VisionLabeler folder): Tailscale on both PCs, a login
+      account, one firewall rule, then open the address on the other PC. They only read; nothing is changed.</p>
+  </section>
+  <section class="panel admin-only">
     <h2>For a monitoring tool</h2>
     <p class="hint">A monitoring tool (for example Uptime Kuma, or a phone app that checks a web address) can call
       <code>/api/health</code>: the answer is <b>200</b> when everything works and <b>503</b> when something does

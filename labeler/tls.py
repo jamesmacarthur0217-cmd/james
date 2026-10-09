@@ -62,3 +62,13 @@ def ensure_certificate(cert_path: Path, key_path: Path) -> str:
         log.warning("the HTTPS certificate %s expires on %s; delete it and its key to get a new one",
                     cert_path, cert.not_valid_after_utc.date())
     return cert.fingerprint(hashes.SHA256()).hex(":").upper()
+
+
+def fingerprint(cert_path: Path) -> str | None:
+    """The certificate's SHA-256 fingerprint (to compare with the browser's), or None if there is none yet."""
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes
+    try:
+        return x509.load_pem_x509_certificate(cert_path.read_bytes()).fingerprint(hashes.SHA256()).hex(":").upper()
+    except (OSError, ValueError):
+        return None

@@ -165,6 +165,11 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
     errors_check, latest_errors = check_errors(now)
     checks = [check_database(db), check_ollama(cfg, pipelines), *check_cameras(cfg, pipelines, camera_health, now_mono),
               check_disk(cfg), check_backup(db, now, bcfg=cfg["backup"]), check_retraining(cfg, db), errors_check]
+    try:   # access from other devices and Tailscale (labeler/remote.py); never breaks the health check
+        from . import remote
+        checks[-1:-1] = remote.checks(cfg, db)   # before "errors in the log"
+    except Exception as e:
+        checks.insert(-1, _check("other devices", "warning", f"could not be checked ({e.__class__.__name__})"))
     if cfg.get("_settings_error"):   # the app started with config.yaml only
         checks.append(_check("Settings page file", "warning", cfg["_settings_error"]))
     problems = [f"{c['name']}: {c['detail']}" for c in checks if c["level"] == "problem"]

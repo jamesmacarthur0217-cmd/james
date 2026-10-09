@@ -24,6 +24,8 @@ Notepad (newest lines at the bottom). `supervisor.log` in the same folder lists 
 **To change a setting** (add a camera, keep data longer, turn HTTPS on…), open **Settings** in the top
 menu, change it, press **Save**, then **Restart now**. The page comes back by itself in about a minute.
 
+**To watch from another site** (another house or office), follow `docs\SECOND-SITE.md`.
+
 **To check that everything works**, open the **Health** page (top menu, or click "health OK" on the Live
 page). Each line is green when it works; red lines say what is wrong and what to do.
 
