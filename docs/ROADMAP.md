@@ -1,19 +1,22 @@
 # VisionLabeler: next improvements roadmap
 
-## Context
+## Status (2026-10-09)
+
+**Phases 0, 2, 3, 4 and 5 are done** (each item below is marked with what was done, measured or rejected;
+details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
+commercially yet. **Phase 6 is next**; after it, switch to planning mode and propose the next round.
+165 tests pass.
+
+## Context (as planned 2026-10-07)
 
 VisionLabeler (`C:\VisionLabeler`) is a working local system: live cameras → YOLO11-pose + ByteTrack →
 color estimator, fast classifiers, age model, Qwen3-VL 4B (Ollama) → Postgres + pgvector → web UI (Live,
-Review, Reports, Alerts, Answer key, Ask box, delete). 75 pytest tests pass; history is in local git
-(latest commit `43d5238`). Measured: 88% mean accuracy on a 39-person hand-made answer key, age model
-60% exact / 96% ±1 group on FairFace, ~2 s per person labeling on an RTX 4070 SUPER.
+Review, Reports, Alerts, Answer key, Ask box, delete). At planning time: 75 tests, 88% on a 39-person answer
+key, age model 60% exact / 96% ±1 group on FairFace, ~2 s per person on an RTX 4070 SUPER.
 
-The user wants the next round planned in a fresh session (the current context is full). Answers to
-scoping questions: **used for both kiosk and security cameras**, and **commercial** use. That puts two
-things first: removing license blockers, and the privacy/security a business deployment needs. The
-kiosk- and security-specific features come after, then the accuracy loop and operations.
-
-Each phase below is sized for one or two sessions and is independently shippable.
+Answers to scoping questions then: **used for both kiosk and security cameras**, and **commercial** use (since
+changed: personal home use for now). Each phase below is sized for one or two sessions and is independently
+shippable.
 
 ## Working notes for the next session (learned the hard way)
 
@@ -22,11 +25,12 @@ Each phase below is sized for one or two sessions and is independently shippable
   environment collapse `\\` → `\`, which turned `\n` into real newlines and `\b` into backspaces
   (broke a page script and `stop.bat`). `tests/test_pages.py` now catches JS syntax errors.
 - Ollama must be addressed as `http://127.0.0.1:11434` (`localhost` adds ~2 s per request on this PC).
-- Test the app on `--port 8001 --source samples\bus.jpg`; stop it with `POST /api/shutdown`; afterwards
+- Test the app on `--port 8001 --source samples\bus.jpg` with a scratch config from
+  `tools/make_test_config.py` (the real config opens the app to the network); stop it with `POST /api/shutdown`; afterwards
   confirm no leftover `python.exe run.py` processes (`Get-CimInstance Win32_Process`), since leftovers
   load the GPU and skew benchmarks. The app now refuses a second copy on the same port.
 - Database: Docker container `visionlabeler-db` (Postgres 17 + pgvector), URL in `.env`.
-- The DB still holds ~55 test people from development; the user can clear them with Delete all.
+- The user's DB holds 27 people (26 in their answer key); don't delete anything without asking.
 
 ## Phase 0: Carry-over (small, do first)
 
@@ -111,14 +115,24 @@ Security:
 - **Done 2026-10-09** (spot checks). Review queue picks varied people, not just uncertain ones, so corrections cover more situations.
 - **Done 2026-10-09.** Per-camera accuracy history from the answer key, shown on the Answer key page.
 
-## Phase 6: Operations
+## Phase 6: Operations (next)
 
-- Run as a Windows service (e.g. NSSM wrapping `python -m labeler.supervisor`) instead of a console window.
-- Log files with rotation (`data/logs`), plus a `/api/health` endpoint.
-- A settings page for cameras, zones, rules and retention, replacing hand-edited `config.yaml`.
-- An installer script for a new PC: Python venv, Docker, Ollama and model downloads, with offline model
-  packaging for sites without internet.
-- Optional: push to a private GitHub repo with CI running the test suite.
+Suggested order (each step tested and committed on its own):
+
+1. Log files with rotation (`data/logs`, for run.py and the supervisor), plus a `/api/health` endpoint
+   (app, database, Ollama, each camera; also usable from a monitoring tool).
+2. Run as a Windows service (e.g. NSSM wrapping `python -m labeler.supervisor` — a download, ask first — or a
+   Task Scheduler "at startup" task without a window) instead of a console window. It must keep start.bat's
+   waits (Docker, Ollama) and stop.bat's clean stop (shutdown API, final saves, DB backup).
+3. A settings page (admin, audited) for cameras, retention, HTTPS, blurring, retraining (zones and rules
+   already have their own pages), replacing hand-edited `config.yaml`. Keep config.yaml as commented defaults
+   and store changes separately (a file or the database) so comments are never lost; validate every value;
+   say when a restart is needed.
+4. An installer script for a new PC: Python venv, Docker, Ollama and model downloads, first admin account,
+   with offline model packaging for sites without internet.
+5. Optional: push to a private GitHub repo with CI running the test suite (ask first).
+
+Then: switch to planning mode and propose the next round (open items: HANDOFF section 8).
 
 ## Critical files
 
