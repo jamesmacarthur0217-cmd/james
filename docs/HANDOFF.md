@@ -16,16 +16,16 @@ Roadmap Phase 1 (licenses) is deferred until they say otherwise. Under Malaysia'
 household use is generally outside the Act; their filled-in camera sign and data-protection summary are in
 `data/privacy/` (git-ignored, contains their email); the blank templates are in `docs/`.
 
-## 2. Current state (2026-10-09)
+## 2. Current state (2026-10-10)
 
-- Git: local repo, branch `main`, clean after the handoff commit. Roadmap **Phases 0, 2, 3, 4, 5 done**; Phase 1
-  deferred; **Phase 6 is next**. Recent commits, newest first: `958d80c` spot checks · `a18e8a8` weekly
+- Git: local repo (no remote yet), branch `main`. Roadmap **Phases 0, 2-6 done**; Phase 1 deferred. Phase 6
+  commits, newest first: `2b6d3f2` GitHub workflow · `39c7dd0` installer · `a63017b` Settings page · `4fb0c3b`
+  health check · `f32543d` log files · `be09f44` stop.bat fix. Earlier: `958d80c` spot checks · `a18e8a8` weekly
   retraining · `e54c242` capacity · `be9c236` far-away people · `953b756` timeline · `14cc7b3` kiosk prompt ·
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **313 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
-- Phase 6 progress: steps 1 (log files), 2 (health check), 3 (Settings page + restart) and 4 (installer) done.
+- Tests: **314 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
   second site over Tailscale, not set up yet: see README "From another site"); one viewer account `TIXUAN`.
 - The user's database: 27 people, 26 of them in the answer key (their own labels; mean ~75% before the
@@ -148,6 +148,12 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
    (ResizeObserver); screenshots sometimes time out: measure with JavaScript instead.
 13. **Cached pages**: fixed (no-cache), but browsers that cached older pages need Ctrl+F5 once.
 14. **`Remove-Item` with a variable path** may be blocked by the tool's safety check: use plain paths.
+15. **Windows' 260-character path limit**: Hugging Face cache paths are long; copies inside a long folder fail
+   with WinError 3. `tools/models.py` copies with `\\?\` paths and skips `.no_exist`.
+16. **PowerShell functions return all uncaptured output**: pipe native programs to `Out-Host` inside a function
+   that returns a value (`Run` in install.ps1). Scripts must stay ASCII (5.1 reads them as ANSI; a test checks).
+17. **Tests must never write the user's files**: the `supervisor` fixture and `settings_file:` in test configs
+   keep logs and settings in tmp folders; `load_config` uses `data/settings.yaml` only for the real config.yaml.
 
 ## 7. Conventions
 
@@ -159,38 +165,30 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
 - Charts follow the dataviz skill (validated palette, one axis, hover, table view, both color modes).
 - Ask before downloads, installing packages, or anything outward-facing; the user decides.
 
-## 8. Next: Phase 6 (operations), then planning
+## 8. Phase 6 result, and what is next
 
-**The approved, detailed plan is [PHASE6-PLAN.md](PHASE6-PLAN.md)** (2026-10-09). The user chose: keep the
-console window (no Windows service), a Settings page for the common settings (stored in `data/settings.yaml`
-over config.yaml), a health check, an installer for a new PC, and a private GitHub backup with tests. Follow that
-plan; the list below is the earlier outline.
+**Phase 6 (operations) is done** (2026-10-09/10, plan in [PHASE6-PLAN.md](PHASE6-PLAN.md)): log files, health
+check, Settings page with Restart now, installer with offline package, and the GitHub test workflow. Not done,
+by the user's choice: a Windows service (console window kept), and the push to GitHub ("later": the user creates
+an empty private repository and gives its URL; then `git remote add origin <url>`, `git push -u origin main`,
+check the first Actions run). Untested parts (user said skip, 2026-10-10): the offline package's Python wheels
+(about 4 GB download) with a fresh `.venv` from them, `docker save` of the database image, and the installer's
+database/account checks with Docker running.
 
-Do Phase 6 from [ROADMAP.md](ROADMAP.md) step by step, each tested and committed:
+Also found and fixed on the way: `stop.bat` held a bell character instead of `\a` in `data\app.pid` (it never
+found the app's process); `/api/cameras` (open to viewers) returned camera addresses with their passwords.
 
-1. **Log files** with rotation (`data/logs/`, e.g. 10 MB × 5) for run.py and the supervisor, plus
-   **`/api/health`** (app, database, Ollama, each camera) for checks from outside.
-2. **Run as a Windows service** instead of a console window (e.g. NSSM around `python -m labeler.supervisor`;
-   NSSM is a download: ask first; or the Task Scheduler "at startup" with no window). Must still wait for Docker
-   and Ollama like start.bat, and stop cleanly (shutdown API) so final saves and the backup happen.
-3. **Settings page** (admin) for cameras, retention, zones/rules links, HTTPS, blurring, retraining, instead of
-   hand-editing `config.yaml`. Writing YAML would lose its comments: keep config.yaml as defaults and store
-   changes in a separate file or the database, applied at startup (restart needed for camera changes); validate
-   every value; audit every change.
-4. **Installer script** for a new PC (Python venv, Docker, Ollama and model downloads, first admin account),
-   with offline model packaging for sites without internet.
-5. Optional: private GitHub repo with CI running the tests (ask first: it publishes code).
-
-When Phase 6 is finished, **switch to planning mode** (the user asked for this) and propose what comes next:
-candidates are the deferred items below, gathered from the user's needs.
-
-Deferred / open items:
+Next: the round after Phase 6 is being planned with the user (planning mode). Open items known so far:
 - Phase 1 licenses (only when the use becomes commercial; ask the user then).
 - Import recorded videos fast and with real times (proposal card exists).
+- Database backups happen only in `stop.bat`: a PC that is never stopped gets none (the Health page warns
+  after 7 days). A daily backup while running would close that gap.
 - More cameras than ~4: batching or one process per camera (README "How many cameras?").
 - Measure the timeline threshold (0.8) and the facing threshold across real cameras when there are some.
 - The user keeps labeling on the Answer key page (aim 50-100); retraining starts helping after 30 more people.
 - Vocabulary refinements (coat, polo, tank top) need answer-key values to be measurable.
+- One test failed once exactly at midnight and passed in 5 runs after: probably a test that builds "today"
+  twice; find it if it happens again (`pytest -rf`).
 
 ## 9. Message to start the next session
 

@@ -1,11 +1,10 @@
 # VisionLabeler: next improvements roadmap
 
-## Status (2026-10-09)
+## Status (2026-10-10)
 
-**Phases 0, 2, 3, 4 and 5 are done** (each item below is marked with what was done, measured or rejected;
+**Phases 0 and 2-6 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
-commercially yet. **Phase 6 is next**; after it, switch to planning mode and propose the next round.
-165 tests pass.
+commercially yet. The next round is being planned with the user. 314 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -115,7 +114,7 @@ Security:
 - **Done 2026-10-09** (spot checks). Review queue picks varied people, not just uncertain ones, so corrections cover more situations.
 - **Done 2026-10-09.** Per-camera accuracy history from the answer key, shown on the Answer key page.
 
-## Phase 6: Operations (next)
+## Phase 6: Operations (done 2026-10-10)
 
 **Approved plan: [PHASE6-PLAN.md](PHASE6-PLAN.md)** (user's choices: console window kept, no service; Settings
 page for common settings; health check; installer; private GitHub with tests). Earlier outline:
@@ -131,7 +130,8 @@ page for common settings; health check; installer; private GitHub with tests). E
    say when a restart is needed.
 4. **Done 2026-10-09** (`install.bat`, `tools/pack_offline.ps1`). An installer script for a new PC: Python venv, Docker, Ollama and model downloads, first admin account,
    with offline model packaging for sites without internet.
-5. Optional: push to a private GitHub repo with CI running the test suite (ask first).
+5. **Prepared** (`.github/workflows/tests.yml`); the push waits for the user ("later"). Optional: push to a
+   private GitHub repo with CI running the test suite (ask first).
 
 Then: switch to planning mode and propose the next round (open items: HANDOFF section 8).
 

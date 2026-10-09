@@ -478,7 +478,7 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-313 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+314 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
