@@ -2,9 +2,9 @@
 
 ## Status (2026-10-10)
 
-**Phases 0 and 2-7 are done** (each item below is marked with what was done, measured or rejected;
+**Phases 0 and 2-8 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
-commercially yet. **Phase 8 is next** (approved plan: [PHASE8-PLAN.md](PHASE8-PLAN.md)). 418 tests pass.
+commercially yet. Phase 8 is done (2026-10-10); the next round is to be planned with the user. 418 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -146,7 +146,7 @@ Then: switch to planning mode and propose the next round (open items: HANDOFF se
 3. **Done 2026-10-10** (measured on vtest.avi; README). Import recorded videos on a new Import page: fast (no waiting, every k-th frame) and with real recording
    times (file name, MP4 metadata, or typed), kept until deleted by default.
 
-## Phase 8: Counting check, person videos, maintenance, extras (next)
+## Phase 8: Counting check, person videos, maintenance, extras (done 2026-10-10)
 
 **Approved plan: [PHASE8-PLAN.md](PHASE8-PLAN.md)** (user's choices 2026-10-10; not chosen: family vs. strangers).
 

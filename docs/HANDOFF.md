@@ -19,8 +19,10 @@ household use is generally outside the Act; their filled-in camera sign and data
 ## 2. Current state (2026-10-10)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
-  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-7 done**; Phase 1 deferred. Phase 7
-  commits, newest first: `e1c1f24` video import · `2c39ed7` second-site checks · `bf55621`/`0dacfe2` daily
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-8 done**; Phase 1 deferred. Phase 8
+  commits, newest first: `3794de3` today at a glance · `e3a6179` photo search · `ea97937` original excerpts ·
+  `4893b9e` person videos · `bae4034` counting check · `0a44601` maintenance · `f38ea1e` plan. Phase 7
+  commits: `e1c1f24` video import · `2c39ed7` second-site checks · `bf55621`/`0dacfe2` daily
   backup · `fab8340` plan. Phase 6 commits: `2b6d3f2` GitHub workflow · `39c7dd0` installer · `a63017b` Settings page · `4fb0c3b`
   health check · `f32543d` log files · `be09f44` stop.bat fix. Earlier: `958d80c` spot checks · `a18e8a8` weekly
   retraining · `e54c242` capacity · `be9c236` far-away people · `953b756` timeline · `14cc7b3` kiosk prompt ·
@@ -181,7 +183,7 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
 - Charts follow the dataviz skill (validated palette, one axis, hover, table view, both color modes).
 - Ask before downloads, installing packages, or anything outward-facing; the user decides.
 
-## 8. Phase 6 and 7 results, and what is next
+## 8. Phase 6, 7 and 8 results, and what is next
 
 **Phase 6 (operations) is done** (plan: [PHASE6-PLAN.md](PHASE6-PLAN.md)): log files, health check, Settings page
 with Restart now, installer with offline package, GitHub test workflow. Not done, by the user's choice: a Windows
@@ -198,19 +200,29 @@ Untested installer parts (user said skip): the offline package's Python wheels (
   This PC: Tailscale running, no other device yet, no firewall rule yet.
 - Import page for recorded videos (README "Importing recorded videos", measured on OpenCV's vtest.avi).
 
-**Next: Phase 8**, approved 2026-10-10: [PHASE8-PLAN.md](PHASE8-PLAN.md). Open items:
+**Phase 8 is done** (2026-10-10, plan: [PHASE8-PLAN.md](PHASE8-PLAN.md)):
+- Maintenance: the midnight test found and fixed; certificate end date on Health; pip-audit (setuptools 81.0;
+  PyTorch 2.11 kept, its advisory is about torch.jit.script); Dependabot security PRs (the user turns on alerts in
+  the repository settings); the offline installer tested end to end except the database image.
+- Counting check against true identities (`tools/relink_check.py`): security cameras now re-link by appearance
+  only at 0.98 (at 0.90, 20 of 24 joins were wrong); kiosk stays 0.90.
+- A video of each person (480 px, median 1.3 MB) and the storage line on Health; original-video excerpts for
+  imported people; search by photo (a hint on far cameras: 6 of 18 first); today at a glance on the Live page.
+
+Open items for the next round:
+- Second site over Tailscale: waits for the user (docs/SECOND-SITE.md; the Health page checks each step).
+- The database image part of the offline package (`docker save` / `docker load`): test when Docker runs.
+- Appearance on far or overhead cameras is weak (re-linking, look-alikes, timeline, photo search): a person
+  re-identification model would help; check its license first (Phase 1 rules).
+- Measure re-linking and photo search on close-up (kiosk) footage with true identities when there is some.
 - Phase 1 licenses (only when the use becomes commercial; ask the user then).
-- Re-linking measured 2026-10-10 against true identities (README "One person, one record"): security now 0.98
-  (0 wrong joins, more split records), kiosk 0.90. A better re-identification model would help far cameras
-  (license check first, Phase 1); measure kiosk-like footage with true identities when available.
 - More cameras than ~4: batching or one process per camera (README "How many cameras?").
-- Measure the timeline threshold (0.8) and the facing threshold across real cameras when there are some.
 - The user keeps labeling on the Answer key page (aim 50-100); retraining starts helping after 30 more people.
-  Imported videos can now add people quickly (they count as the user's own cameras).
+  Imported videos can add people quickly (they count as the user's own cameras).
 - Vocabulary refinements (coat, polo, tank top) need answer-key values to be measurable.
 
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then do Phase 8 step by step following
-> docs/PHASE8-PLAN.md. When Phase 8 is finished, switch to planning mode and propose the next steps.
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then switch to planning mode and propose
+> the next steps (open items: HANDOFF section 8).
