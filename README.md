@@ -142,6 +142,19 @@ so misunderstandings are visible. A condition is only used if the question menti
 it is named: the model otherwise invents filters. When few people match, the closest look-alikes whose labels
 differ are added and marked, because labels can be wrong. Interpreting a question takes under a second.
 
+### Search by photo
+
+**Search by photo** (next to Ask) takes a JPEG or PNG from this PC or a phone (up to 10 MB) and lists the recorded
+people who look most like the person in it, on all cameras and imported videos, closest first. The detector
+finds the people in the picture; the one in the middle is searched (else the largest; with nobody found, the
+whole picture). The photo is not stored; the search is in the Audit log. Viewers may use it, like text search.
+
+Measured on the overhead test video (people about 90 pixels tall): for 18 people, a picture cut from a frame of
+each found that person first 6 times (8 among the first 3); even a person's own saved picture ranked them 11th
+of 40. On far or overhead cameras this is a hint, as with look-alikes; close-up photos and kiosk cameras should
+do better but were not measured. Preferring the person in the middle changed nothing on this video (chosen
+because people centre what they photograph). The first search loads a detector copy (about 1 s).
+
 ### Deleting
 
 Tick people in **People seen** (or **Select all shown**) and press **Delete selected**, or use
@@ -589,9 +602,9 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-404 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+413 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 

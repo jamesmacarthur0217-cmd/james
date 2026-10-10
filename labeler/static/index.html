@@ -54,6 +54,8 @@
       <input id="q" placeholder="Ask, e.g. who wore a red top after 3pm?  or describe: man in a beige coat"
              style="flex:1; min-width:180px">
       <button class="primary">Ask</button>
+      <button type="button" id="photo-btn" title="Find people who look like the person in a picture (it is not stored)">Search by photo</button>
+      <input type="file" id="photo-file" accept="image/jpeg,image/png" hidden>
     </form>
     <div class="search">
       <select id="f-camera" hidden title="Which camera's people (live cameras and imported videos)"><option value="">All cameras</option></select>
@@ -133,6 +135,24 @@ $("player-close").addEventListener("click", closeVideo);
 $("player").addEventListener("click", (e) => { if (e.target.id === "player") closeVideo(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("player").hidden) closeVideo(); });
 
+// Search by photo: the picture is sent as it is and not stored; the server finds the person in it.
+$("photo-btn").addEventListener("click", () => $("photo-file").click());
+$("photo-file").addEventListener("change", async () => {
+  const file = $("photo-file").files[0];
+  $("photo-file").value = "";
+  if (!file) return;
+  $("banner").hidden = false;
+  $("banner").textContent = "Looking at the photo…";
+  try {
+    const r = await fetch("/api/search/photo?limit=20", { method: "POST", body: file,
+                                                         headers: { "Content-Type": file.type || "image/jpeg" } });
+    const out = await r.json();
+    if (!r.ok) { $("banner").textContent = out.detail || "The photo could not be searched."; return; }
+    view = { kind: "photo", people: out.people, found: out.found };
+    refresh();
+  } catch { $("banner").textContent = "The photo could not be sent."; }
+});
+
 $("banner").addEventListener("click", (e) => {
   if (e.target.dataset.back !== undefined) { view = { kind: "recent" }; $("q").value = ""; refresh(); }
 });
@@ -183,6 +203,7 @@ async function fetchTracks() {
     const r = await fetch("/api/search?" + new URLSearchParams({ q: view.q, limit: 20 }));
     return r.ok ? r.json() : [];
   }
+  if (view.kind === "photo") return view.people;
   if (view.kind === "similar") {
     const r = await fetch(`/api/tracks/${view.id}/similar?limit=10`);
     return r.ok ? r.json() : [];
@@ -261,6 +282,8 @@ async function refresh() {
   if (view.kind === "search") $("banner").innerHTML = `Best matches for “${esc(view.q)}”, closest first.` + back;
   if (view.kind === "ask") $("banner").innerHTML = esc(view.explanation) + back;
   if (view.kind === "similar") $("banner").innerHTML = `People who look most like #${view.id}.` + back;
+  if (view.kind === "photo") $("banner").innerHTML = `People who look like the person in your photo (${esc(view.found)}), `
+    + "closest first. Same clothes can be a different person." + back;
   if (view.kind === "timeline") $("banner").innerHTML = `Where #${view.id} may have been seen, in time order: `
     + "look-alikes from all cameras, without ones seen elsewhere at the same time. Same clothes can be a "
     + "different person." + back;

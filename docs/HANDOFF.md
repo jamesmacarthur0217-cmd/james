@@ -27,7 +27,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **404 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
+- Tests: **413 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
   second site over Tailscale, not set up yet: see README "From another site"); one viewer account `TIXUAN`.
 - The user's database: 27 people, 26 of them in the answer key (their own labels; mean ~75% before the
@@ -85,6 +85,8 @@ labeler/importer.py  (+ tracks.source_file/source_offset_s, make_excerpt -> clip
 labeler/importer.py  Import page: start times (typed/name/mvhd/mtime), RecordedVideo (sources.py),
                      VideoClock (pipeline.clock), one job at a time, VLM throttle, no alerts/clips;
                      cameras.retention_days (0 = keep) used by _apply_retention; run.py routes VLM answers
+labeler/photo.py     search by photo: own YOLO copy (lazy), person in the middle else largest, Embedder,
+                     db.nearest; raw request body (no python-multipart); POST /api/search/photo (viewers too)
 labeler/remote.py    Health checks for other devices / Tailscale / firewall (netsh, read-only, cached 5 min)
 labeler/settings.py  Settings page: data/settings.yaml merged over config.yaml in load_config (only the
                      project's config.yaml, or a config naming settings_file:); validated; masked passwords;

@@ -56,7 +56,7 @@ VIEWER = {
     "GET": ["/", "/stream", "/api/live", "/api/live/thumb/", "/api/status", "/api/schema", "/api/cameras",
             "/api/tracks", "/api/tracks/", "/api/search", "/api/alerts/events", "/api/me", "/crops/", "/static/",
             "/health", "/api/health"],
-    "POST": ["/api/ask", "/api/logout"],
+    "POST": ["/api/ask", "/api/logout", "/api/search/photo"],
 }
 
 

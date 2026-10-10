@@ -139,7 +139,7 @@ def ensure_first_admin(db: Database, web: dict) -> None:
 
 
 def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | None, embedder=None,
-               alerts=None, agent=None, health=None, retrainer=None, importer=None) -> FastAPI:
+               alerts=None, agent=None, health=None, retrainer=None, importer=None, photo=None) -> FastAPI:
     app = FastAPI(title="VisionLabeler")
     app.state.stopping = threading.Event()
     app.state.started_at = time.time()
@@ -692,6 +692,35 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             t["similarity"] = round(sims[t["id"]], 4)
             t["match"] = round(embedder.match_probability(sims[t["id"]]), 4)
         return videos(request, tracks)
+
+    @app.post("/api/search/photo")
+    async def search_photo(request: Request, limit: int = 20):
+        """People who look like the person in a picture. The picture is the request body (JPEG or PNG, up to
+        10 MB), sent by the page as is; it is not stored."""
+        if embedder is None:
+            raise HTTPException(503, "embeddings are disabled in config.yaml")
+        from .photo import PhotoSearch
+        searcher = photo or getattr(app.state, "photo", None)
+        if searcher is None:
+            searcher = app.state.photo = PhotoSearch(cfg, embedder)
+        data = await request.body()
+        try:
+            vector, info = await run_in_threadpool(searcher.vector, data)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        n = info["people"]
+        found = ("1 person found" if n == 1 else f"{n} people found, the one in the middle (or the largest) searched"
+                 if n else "nobody found, the whole picture searched")
+        await run_in_threadpool(audit, request, "photo search", f"picture {info['width']}x{info['height']}, {found}")
+
+        def rank():
+            hits = db.nearest(vector, embedder.model_name, limit=min(limit, 100))
+            people = db.get_tracks([tid for tid, _ in hits])
+            sims = dict(hits)
+            for t in people:
+                t["similarity"] = round(sims[t["id"]], 4)
+            return videos(request, people)
+        return {"people": await run_in_threadpool(rank), "info": info, "found": found}
 
     @app.post("/api/ask")
     def ask(body: AskIn, request: Request):
