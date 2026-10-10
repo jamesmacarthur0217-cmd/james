@@ -48,7 +48,7 @@ class FakeSystem:
     def __call__(self, cmd, **kw):
         if cmd[0] == "netsh":
             return subprocess.CompletedProcess(cmd, 0, self.netsh, "")
-        status = {"BackendState": self.state, "Self": {"TailscaleIPs": ["100.116.21.17", "fd7a::1"]},
+        status = {"BackendState": self.state, "Self": {"TailscaleIPs": ["100.101.102.103", "fd7a::1"]},
                   "Peer": {f"k{i}": {"Online": i == 0} for i in range(self.peers)}}
         return subprocess.CompletedProcess(cmd, 0, json.dumps(status), "")
 
@@ -100,7 +100,7 @@ def test_all_set_up(cfg, db, installed):
     c = _by_name(remote.checks(cfg, db, FakeSystem(peers=2)))
     assert c["other devices"]["level"] == "ok" and "made at the next start" in c["other devices"]["detail"]
     ts = c["Tailscale (another site)"]
-    assert ts["level"] == "ok" and "100.116.21.17" in ts["detail"] and "2 other device(s)" in ts["detail"]
+    assert ts["level"] == "ok" and "100.101.102.103" in ts["detail"] and "2 other device(s)" in ts["detail"]
     assert "1 online" in ts["detail"] and "last login over Tailscale" in ts["detail"] and "tixuan" in ts["detail"]
     assert c["firewall for Tailscale"]["level"] == "ok"
 
