@@ -4,7 +4,7 @@
 
 **Phases 0 and 2-7 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
-commercially yet. Phase 7 is done (2026-10-10); the next round is to be planned with the user. 381 tests pass.
+commercially yet. **Phase 8 is next** (approved plan: [PHASE8-PLAN.md](PHASE8-PLAN.md)). 381 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -145,6 +145,15 @@ Then: switch to planning mode and propose the next round (open items: HANDOFF se
    Tailscale: self-checks on the Health page and a plain guide; the user connects the other PC.
 3. **Done 2026-10-10** (measured on vtest.avi; README). Import recorded videos on a new Import page: fast (no waiting, every k-th frame) and with real recording
    times (file name, MP4 metadata, or typed), kept until deleted by default.
+
+## Phase 8: Counting check, person videos, maintenance, extras (next)
+
+**Approved plan: [PHASE8-PLAN.md](PHASE8-PLAN.md)** (user's choices 2026-10-10; not chosen: family vs. strangers).
+
+1. Maintenance: the midnight test, security updates, certificate expiry on the Health page, skipped installer tests.
+2. Check people counting (re-linking) against the published ground truth of the test video; change only if measured.
+3. A short video of each person (admin-only), and storage use on the Health page.
+4. Original video link for imported people. 5. Search by photo. 6. Today at a glance on the Live page.
 
 ## Critical files
 

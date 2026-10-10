@@ -189,7 +189,7 @@ Untested installer parts (user said skip): the offline package's Python wheels (
   This PC: Tailscale running, no other device yet, no firewall rule yet.
 - Import page for recorded videos (README "Importing recorded videos", measured on OpenCV's vtest.avi).
 
-Open items for the next round:
+**Next: Phase 8**, approved 2026-10-10: [PHASE8-PLAN.md](PHASE8-PLAN.md). Open items:
 - Phase 1 licenses (only when the use becomes commercial; ask the user then).
 - Re-linking by appearance alone (`long_gap_min_similarity` 0.90) joined 24 of 34 tracks on a crowded
   overhead video; plausible by eye (people walking back and forth), but not checked pair by pair. Small people
@@ -206,5 +206,5 @@ Open items for the next round:
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then switch to planning mode and propose
-> the next steps (open items: HANDOFF section 8).
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then do Phase 8 step by step following
+> docs/PHASE8-PLAN.md. When Phase 8 is finished, switch to planning mode and propose the next steps.
