@@ -65,7 +65,9 @@ from their setup files (not in the package), then run `install.bat -Offline D:\v
 the models part was packed (5.2 GB in 5 s) and unpacked into empty model folders, the vision model's file
 matched its checksum, and both Hugging Face models loaded with networking turned off; the whole package (8.2 GB)
 was built, a new `.venv` installed from it with pip offline (`--no-index`, 5 minutes), CUDA worked in it, and all
-tests passed there (2026-10-10). Not yet tried: the database image (`docker save`/`docker load`).
+tests passed there (2026-10-10); the database image part was saved (0.2 GB) and the tarball holds
+`pgvector/pgvector:pg17`, and `install.bat -CheckOnly` with Docker running found the image, the running
+database and the login account. Not tried: `docker load` on a PC that has no image yet.
 
 ## Running it
 
@@ -609,7 +611,7 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-418 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+420 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, today at a glance, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).

@@ -2,9 +2,10 @@
 
 ## Status (2026-10-10)
 
-**Phases 0 and 2-8 are done** (each item below is marked with what was done, measured or rejected;
+**Phases 0 and 2-9 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
-commercially yet. **Phase 9 (small fixes) is next**: [PHASE9-PLAN.md](PHASE9-PLAN.md). 418 tests pass.
+commercially yet. Phase 9 (small fixes, [PHASE9-PLAN.md](PHASE9-PLAN.md)) is done (2026-10-10); the next round is
+to be planned with the user. 420 tests pass.
 
 ## Context (as planned 2026-10-07)
 

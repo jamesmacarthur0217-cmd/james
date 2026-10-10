@@ -19,7 +19,8 @@ household use is generally outside the Act; their filled-in camera sign and data
 ## 2. Current state (2026-10-10)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
-  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-8 done**; Phase 1 deferred. Phase 8
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-9 done**; Phase 1 deferred. Phase 9 (small
+  fixes): `8675c46` list redraw · `81dbcb2` backup.dir · `482bdd4` CI v7 · `0296435` relink_check help. Phase 8
   commits, newest first: `3794de3` today at a glance · `e3a6179` photo search · `ea97937` original excerpts ·
   `4893b9e` person videos · `bae4034` counting check · `0a44601` maintenance · `f38ea1e` plan. Phase 7
   commits: `e1c1f24` video import · `2c39ed7` second-site checks · `bf55621`/`0dacfe2` daily
@@ -29,7 +30,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **418 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
+- Tests: **420 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
   second site over Tailscale, not set up yet: see README "From another site"); one viewer account `TIXUAN`.
 - The user's database: 27 people, 26 of them in the answer key (their own labels; mean ~75% before the
@@ -209,11 +210,12 @@ Untested installer parts (user said skip): the offline package's Python wheels (
 - A video of each person (480 px, median 1.3 MB) and the storage line on Health; original-video excerpts for
   imported people; search by photo (a hint on far cameras: 6 of 18 first); today at a glance on the Live page.
 
-**Next: Phase 9, small fixes** (the user's choice 2026-10-10): [PHASE9-PLAN.md](PHASE9-PLAN.md).
+**Phase 9 (small fixes) is done** (2026-10-10, [PHASE9-PLAN.md](PHASE9-PLAN.md)): the people list redraws only
+when it changed; `backup.dir` (test copies keep their own backups); CI actions v7; relink_check help;
+the offline package's database image and the installer's database checks tested.
 
 Open items for later rounds:
 - Second site over Tailscale: waits for the user (docs/SECOND-SITE.md; the Health page checks each step).
-- The database image part of the offline package (`docker save` / `docker load`): test when Docker runs.
 - Appearance on far or overhead cameras is weak (re-linking, look-alikes, timeline, photo search): a person
   re-identification model would help; check its license first (Phase 1 rules).
 - Measure re-linking and photo search on close-up (kiosk) footage with true identities when there is some.
