@@ -39,7 +39,8 @@ DEFAULTS: dict = {
             "short_gap_s": 5,
             "short_gap_min_similarity": 0.75,
             "short_gap_min_overlap": 0.2,
-            "long_gap_min_similarity": 0.90,
+            # Appearance alone (no position check): far or overhead views need a much higher bar (README).
+            "long_gap_min_similarity": {"kiosk": 0.90, "security": 0.98},
         },
     },
     "vlm": {

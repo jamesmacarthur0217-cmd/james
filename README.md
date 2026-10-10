@@ -215,8 +215,34 @@ detection and colors run every frame for everyone. Things that turned out to mat
 - **Tracker** (`labeler/trackers/people.yaml`): weak detections only keep a known person tracked; a lost
   person is remembered ~3 s.
 - **Re-linking** (`tracking.relink`): someone who reappears within 5 s near the same spot (similarity
-  ≥ 0.75), or within 30 s looking very similar (≥ 0.90), continues the same record. Tested: 2 s and 10 s gaps
-  → 1 record (before: 2); 40 s → 2 records, as intended.
+  ≥ 0.75), or within 30 s looking very similar, continues the same record. "Very similar" (appearance alone)
+  is ≥ 0.90 for kiosk cameras and ≥ 0.98 for security cameras (`long_gap_min_similarity`, per mode). Tested on
+  webcam footage: 2 s and 10 s gaps → 1 record (before: 2); 40 s → 2 records, as intended.
+
+**Measured against true identities** (2026-10-10, `tools/relink_check.py`): the test video (OpenCV's vtest.avi
+is the PETS 2009 S2L1 recording: people walking, seen from above, 768×576) with MOTChallenge's per-frame markings
+of its 19 people; detector size 1280, 10 frames per second. A join is wrong when the returning piece is a
+different true person.
+
+| Appearance-only bar | Records (19 people) | Records mixing 2+ people | Joins | Right | Wrong |
+|---|---|---|---|---|---|
+| 0.90 (the old value for all cameras) | 10 | 7 | 24 | 4 | 20 |
+| 0.93 | 15 | 7 | 19 | 7 | 12 |
+| 0.95 | 20 | 5 | 14 | 8 | 6 |
+| **0.98 (now for security)** | 33 | 2 | 1 | 1 | 0 |
+| off | 34 | 2 | 0 | – | – |
+
+Small people seen from above look alike: right joins scored 0.92-0.97, wrong ones 0.90-0.97, so no bar below
+0.98 separates them, and a movement check does not help either (the wrong joins imply normal walking speeds).
+The code's rule is that a duplicate record is better than two people merged into one, so security cameras now use
+0.98: people are split into more records (33 for 19) but not mixed. The 2 remaining mixed records are the tracker
+swapping two people who cross, not re-linking. Kiosk cameras (people close, faces visible) keep 0.90, measured
+on webcam footage. Check another view with: `tools/relink_check.py <video> <gt.txt> --config <test config>`.
+
+**Look-alikes and the timeline** use the same similarity. On this video every pair of records scored ≥ 0.80 (the
+timeline's bar), but only 24 of the 561 pairs are the same person; the closest look-alike was the same person
+10 times of 26 (14 of 26 among the closest 3). On far or overhead cameras treat them as hints; the timeline
+already says "Same clothes can be a different person".
 
 ## Importing recorded videos
 
@@ -255,10 +281,9 @@ at 1280), so the page defaults to 1280; use 640 for close-up phone videos (faste
 tracks into more pieces (38 at 5 fps against 34 at 10, with re-linking off) and miss people, so 10 stays the
 default; this video has only 10 fps, so more was not tested.
 
-Re-linking on this video: the tracker's 34 pieces became 10 people, 24 joined by appearance alone (similarity
-0.90-0.96, no box overlap). By eye there are about 10-12 different people walking back and forth in similar dark
-clothes, so this looks plausible, but each join was not checked; small people seen from above look alike, so on
-such views re-linking may also join different people.
+Correction (measured later against the true identities, see "One person, one record"): this video has 19
+people, and 20 of the 24 joins above were wrong. Security cameras (and imports in security mode) now need
+similarity 0.98 for such joins; the table above was measured with the old 0.90.
 
 ## Zones and counting lines
 
@@ -540,9 +565,9 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-381 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+390 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 

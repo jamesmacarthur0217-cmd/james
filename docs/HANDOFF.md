@@ -27,7 +27,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **381 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
+- Tests: **390 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
   second site over Tailscale, not set up yet: see README "From another site"); one viewer account `TIXUAN`.
 - The user's database: 27 people, 26 of them in the answer key (their own labels; mean ~75% before the
@@ -88,6 +88,7 @@ labeler/settings.py  Settings page: data/settings.yaml merged over config.yaml i
 start.bat / stop.bat daily start/stop (wait for Docker + Ollama; stop waits for app exit, backs up DB)
 install.bat/.ps1     new PC: winget Python/Docker/Ollama, .venv, .env, DB, models, admin, autostart,
                      health; -CheckOnly, -Offline <pkg>; PowerShell 5.1 + ASCII only (tests check)
+tools/relink_check.py counting check against MOTChallenge gt.txt (true identities); per-join right/wrong
 tools/models.py      check / download / pack / unpack models (HF cache, Ollama manifest+blobs, YOLO)
 tools/pack_offline.ps1 offline package: pip freeze wheels (cu128 index), models, docker save
 tools/               evaluate.py (COCO answer key), bench_vlm.py, bench_age.py, teacher_label.py,
@@ -193,10 +194,9 @@ Untested installer parts (user said skip): the offline package's Python wheels (
 
 **Next: Phase 8**, approved 2026-10-10: [PHASE8-PLAN.md](PHASE8-PLAN.md). Open items:
 - Phase 1 licenses (only when the use becomes commercial; ask the user then).
-- Re-linking by appearance alone (`long_gap_min_similarity` 0.90) joined 24 of 34 tracks on a crowded
-  overhead video; plausible by eye (people walking back and forth), but not checked pair by pair. Small people
-  from above look alike, so security views may need a higher bar or a position check: measure with labeled
-  footage before changing.
+- Re-linking measured 2026-10-10 against true identities (README "One person, one record"): security now 0.98
+  (0 wrong joins, more split records), kiosk 0.90. A better re-identification model would help far cameras
+  (license check first, Phase 1); measure kiosk-like footage with true identities when available.
 - More cameras than ~4: batching or one process per camera (README "How many cameras?").
 - Measure the timeline threshold (0.8) and the facing threshold across real cameras when there are some.
 - The user keeps labeling on the Answer key page (aim 50-100); retraining starts helping after 30 more people.

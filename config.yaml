@@ -49,7 +49,9 @@ tracking:
     short_gap_s: 5            # gaps up to this long: moderate similarity + similar position
     short_gap_min_similarity: 0.75
     short_gap_min_overlap: 0.2
-    long_gap_min_similarity: 0.90   # longer gaps: appearance alone, so the bar is high
+    long_gap_min_similarity:  # longer gaps: appearance alone, so the bar is high
+      kiosk: 0.90             # people close to the camera (measured on webcam footage)
+      security: 0.98          # far or from above, people look alike: at 0.90, 20 of 24 joins were wrong (README)
 
 # Areas and counting lines are drawn on the Live page (admin) and stored in the database.
 zones:

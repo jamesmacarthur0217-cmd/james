@@ -4,7 +4,7 @@
 
 **Phases 0 and 2-7 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
-commercially yet. **Phase 8 is next** (approved plan: [PHASE8-PLAN.md](PHASE8-PLAN.md)). 381 tests pass.
+commercially yet. **Phase 8 is next** (approved plan: [PHASE8-PLAN.md](PHASE8-PLAN.md)). 390 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -152,7 +152,8 @@ Then: switch to planning mode and propose the next round (open items: HANDOFF se
 
 1. **Done 2026-10-10** (database image test waits for Docker). Maintenance: the midnight test, security updates,
    certificate expiry on the Health page, skipped installer tests.
-2. Check people counting (re-linking) against the published ground truth of the test video; change only if measured.
+2. **Done 2026-10-10** (security 0.98: 20 of 24 joins were wrong at 0.90). Check people counting (re-linking)
+   against the published ground truth of the test video; change only if measured.
 3. A short video of each person (admin-only), and storage use on the Health page.
 4. Original video link for imported people. 5. Search by photo. 6. Today at a glance on the Live page.
 

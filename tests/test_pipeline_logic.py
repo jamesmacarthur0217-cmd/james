@@ -8,7 +8,7 @@ import numpy as np
 
 from labeler import schema
 from labeler.config import DEFAULTS
-from labeler.pipeline import Candidate, Pipeline, TrackState
+from labeler.pipeline import Candidate, Pipeline, TrackState, relink_settings
 from labeler.vlm import VLMWorker
 
 
@@ -34,7 +34,7 @@ def make_pipeline(db, embedder=None):
     p.vlm_model_name = "fake-vlm"
     p.threshold = 0.6
     p.tracks, p.by_db_id, p.recently_lost = {}, {}, {}
-    p.relink_cfg = p.cfg["tracking"]["relink"]
+    p.relink_cfg = relink_settings(p.cfg, p.mode)
     p.deleted_ids = set()
     p.alerts = None
     p.name = "test-cam"

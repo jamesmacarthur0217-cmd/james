@@ -31,6 +31,16 @@ HIDDEN_VALUES = ("unknown", "none", "no")
 COLOR_FIELDS = ("upper_color", "lower_color")   # not stored from black-and-white (night) frames
 
 
+def relink_settings(cfg: dict, mode: str) -> dict:
+    """tracking.relink with long_gap_min_similarity for this camera's mode (a number, or per mode like
+    detector.min_box_area)."""
+    rc = dict(cfg["tracking"]["relink"])
+    bar = rc["long_gap_min_similarity"]
+    if isinstance(bar, dict):
+        rc["long_gap_min_similarity"] = float(bar.get(mode, 0.98))   # unknown mode: the cautious value
+    return rc
+
+
 class LiveClock:
     """Time for a live camera: now."""
 
@@ -147,7 +157,7 @@ class Pipeline:
         # People who recently left the view, kept briefly so a returning person continues
         # the same record instead of becoming a new one: db_id -> (state, time lost).
         self.recently_lost: dict[int, tuple[TrackState, float]] = {}
-        self.relink_cfg = cfg["tracking"]["relink"]
+        self.relink_cfg = relink_settings(cfg, self.mode)
         min_area = det.get("min_box_area", 0.0)
         self.min_box_area = min_area.get(self.mode, 0.0) if isinstance(min_area, dict) else float(min_area)
         self.ignore_zones = [tuple(z) for z in cam.get("ignore_zones") or []]
