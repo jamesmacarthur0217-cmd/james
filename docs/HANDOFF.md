@@ -214,7 +214,11 @@ Untested installer parts (user said skip): the offline package's Python wheels (
 when it changed; `backup.dir` (test copies keep their own backups); CI actions v7; relink_check help;
 the offline package's database image and the installer's database checks tested.
 
-Open items for later rounds:
+**Next: [PHASE10-PLAN.md](PHASE10-PLAN.md)** (approved 2026-10-10): Phase 10 (24-hour soak test, idle mode,
+restore drill), then Phase 11 (faster answer key, retraining past its gate), Phase 12 when IP cameras are added.
+Ask the user before each phase starts.
+
+Open items (also in that plan):
 - Second site over Tailscale: waits for the user (docs/SECOND-SITE.md; the Health page checks each step).
 - Appearance on far or overhead cameras is weak (re-linking, look-alikes, timeline, photo search): a person
   re-identification model would help; check its license first (Phase 1 rules).
@@ -228,5 +232,5 @@ Open items for later rounds:
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then switch to planning mode and propose
-> the next steps (open items: HANDOFF section 8).
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE10-PLAN.md:
+> ask me before each phase starts, and do it step by step.

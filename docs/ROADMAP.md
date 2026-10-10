@@ -4,8 +4,10 @@
 
 **Phases 0 and 2-9 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
-commercially yet. Phase 9 (small fixes, [PHASE9-PLAN.md](PHASE9-PLAN.md)) is done (2026-10-10); the next round is
-to be planned with the user. 420 tests pass.
+commercially yet. Phase 9 (small fixes, [PHASE9-PLAN.md](PHASE9-PLAN.md)) is done (2026-10-10). **Next: the
+approved plan [PHASE10-PLAN.md](PHASE10-PLAN.md)**: Phase 10 long-run check + idle mode + restore drill, Phase 11
+better labels on the user's webcam, Phase 12 (when IP cameras come) a re-identification model and more cameras.
+420 tests pass.
 
 ## Context (as planned 2026-10-07)
 
