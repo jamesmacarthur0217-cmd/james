@@ -31,6 +31,32 @@ HIDDEN_VALUES = ("unknown", "none", "no")
 COLOR_FIELDS = ("upper_color", "lower_color")   # not stored from black-and-white (night) frames
 
 
+class LiveClock:
+    """Time for a live camera: now."""
+
+    def mono(self) -> float:
+        return time.monotonic()
+
+    def wall(self) -> datetime:
+        return datetime.now()
+
+
+class VideoClock:
+    """Time inside a recorded video (Import page): `t` is the position in the file in seconds, set for each
+    frame, so tracking, re-linking, time in view and zone dwell follow the video, however fast it is processed,
+    and people get the real time they were filmed (`start` + position). `base` keeps it increasing across
+    several files of one import, with a large gap so nobody is re-linked from one file to the next."""
+
+    def __init__(self, start: datetime, base: float = 0.0):
+        self.start, self.base, self.t = start, base, 0.0
+
+    def mono(self) -> float:
+        return self.base + self.t
+
+    def wall(self) -> datetime:
+        return self.start + timedelta(seconds=self.t)
+
+
 @dataclass
 class Candidate:
     score: float
@@ -82,6 +108,8 @@ class TrackState:
 
 
 class Pipeline:
+    clock: LiveClock | VideoClock = LiveClock()   # live: now (shared: it has no state); imports set a VideoClock
+
     def __init__(self, cfg: dict, db: Database, vlm: VLMWorker | None, embedder: Embedder | None = None,
                  student: Student | None = None, camera: dict | None = None):
         self.cfg = cfg
@@ -233,7 +261,7 @@ class Pipeline:
     # --- per frame ----------------------------------------------------------------
 
     def process(self, frame: np.ndarray) -> None:
-        now = time.monotonic()
+        now = self.clock.mono()
         tcfg = self.cfg["tracking"]
         result = self.model.track(
             frame, persist=True, tracker=self.det_cfg["tracker"], classes=[0],
@@ -269,7 +297,7 @@ class Pipeline:
                 kpts = kpts_all[i] if kpts_all is not None else None
                 st = self.tracks.get(tid)
                 if st is None:
-                    st = self.tracks[tid] = TrackState(tid, datetime.now(), now, seen_since=now)
+                    st = self.tracks[tid] = TrackState(tid, self.clock.wall(), now, seen_since=now)
                 self._update(st, frame, tuple(xyxy[i]), kpts, now, low_color, tcfg)
                 if st.db_id is None and st.n_frames in self.relink_cfg["check_at_frames"]:
                     st = self._try_relink(tid, st, now)
@@ -281,7 +309,7 @@ class Pipeline:
                     self._relabel(st)
                 if self.zone_counter.zones:
                     st.zone_log += self.zone_counter.update(
-                        st.zones, zones_mod.anchor(st.box, frame.shape, self.mode), datetime.now())
+                        st.zones, zones_mod.anchor(st.box, frame.shape, self.mode), self.clock.wall())
                     self._flush_zone_events(st)
 
         for tid, st in list(self.tracks.items()):
@@ -292,7 +320,8 @@ class Pipeline:
             self.recently_lost = {k: v for k, v in self.recently_lost.items() if now - v[1] <= window}
 
         blurred = None
-        viewer_needs = self.cfg["web"].get("blur_faces_for_viewers", True) and now - self.viewer_watching_at < 5
+        viewer_needs = (self.cfg["web"].get("blur_faces_for_viewers", True)
+                        and time.monotonic() - self.viewer_watching_at < 5)   # real time, not video time
         clips_need = self.clips is not None and self.cfg["storage"].get("blur_faces", False)
         if viewer_needs or clips_need:
             # Faces are blurred before the labels are drawn, so the labels stay readable.
@@ -593,7 +622,7 @@ class Pipeline:
             return
         self._ensure_db(st)
         # Leaving the view ends their stay in every area, at the moment they were last seen.
-        left_at = datetime.now() - timedelta(seconds=max(0.0, time.monotonic() - st.last_seen))
+        left_at = self.clock.wall() - timedelta(seconds=max(0.0, self.clock.mono() - st.last_seen))
         st.zone_log += self.zone_counter.leave(st.zones, left_at)
         self._flush_zone_events(st)
         if not st.vlm_requested:
@@ -605,7 +634,7 @@ class Pipeline:
             self._store_embedding(st)
             self._store_age(st)
         self.db.update_track(
-            st.db_id, status="finished", ended_at=datetime.now(), n_frames=st.n_frames,
+            st.db_id, status="finished", ended_at=self.clock.wall(), n_frames=st.n_frames,
             low_light=st.low_light_frames > st.n_frames / 2,
             in_view_s=round(st.in_view_s, 1), facing_s=round(st.facing_s, 1),
         )
@@ -622,7 +651,7 @@ class Pipeline:
         st = self.by_db_id.get(db_id)
         if st is not None:
             st.vlm_pending = False
-            st.last_labeled = time.monotonic()
+            st.last_labeled = self.clock.mono()
         if not results:
             return
         if db_id in self.night_ids:

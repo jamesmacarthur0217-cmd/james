@@ -10,7 +10,7 @@
 <body>
 <header>
   <h1>VisionLabeler</h1>
-  <nav><a href="/" class="active">Live</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/audit" class="admin-only">Audit log</a><a href="/settings" class="admin-only">Settings</a><a href="/health">Health</a></nav>
+  <nav><a href="/" class="active">Live</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/audit" class="admin-only">Audit log</a><a href="/import" class="admin-only">Import</a><a href="/settings" class="admin-only">Settings</a><a href="/health">Health</a></nav>
   <div class="status" id="status">connecting…</div>
   <button id="stop" class="admin-only" title="Finish labeling the people in view, save, and close the app">Stop</button>
 </header>
@@ -56,6 +56,7 @@
       <button class="primary">Ask</button>
     </form>
     <div class="search">
+      <select id="f-camera" hidden title="Which camera's people (live cameras and imported videos)"><option value="">All cameras</option></select>
       <select id="f-name"><option value="">Filter by attribute…</option></select>
       <select id="f-value" disabled><option value="">value</option></select>
       <button id="f-clear">Clear</button>
@@ -93,7 +94,8 @@ $("f-name").onchange = () => {
   refresh();
 };
 $("f-value").onchange = () => { view = { kind: "recent" }; refresh(); };
-$("f-clear").onclick = () => { $("f-name").value = ""; $("q").value = ""; view = { kind: "recent" }; $("f-name").onchange(); };
+$("f-camera").onchange = () => { view = { kind: "recent" }; refresh(); };
+$("f-clear").onclick = () => { $("f-name").value = ""; $("f-camera").value = ""; $("q").value = ""; view = { kind: "recent" }; $("f-name").onchange(); };
 
 // What the list shows: recent people (auto-refreshing), a text search, or look-alikes of one person.
 let view = { kind: "recent" };
@@ -168,6 +170,7 @@ async function fetchTracks() {
   }
   const p = new URLSearchParams({ limit: 30 });
   if ($("f-name").value && $("f-value").value) { p.set("name", $("f-name").value); p.set("value", $("f-value").value); }
+  if ($("f-camera").value) p.set("camera", $("f-camera").value);
   return (await fetch("/api/tracks?" + p)).json();
 }
 
@@ -338,7 +341,7 @@ const ZONE_HINT = {
   area: "Click the corners of the area on the picture, then name it and Save. People in it are counted, with how long they stay.",
   line: "Click 2 points across the way people walk. The arrow shows the \"in\" direction; click the points the other way round to flip it.",
 };
-function zoneCamera() { return camera || cameraNames[0] || "cam1"; }
+function zoneCamera() { return camera || liveNames[0] || "cam1"; }
 
 function pictureBox() {
   const img = $("live"), r = img.getBoundingClientRect(), v = $("video").getBoundingClientRect();
@@ -485,7 +488,8 @@ async function pollLive() {
 
 // Cameras: tabs appear when there is more than one; the video and "In view now" follow the selected one.
 let camera = null;
-let cameraNames = [];
+let cameraNames = [];   // every camera with people (live ones and imported videos)
+let liveNames = [];     // cameras with a live video
 function camParam() { return camera ? `camera=${encodeURIComponent(camera)}&` : ""; }
 
 function selectCamera(name) {
@@ -499,13 +503,20 @@ function selectCamera(name) {
 }
 
 async function loadCameras() {
-  cameraNames = (await (await fetch("/api/cameras")).json()).map(c => c.name);
-  if (cameraNames.length > 1) {
+  const cams = await (await fetch("/api/cameras")).json();
+  cameraNames = cams.map(c => c.name);
+  liveNames = cams.filter(c => c.live !== false).map(c => c.name);
+  if (liveNames.length > 1) {
     $("cam-tabs").hidden = false;
-    $("cam-tabs").innerHTML = cameraNames.map(n => `<button data-cam="${esc(n)}">${esc(n)}</button>`).join("");
+    $("cam-tabs").innerHTML = liveNames.map(n => `<button data-cam="${esc(n)}">${esc(n)}</button>`).join("");
     $("cam-tabs").onclick = (e) => { if (e.target.dataset.cam) selectCamera(e.target.dataset.cam); };
-    selectCamera(cameraNames[0]);
+    selectCamera(liveNames[0]);
   }
+  // The people list can show one camera's people, e.g. an import (to check it, or to delete it).
+  $("f-camera").hidden = cameraNames.length < 2;
+  for (const c of cams) $("f-camera").add(new Option(c.live === false ? `${c.name} (${c.source})` : c.name, c.name));
+  const wanted = new URLSearchParams(location.search).get("camera");
+  if (wanted && cameraNames.includes(wanted)) $("f-camera").value = wanted;
 }
 
 // Alert pop-ups: new alerts since the page opened appear bottom-right for 20 seconds.

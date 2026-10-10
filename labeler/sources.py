@@ -125,6 +125,60 @@ class FrameSource:
             self._cap.release()
 
 
+VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".wmv", ".mts", ".m2ts", ".ts", ".webm", ".3gp"}
+
+
+class RecordedVideo:
+    """A recorded video for the Import page: read as fast as the computer can (no waiting between frames, no
+    looping), every `stride`-th frame, each with its position in the file in seconds. Positions come from the
+    file's own timestamps, which is right for phone videos with a changing frame rate."""
+
+    def __init__(self, path: str | Path, stride: int = 1):
+        self.path = Path(path)
+        self.stride = max(1, int(stride))
+        self._cap = cv2.VideoCapture(str(self.path))
+        if not self._cap.isOpened():
+            raise ValueError(f"cannot open the video {self.path.name}")
+        self.fps = self._cap.get(cv2.CAP_PROP_FPS) or 25.0
+        self.frame_count = int(self._cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        self.duration_s = self.frame_count / self.fps if self.frame_count else 0.0
+
+    def frames(self, stop: threading.Event | None = None):
+        """(frame, seconds into the video) for every stride-th frame. Skipped frames are only grabbed, not
+        converted, which is quicker."""
+        index = 0
+        try:
+            while stop is None or not stop.is_set():
+                if index % self.stride:
+                    if not self._cap.grab():
+                        return
+                    index += 1
+                    continue
+                ok, frame = self._cap.read()
+                if not ok:
+                    return
+                pos_ms = self._cap.get(cv2.CAP_PROP_POS_MSEC)
+                # Some files report no position (0 after the first frame): count frames instead.
+                yield frame, (pos_ms / 1000 if pos_ms > 0 or index == 0 else index / self.fps)
+                index += 1
+        finally:
+            self._cap.release()
+
+
+def probe_video(path: str | Path) -> dict:
+    """Frame rate, frame count and length of a video file, without reading it."""
+    cap = cv2.VideoCapture(str(path))
+    try:
+        if not cap.isOpened():
+            raise ValueError(f"cannot open the video {Path(path).name}")
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+        n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        return {"fps": round(fps, 2), "frames": n, "duration_s": round(n / fps, 1) if n else 0.0,
+                "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), "height": int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))}
+    finally:
+        cap.release()
+
+
 def is_blank(frame: np.ndarray) -> bool:
     """True when the picture has no detail at all (lens cover, camera busy, or still starting)."""
     small = cv2.resize(frame, (64, 36), interpolation=cv2.INTER_AREA)

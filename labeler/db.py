@@ -65,12 +65,17 @@ class Base(DeclarativeBase):
     pass
 
 
+IMPORTED = "imported videos"   # cameras.source of footage added on the Import page (labeler/importer.py)
+
+
 class Camera(Base):
     __tablename__ = "cameras"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)
     source: Mapped[str] = mapped_column(Text)
     mode: Mapped[str] = mapped_column(String(20))
+    # Own retention for cameras that are not in the config (imported videos; 0 = until deleted by hand).
+    retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class Track(Base):
@@ -290,7 +295,7 @@ def resolve(attrs: list[Attribute]) -> dict[str, dict]:
 
 # Columns added to existing tables after the first release. create_all() makes new tables but never changes
 # existing ones, so these are added at startup when missing (FLOAT works on SQLite and PostgreSQL).
-NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT"}}
+NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT"}, "cameras": {"retention_days": "INTEGER"}}
 
 
 def _token_hash(token: str) -> str:
@@ -362,6 +367,37 @@ class Database:
                 s.flush()
             cam.source, cam.mode = source, mode
             return cam.id
+
+    def list_cameras(self) -> list[dict]:
+        """Every camera the database knows, with how many people it recorded and when (first and last)."""
+        from sqlalchemy import func
+        with self.Session() as s:
+            stats = {r.camera_id: r for r in s.execute(
+                select(Track.camera_id, func.count(Track.id).label("people"), func.min(Track.started_at).label("first"),
+                       func.max(Track.started_at).label("last")).group_by(Track.camera_id))}
+            out = []
+            for cam in s.scalars(select(Camera).order_by(Camera.name)):
+                st = stats.get(cam.id)
+                out.append({"name": cam.name, "mode": cam.mode, "imported": cam.source == IMPORTED,
+                            "retention_days": cam.retention_days, "people": st.people if st else 0,
+                            "first": st.first.isoformat(timespec="seconds") if st else None,
+                            "last": st.last.isoformat(timespec="seconds") if st else None})
+            return out
+
+    def set_camera_retention(self, name: str, days: int | None) -> None:
+        with self.Session.begin() as s:
+            cam = s.scalar(select(Camera).where(Camera.name == name))
+            if cam is not None:
+                cam.retention_days = days
+
+    def camera_retention(self) -> dict[str, int]:
+        """Retention stored with the camera (imported videos), for cameras not in the config."""
+        with self.Session() as s:
+            return {c.name: c.retention_days for c in s.scalars(select(Camera).where(Camera.retention_days.is_not(None)))}
+
+    def camera_track_ids(self, name: str) -> list[int]:
+        with self.Session() as s:
+            return list(s.scalars(select(Track.id).join(Camera, Track.camera_id == Camera.id).where(Camera.name == name)))
 
     def create_track(self, camera_id: int, tracker_id: int, started_at: datetime) -> int:
         with self.Session.begin() as s:

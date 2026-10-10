@@ -25,7 +25,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **345 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
+- Tests: **381 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
   second site over Tailscale, not set up yet: see README "From another site"); one viewer account `TIXUAN`.
 - The user's database: 27 people, 26 of them in the answer key (their own labels; mean ~75% before the
@@ -76,6 +76,9 @@ labeler/logs.py      console + data/logs/visionlabeler.log (10 MB × 5) + superv
 labeler/healthcheck.py /api/health + /health: db, Ollama, cameras, disk, backup, retrain, log errors;
                      200/503; ?token= (web.health_token) = status only; config.mask_password for URLs
 labeler/backups.py   daily backup thread (tools/backup_db.py; --copy-to, weekly --verify into a test DB)
+labeler/importer.py  Import page: start times (typed/name/mvhd/mtime), RecordedVideo (sources.py),
+                     VideoClock (pipeline.clock), one job at a time, VLM throttle, no alerts/clips;
+                     cameras.retention_days (0 = keep) used by _apply_retention; run.py routes VLM answers
 labeler/remote.py    Health checks for other devices / Tailscale / firewall (netsh, read-only, cached 5 min)
 labeler/settings.py  Settings page: data/settings.yaml merged over config.yaml in load_config (only the
                      project's config.yaml, or a config naming settings_file:); validated; masked passwords;

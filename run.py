@@ -106,10 +106,11 @@ def main() -> int:
     _apply_retention(db, cfg, crop_dir)
 
     pipelines: list[Pipeline] = []
+    imports: list[Pipeline] = []   # pipelines of the Import page (labeler/importer.py), while they run
 
     def route_result(track_id: int, results: list) -> None:
-        """Send a VLM answer to the camera that owns this person."""
-        for p in pipelines:
+        """Send a VLM answer to the camera (or video import) that owns this person."""
+        for p in pipelines + imports:
             if track_id in p.owned_ids:
                 p.on_vlm_result(track_id, results)
                 return
@@ -187,7 +188,10 @@ def main() -> int:
         health = HealthMonitor(db, cfg["health"])
     from labeler.retrain import Retrainer
     retrainer = Retrainer(db, cfg, pipelines)
-    app = create_app(cfg, db, pipelines, embedder, alerts, agent, health, retrainer)
+    from labeler.importer import Importer
+    importer = Importer(cfg, db, worker, embedder, student, age_model, register=imports.append,
+                        unregister=lambda p: imports.remove(p) if p in imports else None)
+    app = create_app(cfg, db, pipelines, embedder, alerts, agent, health, retrainer, importer)
     server = _web_servers(app, web)
 
     def request_shutdown() -> None:
@@ -248,6 +252,7 @@ def main() -> int:
             p.stop()
         for t in threads:
             t.join(timeout=15)
+        importer.cancel()   # an import stops at once; the people it found are kept
         _finish_labeling(worker)
         pid_file.unlink(missing_ok=True)
         log.info("stopped")
@@ -260,7 +265,8 @@ RETENTION_EVERY_S = 3600
 def _apply_retention(db: Database, cfg: dict, crop_dir) -> None:
     """Delete people (and their pictures) older than their camera's retention_days, and old audit entries."""
     from labeler.privacy import remove_picture
-    per_camera = {c["name"]: c["retention_days"] for c in cfg["cameras"] if c.get("retention_days") is not None}
+    per_camera = {**db.camera_retention(),   # imported videos keep their own (0 = until deleted by hand)
+                  **{c["name"]: c["retention_days"] for c in cfg["cameras"] if c.get("retention_days") is not None}}
     removed = db.cleanup(cfg["storage"]["retention_days"], per_camera)
     for name in removed:
         remove_picture(crop_dir, name)   # and its blurred copy

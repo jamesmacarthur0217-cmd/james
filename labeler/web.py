@@ -9,6 +9,7 @@ import threading
 import shutil
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import cv2
 from fastapi import FastAPI, HTTPException, Request
@@ -65,6 +66,28 @@ class AskIn(BaseModel):
     limit: int = 30
 
 
+class ImportPath(BaseModel):
+    path: str
+
+
+class ImportFile(BaseModel):
+    path: str
+    start: str                    # 2026-10-09T14:30:12
+
+
+class ImportStart(BaseModel):
+    files: list[ImportFile]
+    camera: str
+    mode: str = "security"
+    keep_days: int = 0            # 0 = until deleted by hand
+    target_fps: float = 10
+    imgsz: int | None = None      # detector picture size: 640, 960 or 1280 (None: detector.imgsz)
+
+
+class CameraName(BaseModel):
+    camera: str
+
+
 def _day_range(start: str | None, end: str | None) -> tuple[datetime, datetime]:
     """Dates as YYYY-MM-DD (end inclusive); default today."""
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -116,7 +139,7 @@ def ensure_first_admin(db: Database, web: dict) -> None:
 
 
 def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | None, embedder=None,
-               alerts=None, agent=None, health=None, retrainer=None) -> FastAPI:
+               alerts=None, agent=None, health=None, retrainer=None, importer=None) -> FastAPI:
     app = FastAPI(title="VisionLabeler")
     app.state.stopping = threading.Event()
     app.state.started_at = time.time()
@@ -448,8 +471,106 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
 
     @app.get("/api/cameras")
     def cameras():
+        """Live cameras, then cameras with recorded people only (imported videos, removed cameras):
+        "live" false, so the Live page shows no video tab for them but lists their people."""
         # Masked: viewers may call this, and an IP camera address can hold its password.
-        return [{"name": p.name, "mode": p.mode, "source": mask_password(p.cam["source"])} for p in pipelines]
+        out = [{"name": p.name, "mode": p.mode, "source": mask_password(p.cam["source"]), "live": True}
+               for p in pipelines]
+        out += [{"name": c["name"], "mode": c["mode"], "source": "imported videos" if c["imported"] else "recorded",
+                 "live": False} for c in db.list_cameras()
+                if c["name"] not in by_name and (c["people"] or c["imported"])]
+        return out
+
+    # --- importing recorded videos (admin; labeler/importer.py) -------------------------------
+
+    @app.get("/import")
+    def import_page():
+        return FileResponse(STATIC / "import.html")
+
+    def need_importer():
+        if importer is None:
+            raise HTTPException(503, "importing runs only inside the app")
+        return importer
+
+    @app.post("/api/import/preview")
+    def import_preview(body: ImportPath):
+        from .importer import describe, find_videos
+        try:
+            files = find_videos(body.path)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        return {"files": describe(files)}
+
+    @app.post("/api/import/start")
+    def import_start(body: ImportStart, request: Request):
+        from .importer import MAX_FILES
+        from .settings import CAMERA_NAME
+        from .sources import VIDEO_EXTS
+        imp = need_importer()
+        camera = body.camera.strip()
+        if not CAMERA_NAME.fullmatch(camera):
+            raise HTTPException(400, "the camera name is 1-32 letters, digits, - or _")
+        known = {c["name"]: c for c in db.list_cameras()}
+        configured = {c.get("name") for c in cfg.get("cameras") or [cfg.get("camera") or {}]}
+        if camera in by_name or camera in configured or (
+                camera in known and not known[camera]["imported"]):
+            raise HTTPException(400, f"{camera!r} is a live camera's name; choose another name for the videos")
+        if body.mode not in ("kiosk", "security"):
+            raise HTTPException(400, "mode is kiosk or security")
+        if not 0 <= body.keep_days <= 3650:
+            raise HTTPException(400, "keep days is 0-3650 (0 = until deleted by hand)")
+        if not 1 <= body.target_fps <= 30:
+            raise HTTPException(400, "frames per second is 1-30")
+        if body.imgsz is not None and body.imgsz not in (640, 960, 1280):
+            raise HTTPException(400, "detector size is 640, 960 or 1280")
+        if not 1 <= len(body.files) <= MAX_FILES:
+            raise HTTPException(400, f"choose 1-{MAX_FILES} videos")
+        files = []
+        for f in body.files:
+            path = Path(f.path)
+            if not path.is_file() or path.suffix.lower() not in VIDEO_EXTS:
+                raise HTTPException(400, f"not a video file: {f.path}")
+            try:
+                start = datetime.fromisoformat(f.start)
+            except ValueError:
+                raise HTTPException(400, f"{path.name}: the start time must look like 2026-10-09T14:30:00")
+            if start.tzinfo is not None:
+                start = start.astimezone().replace(tzinfo=None)
+            files.append({"path": path, "start": start})
+        try:
+            job = imp.start(files, camera, body.mode, body.keep_days, body.target_fps, who(request), body.imgsz)
+        except ValueError as e:
+            raise HTTPException(409, str(e))
+        audit(request, "import videos", f"{len(files)} video(s) into camera {camera} from "
+                                        f"{files[0]['path'].parent}"[:500])
+        return job
+
+    @app.get("/api/import")
+    def import_status():
+        imp = need_importer()
+        return {**imp.status(), "recorded": [c for c in db.list_cameras() if c["imported"]],
+                "vlm_queue": imp.worker.pending if imp.worker is not None else None}
+
+    @app.post("/api/import/cancel")
+    def import_cancel(request: Request):
+        if not need_importer().cancel():
+            raise HTTPException(409, "no import is running")
+        audit(request, "import cancelled")
+        return {"ok": True}
+
+    @app.post("/api/import/delete")
+    def import_delete(body: CameraName, request: Request):
+        """Delete every person of an imported camera (with pictures, labels and history)."""
+        imp = need_importer()
+        cams = {c["name"]: c for c in db.list_cameras()}
+        if body.camera not in cams or not cams[body.camera]["imported"]:
+            raise HTTPException(404, "no imported videos under that name")
+        if imp.running and imp.job["camera"] == body.camera:
+            raise HTTPException(409, "an import into this camera is running; cancel it first")
+        deleted, paths = db.delete_tracks(db.camera_track_ids(body.camera))
+        removed = sum(privacy.remove_picture(crop_dir, name) for name in paths)
+        audit(request, "delete", f"imported camera {body.camera}: {len(deleted)} people")
+        return {"deleted": len(deleted), "pictures_removed": removed}
 
     @app.get("/health")
     def health_page():

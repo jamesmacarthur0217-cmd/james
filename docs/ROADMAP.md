@@ -143,7 +143,7 @@ Then: switch to planning mode and propose the next round (open items: HANDOFF se
    an optional second copy and a weekly restore check.
 2. **Checks and guide done 2026-10-10** (connecting the other PC: the user, later). Second site over
    Tailscale: self-checks on the Health page and a plain guide; the user connects the other PC.
-3. Import recorded videos on a new Import page: fast (no waiting, every k-th frame) and with real recording
+3. **Done 2026-10-10** (measured on vtest.avi; README). Import recorded videos on a new Import page: fast (no waiting, every k-th frame) and with real recording
    times (file name, MP4 metadata, or typed), kept until deleted by default.
 
 ## Critical files

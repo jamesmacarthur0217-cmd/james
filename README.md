@@ -111,6 +111,7 @@ or another app (Teams, Discord) holding the camera.
 | **Reports** | People per hour/day, attribute breakdowns, date range and camera filters, **Download CSV** |
 | **Alerts** | Rules like "red top + backpack" or "anyone" (per camera); each fires once per person |
 | **Answer key** | Label recorded people yourself, blind, and see how accurate the system is on this camera |
+| **Import** (admin) | Add recorded videos with their real times (see Importing recorded videos) |
 | **Settings** (admin) | Cameras, how long data is kept, backups, face blurring, HTTPS, weekly retraining; **Restart now** |
 | **Health** | Whether the database, Ollama, cameras, disk and backups work (see Reliability) |
 
@@ -214,6 +215,48 @@ detection and colors run every frame for everyone. Things that turned out to mat
 - **Re-linking** (`tracking.relink`): someone who reappears within 5 s near the same spot (similarity
   ≥ 0.75), or within 30 s looking very similar (≥ 0.90), continues the same record. Tested: 2 s and 10 s gaps
   → 1 record (before: 2); 40 s → 2 records, as intended.
+
+## Importing recorded videos
+
+The **Import** page (admin) adds old footage: a phone video, a recorder's files, a whole folder. People in it are
+found, labeled and stored like people seen live, with the **real time they were filmed**, so they can be
+searched, asked about, reviewed and counted in Reports on their real dates. The videos stay where they are.
+
+1. Type a video file or folder on this PC and press **Find videos**.
+2. Check each file's start time. It comes from the file name (`VID_20261009_143012.mp4`, `20261009_143012.mp4`,
+   recorder names like `ch01_20261009143012.avi`), else from the MP4/MOV header (creation time), else from the
+   file's modified time minus its length. Every person gets this time plus their moment in the video.
+3. Give the footage a camera name (not a live camera's name), a mode, how long to keep it (0 = until you delete
+   it; counted from when it was filmed), the detector size and frames per second, and press **Start import**.
+
+The import runs inside the app next to the live cameras, as fast as the GPU allows; the vision model still
+labels everyone (the import waits while more than 2 people are queued, so live cameras are delayed by at most
+two labeling jobs). Old footage sends no alerts and makes no alert clips. Cancel keeps the people found so far.
+The page lists each import with **Delete all its people**; on the Live page the people list has a camera filter
+(`/?camera=<name>`). Imports are in the Audit log.
+
+Measured on a public test video (OpenCV's `vtest.avi`: 80 s, 768×576, 10 fps, people walking, seen from above):
+
+| Detector size | Frames per second used | People found | Time (no vision model) |
+|---|---|---|---|
+| 640 | 10 | 3 | 15 s (5.2× real time) |
+| 960 | 10 | 9 | 19 s (4.1×) |
+| 1280 | 10 | 10 | 24 s (3.2×) |
+| 1280 | 5 | 9 | 14 s (5.8×) |
+| 1280 | 3.3 | 8 | 10 s (7.9×) |
+| 1280 | 2.5 | 5 | 8 s (10.4×) |
+
+With the vision model on (1280, 10 fps): 52 s for the 80 s video (1.5×), 10 people, 9 of them labeled by the
+vision model; inside the app with the demo camera running at the same time: 1.3×, all 10 labeled, the live
+camera kept labeling at 16 fps. The detector misses most people of this view at 640 (0.3 per frame against 3.3
+at 1280), so the page defaults to 1280; use 640 for close-up phone videos (faster). Fewer frames per second split
+tracks into more pieces (38 at 5 fps against 34 at 10, with re-linking off) and miss people, so 10 stays the
+default; this video has only 10 fps, so more was not tested.
+
+Re-linking on this video: the tracker's 34 pieces became 10 people, 24 joined by appearance alone (similarity
+0.90-0.96, no box overlap). By eye there are about 10-12 different people walking back and forth in similar dark
+clothes, so this looks plausible, but each join was not checked; small people seen from above look alike, so on
+such views re-linking may also join different people.
 
 ## Zones and counting lines
 
@@ -488,9 +531,9 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-345 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+381 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the second-site checks, alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 
@@ -509,6 +552,7 @@ Changes are tracked with git.
 | `labeler/supervisor.py`, `labeler/logs.py` | restart after crashes; log files |
 | `labeler/healthcheck.py` | the Health page and `/api/health` |
 | `labeler/settings.py` | the Settings page (`data/settings.yaml` over config.yaml) |
+| `labeler/importer.py` | the Import page: recorded videos with real times |
 | `run.py`, `start.bat`, `stop.bat` | starting and stopping |
 | `install.bat` / `install.ps1`, `tools/models.py`, `tools/pack_offline.ps1` | installing on a new PC, offline package |
 | `tools/` | benchmarks, evaluation, training, backups |
