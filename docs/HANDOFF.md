@@ -18,8 +18,9 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-10)
 
-- Git: local repo (no remote yet), branch `main`. Roadmap **Phases 0, 2-6 done**; Phase 1 deferred. Phase 6
-  commits, newest first: `2b6d3f2` GitHub workflow · `39c7dd0` installer · `a63017b` Settings page · `4fb0c3b`
+- Git: local repo (no remote yet), branch `main`. Roadmap **Phases 0, 2-7 done**; Phase 1 deferred. Phase 7
+  commits, newest first: `e1c1f24` video import · `2c39ed7` second-site checks · `bf55621`/`0dacfe2` daily
+  backup · `fab8340` plan. Phase 6 commits: `2b6d3f2` GitHub workflow · `39c7dd0` installer · `a63017b` Settings page · `4fb0c3b`
   health check · `f32543d` log files · `be09f44` stop.bat fix. Earlier: `958d80c` spot checks · `a18e8a8` weekly
   retraining · `e54c242` capacity · `be9c236` far-away people · `953b756` timeline · `14cc7b3` kiosk prompt ·
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
@@ -170,25 +171,33 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
 - Charts follow the dataviz skill (validated palette, one axis, hover, table view, both color modes).
 - Ask before downloads, installing packages, or anything outward-facing; the user decides.
 
-## 8. Phase 6 result, and what is next
+## 8. Phase 6 and 7 results, and what is next
 
-**Phase 6 (operations) is done** (2026-10-09/10, plan in [PHASE6-PLAN.md](PHASE6-PLAN.md)): log files, health
-check, Settings page with Restart now, installer with offline package, and the GitHub test workflow. Not done,
-by the user's choice: a Windows service (console window kept), and the push to GitHub ("later": the user creates
-an empty private repository and gives its URL; then `git remote add origin <url>`, `git push -u origin main`,
-check the first Actions run). Untested parts (user said skip, 2026-10-10): the offline package's Python wheels
-(about 4 GB download) with a fresh `.venv` from them, `docker save` of the database image, and the installer's
-database/account checks with Docker running.
+**Phase 6 (operations) is done** (plan: [PHASE6-PLAN.md](PHASE6-PLAN.md)): log files, health check, Settings page
+with Restart now, installer with offline package, GitHub test workflow. Not done, by the user's choice: a Windows
+service (console window kept), and the push to GitHub ("later": the user creates an empty private repository and
+gives its URL; then `git remote add origin <url>`, `git push -u origin main`, check the first Actions run).
+Untested installer parts (user said skip): the offline package's Python wheels (~4 GB download) with a fresh
+`.venv`, `docker save` of the database image, the installer's database/account checks with Docker running.
 
-Also found and fixed on the way: `stop.bat` held a bell character instead of `\a` in `data\app.pid` (it never
-found the app's process); `/api/cameras` (open to viewers) returned camera addresses with their passwords.
+**Phase 7 is done** (2026-10-10, plan: [PHASE7-PLAN.md](PHASE7-PLAN.md)):
+- Daily backup while running, second copy (`backup.copy_to`), weekly restore check; checked on the real database
+  (27 of 27 people restored, 2 s).
+- Second site: Health page checks every step, guide `docs/SECOND-SITE.md`. **Still to do with the user**
+  ("later"): Tailscale on the other PC, the firewall rule (admin PowerShell, the user runs it), first login.
+  This PC: Tailscale running, no other device yet, no firewall rule yet.
+- Import page for recorded videos (README "Importing recorded videos", measured on OpenCV's vtest.avi).
 
-**Next: Phase 7**, approved 2026-10-10: [PHASE7-PLAN.md](PHASE7-PLAN.md) (daily backup, second site, import
-recorded videos; the user said no phone alerts). Other open items:
+Open items for the next round:
 - Phase 1 licenses (only when the use becomes commercial; ask the user then).
+- Re-linking by appearance alone (`long_gap_min_similarity` 0.90) joined 24 of 34 tracks on a crowded
+  overhead video; plausible by eye (people walking back and forth), but not checked pair by pair. Small people
+  from above look alike, so security views may need a higher bar or a position check: measure with labeled
+  footage before changing.
 - More cameras than ~4: batching or one process per camera (README "How many cameras?").
 - Measure the timeline threshold (0.8) and the facing threshold across real cameras when there are some.
 - The user keeps labeling on the Answer key page (aim 50-100); retraining starts helping after 30 more people.
+  Imported videos can now add people quickly (they count as the user's own cameras).
 - Vocabulary refinements (coat, polo, tank top) need answer-key values to be measurable.
 - One test failed once exactly at midnight and passed in 5 runs after: probably a test that builds "today"
   twice; find it if it happens again (`pytest -rf`).
@@ -196,5 +205,5 @@ recorded videos; the user said no phone alerts). Other open items:
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then do Phase 7 step by step following
-> docs/PHASE7-PLAN.md. When Phase 7 is finished, switch to planning mode and propose the next steps.
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then switch to planning mode and propose
+> the next steps (open items: HANDOFF section 8).

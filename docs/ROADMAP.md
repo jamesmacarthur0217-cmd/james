@@ -2,9 +2,9 @@
 
 ## Status (2026-10-10)
 
-**Phases 0 and 2-6 are done** (each item below is marked with what was done, measured or rejected;
+**Phases 0 and 2-7 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
-commercially yet. **Phase 7 is next** (approved plan: [PHASE7-PLAN.md](PHASE7-PLAN.md)). 314 tests pass.
+commercially yet. Phase 7 is done (2026-10-10); the next round is to be planned with the user. 381 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -135,7 +135,7 @@ page for common settings; health check; installer; private GitHub with tests). E
 
 Then: switch to planning mode and propose the next round (open items: HANDOFF section 8).
 
-## Phase 7: Backups, second site, recorded videos (next)
+## Phase 7: Backups, second site, recorded videos (done 2026-10-10)
 
 **Approved plan: [PHASE7-PLAN.md](PHASE7-PLAN.md)** (user's choices 2026-10-10; no phone alerts).
 
