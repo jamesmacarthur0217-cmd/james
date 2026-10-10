@@ -14,6 +14,7 @@
   <div class="status" id="status">connecting…</div>
   <button id="stop" class="admin-only" title="Finish labeling the people in view, save, and close the app">Stop</button>
 </header>
+<div class="today" id="today" hidden></div>
 <main class="layout">
   <section class="panel">
     <div class="panel-head">
@@ -134,6 +135,30 @@ function closeVideo() { $("player-video").pause(); $("player-video").removeAttri
 $("player-close").addEventListener("click", closeVideo);
 $("player").addEventListener("click", (e) => { if (e.target.id === "player") closeVideo(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("player").hidden) closeVideo(); });
+
+// Today at a glance (labeler/today.py), once a minute.
+async function loadToday() {
+  let d;
+  try { d = await (await fetch("/api/today")).json(); } catch { return; }
+  const tile = (num, label, cls = "") => `<div class="today-tile ${cls}"><b>${num}</b><span>${label}</span></div>`;
+  const usual = d.usual_by_now == null ? "no earlier weeks to compare yet"
+    : `usually ${d.usual_by_now} by now (${d.usual_day} a whole day; ${d.usual_from_days} earlier ${d.usual_from_days === 1 ? "week" : "weeks"})`;
+  const h = d.busiest_hour;
+  let html = tile(d.people, `people today · ${usual}`)
+    + tile(h ? `${String(h.hour).padStart(2, "0")}:00` : "–", h ? `busiest hour (${h.people} people)` : "busiest hour");
+  if (d.alerts !== undefined) {
+    html += `<a href="/alerts">${tile(d.alerts, d.alerts === 1 ? "alert today" : "alerts today", d.alerts ? "warn" : "")}</a>`;
+    const p = d.camera_problems_now ? `${d.camera_problems} (${d.camera_problems_now} now)` : d.camera_problems;
+    html += `<a href="/alerts">${tile(p, "camera problems today", d.camera_problems_now ? "warn" : "")}</a>`;
+    if (d.postgres) {
+      const age = d.backup_age_h;
+      html += `<a href="/health">${tile(age == null ? "none" : age < 24 ? `${Math.round(age)} h` : `${(age / 24).toFixed(1)} d`,
+        "since the last backup", age == null || age > 48 ? "warn" : "")}</a>`;
+    }
+  }
+  $("today").innerHTML = html;
+  $("today").hidden = false;
+}
 
 // Search by photo: the picture is sent as it is and not stored; the server finds the person in it.
 $("photo-btn").addEventListener("click", () => $("photo-file").click());
@@ -597,6 +622,8 @@ setInterval(() => { if (view.kind === "recent") refresh(); }, 3000);
 setInterval(status, 1000);
 healthStatus();
 setInterval(healthStatus, 30000);
+loadToday();
+setInterval(loadToday, 60000);
 </script>
 </body>
 </html>

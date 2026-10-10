@@ -133,6 +133,13 @@ use it); a removed camera's people stay until their retention ends. Camera passw
 leaving the mask keeps the stored password, and the Audit log never contains it. Zones are drawn on the Live
 page, alert rules are on the Alerts page, and accounts are managed with `tools\users.py`.
 
+### Today at a glance
+
+The top of the Live page shows today so far: people today against the same weekday in the last 4 weeks by the
+same time of day (only weeks with people count: a day the app was off says nothing), the busiest hour, alerts
+and camera problems today (admins; click for the Alerts page), and the time since the last database backup
+(admins; a warning after 2 days). Updated every minute; it matches Reports for today (checked 2026-10-10).
+
 ### Asking questions
 
 The Ask box understands questions like "who wore a red top after 3pm?", "women with a backpack yesterday",
@@ -602,9 +609,9 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-413 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+418 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, today at a glance, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 

@@ -424,14 +424,26 @@ class Database:
                 return None
             return t.source_file, t.source_offset_s or 0.0, t.in_view_s or 0.0
 
-    def count_tracks(self, since: datetime | None = None) -> int:
-        """People recorded (since a time: for the daily rate on the Health page's storage line)."""
+    def count_tracks(self, since: datetime | None = None, until: datetime | None = None) -> int:
+        """People recorded (since / until a time: the storage line's daily rate, Today at a glance)."""
         from sqlalchemy import func
         q = select(func.count(Track.id))
         if since is not None:
             q = q.where(Track.started_at >= since)
+        if until is not None:
+            q = q.where(Track.started_at < until)
         with self.Session() as s:
             return s.scalar(q) or 0
+
+    def track_starts(self, since: datetime, until: datetime) -> list[datetime]:
+        with self.Session() as s:
+            return list(s.scalars(select(Track.started_at).where(Track.started_at >= since,
+                                                                 Track.started_at < until)))
+
+    def count_alerts(self, since: datetime) -> int:
+        from sqlalchemy import func
+        with self.Session() as s:
+            return s.scalar(select(func.count(AlertEvent.id)).where(AlertEvent.created_at >= since)) or 0
 
     def camera_track_ids(self, name: str) -> list[int]:
         with self.Session() as s:

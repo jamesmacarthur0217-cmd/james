@@ -119,3 +119,12 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .player-box { background: var(--panel); border-radius: 10px; padding: 12px; max-width: min(900px, 100%); width: 100%; }
 .player-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .player video { width: 100%; max-height: 75vh; background: #000; border-radius: 6px; }
+/* Today at a glance (Live page). */
+.today { display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 20px 0; }
+.today[hidden] { display: none; }
+.today a { text-decoration: none; color: inherit; }
+.today-tile { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px;
+  display: flex; flex-direction: column; min-width: 120px; }
+.today-tile b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.today-tile span { color: var(--muted); font-size: 12px; }
+.today-tile.warn b { color: var(--warn); }

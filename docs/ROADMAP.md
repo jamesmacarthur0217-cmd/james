@@ -4,7 +4,7 @@
 
 **Phases 0 and 2-7 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
-commercially yet. **Phase 8 is next** (approved plan: [PHASE8-PLAN.md](PHASE8-PLAN.md)). 413 tests pass.
+commercially yet. **Phase 8 is next** (approved plan: [PHASE8-PLAN.md](PHASE8-PLAN.md)). 418 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -156,7 +156,7 @@ Then: switch to planning mode and propose the next round (open items: HANDOFF se
    against the published ground truth of the test video; change only if measured.
 3. **Done 2026-10-10** (median 1.3 MB per person at 480 px). A short video of each person (admin-only), and
    storage use on the Health page.
-4. **Done 2026-10-10** (excerpt cut on first view). Original video link for imported people. 5. **Done 2026-10-10** (a hint on far cameras: 6/18 first). Search by photo. 6. Today at a glance on the Live page.
+4. **Done 2026-10-10** (excerpt cut on first view). Original video link for imported people. 5. **Done 2026-10-10** (a hint on far cameras: 6/18 first). Search by photo. 6. **Done 2026-10-10.** Today at a glance on the Live page.
 
 ## Critical files
 

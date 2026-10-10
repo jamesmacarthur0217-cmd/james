@@ -615,6 +615,13 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         stop()
         return {"ok": True}
 
+    @app.get("/api/today")
+    def today_summary(request: Request):
+        """Today at a glance (labeler/today.py); viewers get the people numbers only."""
+        from . import today
+        admin = (getattr(request.state, "user", None) or {}).get("role") == "admin"
+        return today.summary(db, admin=admin)
+
     @app.get("/api/live")
     def live(camera: str | None = None):
         """People in view right now and their current labels."""

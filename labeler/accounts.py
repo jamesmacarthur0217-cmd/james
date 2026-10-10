@@ -55,7 +55,7 @@ PUBLIC = {("GET", "/login"), ("POST", "/api/login"), ("GET", "/static/style.css"
 VIEWER = {
     "GET": ["/", "/stream", "/api/live", "/api/live/thumb/", "/api/status", "/api/schema", "/api/cameras",
             "/api/tracks", "/api/tracks/", "/api/search", "/api/alerts/events", "/api/me", "/crops/", "/static/",
-            "/health", "/api/health"],
+            "/health", "/api/health", "/api/today"],
     "POST": ["/api/ask", "/api/logout", "/api/search/photo"],
 }
 
