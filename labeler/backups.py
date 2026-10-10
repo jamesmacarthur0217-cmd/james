@@ -22,25 +22,24 @@ from .config import ROOT, resolve
 
 log = logging.getLogger(__name__)
 
-BACKUP_DIR = "data/backups"
 PATTERN = "visionlabeler-*.dump"
 VERIFY_FILE = "last_verify.json"   # written by tools/backup_db.py --verify
 MIN_AGE_H = 20                     # same as stop.bat: at most one backup a day
 VERIFY_EVERY_D = 7
 
 
-def folder() -> Path:
-    return resolve(BACKUP_DIR)
+def folder(cfg: dict) -> Path:
+    """backup.dir (data/backups; a test config keeps its own)."""
+    return resolve(cfg["backup"].get("dir") or "data/backups")
 
 
-def newest(where: Path | None = None) -> Path | None:
-    where = where or folder()
+def newest(where: Path) -> Path | None:
     return max(where.glob(PATTERN), key=lambda p: p.stat().st_mtime, default=None) if where.is_dir() else None
 
 
-def last_verify(where: Path | None = None) -> dict | None:
+def last_verify(where: Path) -> dict | None:
     """{"at": iso time, "ok": bool, "message": str} of the last restore check, or None."""
-    path = (where or folder()) / VERIFY_FILE
+    path = where / VERIFY_FILE
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -65,7 +64,8 @@ def verify_due(now: datetime, verify: dict | None) -> bool:
 
 def command(cfg: dict, verify: bool) -> list[str]:
     bcfg = cfg["backup"]
-    cmd = [sys.executable, str(ROOT / "tools" / "backup_db.py"), "--keep", str(int(bcfg["keep"]))]
+    cmd = [sys.executable, str(ROOT / "tools" / "backup_db.py"), "--keep", str(int(bcfg["keep"])),
+           "--dir", str(folder(cfg))]
     if bcfg.get("copy_to"):
         cmd += ["--copy-to", str(bcfg["copy_to"])]
     if verify:
@@ -94,10 +94,10 @@ def tick(cfg: dict, db, now: datetime | None = None, runner=subprocess.run) -> b
     if not bcfg["enabled"] or not db.is_postgres:
         return None
     now = now or datetime.now()
-    latest = newest()
+    latest = newest(folder(cfg))
     if not due(now, int(bcfg["hour"]), latest.stat().st_mtime if latest else None):
         return None
-    return run_backup(cfg, verify_due(now, last_verify()), runner)
+    return run_backup(cfg, verify_due(now, last_verify(folder(cfg))), runner)
 
 
 def loop(cfg: dict, db, stop: threading.Event, every_s: float = 600, retry_s: float = 3600) -> None:

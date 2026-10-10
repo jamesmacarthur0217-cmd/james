@@ -620,7 +620,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         """Today at a glance (labeler/today.py); viewers get the people numbers only."""
         from . import today
         admin = (getattr(request.state, "user", None) or {}).get("role") == "admin"
-        return today.summary(db, admin=admin)
+        return today.summary(db, admin=admin, cfg=cfg)
 
     @app.get("/api/live")
     def live(camera: str | None = None):

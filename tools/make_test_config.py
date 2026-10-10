@@ -34,6 +34,7 @@ def main() -> None:
     cfg["web"].update({"host": "127.0.0.1", "https": False})
     cfg.setdefault("logs", {})["dir"] = (folder / "logs").as_posix()
     cfg["settings_file"] = (folder / "settings.yaml").as_posix()   # the Settings page writes here, not data/
+    cfg.setdefault("backup", {})["dir"] = (folder / "backups").as_posix()   # never the user's backups
     cfg.setdefault("student", {})["retrained_path"] = (folder / "models" / "attributes.joblib").as_posix()
     if args.https:
         cfg["web"].update({"https": True, "https_port": 8444, "cert_file": (folder / "tls" / "cert.pem").as_posix(),

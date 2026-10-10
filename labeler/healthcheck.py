@@ -128,7 +128,7 @@ def storage_use(cfg: dict) -> dict:
     return {"pictures": _size(list(crops.glob("*.jpg")) + list((crops / "blurred").glob("*.jpg"))),
             "person videos": _size(clips.glob("person_*.webm")),
             "alert clips": _size(clips.glob("alert_*.webm")),
-            "backups": _size(backups.folder().glob("*.dump")) if backups.folder().is_dir() else 0,
+            "backups": _size(backups.folder(cfg).glob("*.dump")) if backups.folder(cfg).is_dir() else 0,
             "logs": _size(resolve(cfg["logs"]["dir"]).glob("*.log*"))}
 
 
@@ -164,6 +164,7 @@ def check_storage(cfg: dict, db, now_wall: float | None = None, use: dict | None
 
 
 def check_backup(db, now: float, folder: Path | None = None, bcfg: dict | None = None) -> dict:
+    """folder: backup.dir (backups.folder(cfg)); bcfg: the backup settings."""
     """The newest backup's age, the second copy (backup.copy_to) and the last restore check."""
     if not db.is_postgres:
         return _check("database backup", "off", "only for the PostgreSQL database")
@@ -171,7 +172,7 @@ def check_backup(db, now: float, folder: Path | None = None, bcfg: dict | None =
     daily = bool(bcfg.get("enabled"))
     maker = f"the app makes one every day from {int(bcfg.get('hour', 2))}:00" if daily else \
         "stop.bat makes one when it stops the app (the daily backup is off)"
-    folder = folder or backups.folder()
+    folder = folder or backups.folder({"backup": bcfg})
     newest = backups.newest(folder)
     if newest is None:
         return _check("database backup", "warning", f"no backup yet; {maker}")
@@ -225,7 +226,7 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
     now_mono, now = time.monotonic(), time.time()
     errors_check, latest_errors = check_errors(now)
     checks = [check_database(db), check_ollama(cfg, pipelines), *check_cameras(cfg, pipelines, camera_health, now_mono),
-              check_disk(cfg), check_backup(db, now, bcfg=cfg["backup"]), check_retraining(cfg, db), errors_check]
+              check_disk(cfg), check_backup(db, now, backups.folder(cfg), cfg["backup"]), check_retraining(cfg, db), errors_check]
     try:
         checks.insert(-1, check_storage(cfg, db))
     except Exception as e:   # never break the health check

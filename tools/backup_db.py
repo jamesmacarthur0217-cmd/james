@@ -130,7 +130,18 @@ def configured_copy_to() -> str:
         return ""
 
 
-def main(argv: list[str] | None = None, folder: Path = BACKUPS, run=subprocess.run) -> int:
+def configured_dir() -> Path:
+    """backup.dir from the app's settings (data/backups unless changed)."""
+    try:
+        sys.path.insert(0, str(ROOT))
+        from labeler.backups import folder
+        from labeler.config import load_config
+        return folder(load_config())
+    except Exception:
+        return BACKUPS
+
+
+def main(argv: list[str] | None = None, folder: Path | None = None, run=subprocess.run) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--keep", type=int, default=7, help="how many backups to keep")
     ap.add_argument("--if-older-than-hours", type=float, default=0,
@@ -138,7 +149,9 @@ def main(argv: list[str] | None = None, folder: Path = BACKUPS, run=subprocess.r
     ap.add_argument("--copy-to", help="also copy each backup into this folder (default: backup.copy_to)")
     ap.add_argument("--verify", action="store_true", help="restore the new backup into a test database")
     ap.add_argument("--verify-only", action="store_true", help="only check the newest backup")
+    ap.add_argument("--dir", type=Path, help="the backups folder (default: backup.dir, data/backups)")
     args = ap.parse_args(argv)
+    folder = folder or args.dir or configured_dir()
 
     if args.verify_only:
         existing = backups(folder)

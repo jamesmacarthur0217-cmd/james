@@ -66,8 +66,7 @@ def test_restore_check_weekly():
 
 
 def test_tick_runs_the_tool_only_for_postgres_and_when_due(tmp_path, monkeypatch, db):
-    monkeypatch.setattr(backups, "folder", lambda: tmp_path)
-    cfg = {"backup": {"enabled": True, "hour": 2, "keep": 5, "copy_to": "E:/copies"}}
+    cfg = {"backup": {"enabled": True, "hour": 2, "keep": 5, "copy_to": "E:/copies", "dir": str(tmp_path)}}
     commands = []
 
     def runner(cmd, **kw):
@@ -77,11 +76,24 @@ def test_tick_runs_the_tool_only_for_postgres_and_when_due(tmp_path, monkeypatch
     assert backups.tick(cfg, db, NIGHT, runner) is None                      # SQLite: no backups
     monkeypatch.setattr(db, "is_postgres", True)
     assert backups.tick(cfg, db, NIGHT, runner) is True
-    assert commands[0][-5:] == ["--keep", "5", "--copy-to", "E:/copies", "--verify"]
+    assert commands[0][-7:] == ["--keep", "5", "--dir", str(tmp_path), "--copy-to", "E:/copies", "--verify"]
     _dump(tmp_path, "visionlabeler-20261010-020000.dump", 1)
     assert backups.tick(cfg, db, NIGHT, runner) is None                      # made an hour ago
     cfg["backup"]["enabled"] = False
     assert backups.tick(cfg, db, NIGHT + timedelta(days=2), runner) is None
+
+
+def test_test_configs_keep_their_own_backups(tmp_path):
+    """tools/make_test_config.py points backup.dir into its folder: a test copy never reads or writes data/backups."""
+    import subprocess as sp
+    import sys
+
+    from labeler.config import ROOT, load_config
+    out = sp.run([sys.executable, str(ROOT / "tools" / "make_test_config.py"), str(tmp_path)], capture_output=True,
+                 text=True, check=True).stdout.strip()
+    cfg = load_config(out)
+    assert backups.folder(cfg) == (tmp_path / "backups").resolve()
+    assert "--dir" in backups.command(cfg, False) and str(tmp_path / "backups") in " ".join(backups.command(cfg, False))
 
 
 def test_a_failed_backup_is_logged_as_an_error(caplog):

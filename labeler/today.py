@@ -15,7 +15,7 @@ from . import backups
 WEEKS = 4
 
 
-def summary(db, now: datetime | None = None, admin: bool = True) -> dict:
+def summary(db, now: datetime | None = None, admin: bool = True, cfg: dict | None = None) -> dict:
     now = now or datetime.now()
     day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     starts = db.track_starts(day, now)
@@ -35,7 +35,7 @@ def summary(db, now: datetime | None = None, admin: bool = True) -> dict:
            "busiest_hour": {"hour": busiest[0], "people": busiest[1]} if busiest else None}
     if admin:
         problems = [e for e in db.list_camera_events(200) if e["started_at"] >= day.isoformat()]
-        newest = backups.newest()
+        newest = backups.newest(backups.folder(cfg)) if cfg else None
         out.update(alerts=db.count_alerts(day),
                    camera_problems=len(problems), camera_problems_now=sum(1 for e in problems if not e["ended_at"]),
                    backup_age_h=round((time.time() - newest.stat().st_mtime) / 3600, 1) if newest else None,
