@@ -246,6 +246,7 @@ async function fetchTracks() {
 // Selection for deleting: kept across refreshes, so ticks survive the 3-second auto-refresh.
 const selected = new Set();
 let shownIds = [];
+let shownHtml = null;   // the people list as drawn last (refresh redraws only when it changes)
 
 function updateSelectBar() {
   for (const id of [...selected]) if (!shownIds.includes(id)) selected.delete(id);
@@ -281,7 +282,7 @@ async function deletePeople(body, what) {
   status();
   $("banner").hidden = false;
   $("banner").innerHTML = `Deleted ${res.deleted} ${res.deleted === 1 ? "person" : "people"} (${what}), `
-    + `with ${res.pictures_removed} picture file${res.pictures_removed === 1 ? "" : "s"}. `
+    + `with ${res.pictures_removed} file${res.pictures_removed === 1 ? "" : "s"} (pictures and videos). `
     + '<a href="#" data-back>OK</a>';
 }
 
@@ -312,7 +313,7 @@ async function refresh() {
   if (view.kind === "timeline") $("banner").innerHTML = `Where #${view.id} may have been seen, in time order: `
     + "look-alikes from all cameras, without ones seen elsewhere at the same time. Same clothes can be a "
     + "different person." + back;
-  $("people").innerHTML = tracks.length ? tracks.map(t => {
+  const html = tracks.length ? tracks.map(t => {
     const chips = phrases(t.attributes)
       .map(p => `<span class="chip ${p.review ? "review" : ""} ${p.human ? "human" : ""}"
          title="${esc(p.title)}">${esc(p.text)}</span>`).join("");
@@ -320,7 +321,7 @@ async function refresh() {
     return `<div class="person${selected.has(t.id) ? " is-selected" : ""}">
       <input type="checkbox" data-select="${t.id}" ${selected.has(t.id) ? "checked" : ""}
              aria-label="Select person ${t.id}">
-      ${t.crop ? `<img src="/crops/${encodeURIComponent(t.crop)}?v=${t.n_frames}" alt="">` : `<img alt="">`}
+      ${t.crop ? `<img src="/crops/${encodeURIComponent(t.crop)}?v=${t.status}${encodeURIComponent(t.ended_at || "")}" alt="">` : `<img alt="">`}
       <div><div class="meta">#${t.id}${cameraNames.length > 1 && t.camera ? ` · ${esc(t.camera)}` : ""} · ${when}${t.source ? ` · in ${esc(t.source.file)} at ${mmss(t.source.offset_s)}` : ""} · ${t.status}${t.low_light ? " · low light" : ""}${score(t)}</div>
       <div class="chips">${chips || '<span class="chip">labeling…</span>'}</div>
       <button class="link" data-similar="${t.id}">Look-alikes</button>
@@ -328,6 +329,12 @@ async function refresh() {
         data-original="${t.id}" data-title="#${t.id}, in ${esc(t.source.file)} at ${mmss(t.source.offset_s)}">▶ Original</button>` : ""}${(t.videos || []).map((v, i, all) =>
         ` <button class="link" data-video="${esc(v)}" data-title="#${t.id}${all.length > 1 ? `, visit ${i + 1}` : ""}">▶ Video${all.length > 1 ? " " + (i + 1) : ""}</button>`).join("")}</div></div>`;
   }).join("") : '<div class="empty">No matching people.</div>';
+  // The list is refreshed every 3 s: replace it only when something changed, so buttons and checkboxes are not
+  // swapped under the mouse (a click could miss) and the list does not flicker.
+  if (html !== shownHtml) {
+    $("people").innerHTML = html;
+    shownHtml = html;
+  }
   updateSelectBar();
 }
 
