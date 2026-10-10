@@ -64,6 +64,15 @@ def ensure_certificate(cert_path: Path, key_path: Path) -> str:
     return cert.fingerprint(hashes.SHA256()).hex(":").upper()
 
 
+def expires(cert_path: Path) -> dt.datetime | None:
+    """When the certificate stops being valid (UTC), or None if there is none yet."""
+    from cryptography import x509
+    try:
+        return x509.load_pem_x509_certificate(cert_path.read_bytes()).not_valid_after_utc
+    except (OSError, ValueError):
+        return None
+
+
 def fingerprint(cert_path: Path) -> str | None:
     """The certificate's SHA-256 fingerprint (to compare with the browser's), or None if there is none yet."""
     from cryptography import x509

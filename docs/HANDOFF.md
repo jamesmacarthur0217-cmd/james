@@ -161,6 +161,8 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
    that returns a value (`Run` in install.ps1). Scripts must stay ASCII (5.1 reads them as ANSI; a test checks).
 17. **Tests must never write the user's files**: the `supervisor` fixture and `settings_file:` in test configs
    keep logs and settings in tmp folders; `load_config` uses `data/settings.yaml` only for the real config.yaml.
+18. **"now" twice in a test** can fall on both sides of midnight: make people at noon of a chosen day and ask
+   for that day (fixed 2026-10-10 in test_alerts_reports and test_zones; it failed once at 00:00).
 
 ## 7. Conventions
 
@@ -200,8 +202,6 @@ Untested installer parts (user said skip): the offline package's Python wheels (
 - The user keeps labeling on the Answer key page (aim 50-100); retraining starts helping after 30 more people.
   Imported videos can now add people quickly (they count as the user's own cameras).
 - Vocabulary refinements (coat, polo, tank top) need answer-key values to be measurable.
-- One test failed once exactly at midnight and passed in 5 runs after: probably a test that builds "today"
-  twice; find it if it happens again (`pytest -rf`).
 
 ## 9. Message to start the next session
 

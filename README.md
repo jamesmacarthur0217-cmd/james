@@ -63,7 +63,9 @@ models copied from this PC (detector, SigLIP 2, age model, the Ollama model) and
 (`docker save`; Docker must be running). On the new PC install Python 3.13 (64-bit), Docker Desktop and Ollama
 from their setup files (not in the package), then run `install.bat -Offline D:\vl-offline`. Checked on this PC:
 the models part was packed (5.2 GB in 5 s) and unpacked into empty model folders, the vision model's file
-matched its checksum, and both Hugging Face models loaded with networking turned off.
+matched its checksum, and both Hugging Face models loaded with networking turned off; the whole package (8.2 GB)
+was built, a new `.venv` installed from it with pip offline (`--no-index`, 5 minutes), CUDA worked in it, and all
+tests passed there (2026-10-10). Not yet tried: the database image (`docker save`/`docker load`).
 
 ## Running it
 
@@ -390,6 +392,13 @@ are drawn as gray "ignored" boxes.
 - **Clean stop**: Stop / `stop.bat` / Ctrl+C save the people in view first; an open Live page no longer
   blocks shutdown.
 - **Ollama errors**: each request is retried once.
+- **Security updates**: `.venv\Scripts\python.exe -m pip_audit` lists installed packages with known security
+  problems (checked 2026-10-10: only setuptools, an install tool, moved to 81.0, the newest PyTorch 2.11 accepts;
+  its remaining issue concerns building packages on a Mac. PyTorch's CUDA build is not checked by pip-audit; by
+  version, 2.11 has an advisory for `torch.jit.script`, which needs local access and is not used by the app).
+  GitHub's Dependabot (`.github/dependabot.yml`) opens a pull request when a package in requirements.txt gets a
+  security fix; turn on "Dependabot alerts" and "security updates" once in the repository's Settings.
+- **HTTPS certificate**: the Health page shows its end date (825 days after it was made) and warns 30 days before.
 - **Backups**: the app backs up the database every night while it runs (`backup.hour`, 2:00; a PC that
   was off catches up later that day), and `stop.bat` makes one when it stops the app; at most one a day,
   the newest 7 kept in `data\backups` (`tools/backup_db.py`). `backup.copy_to` (Settings page: *Second copy

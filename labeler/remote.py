@@ -128,6 +128,28 @@ def last_tailscale_login(db) -> dict | None:
     return None
 
 
+CERT_WARN_DAYS = 30
+
+
+def certificate_check(cert: Path, now=None) -> dict:
+    """The HTTPS certificate's end date: browsers refuse an expired one, so other devices could not connect."""
+    import datetime as dt
+
+    from .tls import expires
+    end = expires(cert)
+    if end is None:
+        return _check("HTTPS certificate", "ok", "made at the next start")
+    now = now or dt.datetime.now(dt.timezone.utc)
+    days = (end - now).days
+    fix = f"delete {cert.name} and {cert.with_name('key.pem').name} in {cert.parent}, then restart the app"
+    if days < 0:
+        return _check("HTTPS certificate", "problem", f"expired on {end.date()}: other devices cannot connect; {fix}")
+    if days < CERT_WARN_DAYS:
+        return _check("HTTPS certificate", "warning", f"ends on {end.date()} (in {days} days); {fix} "
+                                                      "(other devices then see a new fingerprint)")
+    return _check("HTTPS certificate", "ok", f"valid until {end.date()} ({days} days)")
+
+
 _cache: dict = {}
 _lock = threading.Lock()
 
@@ -163,6 +185,9 @@ def checks(cfg: dict, db, run=subprocess.run) -> list[dict]:
         out.append(_check("other devices", "ok", f"https://<this PC>:{web['https_port']}, {users} login account(s)"
                           + (f"; certificate fingerprint starts {fp[:23]}" if fp
                              else "; the HTTPS certificate is made at the next start")))
+
+    if web.get("https"):
+        out.append(certificate_check(resolve(web["cert_file"])))
 
     ts, fw = _system(run)
     if ts is None:

@@ -121,6 +121,20 @@ def test_plain_http_is_a_warning(cfg, db, installed):
     assert "plain HTTP" in _by_name(remote.checks(cfg, db, FakeSystem()))["other devices"]["detail"]
 
 
+def test_certificate_end_date(tmp_path):
+    import datetime as dt
+
+    from labeler.tls import ensure_certificate, expires
+    cert = tmp_path / "cert.pem"
+    assert remote.certificate_check(cert)["detail"] == "made at the next start"
+    ensure_certificate(cert, tmp_path / "key.pem")
+    end = expires(cert)
+    assert remote.certificate_check(cert)["level"] == "ok"
+    soon = remote.certificate_check(cert, now=end - dt.timedelta(days=10))
+    assert soon["level"] == "warning" and "in 10 days" in soon["detail"] and "restart" in soon["detail"]
+    assert remote.certificate_check(cert, now=end + dt.timedelta(days=1))["level"] == "problem"
+
+
 def test_without_tailscale(cfg, db, monkeypatch):
     monkeypatch.setattr(remote, "tailscale_exe", lambda: None)
     assert _by_name(remote.checks(cfg, db, FakeSystem()))["Tailscale (another site)"]["level"] == "off"

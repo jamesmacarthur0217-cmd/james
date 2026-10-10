@@ -150,7 +150,8 @@ Then: switch to planning mode and propose the next round (open items: HANDOFF se
 
 **Approved plan: [PHASE8-PLAN.md](PHASE8-PLAN.md)** (user's choices 2026-10-10; not chosen: family vs. strangers).
 
-1. Maintenance: the midnight test, security updates, certificate expiry on the Health page, skipped installer tests.
+1. **Done 2026-10-10** (database image test waits for Docker). Maintenance: the midnight test, security updates,
+   certificate expiry on the Health page, skipped installer tests.
 2. Check people counting (re-linking) against the published ground truth of the test video; change only if measured.
 3. A short video of each person (admin-only), and storage use on the Health page.
 4. Original video link for imported people. 5. Search by photo. 6. Today at a glance on the Live page.

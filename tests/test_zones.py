@@ -117,9 +117,10 @@ def test_rules_and_reports_know_the_zones(db, camera, tmp_path):
     assert admin.post("/api/alerts/rules", json=rule).status_code == 400          # no zone "door" yet
     db.add_zone("test-cam", "door", "line", DOOR["points"])
     assert admin.post("/api/alerts/rules", json=rule).status_code == 200
-    t = db.create_track(camera, 1, datetime.now())
-    db.add_zone_events(t, "test-cam", [{"zone_id": 1, "zone_name": "door", "kind": "out", "at": datetime.now()}])
-    zones_ = admin.get("/api/reports/summary").json()["zones"]
+    noon = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)   # not "now" twice: midnight
+    t = db.create_track(camera, 1, noon)
+    db.add_zone_events(t, "test-cam", [{"zone_id": 1, "zone_name": "door", "kind": "out", "at": noon}])
+    zones_ = admin.get("/api/reports/summary", params={"start": noon.strftime("%Y-%m-%d")}).json()["zones"]
     assert [(z["zone"], z["in"], z["out"]) for z in zones_] == [("door", 0, 1)]
 
 

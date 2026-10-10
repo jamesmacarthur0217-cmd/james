@@ -1,0 +1,11 @@
+# GitHub Dependabot: checks requirements.txt every week. Only security fixes: routine version updates are off
+# (open-pull-requests-limit 0), so a pull request appears only when a package has a known security problem.
+# For those, turn on "Dependabot alerts" and "Dependabot security updates" once in the repository's
+# Settings -> Code security. PyTorch is installed separately (README) and is not checked here.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0

@@ -10,8 +10,8 @@ from labeler.config import DEFAULTS
 from labeler.web import create_app
 
 
-def _person(db, camera, **labels):
-    t = db.create_track(camera, 1, datetime.now())
+def _person(db, camera, at=None, **labels):
+    t = db.create_track(camera, 1, at or datetime.now())
     db.add_attributes(t, [(n, v, 1.0) for n, v in labels.items()], "vlm", "q", threshold=0.6)
     return t
 
@@ -111,8 +111,10 @@ def test_alert_rule_api(db, tmp_path):
 
 def test_report_api_and_csv(db, camera, tmp_path):
     api = _api(db, tmp_path)
-    _person(db, camera, upper_color="red")
-    today = datetime.now().strftime("%Y-%m-%d")
+    # Noon of one day, and that same day asked for: "now" twice could fall on both sides of midnight (it did once).
+    noon = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    _person(db, camera, at=noon, upper_color="red")
+    today = noon.strftime("%Y-%m-%d")
     s = api.get("/api/reports/summary", params={"start": today, "end": today}).json()
     assert s["total"] == 1 and s["attributes"]["upper_color"][0]["value"] == "red"
     assert api.get("/api/reports/summary", params={"start": "07/10/2026"}).status_code == 400
