@@ -102,6 +102,67 @@ def check_disk(cfg: dict) -> dict:
     return _check("disk", "ok", f"{free_gb:.0f} GB free")
 
 
+STORAGE_CACHE_S = 600     # adding up thousands of files is not needed every 30 s
+STORAGE_WARN_DAYS = 30
+_storage_cache: dict = {}
+
+
+def _size(paths) -> int:
+    total = 0
+    for f in paths:
+        try:
+            total += f.stat().st_size
+        except OSError:
+            pass
+    return total
+
+
+def _mb(n: int) -> str:
+    return f"{n / 1e9:.1f} GB" if n >= 1e9 else f"{n / 1e6:.0f} MB" if n >= 1e6 else f"{n / 1e3:.0f} kB"
+
+
+def storage_use(cfg: dict) -> dict:
+    """Bytes used by what the app stores, by kind."""
+    crops = resolve(cfg["storage"]["crop_dir"])
+    clips = crops / "clips"
+    return {"pictures": _size(list(crops.glob("*.jpg")) + list((crops / "blurred").glob("*.jpg"))),
+            "person videos": _size(clips.glob("person_*.webm")),
+            "alert clips": _size(clips.glob("alert_*.webm")),
+            "backups": _size(backups.folder().glob("*.dump")) if backups.folder().is_dir() else 0,
+            "logs": _size(resolve(cfg["logs"]["dir"]).glob("*.log*"))}
+
+
+def check_storage(cfg: dict, db, now_wall: float | None = None, use: dict | None = None) -> dict:
+    """What the app's files use, and how many days of space are left at the last week's rate."""
+    from datetime import timedelta
+    now = datetime.fromtimestamp(now_wall) if now_wall else datetime.now()
+    if use is None:
+        cached = _storage_cache.get("value")
+        if cached and time.monotonic() - _storage_cache["at"] < STORAGE_CACHE_S:
+            use = cached
+        else:
+            use = storage_use(cfg)
+            _storage_cache.update(value=use, at=time.monotonic())
+    parts = ", ".join(f"{k} {_mb(v)}" for k, v in use.items() if v)
+    people = db.count_tracks()
+    week = db.count_tracks(now - timedelta(days=7))
+    per_person = (use["pictures"] + use["person videos"]) / people if people else 0
+    per_day = per_person * week / 7
+    free = shutil.disk_usage(resolve(cfg["storage"]["crop_dir"])).free - cfg["storage"]["min_free_gb"] * 1e9
+    if per_day <= 0:
+        return _check("storage", "ok", (parts or "nothing stored yet") + "; no new people in the last 7 days")
+    days = max(0, free) / per_day
+    detail = (f"{parts}; about {_mb(int(per_person))} per person, {round(week / 7, 1):g} people a day (last 7 days): "
+              f"space for about {days:,.0f} more days")
+    retention = cfg["storage"]["retention_days"]
+    if retention and days > retention:
+        detail += f" (people are kept {retention} days, so it does not fill up)"
+    elif days < STORAGE_WARN_DAYS:
+        return _check("storage", "warning", detail + ": free space, lower storage.retention_days, or turn off "
+                                                     "person videos (Settings)")
+    return _check("storage", "ok", detail)
+
+
 def check_backup(db, now: float, folder: Path | None = None, bcfg: dict | None = None) -> dict:
     """The newest backup's age, the second copy (backup.copy_to) and the last restore check."""
     if not db.is_postgres:
@@ -165,6 +226,10 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
     errors_check, latest_errors = check_errors(now)
     checks = [check_database(db), check_ollama(cfg, pipelines), *check_cameras(cfg, pipelines, camera_health, now_mono),
               check_disk(cfg), check_backup(db, now, bcfg=cfg["backup"]), check_retraining(cfg, db), errors_check]
+    try:
+        checks.insert(-1, check_storage(cfg, db))
+    except Exception as e:   # never break the health check
+        checks.insert(-1, _check("storage", "warning", f"could not be measured ({e.__class__.__name__})"))
     try:   # access from other devices and Tailscale (labeler/remote.py); never breaks the health check
         from . import remote
         checks[-1:-1] = remote.checks(cfg, db)   # before "errors in the log"

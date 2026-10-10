@@ -93,6 +93,7 @@ class Track(Base):
     low_light: Mapped[bool] = mapped_column(Boolean, default=False)
     in_view_s: Mapped[float | None] = mapped_column(Float)   # time actually in view (gaps not counted)
     facing_s: Mapped[float | None] = mapped_column(Float)    # of which facing the camera
+    video_paths: Mapped[str | None] = mapped_column(Text)    # person videos, one per visit, comma-separated
     attributes: Mapped[list[Attribute]] = relationship(back_populates="track", cascade="all, delete-orphan")
     embeddings: Mapped[list[Embedding]] = relationship(cascade="all, delete-orphan")
 
@@ -295,7 +296,12 @@ def resolve(attrs: list[Attribute]) -> dict[str, dict]:
 
 # Columns added to existing tables after the first release. create_all() makes new tables but never changes
 # existing ones, so these are added at startup when missing (FLOAT works on SQLite and PostgreSQL).
-NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT"}, "cameras": {"retention_days": "INTEGER"}}
+NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT", "video_paths": "TEXT"},
+               "cameras": {"retention_days": "INTEGER"}}
+
+
+def _videos(value: str | None) -> list[str]:
+    return [v for v in (value or "").split(",") if v]
 
 
 def _token_hash(token: str) -> str:
@@ -395,6 +401,15 @@ class Database:
         with self.Session() as s:
             return {c.name: c.retention_days for c in s.scalars(select(Camera).where(Camera.retention_days.is_not(None)))}
 
+    def count_tracks(self, since: datetime | None = None) -> int:
+        """People recorded (since a time: for the daily rate on the Health page's storage line)."""
+        from sqlalchemy import func
+        q = select(func.count(Track.id))
+        if since is not None:
+            q = q.where(Track.started_at >= since)
+        with self.Session() as s:
+            return s.scalar(q) or 0
+
     def camera_track_ids(self, name: str) -> list[int]:
         with self.Session() as s:
             return list(s.scalars(select(Track.id).join(Camera, Track.camera_id == Camera.id).where(Camera.name == name)))
@@ -492,6 +507,7 @@ class Database:
             "low_light": t.low_light,
             "in_view_s": t.in_view_s,
             "facing_s": t.facing_s,
+            "videos": _videos(t.video_paths),
             "attributes": resolve(t.attributes),
         }
 
@@ -673,11 +689,13 @@ class Database:
             return [], []
         with self.Session.begin() as s:
             which = select(Track.id) if everything else select(Track.id).where(Track.id.in_(list(ids)))
-            rows = s.execute(select(Track.id, Track.crop_path, Track.face_path).where(Track.id.in_(which))).all()
+            rows = s.execute(select(Track.id, Track.crop_path, Track.face_path, Track.video_paths)
+                             .where(Track.id.in_(which))).all()
             deleted = [r.id for r in rows]
             if not deleted:
                 return [], []
             paths = [p for r in rows for p in (r.crop_path, r.face_path) if p]
+            paths += [v for r in rows for v in _videos(r.video_paths)]
             for start in range(0, len(deleted), 1000):
                 chunk = deleted[start:start + 1000]
                 attr_ids = select(Attribute.id).where(Attribute.track_id.in_(chunk))
@@ -1161,6 +1179,7 @@ class Database:
                     old += s.scalars(select(Track).where(Track.camera_id == cam.id,
                                                          Track.started_at < now - timedelta(days=days))).all()
             paths = [p for t in old for p in (t.crop_path, t.face_path) if p]
+            paths += [v for t in old for v in _videos(t.video_paths)]
             if old:
                 paths += [clip_name(i) for i in s.scalars(select(AlertEvent.id).where(
                     AlertEvent.track_id.in_([t.id for t in old])))]

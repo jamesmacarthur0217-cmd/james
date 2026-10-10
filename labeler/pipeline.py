@@ -1,6 +1,7 @@
 """Camera loop: detect and track people, pick their best frames, and label them."""
 from __future__ import annotations
 
+import itertools
 import logging
 import threading
 import time
@@ -14,7 +15,7 @@ from ultralytics import YOLO
 
 from . import colors, geometry, privacy, schema
 from . import zones as zones_mod
-from .clips import ClipRecorder
+from .clips import ClipRecorder, person_video_name
 from .config import resolve
 from .db import Database
 from .embed import Embedder
@@ -105,6 +106,8 @@ class TrackState:
     age_label: tuple[str, str, float] | None = None   # (attribute, value, confidence) from the age model
     zones: zones_mod.PersonZones = field(default_factory=zones_mod.PersonZones)
     zone_log: list[dict] = field(default_factory=list)   # zone events waiting for this person's record
+    videos: list[str] = field(default_factory=list)   # person videos written for this record (one per visit)
+    clip_key: int | None = None   # the person video being recorded for this visit (ClipRecorder)
     in_view_s: float = 0.0     # time actually seen (a gap while tracked counts at most 1 s per frame)
     facing_s: float = 0.0      # of which facing the camera (geometry.frontality)
 
@@ -119,6 +122,7 @@ class TrackState:
 
 class Pipeline:
     clock: LiveClock | VideoClock = LiveClock()   # live: now (shared: it has no state); imports set a VideoClock
+    _clip_keys = itertools.count(1)   # person-video keys: unique, never reused (unlike id() of a freed object)
 
     def __init__(self, cfg: dict, db: Database, vlm: VLMWorker | None, embedder: Embedder | None = None,
                  student: Student | None = None, camera: dict | None = None):
@@ -150,7 +154,9 @@ class Pipeline:
         self.camera_id = db.get_or_create_camera(cam["name"], str(cam["source"]), self.mode)
         self.owned_ids: set[int] = set()   # records created by this camera, for routing VLM results
         self.zone_counter = zones_mod.ZoneCounter(db.list_zones(self.name), cfg["zones"]["min_frames"])
-        self.clips = ClipRecorder(self.crop_dir, cfg["clips"]) if cfg["clips"]["enabled"] else None
+        pv = cfg.get("person_videos") or {}
+        self.clips = (ClipRecorder(self.crop_dir, cfg["clips"], pv)
+                      if cfg["clips"]["enabled"] or pv.get("enabled") else None)
 
         self.tracks: dict[int, TrackState] = {}
         self.by_db_id: dict[int, TrackState] = {}
@@ -211,6 +217,8 @@ class Pipeline:
         for st in list(self.tracks.values()):
             if st.db_id in ids:
                 st.deleted = True
+                if self.clips is not None:
+                    self.clips.drop_person(st.clip_key)   # no video of a deleted person
         for db_id in ids:
             self.by_db_id.pop(db_id, None)
             self.recently_lost.pop(db_id, None)
@@ -308,6 +316,9 @@ class Pipeline:
                 st = self.tracks.get(tid)
                 if st is None:
                     st = self.tracks[tid] = TrackState(tid, self.clock.wall(), now, seen_since=now)
+                    if self.clips is not None:
+                        st.clip_key = next(self._clip_keys)
+                        self.clips.start_person(st.clip_key)   # their video starts a second before now
                 self._update(st, frame, tuple(xyxy[i]), kpts, now, low_color, tcfg)
                 if st.db_id is None and st.n_frames in self.relink_cfg["check_at_frames"]:
                     st = self._try_relink(tid, st, now)
@@ -451,7 +462,7 @@ class Pipeline:
             except Exception:
                 log.exception("checking alert rules failed")
                 return
-            if self.clips is not None:
+            if self.clips is not None and self.cfg["clips"]["enabled"]:
                 for event in fired:
                     self.clips.request(event["id"])   # a clip around the moment the alert fired
 
@@ -607,6 +618,7 @@ class Pipeline:
         old.last_seen, old.box = new.last_seen, new.box
         old.seen_since, old.kpts, old.thumb, old.recent = new.seen_since, new.kpts, new.thumb, new.recent
         old.thumb_blurred = new.thumb_blurred
+        old.clip_key = new.clip_key    # the new piece's video is this record's next visit
         old.zones = new.zones          # their zones were closed when they left; where they are now
         old.zone_log += new.zone_log   # events since they came back, stored under the old record
         old.in_view_s += new.in_view_s
@@ -625,12 +637,23 @@ class Pipeline:
     def _finish(self, tid: int, lost_at: float | None = None) -> None:
         st = self.tracks.pop(tid)
         if st.deleted:
+            if self.clips is not None:
+                self.clips.drop_person(st.clip_key)
             return
         if st.n_frames < self.cfg["tracking"]["min_frames_keep"]:
+            if self.clips is not None:
+                self.clips.drop_person(st.clip_key)   # noise: no video
             if st.db_id is not None:
                 self.by_db_id.pop(st.db_id, None)
             return
         self._ensure_db(st)
+        video = {}
+        if self.clips is not None and self.clips.person is not None:
+            name = person_video_name(st.db_id, len(st.videos) + 1)
+            self.clips.finish_person(st.clip_key, name)
+            st.videos.append(name)
+            st.clip_key = None
+            video = {"video_paths": ",".join(st.videos)}
         # Leaving the view ends their stay in every area, at the moment they were last seen.
         left_at = self.clock.wall() - timedelta(seconds=max(0.0, self.clock.mono() - st.last_seen))
         st.zone_log += self.zone_counter.leave(st.zones, left_at)
@@ -646,7 +669,7 @@ class Pipeline:
         self.db.update_track(
             st.db_id, status="finished", ended_at=self.clock.wall(), n_frames=st.n_frames,
             low_light=st.low_light_frames > st.n_frames / 2,
-            in_view_s=round(st.in_view_s, 1), facing_s=round(st.facing_s, 1),
+            in_view_s=round(st.in_view_s, 1), facing_s=round(st.facing_s, 1), **video,
         )
         # A VLM result arriving after this point is still written to the database.
         self.by_db_id.pop(st.db_id, None)

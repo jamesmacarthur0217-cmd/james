@@ -74,6 +74,7 @@ class SettingsIn(BaseModel):
     https: bool
     retrain_enabled: bool
     backup_enabled: bool
+    person_videos: bool
     backup_copy_to: str = Field(default="", max_length=260)
 
     @field_validator("backup_copy_to")
@@ -95,6 +96,7 @@ SIMPLE = {
     "https": ("web", "https"),
     "retrain_enabled": ("retrain", "enabled"),
     "backup_enabled": ("backup", "enabled"),
+    "person_videos": ("person_videos", "enabled"),
     "backup_copy_to": ("backup", "copy_to"),
 }
 CAMERA_FIELDS = ("name", "source", "mode", "retention_days", "imgsz")

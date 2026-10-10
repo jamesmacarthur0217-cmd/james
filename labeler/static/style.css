@@ -112,3 +112,10 @@ body:not(.is-admin) .admin-only { display: none !important; }
 .clip-box video { display: block; width: 100%; max-width: 480px; margin-top: 6px; border-radius: 6px; background: #000; }
 /* Review queue: spot checks are not problems, so they are not shown in the warning color. */
 .card .reason.spot { color: var(--muted); }
+/* A person's video (Live page): an overlay, so the redrawn people list does not cut it off. */
+.player { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center;
+  justify-content: center; z-index: 50; padding: 16px; }
+.player[hidden] { display: none; }
+.player-box { background: var(--panel); border-radius: 10px; padding: 12px; max-width: min(900px, 100%); width: 100%; }
+.player-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.player video { width: 100%; max-height: 75vh; background: #000; border-radius: 6px; }

@@ -24,6 +24,7 @@ DEFAULTS: dict = {
     "engagement": {"facing_min": 0.6, "looked_s": 3.0},
     "timeline": {"min_similarity": 0.8, "window_h": 24},
     "clips": {"enabled": True, "before_s": 5, "after_s": 5, "fps": 10, "max_width": 960},
+    "person_videos": {"enabled": True, "max_s": 20, "fps": 5, "max_width": 480, "before_s": 1, "after_s": 1},
     "health": {"enabled": True, "offline_after_s": 10, "blank_after_s": 10, "slow_after_s": 30, "min_fps": 5,
                "startup_grace_s": 30},
     "tracking": {

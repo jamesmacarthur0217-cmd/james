@@ -1,4 +1,4 @@
-"""Short video clips around alerts.
+"""Short video clips around alerts, and a short video of each person.
 
 Each camera keeps its last `before_s` seconds of the live picture in memory (the JPEGs already made for the live
 view, `fps` of them per second: about 5 MB per camera). When an alert fires, frames keep being collected for
@@ -6,6 +6,10 @@ view, `fps` of them per second: about 5 MB per camera). When an alert fires, fra
 browser) by a background thread, so the camera never waits. A clip is written under a temporary name and
 renamed when complete, so a half-written clip is never served. Clips show the labels and boxes, like the
 Live page; with storage.blur_faces they are made from the blurred picture.
+
+Person videos (person_videos): each person's visit is recorded from 1 s before they appear to 1 s after they
+leave, at most max_s seconds (their arrival, which shows the most), smaller than alert clips (5 fps, 480 px):
+about 1-2 MB each, since OpenCV's VP8 writer spends about width x height / 8 bytes on every frame (no quality setting). A person who turns out to be noise (too few frames) is dropped before anything is written.
 """
 from __future__ import annotations
 
@@ -28,13 +32,22 @@ def clip_name(event_id: int) -> str:
     return f"clips/alert_{event_id}.webm"
 
 
+def person_video_name(track_id: int, visit: int) -> str:
+    """Path of a person's video for one visit (a returning person gets another), relative to the picture folder."""
+    return f"clips/person_{track_id}_{visit}.webm"
+
+
 class ClipRecorder:
-    def __init__(self, crop_dir: Path, cfg: dict):
+    def __init__(self, crop_dir: Path, cfg: dict, person_cfg: dict | None = None):
         self.dir = crop_dir
         self.before_s, self.after_s = cfg["before_s"], cfg["after_s"]
         self.fps, self.max_width = cfg["fps"], cfg["max_width"]
+        self.person = person_cfg if person_cfg and person_cfg.get("enabled") else None
+        if self.person:
+            self.before_s = max(self.before_s, self.person["before_s"])
         self._buffer: deque[tuple[float, bytes]] = deque()
         self._recording: list[dict] = []
+        self._people: dict = {}   # key -> person recording still open (the person is in view)
         self._next_due = -1e9
         self._closed = False
         self._lock = threading.Lock()
@@ -53,6 +66,9 @@ class ClipRecorder:
                 self._buffer.append((now, jpeg))
                 for rec in self._recording:
                     rec["frames"].append((now, jpeg))
+                for rec in self._people.values():
+                    if now <= rec["cap"]:
+                        rec["frames"].append((now, jpeg))
             while self._buffer and now - self._buffer[0][0] > self.before_s:
                 self._buffer.popleft()
             done = [r for r in self._recording if now >= r["until"]]
@@ -69,6 +85,37 @@ class ClipRecorder:
             self._recording.append({"event_id": event_id, "frames": list(self._buffer),
                                     "until": now + self.after_s})
 
+    # --- person videos ---------------------------------------------------------------------------
+
+    def start_person(self, key, now: float | None = None) -> None:
+        """A person appeared: keep frames from `before_s` ago on, until finish_person or drop_person."""
+        if self.person is None:
+            return
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            if self._closed:
+                return
+            pre = [(t, j) for t, j in self._buffer if now - t <= self.person["before_s"]]
+            self._people[key] = {"frames": pre, "cap": now + self.person["max_s"], "person": True}
+
+    def finish_person(self, key, name: str, now: float | None = None) -> None:
+        """The person left and is kept: their video is written after `after_s` more seconds (or at the cap)."""
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            rec = self._people.pop(key, None)
+            if rec is None:
+                return
+            rec.update(name=name, until=min(now + self.person["after_s"], rec["cap"]))
+            if self._closed or now >= rec["until"]:
+                self._queue.put(rec)
+            else:
+                self._recording.append(rec)   # collects the last second like an alert clip, then is written
+
+    def drop_person(self, key) -> None:
+        """Noise, or deleted by the user while in view: nothing is written."""
+        with self._lock:
+            self._people.pop(key, None)
+
     def close(self, wait_s: float = 60) -> None:
         """The camera stops: write what the open clips have so far, then stop the writer."""
         with self._lock:
@@ -76,6 +123,7 @@ class ClipRecorder:
                 return
             self._closed = True
             done, self._recording = self._recording, []
+            self._people.clear()   # people still in view are finished by the camera loop before this
         for rec in done:
             self._queue.put(rec)
         self._queue.put(None)
@@ -89,10 +137,20 @@ class ClipRecorder:
             try:
                 self._write(rec)
             except Exception:
-                log.exception("could not save the clip of alert #%s", rec["event_id"])
+                log.exception("could not save the clip %s", rec.get("name") or f"of alert #{rec.get('event_id')}")
 
     def _write(self, rec: dict) -> None:
         frames = rec["frames"]
+        person = rec.get("person", False)
+        fps_wanted = self.person["fps"] if person else self.fps
+        max_width = self.person["max_width"] if person else self.max_width
+        if person and frames:   # fewer frames than the alert-clip buffer keeps: every n-th, on a schedule
+            kept, due = [], -1e9
+            for t, j in frames:
+                if t >= due:
+                    kept.append((t, j))
+                    due = max(due + 1 / fps_wanted, t - 1 / fps_wanted)
+            frames = kept
         if not frames:
             return
         images = [cv2.imdecode(np.frombuffer(j, np.uint8), cv2.IMREAD_COLOR) for _, j in frames]
@@ -100,13 +158,13 @@ class ClipRecorder:
         if not images:
             return
         h, w = images[0].shape[:2]
-        if w > self.max_width:
-            w, h = self.max_width, int(h * self.max_width / w)
+        if w > max_width:
+            w, h = max_width, int(h * max_width / w)
         w, h = w - w % 2, h - h % 2                        # encoders want even sizes
         span = frames[-1][0] - frames[0][0]
         # The real rate (a slow camera gives fewer frames), so the clip plays at normal speed.
-        fps = min(self.fps, max(1.0, (len(frames) - 1) / span)) if span > 0 else self.fps
-        final = self.dir / clip_name(rec["event_id"])
+        fps = min(fps_wanted, max(1.0, (len(frames) - 1) / span)) if span > 0 else fps_wanted
+        final = self.dir / (rec["name"] if person else clip_name(rec["event_id"]))
         final.parent.mkdir(parents=True, exist_ok=True)
         part = final.with_name(final.stem + ".part.webm")
         writer = cv2.VideoWriter(str(part), cv2.VideoWriter_fourcc(*"VP80"), fps, (w, h))
@@ -116,4 +174,7 @@ class ClipRecorder:
             writer.write(cv2.resize(im, (w, h), interpolation=cv2.INTER_AREA) if im.shape[:2] != (h, w) else im)
         writer.release()
         os.replace(part, final)
-        log.info("saved the clip of alert #%s (%.0f s, %d frames)", rec["event_id"], span, len(images))
+        if person:
+            log.debug("saved %s (%.0f s, %d frames)", rec["name"], span, len(images))
+        else:
+            log.info("saved the clip of alert #%s (%.0f s, %d frames)", rec["event_id"], span, len(images))

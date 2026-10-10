@@ -70,6 +70,15 @@ clips:
   fps: 10
   max_width: 960              # pixels; a 10 s clip is about 1-2 MB
 
+# A short video of each person (admins: the video button on a person). Deleted with the person.
+person_videos:
+  enabled: true
+  max_s: 20                   # at most this long: from 1 s before they appear (their arrival shows the most)
+  fps: 5
+  max_width: 480              # pixels; about 1-2 MB per person (README)
+  before_s: 1
+  after_s: 1
+
 # Camera problems (shown on the Live page and the Alerts page). A problem must last this long to count.
 health:
   enabled: true

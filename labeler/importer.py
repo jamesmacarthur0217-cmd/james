@@ -196,6 +196,7 @@ class Importer:
     def _pipeline(self, camera: str, mode: str, imgsz: int | None = None):
         cfg = copy.deepcopy(self.cfg)
         cfg["clips"]["enabled"] = False      # no alert clips for old footage
+        cfg.setdefault("person_videos", {})["enabled"] = False   # the original video is there already
         cam = {"name": camera, "source": IMPORTED, "mode": mode, "loop_files": False, "ignore_zones": []}
         if imgsz:
             cam["imgsz"] = imgsz   # people far away or seen from above need a bigger detector picture

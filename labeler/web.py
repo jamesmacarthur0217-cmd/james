@@ -28,7 +28,7 @@ from .pipeline import Pipeline
 
 STATIC = ROOT / "labeler" / "static"
 log = logging.getLogger(__name__)
-CLIP_NAME = re.compile(r"alert_\d+\.webm")
+CLIP_NAME = re.compile(r"(alert_\d+|person_\d+_\d+)\.webm")   # alert clips and person videos (admins)
 
 
 class ReviewIn(BaseModel):
@@ -653,9 +653,19 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             "all_fields": {**{n: v for n, v in schema.FIELDS.items()}, **schema.LIST_FIELDS},
         }
 
+    def videos(request: Request, people: list[dict]) -> list[dict]:
+        """Person videos for admins, only those already written (a video is saved a second after the person
+        leaves); viewers get none (like alert clips)."""
+        admin = (getattr(request.state, "user", None) or {}).get("role") == "admin"
+        for person in people:
+            person["videos"] = [v.split("/")[-1] for v in person.get("videos") or []
+                                if admin and (crop_dir / v).is_file()]
+        return people
+
     @app.get("/api/tracks")
-    def tracks(limit: int = 50, name: str | None = None, value: str | None = None, camera: str | None = None):
-        return db.list_tracks(limit=min(limit, 500), name=name, value=value, camera=camera)
+    def tracks(request: Request, limit: int = 50, name: str | None = None, value: str | None = None,
+               camera: str | None = None):
+        return videos(request, db.list_tracks(limit=min(limit, 500), name=name, value=value, camera=camera))
 
     @app.post("/api/tracks/delete")
     def delete_tracks(body: DeleteIn, request: Request):
@@ -681,7 +691,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         for t in tracks:
             t["similarity"] = round(sims[t["id"]], 4)
             t["match"] = round(embedder.match_probability(sims[t["id"]]), 4)
-        return tracks
+        return videos(request, tracks)
 
     @app.post("/api/ask")
     def ask(body: AskIn, request: Request):
@@ -691,7 +701,9 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         if not body.question.strip():
             raise HTTPException(400, "empty question")
         audit(request, "question", body.question.strip()[:300])
-        return agent.run(body.question.strip()[:300], limit=min(body.limit, 100))
+        result = agent.run(body.question.strip()[:300], limit=min(body.limit, 100))
+        videos(request, result.get("people") or [])
+        return result
 
     @app.get("/api/tracks/{track_id}/similar")
     def similar(track_id: int, request: Request, limit: int = 10):
@@ -707,7 +719,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         sims = dict(hits)
         for t in tracks:
             t["similarity"] = round(sims[t["id"]], 4)
-        return tracks
+        return videos(request, tracks)
 
     @app.get("/api/tracks/{track_id}/timeline")
     def timeline(track_id: int, request: Request, min_similarity: float | None = None):
@@ -726,13 +738,16 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         anchor = next(t for t in found if t["id"] == track_id)
         candidates = [dict(t, similarity=round(sims[t["id"]], 4)) for t in found if t["id"] != track_id]
         audit(request, "timeline", f"person #{track_id}")
-        return timeline_mod.plausible(anchor, candidates, tcfg["window_h"])
+        return videos(request, timeline_mod.plausible(anchor, candidates, tcfg["window_h"]))
 
     @app.get("/api/review")
-    def review_queue(limit: int = 50):
+    def review_queue(request: Request, limit: int = 50):
         items = db.review_queue(limit=min(limit, 200), spot_every=cfg["review"].get("spot_check_every", 0))
+        # The person's video helps to answer ("is that a backpack?"): attached from their record.
+        people = {t["id"]: t for t in videos(request, db.get_tracks(list({i["track_id"] for i in items})))}
         for item in items:
             item["allowed"] = schema.allowed_values(item["name"])
+            item["videos"] = people.get(item["track_id"], {}).get("videos", [])
         return items
 
     @app.post("/api/review/{attribute_id}")

@@ -24,6 +24,8 @@ Notepad (newest lines at the bottom). `supervisor.log` in the same folder lists 
 **To change a setting** (add a camera, keep data longer, turn HTTPS on…), open **Settings** in the top
 menu, change it, press **Save**, then **Restart now**. The page comes back by itself in about a minute.
 
+**To see what a person did**, press **▶ Video** on them in the people list (admins).
+
 **To add old videos** (from a phone or a recorder), open **Import** in the top menu.
 
 **To watch from another site** (another house or office), follow `docs\SECOND-SITE.md`.

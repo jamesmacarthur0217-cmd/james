@@ -95,6 +95,9 @@
       <label for="blur_faces">Blur faces in saved pictures</label>
       <div><input type="checkbox" id="blur_faces"> <span class="hint">Nobody (admins too) sees faces in pictures saved
         from now on. Labeling still works; the Review and Answer key pages cannot show faces.</span></div>
+      <label for="person_videos">A short video of each person</label>
+      <div><input type="checkbox" id="person_videos"> <span class="hint">Up to 20 seconds from when they appear,
+        for admins only (the ▶ Video button on a person); deleted with the person. About 1-2 MB each.</span></div>
       <label for="https">HTTPS for other devices</label>
       <div><input type="checkbox" id="https"> <span class="hint">Other devices use https://&lt;this PC&gt;:8443
         (encrypted); plain http then works on this PC only.</span></div>
@@ -125,7 +128,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const SIMPLE = ["retention_days", "audit_retention_days", "blur_faces", "blur_faces_for_viewers", "https", "retrain_enabled",
-                "backup_enabled", "backup_copy_to"];
+                "backup_enabled", "backup_copy_to", "person_videos"];
 let loaded = null;        // values as saved (what the next start uses)
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }

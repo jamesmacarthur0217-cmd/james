@@ -31,7 +31,8 @@ async function load() {
     const cands = it.candidates.map(c => `${esc(c.source)}: <b>${esc(c.value)}</b> (${Math.round(c.confidence * 100)}%)`).join("<br>");
     return `<div class="card" data-id="${it.attribute_id}">
       ${it.crop ? `<img src="/crops/${encodeURIComponent(it.crop)}" alt="">` : ""}
-      <div class="attr">#${it.track_id} · ${esc(it.name.replace(/_/g, " "))}</div>
+      <div class="attr">#${it.track_id} · ${esc(it.name.replace(/_/g, " "))}${(it.videos || []).map((v, i) =>
+        ` · <a href="/clips/${encodeURIComponent(v)}" target="_blank" rel="noopener">▶ video${it.videos.length > 1 ? " " + (i + 1) : ""}</a>`).join("")}</div>
       <div class="reason${it.spot_check ? " spot" : ""}">${esc(it.reason)}</div>
       <div class="cands">${cands}</div>
       <div class="row">${input}<button class="primary">Save</button></div>

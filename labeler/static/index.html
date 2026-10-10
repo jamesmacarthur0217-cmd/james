@@ -71,6 +71,12 @@
   </section>
   </div>
 </main>
+<div id="player" class="player" hidden>
+  <div class="player-box">
+    <div class="player-head"><b id="player-title"></b><button id="player-close">Close</button></div>
+    <video id="player-video" controls playsinline></video>
+  </div>
+</div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -106,10 +112,23 @@ $("q-form").onsubmit = (e) => {
   refresh();
 };
 $("people").addEventListener("click", (e) => {
+  if (e.target.dataset.video) { playVideo(e.target.dataset.video, e.target.dataset.title); return; }
   const id = e.target.dataset.similar, tl = e.target.dataset.timeline;
   if (id) { view = { kind: "similar", id: Number(id) }; refresh(); }
   if (tl) { view = { kind: "timeline", id: Number(tl) }; refresh(); }
 });
+// A person's video plays in an overlay: the people list is redrawn every few seconds, which would cut it off.
+function playVideo(name, title) {
+  $("player-title").textContent = `Person ${title}`;
+  $("player-video").src = "/clips/" + encodeURIComponent(name);
+  $("player").hidden = false;
+  $("player-video").play().catch(() => {});
+}
+function closeVideo() { $("player-video").pause(); $("player-video").removeAttribute("src"); $("player").hidden = true; }
+$("player-close").addEventListener("click", closeVideo);
+$("player").addEventListener("click", (e) => { if (e.target.id === "player") closeVideo(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("player").hidden) closeVideo(); });
+
 $("banner").addEventListener("click", (e) => {
   if (e.target.dataset.back !== undefined) { view = { kind: "recent" }; $("q").value = ""; refresh(); }
 });
@@ -253,7 +272,8 @@ async function refresh() {
       <div><div class="meta">#${t.id}${cameraNames.length > 1 && t.camera ? ` · ${esc(t.camera)}` : ""} · ${when} · ${t.status}${t.low_light ? " · low light" : ""}${score(t)}</div>
       <div class="chips">${chips || '<span class="chip">labeling…</span>'}</div>
       <button class="link" data-similar="${t.id}">Look-alikes</button>
-      <button class="link" data-timeline="${t.id}">Timeline</button></div></div>`;
+      <button class="link" data-timeline="${t.id}">Timeline</button>${(t.videos || []).map((v, i, all) =>
+        ` <button class="link" data-video="${esc(v)}" data-title="#${t.id}${all.length > 1 ? `, visit ${i + 1}` : ""}">▶ Video${all.length > 1 ? " " + (i + 1) : ""}</button>`).join("")}</div></div>`;
   }).join("") : '<div class="empty">No matching people.</div>';
   updateSelectBar();
 }

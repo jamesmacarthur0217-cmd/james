@@ -115,7 +115,7 @@ or another app (Teams, Discord) holding the camera.
 | **Answer key** | Label recorded people yourself, blind, and see how accurate the system is on this camera |
 | **Import** (admin) | Add recorded videos with their real times (see Importing recorded videos) |
 | **Settings** (admin) | Cameras, how long data is kept, backups, face blurring, HTTPS, weekly retraining; **Restart now** |
-| **Health** | Whether the database, Ollama, cameras, disk and backups work (see Reliability) |
+| **Health** | Whether the database, Ollama, cameras, disk, backups and storage are fine (see Reliability) |
 
 ### Settings page
 
@@ -326,6 +326,23 @@ the Audit log). Each camera keeps its last seconds in memory (about 5 MB); clips
 OpenCV, plays in every current browser), at most 960 pixels wide and 10 frames per second, about 1.5-3 MB each,
 written in the background a few seconds after the alert. They are deleted with the person (Delete, retention)
 or with their alert rule. With `storage.blur_faces: true` clips are made from the blurred picture.
+
+## A video of each person
+
+Every person seen live gets a short video of their visit: from 1 second before they appear to 1 second after
+they leave, at most 20 seconds (their arrival; `person_videos:` in config.yaml, on/off on the Settings page). The
+**▶ Video** button on a person (Live page people list, also in look-alikes, timeline and answers; and on the Review
+page) plays it in a window above the page; a person who comes back gets a video per visit. Admins only (viewers
+see none, as with alert clips); watching is in the Audit log. Deleted with the person (Delete, retention). Made
+from the blurred picture with `storage.blur_faces`. Not for imported videos (their original file exists).
+
+Size, measured on the test video as a live camera (2026-10-10): 480×360, 5 frames per second, median 1.3 MB per
+person (0.9-2.3 MB); the camera kept its 10 fps. OpenCV's VP8 writer has no quality setting (it spends about
+width × height ÷ 8 bytes on every frame), so the size is set by the picture size: at 640 px the median was 2.1 MB.
+Animated WebP would be 4-6 times smaller but took 3-6 s of processor time per person and cannot be paused, so
+it was not used. The Health page's **storage** line shows what pictures, person videos, alert clips, backups
+and logs use, the average per person, people per day (last 7 days) and days of space left at that rate; a
+warning below 30 days, unless retention deletes people before the disk fills.
 
 ## Camera problems
 
@@ -565,9 +582,9 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-390 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+400 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 
