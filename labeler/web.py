@@ -721,6 +721,28 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             t["similarity"] = round(sims[t["id"]], 4)
         return videos(request, tracks)
 
+    @app.get("/api/tracks/{track_id}/original")
+    def original(track_id: int, request: Request):
+        """An imported person's moment in their original video, as a short excerpt that plays in a browser
+        (admins; viewers may only open look-alikes and the timeline below a person). Made on first view."""
+        from .db import excerpt_name
+        from .importer import make_excerpt
+        source = db.track_source(track_id)
+        if source is None:
+            raise HTTPException(404, "this person was not imported from a video")
+        file, offset, in_view = source
+        path = Path(file)
+        if not path.is_file():
+            raise HTTPException(404, f"the original video {path.name} is no longer where it was imported from")
+        out = crop_dir / excerpt_name(track_id)
+        if not out.is_file():
+            try:
+                make_excerpt(path, offset, in_view, out)
+            except (ValueError, RuntimeError) as e:
+                raise HTTPException(500, str(e))
+        audit(request, "view original", f"person #{track_id}: {path.name} at {offset:.0f} s")
+        return FileResponse(out, media_type="video/webm", headers={"Cache-Control": "private, max-age=3600"})
+
     @app.get("/api/tracks/{track_id}/timeline")
     def timeline(track_id: int, request: Request, min_similarity: float | None = None):
         """Where this person was seen: look-alikes from all cameras in time order (labeler/timeline.py)."""

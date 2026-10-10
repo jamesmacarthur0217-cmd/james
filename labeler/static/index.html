@@ -112,15 +112,19 @@ $("q-form").onsubmit = (e) => {
   refresh();
 };
 $("people").addEventListener("click", (e) => {
-  if (e.target.dataset.video) { playVideo(e.target.dataset.video, e.target.dataset.title); return; }
+  if (e.target.dataset.video) { playVideo("/clips/" + encodeURIComponent(e.target.dataset.video), e.target.dataset.title); return; }
+  if (e.target.dataset.original) { playVideo(`/api/tracks/${e.target.dataset.original}/original`, e.target.dataset.title); return; }
   const id = e.target.dataset.similar, tl = e.target.dataset.timeline;
   if (id) { view = { kind: "similar", id: Number(id) }; refresh(); }
   if (tl) { view = { kind: "timeline", id: Number(tl) }; refresh(); }
 });
 // A person's video plays in an overlay: the people list is redrawn every few seconds, which would cut it off.
-function playVideo(name, title) {
-  $("player-title").textContent = `Person ${title}`;
-  $("player-video").src = "/clips/" + encodeURIComponent(name);
+function playVideo(src, title) {
+  // An imported person's original is cut from the file on first view: a few seconds.
+  $("player-title").textContent = `Person ${title} · preparing the video…`;
+  $("player-video").onloadeddata = () => { $("player-title").textContent = `Person ${title}`; };
+  $("player-video").onerror = () => { $("player-title").textContent = `Person ${title} · the video could not be loaded`; };
+  $("player-video").src = src;
   $("player").hidden = false;
   $("player-video").play().catch(() => {});
 }
@@ -269,10 +273,11 @@ async function refresh() {
       <input type="checkbox" data-select="${t.id}" ${selected.has(t.id) ? "checked" : ""}
              aria-label="Select person ${t.id}">
       ${t.crop ? `<img src="/crops/${encodeURIComponent(t.crop)}?v=${t.n_frames}" alt="">` : `<img alt="">`}
-      <div><div class="meta">#${t.id}${cameraNames.length > 1 && t.camera ? ` · ${esc(t.camera)}` : ""} · ${when} · ${t.status}${t.low_light ? " · low light" : ""}${score(t)}</div>
+      <div><div class="meta">#${t.id}${cameraNames.length > 1 && t.camera ? ` · ${esc(t.camera)}` : ""} · ${when}${t.source ? ` · in ${esc(t.source.file)} at ${mmss(t.source.offset_s)}` : ""} · ${t.status}${t.low_light ? " · low light" : ""}${score(t)}</div>
       <div class="chips">${chips || '<span class="chip">labeling…</span>'}</div>
       <button class="link" data-similar="${t.id}">Look-alikes</button>
-      <button class="link" data-timeline="${t.id}">Timeline</button>${(t.videos || []).map((v, i, all) =>
+      <button class="link" data-timeline="${t.id}">Timeline</button>${t.source ? ` <button class="link admin-only"
+        data-original="${t.id}" data-title="#${t.id}, in ${esc(t.source.file)} at ${mmss(t.source.offset_s)}">▶ Original</button>` : ""}${(t.videos || []).map((v, i, all) =>
         ` <button class="link" data-video="${esc(v)}" data-title="#${t.id}${all.length > 1 ? `, visit ${i + 1}` : ""}">▶ Video${all.length > 1 ? " " + (i + 1) : ""}</button>`).join("")}</div></div>`;
   }).join("") : '<div class="empty">No matching people.</div>';
   updateSelectBar();

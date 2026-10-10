@@ -139,6 +139,52 @@ def describe(files: list[Path]) -> list[dict]:
     return out
 
 
+EXCERPT_BEFORE_S = 2
+EXCERPT_MAX_S = 30
+
+
+def make_excerpt(src: Path, offset_s: float, in_view_s: float, out: Path, fps: float = 10, width: int = 640) -> Path:
+    """A short web-playable video (VP8 WebM) of the original file around one person's moment: from 2 s before
+    they appear, as long as they were in view (+2 s), at most 30 s. Works for any format OpenCV reads (an AVI
+    from a recorder plays in no browser). Written under a temporary name, then renamed."""
+    import cv2
+    cap = cv2.VideoCapture(str(src))
+    if not cap.isOpened():
+        raise ValueError(f"cannot open {src.name}")
+    try:
+        src_fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+        start = max(0.0, offset_s - EXCERPT_BEFORE_S)
+        end = start + min(EXCERPT_MAX_S, in_view_s + 2 * EXCERPT_BEFORE_S)
+        cap.set(cv2.CAP_PROP_POS_MSEC, start * 1000)
+        fps = min(fps, src_fps)
+        step, due, writer, part = 1 / fps, start, None, out.with_name(out.stem + ".part.webm")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            t = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000
+            if t > end:
+                break
+            if t + 1e-6 < due:
+                continue
+            due += step
+            h, w = frame.shape[:2]
+            if writer is None:
+                size = (min(width, w) // 2 * 2, int(h * min(width, w) / w) // 2 * 2)
+                writer = cv2.VideoWriter(str(part), cv2.VideoWriter_fourcc(*"VP80"), fps, size)
+                if not writer.isOpened():
+                    raise RuntimeError("the VP8 video encoder is not available")
+            writer.write(cv2.resize(frame, size, interpolation=cv2.INTER_AREA))
+        if writer is None:
+            raise ValueError(f"no pictures at {offset_s:.0f} s in {src.name}")
+        writer.release()
+    finally:
+        cap.release()
+    part.replace(out)
+    return out
+
+
 def stride_for(fps: float, target_fps: float) -> int:
     return max(1, round(fps / max(target_fps, 0.1)))
 
@@ -232,7 +278,7 @@ class Importer:
                 with self._lock:
                     job["current"] = i
                     job["files"][i]["state"] = "running"
-                before = len(p.owned_ids)
+                before = set(p.owned_ids)
                 self._new_tracker(p)
                 p.clock = VideoClock(f["start"], base)
                 video = RecordedVideo(f["path"], stride_for(info["fps"], job["target_fps"]))
@@ -248,13 +294,15 @@ class Importer:
                                   speed=round((done_before + t) / elapsed, 1) if elapsed > 0 else None)
                 for tid in list(p.tracks):   # the end of a file: everyone in view leaves
                     p._finish(tid)
+                # Each person remembers the original file and their moment in it ("seen in door.mp4 at 0:31").
+                self.db.set_sources(set(p.owned_ids) - before, str(f["path"]), f["start"])
                 p.recently_lost.clear()
                 base += info["duration_s"] + FILE_GAP_S
                 # A cancelled file counts only as far as it got.
                 done_before += p.clock.t if self._stop.is_set() else info["duration_s"]
                 with self._lock:
                     job["files"][i].update(state="cancelled" if self._stop.is_set() else "done",
-                                           people=len(p.owned_ids) - before)
+                                           people=len(set(p.owned_ids) - before))
                     job["people"] = len(p.owned_ids)
                     job["done_s"] = round(done_before, 1)
             self._set(job, state="finishing")

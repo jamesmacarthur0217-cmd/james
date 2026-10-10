@@ -94,6 +94,8 @@ class Track(Base):
     in_view_s: Mapped[float | None] = mapped_column(Float)   # time actually in view (gaps not counted)
     facing_s: Mapped[float | None] = mapped_column(Float)    # of which facing the camera
     video_paths: Mapped[str | None] = mapped_column(Text)    # person videos, one per visit, comma-separated
+    source_file: Mapped[str | None] = mapped_column(Text)    # imported videos: the original file
+    source_offset_s: Mapped[float | None] = mapped_column(Float)   # and when in it the person appears
     attributes: Mapped[list[Attribute]] = relationship(back_populates="track", cascade="all, delete-orphan")
     embeddings: Mapped[list[Embedding]] = relationship(cascade="all, delete-orphan")
 
@@ -296,12 +298,18 @@ def resolve(attrs: list[Attribute]) -> dict[str, dict]:
 
 # Columns added to existing tables after the first release. create_all() makes new tables but never changes
 # existing ones, so these are added at startup when missing (FLOAT works on SQLite and PostgreSQL).
-NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT", "video_paths": "TEXT"},
+NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT", "video_paths": "TEXT", "source_file": "TEXT",
+                          "source_offset_s": "FLOAT"},
                "cameras": {"retention_days": "INTEGER"}}
 
 
 def _videos(value: str | None) -> list[str]:
     return [v for v in (value or "").split(",") if v]
+
+
+def excerpt_name(track_id: int) -> str:
+    """The playable excerpt of an imported person's original video (made on first view, labeler/importer.py)."""
+    return f"clips/excerpt_{track_id}.webm"
 
 
 def _token_hash(token: str) -> str:
@@ -400,6 +408,21 @@ class Database:
         """Retention stored with the camera (imported videos), for cameras not in the config."""
         with self.Session() as s:
             return {c.name: c.retention_days for c in s.scalars(select(Camera).where(Camera.retention_days.is_not(None)))}
+
+    def set_sources(self, track_ids, file: str, file_start: datetime) -> None:
+        """Imported people: which file they are in, and when (seconds from the file's start)."""
+        with self.Session.begin() as s:
+            for t in s.scalars(select(Track).where(Track.id.in_(list(track_ids)))):
+                t.source_file = file
+                t.source_offset_s = round(max(0.0, (t.started_at - file_start).total_seconds()), 1)
+
+    def track_source(self, track_id: int) -> tuple[str, float, float] | None:
+        """(original file, offset, seconds in view) of an imported person."""
+        with self.Session() as s:
+            t = s.get(Track, track_id)
+            if t is None or not t.source_file:
+                return None
+            return t.source_file, t.source_offset_s or 0.0, t.in_view_s or 0.0
 
     def count_tracks(self, since: datetime | None = None) -> int:
         """People recorded (since a time: for the daily rate on the Health page's storage line)."""
@@ -508,6 +531,9 @@ class Database:
             "in_view_s": t.in_view_s,
             "facing_s": t.facing_s,
             "videos": _videos(t.video_paths),
+            # Imported people: the original file's name (not its folder) and the moment in it.
+            "source": {"file": t.source_file.replace("\\", "/").split("/")[-1], "offset_s": t.source_offset_s}
+            if t.source_file else None,
             "attributes": resolve(t.attributes),
         }
 
@@ -689,13 +715,14 @@ class Database:
             return [], []
         with self.Session.begin() as s:
             which = select(Track.id) if everything else select(Track.id).where(Track.id.in_(list(ids)))
-            rows = s.execute(select(Track.id, Track.crop_path, Track.face_path, Track.video_paths)
+            rows = s.execute(select(Track.id, Track.crop_path, Track.face_path, Track.video_paths, Track.source_file)
                              .where(Track.id.in_(which))).all()
             deleted = [r.id for r in rows]
             if not deleted:
                 return [], []
             paths = [p for r in rows for p in (r.crop_path, r.face_path) if p]
             paths += [v for r in rows for v in _videos(r.video_paths)]
+            paths += [excerpt_name(r.id) for r in rows if r.source_file]   # imported people only
             for start in range(0, len(deleted), 1000):
                 chunk = deleted[start:start + 1000]
                 attr_ids = select(Attribute.id).where(Attribute.track_id.in_(chunk))
@@ -1180,6 +1207,7 @@ class Database:
                                                          Track.started_at < now - timedelta(days=days))).all()
             paths = [p for t in old for p in (t.crop_path, t.face_path) if p]
             paths += [v for t in old for v in _videos(t.video_paths)]
+            paths += [excerpt_name(t.id) for t in old if t.source_file]
             if old:
                 paths += [clip_name(i) for i in s.scalars(select(AlertEvent.id).where(
                     AlertEvent.track_id.in_([t.id for t in old])))]

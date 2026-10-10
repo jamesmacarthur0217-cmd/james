@@ -290,6 +290,60 @@ def test_imported_footage_keeps_its_own_retention(db, tmp_path):
     assert len(db.camera_track_ids("forever")) == 1 and db.camera_track_ids("year") == []
 
 
+def _imported_person(db, video, offset_s=0.5, in_view=1.0):
+    cam = db.get_or_create_camera("phone", IMPORTED, "security")
+    start = datetime(2026, 1, 1, 8, 0)
+    t = db.create_track(cam, 1, start + timedelta(seconds=offset_s))
+    db.update_track(t, in_view_s=in_view)
+    db.set_sources([t], str(video), start)
+    return t
+
+
+def test_imported_people_remember_their_file_and_moment(db, tmp_path):
+    video = _video(tmp_path / "door cam.avi")
+    t = _imported_person(db, video, offset_s=31.4)
+    assert db.get_tracks([t])[0]["source"] == {"file": "door cam.avi", "offset_s": 31.4}   # the name, not the folder
+    assert db.track_source(t)[0] == str(video)
+
+
+def test_excerpt_of_the_original(tmp_path):
+    video = _video(tmp_path / "v.avi", frames=200, fps=20.0)                # 10 s
+    out = importer.make_excerpt(video, offset_s=4.0, in_view_s=0.5, out=tmp_path / "e.webm", fps=10)
+    cap = cv2.VideoCapture(str(out))
+    n = 0
+    while cap.read()[0]:
+        n += 1
+    assert 43 <= n <= 47                     # 2 s before to 2 s after the 0.5 s in view: 2.0-6.5 s at 10 per second
+    with pytest.raises(ValueError, match="no pictures"):
+        importer.make_excerpt(video, offset_s=60, in_view_s=1, out=tmp_path / "late.webm")
+
+
+def test_original_is_played_for_admins_only(web, db, tmp_path):
+    client, _ = web
+    video = _video(tmp_path / "v.avi", frames=60, fps=20.0)
+    t = _imported_person(db, video)
+    r = client.get(f"/api/tracks/{t}/original")
+    assert r.status_code == 200 and r.headers["content-type"] == "video/webm" and len(r.content) > 0
+    assert db.list_audit(1)[0]["detail"] == f"person #{t}: v.avi at 0 s"
+    live = db.create_track(db.get_or_create_camera("cam1", "0", "kiosk"), 2, NOW)
+    assert client.get(f"/api/tracks/{live}/original").status_code == 404     # not imported
+    db.add_user("vic", accounts.hash_password("correct horse battery"), "viewer")
+    viewer = TestClient(client.app, client=("192.168.1.20", 5000))
+    viewer.post("/api/login", json={"username": "vic", "password": "correct horse battery"})
+    assert viewer.get(f"/api/tracks/{t}/original").status_code == 403
+    deleted, paths = db.delete_tracks([t])                                   # the excerpt goes with the person
+    assert f"clips/excerpt_{t}.webm" in paths
+
+
+def test_original_moved_away(web, db, tmp_path):
+    client, _ = web
+    video = _video(tmp_path / "v.avi")
+    t = _imported_person(db, video)
+    video.unlink()
+    r = client.get(f"/api/tracks/{t}/original")
+    assert r.status_code == 404 and "no longer where it was imported from" in r.json()["detail"]
+
+
 def test_viewers_cannot_import(web, db):
     client, _ = web
     db.add_user("vic", accounts.hash_password("correct horse battery"), "viewer")

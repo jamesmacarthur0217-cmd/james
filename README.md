@@ -263,6 +263,13 @@ two labeling jobs). Old footage sends no alerts and makes no alert clips. Cancel
 The page lists each import with **Delete all its people**; on the Live page the people list has a camera filter
 (`/?camera=<name>`). Imports are in the Audit log.
 
+Each imported person shows where they are in the original ("in door_cam.mp4 at 0:31"), and admins get
+**▶ Original**: a short excerpt of the original file around that moment (from 2 s before, as long as they were
+in view, at most 30 s), cut on first view and then kept until the person is deleted, so formats a browser cannot
+play (an AVI from a recorder) still play. Only the file an import recorded for that person can be read; viewing is
+in the Audit log. Measured: a 6 s excerpt of the 768×576 test video took 3.5 s to make the first time (2.4 MB) and
+0.03 s after that. If the original was moved or deleted, the button says so.
+
 Measured on a public test video (OpenCV's `vtest.avi`: 80 s, 768×576, 10 fps, people walking, seen from above):
 
 | Detector size | Frames per second used | People found | Time (no vision model) |
@@ -582,9 +589,9 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-400 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+404 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 
