@@ -209,7 +209,9 @@ Untested installer parts (user said skip): the offline package's Python wheels (
 - A video of each person (480 px, median 1.3 MB) and the storage line on Health; original-video excerpts for
   imported people; search by photo (a hint on far cameras: 6 of 18 first); today at a glance on the Live page.
 
-Open items for the next round:
+**Next: Phase 9, small fixes** (the user's choice 2026-10-10): [PHASE9-PLAN.md](PHASE9-PLAN.md).
+
+Open items for later rounds:
 - Second site over Tailscale: waits for the user (docs/SECOND-SITE.md; the Health page checks each step).
 - The database image part of the offline package (`docker save` / `docker load`): test when Docker runs.
 - Appearance on far or overhead cameras is weak (re-linking, look-alikes, timeline, photo search): a person
