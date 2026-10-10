@@ -2,7 +2,7 @@
 (MOTChallenge gt.txt: frame, person, left, top, width, height, ...) and compares.
 
     python tools/relink_check.py <video> <gt.txt> --config <test_config.yaml> [--imgsz 1280] [--fps 10]
-           [--long-gap 0.90,0.95,off] [--sheet <folder>]
+           [--long-gap 0.90,0.95,default,off] [--json <file>]
 
 For each setting of tracking.relink.long_gap_min_similarity ("off" = re-linking turned off) it prints:
   true      people in the markings
@@ -13,7 +13,8 @@ For each setting of tracking.relink.long_gap_min_similarity ("off" = re-linking 
   joins     re-link decisions; right = the same true person came back, wrong = a different one
 
 A record follows a true person in a frame when their boxes overlap by IoU >= 0.5. Nothing is written to the
-user's data: use a test config from tools/make_test_config.py. With --sheet, pictures of the wrong joins.
+user's data: use a test config from tools/make_test_config.py. The age model is not loaded (it does not
+change who is counted).
 """
 from __future__ import annotations
 
@@ -216,11 +217,9 @@ def main() -> int:
     logging.getLogger("labeler.pipeline").setLevel(logging.INFO)
 
     cfg = load_config(args.config)
-    from labeler.age import AgeEstimator
     from labeler.embed import Embedder
     embedder = Embedder(cfg["embeddings"])
     shared = {"embedder": embedder, "student": None, "age": None}
-    _ = AgeEstimator   # the age model does not change who is counted; left out for speed
     gt = read_gt(args.gt)
     results = []
     print(f"{'setting':>10} {'true':>5} {'counted':>8} {'found':>6} {'merged':>7} {'split':>6} {'joins':>6} "
