@@ -18,7 +18,8 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-10)
 
-- Git: local repo (no remote yet), branch `main`. Roadmap **Phases 0, 2-7 done**; Phase 1 deferred. Phase 7
+- Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-7 done**; Phase 1 deferred. Phase 7
   commits, newest first: `e1c1f24` video import · `2c39ed7` second-site checks · `bf55621`/`0dacfe2` daily
   backup · `fab8340` plan. Phase 6 commits: `2b6d3f2` GitHub workflow · `39c7dd0` installer · `a63017b` Settings page · `4fb0c3b`
   health check · `f32543d` log files · `be09f44` stop.bat fix. Earlier: `958d80c` spot checks · `a18e8a8` weekly
@@ -175,8 +176,8 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
 
 **Phase 6 (operations) is done** (plan: [PHASE6-PLAN.md](PHASE6-PLAN.md)): log files, health check, Settings page
 with Restart now, installer with offline package, GitHub test workflow. Not done, by the user's choice: a Windows
-service (console window kept), and the push to GitHub ("later": the user creates an empty private repository and
-gives its URL; then `git remote add origin <url>`, `git push -u origin main`, check the first Actions run).
+service (console window kept). GitHub: pushed 2026-10-10; the first Actions run is checked by the user (the
+browser pane is not signed in to GitHub, and the repository is private).
 Untested installer parts (user said skip): the offline package's Python wheels (~4 GB download) with a fresh
 `.venv`, `docker save` of the database image, the installer's database/account checks with Docker running.
 

@@ -130,7 +130,7 @@ page for common settings; health check; installer; private GitHub with tests). E
    say when a restart is needed.
 4. **Done 2026-10-09** (`install.bat`, `tools/pack_offline.ps1`). An installer script for a new PC: Python venv, Docker, Ollama and model downloads, first admin account,
    with offline model packaging for sites without internet.
-5. **Prepared** (`.github/workflows/tests.yml`); the push waits for the user ("later"). Optional: push to a
+5. **Done 2026-10-10** (pushed to the user's private repository; `.github/workflows/tests.yml`). Optional: push to a
    private GitHub repo with CI running the test suite (ask first).
 
 Then: switch to planning mode and propose the next round (open items: HANDOFF section 8).
