@@ -490,6 +490,20 @@ are drawn as gray "ignored" boxes.
   `tools\backup_db.py --verify-only`. Measured here: backup and restore check of the 27-person database
   took 2 s (0.2 MB). Before 2026-10-10 only `stop.bat` made backups, so a PC that was never
   stopped had none.
+- **Restore drill** (`tools\restore_drill.py`): the whole way back, as after a broken disk: a new, empty
+  database container (port 5433, same image, nothing downloaded), the newest backup restored into it, a test copy
+  of the app started on it (port 8002) with a copy of the pictures, every page and a few calls on restored people
+  checked, then everything removed. The real database is not touched. Measured 2026-10-12: 27 of 27 people back,
+  all pages, pictures, look-alike search, reports and the health check working; **22 s** in all (new database
+  2 s, restore 1 s, app start 15 s). **The backups hold the database only**: with `--no-pictures` (as after a
+  lost disk) people come back with labels, search and reports, but without pictures or person videos.
+- **Long-run check** (`tools\soak.py`): samples a running copy every 10 minutes (the app's private memory,
+  threads, handles and own GPU memory; Ollama; GPU power; FPS; errors in the log) and charts the trend after the
+  first hour. 24 hours on the webcam (2026-10-11; the lens cover was closed, so no people were labeled): the app
+  never stopped answering, no errors, threads and handles flat, private memory 4.93 → 4.99 GB (+60 MB in 23 h,
+  levelling off). Its working set (RSS) fell from 2.1 GB to 0.13 GB: Windows trims a quiet program's memory,
+  nothing was freed, so private memory is the number to watch. FPS fell from ~40 to ~18 for 11 hours while the PC
+  was used for other things (GPU memory of all programs up to 6.5 GB) and came back by itself without a restart.
 - **Disk space**: warning at startup and in the page header below `storage.min_free_gb` (5 GB).
 - **Auto-start**: `install-autostart.bat` / `remove-autostart.bat`.
 
@@ -622,9 +636,9 @@ recorded once a day and shown as a chart (**Accuracy over time**), so you can se
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-420 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+446 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, today at a glance, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, today at a glance, idle mode, the long-run check and the restore drill, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 
@@ -646,7 +660,7 @@ Changes are tracked with git.
 | `labeler/importer.py` | the Import page: recorded videos with real times |
 | `run.py`, `start.bat`, `stop.bat` | starting and stopping |
 | `install.bat` / `install.ps1`, `tools/models.py`, `tools/pack_offline.ps1` | installing on a new PC, offline package |
-| `tools/` | benchmarks, evaluation, training, backups |
+| `tools/` | benchmarks, evaluation, training, backups, long-run check (`soak.py`), restore drill |
 | `tests/` | automated tests |
 | `data/` | person pictures, backups, log files, datasets (not in git) |
 
