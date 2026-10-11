@@ -232,8 +232,8 @@ the offline package's database image and the installer's database checks tested.
 when IP cameras are added. Ask the user before each phase starts.
 
 Open items (also in that plan):
-- Pictures and person videos are not in the backups (restore drill, 2026-10-12): ask the user whether to copy
-  `data/crops` with each backup to `backup.copy_to` (only useful on another disk; copy_to is empty now).
+- Pictures and person videos are not in the backups (restore drill, 2026-10-12). The user chose to leave it so
+  (2026-10-12); offer again only if they set up a second disk (`backup.copy_to`).
 - Second site over Tailscale: waits for the user (docs/SECOND-SITE.md; the Health page checks each step).
 - Appearance on far or overhead cameras is weak (re-linking, look-alikes, timeline, photo search): a person
   re-identification model would help; check its license first (Phase 1 rules).
