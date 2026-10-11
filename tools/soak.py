@@ -3,15 +3,16 @@
     python tools/soak.py --port 8001 --hours 24 --every 600 --out <folder> [--data <folder>] [--log <file>]
     python tools/soak.py --report <folder>/soak.csv        # chart and trends again, from an earlier run
 
-Every --every seconds it writes one row to <folder>/soak.csv: the app's memory (RSS and private bytes), threads
-and handles; Ollama's memory; the GPU's memory, power and use; free disk and the size of --data (pictures, clips,
+Every --every seconds it writes one row to <folder>/soak.csv: the app's memory (RSS and private bytes), threads,
+handles and GPU memory; Ollama's memory; the whole GPU's memory, power and use; free disk and the size of --data (pictures, clips,
 database); FPS, frames, people in view, VLM queue and people stored (/api/status); the health check result
 (/api/health); new ERROR and WARNING lines in --log. It only reads: nothing in the app changes.
 
 At the end (or with --report) it writes soak.png (one small chart per value) and soak.txt: for each value the
 straight-line trend after the first hour (models loading, caches filling), and "GROWING" when it would add more
 than 10% (and more than a small fixed amount) in 24 hours; FPS is flagged when it falls. A memory leak shows as
-steady growth; one-off steps (a model loaded on first use) do not.
+steady growth; one-off steps (a model loaded on first use) do not. Watch the private memory: Windows trims the
+RSS (working set) of a quiet process, so it can fall a lot without anything being freed.
 """
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ from pathlib import Path
 
 import psutil
 
-COLUMNS = ["time", "elapsed_h", "up", "app_rss_mb", "app_private_mb", "app_threads", "app_handles", "ollama_mb",
+COLUMNS = ["time", "elapsed_h", "up", "app_rss_mb", "app_private_mb", "app_threads", "app_handles", "app_gpu_mb", "ollama_mb",
            "gpu_mem_mb", "gpu_watts", "gpu_util", "disk_free_gb", "data_mb", "fps", "frames", "people_in_view",
            "vlm_queue", "people_stored", "health_ok", "log_errors", "log_warnings"]
 
@@ -38,13 +39,14 @@ GROWTH = {
     "app_private_mb": ("app private memory (MB)", 200),
     "app_threads": ("app threads", 10),
     "app_handles": ("app handles", 500),
+    "app_gpu_mb": ("app GPU memory (MB)", 300),
     "ollama_mb": ("Ollama memory (MB)", 200),
-    "gpu_mem_mb": ("GPU memory (MB)", 300),
     "vlm_queue": ("VLM queue", 5),
 }
 # Shown in the chart and the summary, but growth is expected (people are stored) or the value is not a trend.
 OTHER = {
     "fps": "FPS",
+    "gpu_mem_mb": "GPU memory, all programs (MB)",
     "gpu_watts": "GPU power (W)",
     "data_mb": "stored data (MB)",
     "people_stored": "people stored",
@@ -83,6 +85,20 @@ def process_numbers(p: psutil.Process | None) -> dict:
             return out
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return {}
+
+
+def app_gpu_mb(pid: int) -> float | None:
+    """The app's own GPU memory, from Windows' "GPU Process Memory" counters (nvidia-smi shows N/A per
+    process on Windows, and the whole GPU's number also counts the desktop, browsers and games)."""
+    if sys.platform != "win32":
+        return None
+    cmd = (f"(Get-Counter '\\GPU Process Memory(pid_{pid}_*)\\Dedicated Usage' -ErrorAction Stop).CounterSamples"
+           " | Measure-Object CookedValue -Sum | ForEach-Object Sum")
+    try:
+        out = subprocess.run(["powershell", "-NoProfile", "-Command", cmd], capture_output=True, text=True, timeout=30)
+        return float(out.stdout.strip()) / 1e6 if out.returncode == 0 and out.stdout.strip() else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
 
 
 def ollama_mb() -> float | None:
@@ -160,7 +176,10 @@ def sample(port: int, data: Path | None, log: LogReader, started: float) -> dict
                    disk_free_gb=status.get("disk_free_gb"))
         code, _ = get_json(base + "/api/health", timeout=60)
         row["health_ok"] = int(code == 200)
-    row.update(process_numbers(find_app(port)))
+    app = find_app(port)
+    row.update(process_numbers(app))
+    if app is not None:
+        row["app_gpu_mb"] = app_gpu_mb(app.pid)
     row["ollama_mb"] = ollama_mb()
     row.update(gpu_numbers())
     row["data_mb"] = folder_mb(data)
@@ -272,8 +291,11 @@ def chart(rows: list[dict], path: Path) -> None:
         for side in ("left", "bottom"):
             ax.spines[side].set_color("#c9c8c2")
         ax.axvspan(0, min(WARMUP_H, max(xs or [0])), color="#efeeea", zorder=0)   # warm-up, not judged
-    for ax in axes[-1]:
-        ax.set_xlabel("hours", fontsize=9, color="#52514e")
+    for col in range(cols):   # hours under the lowest chart of each column (the last row may be part empty)
+        shown = [axes[r][col] for r in range(nrows) if r * cols + col < len(panels)]
+        if shown:
+            shown[-1].xaxis.set_tick_params(labelbottom=True)
+            shown[-1].set_xlabel("hours", fontsize=9, color="#52514e")
     fig.suptitle(f"Long-run check: {rows[0]['time']} to {rows[-1]['time']} (grey: first hour, not judged)",
                  fontsize=11, color="#0b0b0b", x=0.01, ha="left")
     fig.tight_layout()
