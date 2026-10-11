@@ -12,9 +12,16 @@
   .labeler { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
   @media (max-width: 600px) { .labeler { grid-template-columns: 1fr; } }
   .labeler img { width: 100%; max-height: 360px; object-fit: contain; background: var(--chip); border-radius: 8px; }
-  .fields { display: grid; grid-template-columns: max-content 1fr; gap: 6px 10px; align-items: center; font-size: 13px; }
-  .items { display: flex; flex-wrap: wrap; gap: 6px 12px; }
-  .items label { display: flex; gap: 4px; align-items: center; }
+  .fields { display: grid; grid-template-columns: max-content 1fr; gap: 8px 10px; align-items: center; font-size: 13px; }
+  .picks { display: flex; flex-wrap: wrap; gap: 4px; padding: 3px; border-radius: 8px; border: 2px solid transparent; }
+  .picks.active { border-color: var(--accent); }
+  .fname.active { font-weight: 600; }
+  .pick { font-size: 12px; padding: 2px 8px; border-radius: 12px; background: var(--chip); border: 1px solid transparent;
+    color: inherit; }
+  .pick.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .pick kbd { font: 11px ui-monospace, Consolas, monospace; opacity: 0.65; margin-right: 3px; }
+  .keys { font-size: 12px; }
+  .keys kbd { font: 11px ui-monospace, Consolas, monospace; background: var(--chip); padding: 0 4px; border-radius: 4px; }
   table.score { border-collapse: collapse; font-size: 13px; width: 100%; }
   table.score td, table.score th { border-bottom: 1px solid var(--border); padding: 5px 8px; text-align: left; }
   table.score td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -40,10 +47,13 @@
   <nav><a href="/">Live</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="active admin-only">Answer key</a><a href="/audit" class="admin-only">Audit log</a><a href="/import" class="admin-only">Import</a><a href="/settings" class="admin-only">Settings</a><a href="/health">Health</a></nav>
 </header>
 <main class="cols">
-  <section class="panel">
+  <section class="panel" style="grid-column: 1 / -1">   <!-- full width: every line of choices fits on screen -->
     <h2>Label this person yourself</h2>
     <p class="hint">The system's labels are hidden so they can't influence you. Pick what you can clearly see;
       leave "not sure" otherwise. About 50-100 people gives a useful accuracy score for this camera.</p>
+    <p class="hint keys">Keys: <kbd>1</kbd>-<kbd>9</kbd>, <kbd>a</kbd>-<kbd>d</kbd> pick (then the next line),
+      <kbd>n</kbd> not sure, <kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>Enter</kbd> save and next, <kbd>s</kbd> skip.
+      Carrying: pick several, <kbd>0</kbd> nothing.</p>
     <div id="labeler"><div class="empty">Loading…</div></div>
   </section>
   <section class="panel">
@@ -74,52 +84,146 @@ const NAMES = { apparent_gender: "Gender (apparent)", age_group: "Age group", ag
   headwear: "Headwear", eyewear: "Eyewear", face_mask: "Face mask", carrying: "Carrying" };
 const ORDER = ["apparent_gender", "age_group", "upper_type", "upper_color", "lower_type", "lower_color",
                "headwear", "eyewear", "face_mask", "carrying"];
-let fields = {}, person = null;
-const skipped = [];
+// Labeling by keyboard or mouse: each line is a row of choices; one line is active (outlined). A value key picks
+// in the active line and moves to the next; Enter saves and shows the next person at once (fetched ahead).
+const KEYS = "123456789abcd";
+let fields = {}, person = null, upcoming = null, lines = [], active = 0, busy = false;
+let answers = {};      // field -> value; carrying: null (not sure) or a Set (empty = nothing)
+let shownAt = 0;
+const skipped = [], times = [];
+
+// Values offered for a line ("none" is a value of headwear and eyewear; for carrying it is the "nothing" key).
+function choices(n) { return fields[n].filter(v => v !== "unknown" && !(n === "carrying" && v === "none")); }
 
 function form() {
-  const rows = ORDER.filter(n => fields[n]).map(n => {
-    if (n === "carrying") {
-      const items = fields[n].filter(v => v !== "none");
-      return `<span>${NAMES[n]}</span><div class="items">
-        <label><input type="radio" name="carry-mode" value="unsure" checked> not sure</label>
-        <label><input type="radio" name="carry-mode" value="items"> these:</label>
-        ${items.map(i => `<label><input type="checkbox" class="carry" value="${esc(i)}"> ${esc(i)}</label>`).join("")}</div>`;
-    }
-    const opts = fields[n].filter(v => v !== "unknown").map(v => `<option>${esc(v)}</option>`).join("");
-    return `<label for="f-${n}">${NAMES[n]}</label><select id="f-${n}" data-name="${n}"><option value="">not sure</option>${opts}</select>`;
+  lines = ORDER.filter(n => fields[n]);
+  const rows = lines.map((n, i) => {
+    const picks = [`<button type="button" class="pick" data-v=""><kbd>n</kbd>not sure</button>`];
+    if (n === "carrying") picks.push(`<button type="button" class="pick" data-v="none"><kbd>0</kbd>nothing</button>`);
+    choices(n).forEach((v, k) => picks.push(`<button type="button" class="pick" data-v="${esc(v)}"><kbd>${KEYS[k]}</kbd>${esc(v)}</button>`));
+    return `<span class="fname" data-row="${i}">${NAMES[n] || esc(n)}</span>`
+      + `<div class="picks" data-row="${i}" role="group" aria-label="${NAMES[n] || esc(n)}">${picks.join("")}</div>`;
   }).join("");
   return `<div class="labeler"><img src="/crops/${encodeURIComponent(person.crop)}" alt="Person ${person.id}">
-    <div><div class="muted" style="margin-bottom:8px">#${person.id}${person.camera ? " · " + esc(person.camera) : ""}</div>
+    <div><div class="muted" style="margin-bottom:8px">#${person.id}${person.camera ? " · " + esc(person.camera) : ""}
+      <span id="pace"></span></div>
     <div class="fields">${rows}</div>
-    <div class="row" style="margin-top:12px;display:flex;gap:8px">
-      <button class="primary" id="save">Save and next</button><button id="skip">Skip (unclear picture)</button></div></div></div>`;
+    <div class="row" style="margin-top:12px;display:flex;gap:8px;align-items:center">
+      <button class="primary" id="save">Save and next (Enter)</button><button id="skip">Skip, unclear (S)</button>
+      <span class="muted" id="ak-msg"></span></div></div></div>`;
 }
 
-async function next() {
-  const data = await (await fetch("/api/answer-key/next?skip=" + skipped.join(","))).json();
-  person = data.person;
-  $("labeler").innerHTML = person ? form() : '<div class="empty">Everyone recorded so far is in the answer key.</div>';
-  if (!person) return;
-  document.querySelectorAll(".carry").forEach(cb => cb.onchange = () => {
-    document.querySelector('input[name="carry-mode"][value="items"]').checked = true; });
-  $("skip").onclick = () => { skipped.push(person.id); next(); };
+function pick(row, value) {
+  const n = lines[row];
+  if (n === "carrying") {
+    if (value === "") answers.carrying = null;
+    else if (value === "none") answers.carrying = new Set();
+    else {
+      const set = answers.carrying || new Set();
+      set.has(value) ? set.delete(value) : set.add(value);
+      answers.carrying = set;
+    }
+  } else {
+    answers[n] = value;
+    active = Math.min(row + 1, lines.length - 1);
+  }
+  $("ak-msg").textContent = "";
+  render();
+}
+
+function render() {
+  document.querySelectorAll(".picks").forEach(group => {
+    const row = Number(group.dataset.row), n = lines[row];
+    group.classList.toggle("active", row === active);
+    group.querySelectorAll(".pick").forEach(b => {
+      const v = b.dataset.v;
+      const on = n === "carrying"
+        ? (answers.carrying == null ? v === "" : v === "none" ? answers.carrying.size === 0 : answers.carrying.has(v))
+        : (answers[n] || "") === v;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on);
+    });
+  });
+  document.querySelectorAll(".fname").forEach(f => f.classList.toggle("active", Number(f.dataset.row) === active));
+}
+
+async function fetchNext(exclude) {
+  const data = await (await fetch("/api/answer-key/next?skip=" + exclude.join(","))).json();
+  if (data.person) new Image().src = "/crops/" + encodeURIComponent(data.person.crop);   // ready when it is shown
+  return data.person;
+}
+
+function show(p) {
+  person = p;
+  answers = {}; active = 0;
+  if (!person) {
+    $("labeler").innerHTML = '<div class="empty">Everyone recorded so far is in the answer key.</div>';
+    return;
+  }
+  $("labeler").innerHTML = form();
+  document.querySelectorAll(".picks").forEach(group => group.addEventListener("click", (e) => {
+    const b = e.target.closest(".pick");
+    if (!b) return;
+    active = Number(group.dataset.row);
+    pick(active, b.dataset.v);
+    b.blur();   // keys go back to the page, not to the clicked button
+  }));
+  $("skip").onclick = skip;
   $("save").onclick = save;
+  if (times.length) {
+    const sorted = [...times].sort((a, b) => a - b);
+    $("pace").textContent = ` · ${times.length} labeled now, about ${Math.round(sorted[Math.floor(sorted.length / 2)])} s each`;
+  }
+  render();
+  shownAt = performance.now();
+  upcoming = fetchNext([...skipped, person.id]);
+}
+
+async function next() { show(upcoming ? await upcoming : await fetchNext(skipped)); }
+
+function skip() {
+  if (!person || busy) return;
+  skipped.push(person.id);
+  next();
 }
 
 async function save() {
+  if (!person || busy) return;
   const labels = {};
-  document.querySelectorAll(".fields select").forEach(s => { if (s.value) labels[s.dataset.name] = s.value; });
-  if (document.querySelector('input[name="carry-mode"]:checked')?.value === "items") {
-    labels.carrying = [...document.querySelectorAll(".carry:checked")].map(c => c.value).join(",") || "none";
+  for (const n of lines) {
+    if (n === "carrying") { if (answers.carrying != null) labels.carrying = [...answers.carrying].join(",") || "none"; }
+    else if (answers[n]) labels[n] = answers[n];
   }
-  if (!Object.keys(labels).length) { alert("Pick at least one thing you can see, or press Skip."); return; }
-  const r = await fetch(`/api/answer-key/${person.id}`, { method: "POST",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ labels }) });
-  if (!r.ok) { alert("Could not save"); return; }
-  loadScore();
-  next();
+  if (!Object.keys(labels).length) { $("ak-msg").textContent = "Pick at least one thing you can see, or press S to skip."; return; }
+  busy = true;
+  try {
+    const r = await fetch(`/api/answer-key/${person.id}`, { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ labels }) });
+    if (!r.ok) { $("ak-msg").textContent = "Could not save: " + ((await r.json().catch(() => ({}))).detail || r.status); return; }
+    times.push((performance.now() - shownAt) / 1000);
+    loadScore();
+    await next();
+  } finally { busy = false; }
 }
+
+document.addEventListener("keydown", (e) => {
+  if (!person || e.ctrlKey || e.altKey || e.metaKey || e.target.closest?.("input, select, textarea")) return;
+  const k = e.key.toLowerCase();
+  if (k === "enter" && e.target.closest?.("a, button")) return;   // a focused link or button does its own job
+  if (k === "enter") { e.preventDefault(); save(); return; }
+  if (k === "s") { skip(); return; }
+  if (k === "arrowdown" || k === "arrowup") {
+    e.preventDefault();
+    active = Math.max(0, Math.min(lines.length - 1, active + (k === "arrowdown" ? 1 : -1)));
+    render();
+    return;
+  }
+  const n = lines[active];
+  if (k === "n") { pick(active, ""); return; }
+  if (k === "0" && n === "carrying") { pick(active, "none"); return; }
+  const i = KEYS.indexOf(k);
+  if (i >= 0 && i < choices(n).length) pick(active, choices(n)[i]);
+});
 
 async function loadScore() {
   const s = await (await fetch("/api/answer-key/score")).json();

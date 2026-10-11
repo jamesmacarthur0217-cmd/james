@@ -221,6 +221,12 @@ attribute, its answer is used over theirs, even at lower confidence (`resolve` i
 The age model was trained on FairFace-style photos, which flatters it on that test. The Answer key page
 measures everything on your own camera; 50-100 labeled people give a useful score. The score for one camera:
 `/api/answer-key/score?camera=cam1` (without `?camera=`, `cameras` lists each camera's mean score).
+Labeling is by keyboard (or mouse): each attribute is a line of choices with keys **1-9, a-d**; a key picks in
+the outlined line and moves to the next, **n** = not sure, **↑ ↓** move, **Enter** saves and shows the next person
+at once (it is fetched ahead), **s** skips; carrying takes several items, **0** = nothing. The system's labels stay
+hidden: shown labels would be accepted too easily and make the score look better than it is. The page shows how
+many people were labeled this visit and the typical seconds per person (before the keys: about 34 s, the middle
+of 24 saves on 2026-10-08).
 
 ## Speed
 
