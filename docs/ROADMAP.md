@@ -1,13 +1,12 @@
 # VisionLabeler: next improvements roadmap
 
-## Status (2026-10-10)
+## Status (2026-10-12)
 
-**Phases 0 and 2-9 are done** (each item below is marked with what was done, measured or rejected;
+**Phases 0 and 2-10 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
-commercially yet. Phase 9 (small fixes, [PHASE9-PLAN.md](PHASE9-PLAN.md)) is done (2026-10-10). **Next: the
-approved plan [PHASE10-PLAN.md](PHASE10-PLAN.md)**: Phase 10 long-run check + idle mode + restore drill, Phase 11
-better labels on the user's webcam, Phase 12 (when IP cameras come) a re-identification model and more cameras.
-420 tests pass.
+commercially yet. Phase 10 (long-run check, idle mode, restore drill) is done (2026-10-12). **Next, in the
+approved plan [PHASE10-PLAN.md](PHASE10-PLAN.md)**: Phase 11 better labels on the user's webcam, Phase 12 (when
+IP cameras come) a re-identification model and more cameras. 446 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -160,6 +159,17 @@ Then: switch to planning mode and propose the next round (open items: HANDOFF se
 3. **Done 2026-10-10** (median 1.3 MB per person at 480 px). A short video of each person (admin-only), and
    storage use on the Health page.
 4. **Done 2026-10-10** (excerpt cut on first view). Original video link for imported people. 5. **Done 2026-10-10** (a hint on far cameras: 6/18 first). Search by photo. 6. **Done 2026-10-10.** Today at a glance on the Live page.
+
+## Phase 10: Long-run check, idle mode, restore drill (done 2026-10-12)
+
+**Approved plan: [PHASE10-PLAN.md](PHASE10-PLAN.md)** (the user chose a webcam test copy for the soak and no second
+long run).
+
+1. **Done 2026-10-11** (`tools/soak.py`). 24 hours: no leak, no errors; the lens cover was closed, so no people were
+   labeled. The tool now reads the app's own GPU memory (the whole GPU's number rose with other programs).
+2. **Done 2026-10-12** (on by default). Idle mode: 12/12 people found, 0.1-0.4 s later; GPU 16.9 → 11.9 W while empty.
+3. **Done 2026-10-12** (`tools/restore_drill.py`). 27/27 people and all pages back in 22 s. Found: the backups hold
+   the database only, not pictures or person videos.
 
 ## Critical files
 

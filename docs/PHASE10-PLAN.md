@@ -13,7 +13,12 @@ own people), and nothing has ever run for days in a row under watch.
 
 ## Recommended order
 
-### Phase 10 — Long-run check and an idle mode (small; for the current setup)
+### Phase 10 — Long-run check and an idle mode (small; for the current setup) — **done 2026-10-12**
+Results (README "Reliability" and "Speed"): 24 h soak on a webcam test copy found no leak or error (the lens cover
+was closed, so no people were labeled; the user chose no second run); `soak.py` now reads the app's own GPU memory.
+Idle mode: 12/12 people found, 0.1-0.4 s later, GPU 16.9 → 11.9 W while empty. Restore drill: 27/27 people, all
+pages, 22 s; it showed that **backups hold the database only** (no pictures or person videos).
+
 1. **24-hour soak test** on the user's real setup (with their OK; on port 8000 only if they agree, else a test copy
    on the webcam): sample every 10 min the app's memory, GPU memory, Ollama's memory, disk use, FPS, queue length,
    errors in the log (`tools/soak.py`, writes a CSV + a chart). Find leaks or slowdowns; fix what it finds.

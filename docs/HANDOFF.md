@@ -16,10 +16,11 @@ Roadmap Phase 1 (licenses) is deferred until they say otherwise. Under Malaysia'
 household use is generally outside the Act; their filled-in camera sign and data-protection summary are in
 `data/privacy/` (git-ignored, contains their email); the blank templates are in `docs/`.
 
-## 2. Current state (2026-10-10)
+## 2. Current state (2026-10-12)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
-  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-9 done**; Phase 1 deferred. Phase 9 (small
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-10 done**; Phase 1 deferred. Phase 10:
+  `2429790`/`bc23363` soak tool · `0449255` idle mode · `23273b1` restore drill. Phase 9 (small
   fixes): `8675c46` list redraw · `81dbcb2` backup.dir · `482bdd4` CI v7 · `0296435` relink_check help. Phase 8
   commits, newest first: `3794de3` today at a glance · `e3a6179` photo search · `ea97937` original excerpts ·
   `4893b9e` person videos · `bae4034` counting check · `0a44601` maintenance · `f38ea1e` plan. Phase 7
@@ -30,7 +31,9 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **420 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~30 s).
+- Tests: **446 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~45 s).
+- The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
+  it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
   second site over Tailscale, not set up yet: see README "From another site"); one viewer account `TIXUAN`.
 - The user's database: 27 people, 26 of them in the answer key (their own labels; mean ~75% before the
@@ -214,11 +217,23 @@ Untested installer parts (user said skip): the offline package's Python wheels (
 when it changed; `backup.dir` (test copies keep their own backups); CI actions v7; relink_check help;
 the offline package's database image and the installer's database checks tested.
 
-**Next: [PHASE10-PLAN.md](PHASE10-PLAN.md)** (approved 2026-10-10): Phase 10 (24-hour soak test, idle mode,
-restore drill), then Phase 11 (faster answer key, retraining past its gate), Phase 12 when IP cameras are added.
-Ask the user before each phase starts.
+**Phase 10 is done** (2026-10-12, [PHASE10-PLAN.md](PHASE10-PLAN.md); numbers in README "Speed" and
+"Reliability"):
+- `tools/soak.py`: 24 h on a webcam test copy, no leak or error (no people: lens cover closed; the user chose no
+  second run). Watch **private** memory (Windows trims RSS) and the app's own GPU memory (Windows "GPU Process
+  Memory" counter; nvidia-smi shows N/A per process here, and the whole GPU's number includes other programs).
+- Idle mode (`idle:`; Pipeline.skip_while_idle / _wake_on_detection): measured with a synthetic video (an empty COCO
+  photo with COCO person crops walking across, 12 arrivals; the script was in the session scratchpad, not kept).
+  Lesson: a video file plays every frame, so time it by frame number, not the clock (a busy PC makes it lag).
+- `tools/restore_drill.py`: whole way back in 22 s. **Backups hold the database only**: pictures and person
+  videos (`data/crops`) are not backed up anywhere.
+
+**Next: Phase 11 of [PHASE10-PLAN.md](PHASE10-PLAN.md)** (faster answer key, retraining past its gate), Phase 12
+when IP cameras are added. Ask the user before each phase starts.
 
 Open items (also in that plan):
+- Pictures and person videos are not in the backups (restore drill, 2026-10-12): ask the user whether to copy
+  `data/crops` with each backup to `backup.copy_to` (only useful on another disk; copy_to is empty now).
 - Second site over Tailscale: waits for the user (docs/SECOND-SITE.md; the Health page checks each step).
 - Appearance on far or overhead cameras is weak (re-linking, look-alikes, timeline, photo search): a person
   re-identification model would help; check its license first (Phase 1 rules).
