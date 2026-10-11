@@ -19,7 +19,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 ## 2. Current state (2026-10-12)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
-  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-10 done**; Phase 1 deferred. Phase 10:
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
   `2429790`/`bc23363` soak tool · `0449255` idle mode · `23273b1` restore drill. Phase 9 (small
   fixes): `8675c46` list redraw · `81dbcb2` backup.dir · `482bdd4` CI v7 · `0296435` relink_check help. Phase 8
   commits, newest first: `3794de3` today at a glance · `e3a6179` photo search · `ea97937` original excerpts ·
@@ -36,9 +36,10 @@ household use is generally outside the Act; their filled-in camera sign and data
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
   second site over Tailscale, not set up yet: see README "From another site"); one viewer account `TIXUAN`.
-- The user's database: 27 people, 26 of them in the answer key (their own labels; mean ~75% before the
-  2026-10-08 prompt change, ~89% for the VLM alone after it on those people). The weekly retraining therefore
-  cannot learn yet (answer-key people are the test; it needs 30 other finished people).
+- The user's database: 27 webcam people, 26 of them in the answer key (their own labels; mean ~75% before the
+  2026-10-08 prompt change, ~89% for the VLM alone after it on those people), plus **127 MOT16 people** imported
+  2026-10-12 as the recorded camera `mot16` (dated March 2016; CC BY-NC-SA 3.0, non-commercial). With them the
+  weekly retraining ran and was kept for the first time (`data/models/attributes.joblib`, 61.8% → 62.1%).
 - BitLocker is on for drive C: (the user turned it on 2026-10-08).
 - **Docker was not running** at the end of the session (the database is in Docker): `start.bat` starts it;
   tools like `tools/users.py` need it running first (they hang otherwise).
@@ -228,8 +229,13 @@ the offline package's database image and the installer's database checks tested.
 - `tools/restore_drill.py`: whole way back in 22 s. **Backups hold the database only**: pictures and person
   videos (`data/crops`) are not backed up anywhere.
 
-**Next: Phase 11 of [PHASE10-PLAN.md](PHASE10-PLAN.md)** (faster answer key, retraining past its gate), Phase 12
-when IP cameras are added. Ask the user before each phase starts.
+**Phase 11 is done** (2026-10-12): Answer key by keyboard (labels stay hidden, the user's choice; before about 34 s
+per person, the page shows the new pace: not measured with the user yet); MOT16 downloaded (with OK) and imported
+by the user on the Import page (my API call into the real app was refused by the permission check: the user starts
+writes to their real app themselves); first kept retraining, no measurable change on 26 answer-key people.
+Lesson: the auto-mode check blocks writes to the user's real app (port 8000): give the user the steps instead.
+
+**Next**: Phase 12 of [PHASE10-PLAN.md](PHASE10-PLAN.md) only when IP cameras are added. Ask the user first.
 
 Open items (also in that plan):
 - Pictures and person videos are not in the backups (restore drill, 2026-10-12). The user chose to leave it so
@@ -240,8 +246,9 @@ Open items (also in that plan):
 - Measure re-linking and photo search on close-up (kiosk) footage with true identities when there is some.
 - Phase 1 licenses (only when the use becomes commercial; ask the user then).
 - More cameras than ~4: batching or one process per camera (README "How many cameras?").
-- The user keeps labeling on the Answer key page (aim 50-100); retraining starts helping after 30 more people.
-  Imported videos can add people quickly (they count as the user's own cameras).
+- The user keeps labeling on the Answer key page (aim 50-100 webcam people; the retraining check is noise with
+  26). Measure their seconds per person with the keyboard page (before: about 34 s).
+- Before any commercial use: remove the `mot16` camera's people and retrain (MOT16 is non-commercial).
 - Vocabulary refinements (coat, polo, tank top) need answer-key values to be measurable.
 
 ## 9. Message to start the next session

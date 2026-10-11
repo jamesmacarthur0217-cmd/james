@@ -636,6 +636,16 @@ key page lists every run (trained on, score before and after, kept or not) and h
 `models/attributes.joblib` is used until the first kept retraining. The answer-key score of each camera is also
 recorded once a day and shown as a chart (**Accuracy over time**), so you can see whether changes help.
 
+**First kept retraining (2026-10-12)**: the user's webcam had given only 1 person outside the answer key, so 7
+eye-level clips of the MOTChallenge MOT16 dataset (street and shopping mall; downloaded with the user's OK, 1.95 GB,
+in `data\datasets\mot16`) were imported as the recorded camera `mot16` (kiosk mode, detector 640, 10 frames a
+second, dated March 2016 so they stay out of today's reports): **127 people** (kiosk mode skips far-away people;
+of about 300 in the clips). Retrained on 126 of them + 1,534 COCO people, the fast classifiers' score on the 26
+webcam answer-key people went **61.8% → 62.1%**, kept. Per attribute: gender 67/67%, carrying 25/25%, eyewear 50 →
+43%, face mask and headwear 100%, top color 9 → 18%, top type 82%. With 26 people one person moves an attribute
+by 4-11%, so this is no measurable change; the final labels (74.6% on the Answer key page) come mostly from the
+vision model, which the classifiers only stand in for until it answers. A larger answer key makes the check meaningful.
+
 ## Tests
 
 ```bash
@@ -681,3 +691,6 @@ Changes are tracked with git.
 
 Ultralytics YOLO: AGPL-3.0 (commercial license needed for closed products, or swap in RF-DETR, Apache-2.0).
 Qwen3-VL: Apache-2.0. Age model: Apache-2.0. COCO photos: various Flickr licenses. FairFace: CC BY 4.0.
+MOT16 (MOTChallenge, imported as the recorded camera `mot16` and used by the retrained classifiers since
+2026-10-12): CC BY-NC-SA 3.0, **non-commercial only**: before commercial use, delete that camera's people on the
+Import page and retrain (or delete `data\models\attributes.joblib` to go back to the shipped classifiers).

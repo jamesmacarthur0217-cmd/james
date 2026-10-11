@@ -28,7 +28,13 @@ pages, 22 s; it showed that **backups hold the database only** (no pictures or p
 3. A **restore drill** on a scratch database: restore the newest backup into a new container/database, start a test
    copy against it, check pages open (proves recovery, not only the dump).
 
-### Phase 11 — Better labels on the user's own webcam (medium; biggest gain for the current setup)
+### Phase 11 — Better labels on the user's own webcam (medium; biggest gain for the current setup) — **done 2026-10-12**
+Results: (1) Answer key by keyboard; the user chose to keep the system's labels hidden (pre-filled values would
+inflate the score). Before: about 34 s per person (24 saves on 2026-10-08); after: shown on the page while the user
+labels (not measured yet). (2) The user had no videos with many people: MOT16 (CC BY-NC-SA 3.0, with their OK)
+imported as camera `mot16`, 127 people. (3) First kept retraining: 61.8% → 62.1% on 26 answer-key people, i.e. no
+measurable change (README "Training the fast classifiers").
+
 1. Faster Answer key page: keyboard shortcuts, values pre-filled from the system's labels (confirm or change),
    "next person" without reload; measure seconds per person before/after with the user.
 2. "Practice from my videos": import the user's own phone videos (Import page) as answer-key material.

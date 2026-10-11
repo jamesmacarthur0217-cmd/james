@@ -2,11 +2,12 @@
 
 ## Status (2026-10-12)
 
-**Phases 0 and 2-10 are done** (each item below is marked with what was done, measured or rejected;
+**Phases 0 and 2-11 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
-commercially yet. Phase 10 (long-run check, idle mode, restore drill) is done (2026-10-12). **Next, in the
-approved plan [PHASE10-PLAN.md](PHASE10-PLAN.md)**: Phase 11 better labels on the user's webcam, Phase 12 (when
-IP cameras come) a re-identification model and more cameras. 446 tests pass.
+commercially yet. Phase 10 (long-run check, idle mode, restore drill) and Phase 11 (keyboard answer key, MOT16
+import, first kept retraining) are done (2026-10-12). **Next, in the approved plan
+[PHASE10-PLAN.md](PHASE10-PLAN.md)**: Phase 12 only when IP cameras come (re-identification model, more cameras).
+446 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -170,6 +171,12 @@ long run).
 2. **Done 2026-10-12** (on by default). Idle mode: 12/12 people found, 0.1-0.4 s later; GPU 16.9 → 11.9 W while empty.
 3. **Done 2026-10-12** (`tools/restore_drill.py`). 27/27 people and all pages back in 22 s. Found: the backups hold
    the database only, not pictures or person videos.
+
+## Phase 11: Better labels on the user's webcam (done 2026-10-12)
+
+1. **Done** (labels kept hidden, the user's choice). Answer key by keyboard; before about 34 s per person.
+2. **Done with a public dataset** (the user had no suitable videos): MOT16, CC BY-NC-SA 3.0, 127 people imported.
+3. **Done**: first kept retraining, 61.8% → 62.1% on 26 answer-key people (no measurable change).
 
 ## Critical files
 
