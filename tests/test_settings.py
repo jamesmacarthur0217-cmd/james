@@ -43,7 +43,8 @@ def _form(**changes):
                         {"name": "door", "source": "rtsp://admin:•••@192.168.1.50:554/stream1", "mode": "security"}],
             "retention_days": 30, "audit_retention_days": 365, "blur_faces": False,
             "blur_faces_for_viewers": True, "https": False, "retrain_enabled": True,
-            "backup_enabled": True, "backup_copy_to": "", "person_videos": True}
+            "backup_enabled": True, "backup_copy_to": "", "person_videos": True,
+            "idle_enabled": True, "idle_after_s": 60}
     form.update(changes)
     return form
 
@@ -140,6 +141,7 @@ def test_masked_password_is_kept_and_never_logged(paths, db):
     ({"detector_conf": 0.5}, "detector_conf"),           # not a setting of this page
     ({"backup_copy_to": "Z:/not/plugged/in"}, "second-copy folder"),
     ({"backup_copy_to": "relative/folder"}, "second-copy folder"),
+    ({"idle_after_s": 5}, "idle_after_s"),
 ])
 def test_bad_values_are_refused(paths, db, change, message):
     app, _ = _app(paths, db)
@@ -157,6 +159,14 @@ def test_daily_backup_settings_are_saved(paths, db, tmp_path):
     assert r.status_code == 200, r.json()
     saved = yaml.safe_load(paths[1].read_text(encoding="utf-8"))
     assert saved == {"backup": {"enabled": False, "copy_to": str(usb)}}
+
+
+def test_idle_mode_settings_are_saved(paths, db):
+    app, _ = _app(paths, db)
+    r = TestClient(app, client=("127.0.0.1", 5000)).post("/api/settings", json=_form(idle_after_s=300))
+    assert r.status_code == 200, r.json()
+    assert yaml.safe_load(paths[1].read_text(encoding="utf-8")) == {"idle": {"after_s": 300}}
+    assert load_config(paths[0])["idle"] == {"enabled": True, "after_s": 300, "fps": 3}
 
 
 def test_viewers_cannot_see_or_change_settings(paths, db):

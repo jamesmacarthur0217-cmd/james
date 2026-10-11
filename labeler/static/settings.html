@@ -105,6 +105,19 @@
   </section>
 
   <section class="panel">
+    <h2>Power</h2>
+    <div class="grid">
+      <label for="idle_enabled">Idle mode</label>
+      <div><input type="checkbox" id="idle_enabled"> <span class="hint">When nobody is in view, the camera is checked
+        only a few times a second (the live picture too), which saves power. The first person seen brings it back
+        to full speed at once.</span></div>
+      <label for="idle_after_s">Idle after (seconds)</label>
+      <div><input type="number" id="idle_after_s" min="10" max="3600"> <span class="hint">How long nobody must be in
+        view first.</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
     <h2>Learning</h2>
     <div class="grid">
       <label for="retrain_enabled">Weekly retraining</label>
@@ -128,7 +141,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const SIMPLE = ["retention_days", "audit_retention_days", "blur_faces", "blur_faces_for_viewers", "https", "retrain_enabled",
-                "backup_enabled", "backup_copy_to", "person_videos"];
+                "backup_enabled", "backup_copy_to", "person_videos", "idle_enabled", "idle_after_s"];
 let loaded = null;        // values as saved (what the next start uses)
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }

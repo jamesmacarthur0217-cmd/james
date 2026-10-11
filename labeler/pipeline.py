@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 import cv2
 import numpy as np
+import yaml
 from ultralytics import YOLO
 
 from . import colors, geometry, privacy, schema
@@ -145,8 +146,11 @@ class Pipeline:
         det = dict(cfg["detector"])
         self.model = YOLO(det["model"])
         tracker_path = resolve(det["tracker"])
+        self.wake_conf = 0.5   # a detection this clear starts a new person, and ends idle mode
         if tracker_path.exists():  # project tracker settings; otherwise an Ultralytics built-in name
             det["tracker"] = str(tracker_path)
+            tracker = yaml.safe_load(tracker_path.read_text(encoding="utf-8")) or {}
+            self.wake_conf = float(tracker.get("new_track_thresh", self.wake_conf))
         self.det_cfg = det
         cam = self.cam
         # Per camera: a wide camera with far-away people may need a bigger detector picture (README, Detection).
@@ -177,6 +181,9 @@ class Pipeline:
         self.frames = 0
         self.blank = False
         self.started_mono = self.last_frame_at = time.monotonic()   # for the camera health check
+        self.idle_cfg = cfg["idle"]
+        self.idle = False                                        # nobody in view for a while: detector slowed
+        self.last_person_at = self.last_processed_at = self.started_mono
         self.running = False
         self.crashed = False
         self.deleted_ids: set[int] = set()
@@ -232,6 +239,7 @@ class Pipeline:
             "frames": self.frames,
             "active_people": len(self.tracks),
             "blank_picture": self.blank,
+            "idle": self.idle,
             "vlm_queue": self.vlm.pending if self.vlm else None,
             "vlm_enabled": self.vlm is not None,
         }
@@ -256,9 +264,11 @@ class Pipeline:
                     if source.ended:
                         break
                     continue
+                if self.skip_while_idle(time.monotonic()):
+                    continue   # still read: a file keeps its pace, a camera's newest frame is used next time
                 self.process(frame)
                 self.frames += 1
-                now = self.last_frame_at = time.monotonic()
+                now = self.last_frame_at = self.last_processed_at = time.monotonic()
                 self.fps = 0.9 * self.fps + 0.1 * (1.0 / max(now - t_last, 1e-6))
                 t_last = now
                 if max_frames and self.frames >= max_frames:
@@ -276,6 +286,34 @@ class Pipeline:
                 self.clips.close()   # alerts that fired just before stopping get a shorter clip
             log.info("pipeline stopped after %d frames", self.frames)
 
+    def skip_while_idle(self, now: float) -> bool:
+        """Idle mode: when nobody has been in view for idle.after_s seconds, only idle.fps frames a second go
+        to the detector (and the live picture), which saves GPU power. A person found in one of those frames
+        starts a track, and with someone tracked every frame is processed again. People leaving keep full
+        speed for after_s, so a returning person is tracked as usual. Live cameras and files only: imports
+        call process() themselves."""
+        if not self.idle_cfg["enabled"]:
+            return False
+        if self.tracks:
+            self.last_person_at = now
+        idle = now - self.last_person_at >= self.idle_cfg["after_s"]
+        if idle != self.idle:
+            self.idle = idle
+            log.info("[%s] %s", self.name, f"idle: nobody in view, looking {self.idle_cfg['fps']:g} times a second"
+                     if idle else "someone in view: full speed")
+        return idle and now - self.last_processed_at < 1.0 / self.idle_cfg["fps"]
+
+    def _wake_on_detection(self, boxes, shape: tuple, now: float) -> None:
+        """Back to full speed on the first clear detection of a person who would be recorded, without waiting
+        for the tracker: it confirms a new person only on a second frame, which a third of a second later may
+        not overlap the first for someone walking fast."""
+        if boxes is None or not len(boxes):
+            return
+        for box, conf in zip(boxes.xyxy.cpu().numpy(), boxes.conf.cpu().tolist()):
+            if conf >= self.wake_conf and not self._should_ignore(tuple(box), shape):
+                self.last_person_at = now
+                return
+
     # --- per frame ----------------------------------------------------------------
 
     def process(self, frame: np.ndarray) -> None:
@@ -286,6 +324,8 @@ class Pipeline:
             conf=self.det_cfg["conf"], imgsz=self.imgsz, device=self.det_cfg["device"],
             verbose=False,
         )[0]
+        if self.idle:
+            self._wake_on_detection(result.boxes, frame.shape, now)
         low_color = colors.is_low_color(frame)
         if self.frames % 30 == 0:
             blank = is_blank(frame)

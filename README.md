@@ -123,7 +123,7 @@ or another app (Teams, Discord) holding the camera.
 
 The common settings can be changed on the **Settings** page instead of editing `config.yaml`: cameras (add,
 remove, source, mode, own retention, detector size), how long people and the audit log are kept, face blurring
-(for viewers, and in saved pictures), HTTPS, and the weekly retraining. Every value is checked before it is
+(for viewers, and in saved pictures), HTTPS, the weekly retraining, and idle mode. Every value is checked before it is
 saved (a webcam number 0-9, a file that exists, or a camera address with a host; detector size 640/960/1280;
 0-3650 days), and every change is in the Audit log. Only the changed values are saved, in `data\settings.yaml`
 (config.yaml keeps its comments and stays the list of defaults; delete the file to go back to it).
@@ -231,6 +231,17 @@ detection and colors run every frame for everyone. Things that turned out to mat
 - One request at a time (`vlm.workers: 1`): with that delay gone, 2 at once is no faster.
 - Several people in one request was rejected: answers mixed people up (gender matched only 54%).
 - The 8B model is slower and was not more accurate.
+
+**Idle mode** (`idle:` in config.yaml, Settings page *Power*; on by default): when nobody has been in view for
+60 s (`idle.after_s`), the detector looks only 3 times a second (`idle.fps`), and the live picture updates as
+often; the Live page shows "(idle)". The first clear detection of a person who would be recorded brings it back
+to full speed at once, without waiting for the tracker to confirm them. The camera health check does not call an
+idle camera slow. Measured 2026-10-12 on a 7.4-minute test video (an empty scene; 12 people, from a 1.5 s
+crossing to standing 5 s, after 25-40 s empty gaps; idle after 10 s for the test): **12 of 12 people found** with
+idle mode on and off, the same records (14); found 0.1-0.4 s later than without it (worst 1.1 s, for a slow
+walker entering at the edge, against 0.6 s); **GPU power while nobody was in view 16.9 W → 11.9 W** (GPU use
+45% → 14%; the GPU drew 13.8 W with the app not running, so the app's own share is nearly gone); 45% fewer
+frames processed over the whole video.
 
 ## One person, one record
 

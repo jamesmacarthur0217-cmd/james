@@ -6,7 +6,7 @@ to go back to config.yaml. Changes apply after a restart (the page has a Restart
 
 Only the common settings are editable here, each validated: cameras (add, remove, source, mode, retention,
 detector size), how long people and the audit log are kept, face blurring, HTTPS, weekly retraining, the
-daily database backup and its second copy. Zones and
+daily database backup and its second copy, idle mode. Zones and
 alert rules have their own pages; accounts are managed with tools/users.py.
 
 A camera keeps its name for good (zones, alert rules and recorded people refer to it); removing a camera keeps
@@ -75,6 +75,8 @@ class SettingsIn(BaseModel):
     retrain_enabled: bool
     backup_enabled: bool
     person_videos: bool
+    idle_enabled: bool
+    idle_after_s: int = Field(ge=10, le=3600)
     backup_copy_to: str = Field(default="", max_length=260)
 
     @field_validator("backup_copy_to")
@@ -98,6 +100,8 @@ SIMPLE = {
     "backup_enabled": ("backup", "enabled"),
     "person_videos": ("person_videos", "enabled"),
     "backup_copy_to": ("backup", "copy_to"),
+    "idle_enabled": ("idle", "enabled"),
+    "idle_after_s": ("idle", "after_s"),
 }
 CAMERA_FIELDS = ("name", "source", "mode", "retention_days", "imgsz")
 

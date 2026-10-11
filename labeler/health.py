@@ -39,7 +39,7 @@ class HealthMonitor:
         out = set()
         if p.blank:
             out.add("blank")
-        if p.fps < self.cfg["min_fps"]:
+        if p.fps < self.cfg["min_fps"] and not getattr(p, "idle", False):   # idle mode is slow on purpose
             out.add("slow")
         return out
 

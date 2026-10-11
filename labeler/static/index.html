@@ -371,7 +371,9 @@ async function status() {
     if (s.disk_low) warn = `<b style="color:var(--warn)">disk almost full (${s.disk_free_gb} GB free)</b> · ` + warn;
     const down = (s.cameras || []).filter(c => !c.running).map(c => c.camera);
     if (down.length) warn = `<b style="color:var(--warn)">camera not running: ${down.map(esc).join(", ")}</b> · ` + warn;
-    $("status").innerHTML = healthLink + warn + `mode <b>${s.mode}</b> · <b>${s.fps ?? "-"}</b> fps · <b>${s.active_people ?? 0}</b> in view · `
+    $("status").innerHTML = healthLink + warn + `mode <b>${s.mode}</b> · <b>${s.fps ?? "-"}</b> fps`
+      + (s.idle ? ' <span class="muted" title="Nobody in view for a while: the camera is checked a few times a second to save power; the first person seen brings it back to full speed.">(idle)</span>' : "")
+      + ` · <b>${s.active_people ?? 0}</b> in view · `
       + `VLM queue <b>${s.vlm_enabled ? s.vlm_queue : "off"}</b> · <b>${s.tracks}</b> people · `
       + `<a href="/review" class="admin-only"><b>${s.needs_review}</b> to review</a>`;
     showCameraProblems(s.camera_problems || []);
