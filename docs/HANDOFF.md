@@ -19,7 +19,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 ## 2. Current state (2026-10-12)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
-  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted); Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
   `2429790`/`bc23363` soak tool · `0449255` idle mode · `23273b1` restore drill. Phase 9 (small
   fixes): `8675c46` list redraw · `81dbcb2` backup.dir · `482bdd4` CI v7 · `0296435` relink_check help. Phase 8
   commits, newest first: `3794de3` today at a glance · `e3a6179` photo search · `ea97937` original excerpts ·
@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **446 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~45 s).
+- Tests: **451 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~45 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -235,14 +235,22 @@ by the user on the Import page (my API call into the real app was refused by the
 writes to their real app themselves); first kept retraining, no measurable change on 26 answer-key people.
 Lesson: the auto-mode check blocks writes to the user's real app (port 8000): give the user the steps instead.
 
-**Next**: Phase 12 of [PHASE10-PLAN.md](PHASE10-PLAN.md) only when IP cameras are added. Ask the user first.
+**Phase 12 step 1 was measured** (2026-10-12, the user asked to go ahead before adding cameras): OSNet-AIN
+(`labeler/reid.py`, weights in `data/models/reid`, downloaded with OK) was not better than SigLIP 2 inside the
+pipeline on 7 MOT16 clips (look-alikes 24/74 vs 34/74; README "One person, one record"); not adopted, kept as
+`tools/relink_check.py --reid`. MOT16 train clips as videos with walking-people-only markings:
+`data/datasets/mot16/train_videos`, `data/datasets/mot16/gt` (use these with relink_check).
+
+**Next**: the rest of Phase 12 (more cameras, per-camera tuning, re-measuring re-identification and the short-gap
+re-link rule on outdoor footage) when the user adds cameras. Ask the user first.
 
 Open items (also in that plan):
 - Pictures and person videos are not in the backups (restore drill, 2026-10-12). The user chose to leave it so
   (2026-10-12); offer again only if they set up a second disk (`backup.copy_to`).
 - Second site over Tailscale: waits for the user (docs/SECOND-SITE.md; the Health page checks each step).
-- Appearance on far or overhead cameras is weak (re-linking, look-alikes, timeline, photo search): a person
-  re-identification model would help; check its license first (Phase 1 rules).
+- Appearance on far or overhead cameras is weak (re-linking, look-alikes, timeline, photo search). A
+  re-identification model (OSNet-AIN) did not help on MOT16 overall but did on a far view: re-measure on the
+  user's outdoor footage. On a crowded moving-camera clip the short-gap re-link rule made 7 wrong joins of 8.
 - Measure re-linking and photo search on close-up (kiosk) footage with true identities when there is some.
 - Phase 1 licenses (only when the use becomes commercial; ask the user then).
 - More cameras than ~4: batching or one process per camera (README "How many cameras?").

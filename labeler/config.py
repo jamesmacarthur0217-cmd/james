@@ -57,6 +57,7 @@ DEFAULTS: dict = {
         "max_queue": 32,
     },
     "embeddings": {"enabled": True, "model": "google/siglip2-base-patch16-224", "device": "cuda"},
+    "reid": {"weights": "data/models/reid/osnet_ain_x1_0.pt", "device": "cuda"},   # tools/relink_check.py --reid
     "age_model": {"enabled": True, "model": "dima806/fairface_age_image_detection"},
     "student": {"enabled": False, "model_path": "models/attributes.joblib", "every_n_frames": 15,
                 "skip_vlm_when_confident": True, "retrained_path": "data/models/attributes.joblib"},

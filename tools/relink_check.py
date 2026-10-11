@@ -28,6 +28,8 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -112,11 +114,13 @@ class JoinLog(logging.Handler):
 
 
 vectors: dict = {}   # record -> appearance vector, from the last run (for the look-alike check)
+reid_vectors: dict = {}   # the same records' re-identification vectors (--reid)
 
 
-def lookalikes(records: dict, gt: dict, thresholds=(0.8, 0.85, 0.9, 0.95)) -> list[dict]:
+def lookalikes(records: dict, gt: dict, thresholds=(0.8, 0.85, 0.9, 0.95), vecs: dict | None = None) -> list[dict]:
     """Look-alike search and the timeline rank people by the same appearance similarity: of the pairs of records
-    at or above a threshold, how many are really the same person?"""
+    at or above a threshold, how many are really the same person? `vecs`: other vectors than the run's own."""
+    vectors = globals()["vectors"] if vecs is None else vecs
     who = {rec: main_person(seen, gt) for rec, seen in records.items()}
     ids = [r for r in records if r in vectors and who[r] is not None]
     pairs = [(float(vectors[a] @ vectors[b]), who[a] == who[b]) for i, a in enumerate(ids) for b in ids[i + 1:]]
@@ -186,12 +190,15 @@ def run(video: Path, cfg: dict, imgsz: int, fps: float, shared: dict) -> tuple[d
         logging.getLogger("labeler.pipeline").removeHandler(log)
     records: dict[int, list] = defaultdict(list)
     vectors.clear()
+    reid_vectors.clear()
     for key, seen in seen_by_state.items():
         st = states[key]
         if st.db_id is not None and st.n_frames >= cfg["tracking"]["min_frames_keep"]:
             records[st.db_id] += seen
             if st.vector is not None:
                 vectors[st.db_id] = st.vector
+            if shared.get("reid") is not None and st.candidates:
+                reid_vectors[st.db_id] = shared["reid"].track_vector([c.person for c in st.candidates])
     for j, pair in zip(log.joins, pairs):   # the log line and the pair come from the same join, in order
         j.update(pair)
     return records, log.joins
@@ -212,6 +219,8 @@ def main() -> int:
     ap.add_argument("--fps", type=float, default=10)
     ap.add_argument("--long-gap", default="0.90,0.93,0.95,0.98,off")
     ap.add_argument("--json", type=Path, help="also write the results here")
+    ap.add_argument("--reid", action="store_true",
+                    help="also score look-alikes with the re-identification model (labeler/reid.py, reid: in config)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.WARNING)
     logging.getLogger("labeler.pipeline").setLevel(logging.INFO)
@@ -219,7 +228,10 @@ def main() -> int:
     cfg = load_config(args.config)
     from labeler.embed import Embedder
     embedder = Embedder(cfg["embeddings"])
-    shared = {"embedder": embedder, "student": None, "age": None}
+    shared = {"embedder": embedder, "student": None, "age": None, "reid": None}
+    if args.reid:
+        from labeler.reid import ReIDEmbedder
+        shared["reid"] = ReIDEmbedder(cfg["reid"])
     gt = read_gt(args.gt)
     results = []
     print(f"{'setting':>10} {'true':>5} {'counted':>8} {'found':>6} {'merged':>7} {'split':>6} {'joins':>6} "
@@ -250,6 +262,22 @@ def main() -> int:
                 print(f"  {row['threshold']:.2f}  {row['pairs']:>4}  {row['same_person']:>4}  (same-person pairs "
                       f"found {row['found_of_same']})")
             results.append({"lookalike": row})
+        if args.reid:
+            print("the same with the re-identification model:")
+            for row in lookalikes(records, gt, thresholds=(0.5, 0.6, 0.7, 0.8), vecs=reid_vectors):
+                print("  " + row["ranking"] if "ranking" in row else
+                      f"  {row['threshold']:.2f}  {row['pairs']:>4}  {row['same_person']:>4}  (same-person pairs "
+                      f"found {row['found_of_same']})")
+                results.append({"lookalike_reid": row})
+            # Both models: cosine of [sqrt(1-w)*a, sqrt(w)*b] = (1-w)*cos(a) + w*cos(b), one vector per person.
+            both = {r: np.concatenate([np.sqrt(0.5) * vectors[r], np.sqrt(0.5) * reid_vectors[r]])
+                    for r in vectors if r in reid_vectors}
+            print("both models, half each:")
+            for row in lookalikes(records, gt, thresholds=(0.6, 0.7, 0.8, 0.9), vecs=both):
+                print("  " + row["ranking"] if "ranking" in row else
+                      f"  {row['threshold']:.2f}  {row['pairs']:>4}  {row['same_person']:>4}  (same-person pairs "
+                      f"found {row['found_of_same']})")
+                results.append({"lookalike_both": row})
     if args.json:
         args.json.write_text(json.dumps(results, indent=1))
     return 0

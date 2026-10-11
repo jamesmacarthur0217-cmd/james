@@ -41,7 +41,13 @@ measurable change (README "Training the fast classifiers").
 3. Get the weekly retraining past its 30-person gate; then compare answer-key accuracy per attribute before/after
    (`/api/answer-key/score`, accuracy history chart). Keep only if it scores at least as well (gate exists).
 
-### Phase 12 — When the user adds IP/outdoor cameras (decision point: ask first)
+### Phase 12 — When the user adds IP/outdoor cameras (decision point: ask first) — **step 1 measured 2026-10-12**
+The user asked to go ahead before adding cameras. Step 1: OSNet-AIN x1.0 (downloaded with OK; MIT, research-data
+trained) measured on 7 MOT16 clips with true identities: in the pipeline look-alikes 24/74 vs SigLIP's 34/74 (both
+together 31/74); on MOT16's boxes 60% vs 61% (both 66%). **Not adopted**; `labeler/reid.py` and
+`tools/relink_check.py --reid` stay for re-measuring on the user's outdoor footage (better on far views). Steps 2-3
+wait for real extra cameras.
+
 1. **Person re-identification model** (bodies, not faces) for re-linking, look-alikes, timeline and photo search on
    far views. Candidates: OSNet (torchreid, MIT code; check the training data's license), CLIP-ReID. License check
    first (Phase 1 rules). Measure with `tools/relink_check.py` on PETS09-S2L1 (MOTChallenge labels): goal 0 wrong

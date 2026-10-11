@@ -5,9 +5,8 @@
 **Phases 0 and 2-11 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
 commercially yet. Phase 10 (long-run check, idle mode, restore drill) and Phase 11 (keyboard answer key, MOT16
-import, first kept retraining) are done (2026-10-12). **Next, in the approved plan
-[PHASE10-PLAN.md](PHASE10-PLAN.md)**: Phase 12 only when IP cameras come (re-identification model, more cameras).
-446 tests pass.
+import, first kept retraining) are done (2026-10-12). Phase 12 step 1 (a re-identification model) was measured
+on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. 451 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -177,6 +176,12 @@ long run).
 1. **Done** (labels kept hidden, the user's choice). Answer key by keyboard; before about 34 s per person.
 2. **Done with a public dataset** (the user had no suitable videos): MOT16, CC BY-NC-SA 3.0, 127 people imported.
 3. **Done**: first kept retraining, 61.8% → 62.1% on 26 answer-key people (no measurable change).
+
+## Phase 12: Re-identification and more cameras (step 1 measured 2026-10-12; the rest waits for cameras)
+
+1. **Measured, not adopted**: OSNet-AIN re-identification model vs SigLIP 2 on MOT16 (look-alikes in the
+   pipeline 24/74 vs 34/74). Kept as a measuring option (`tools/relink_check.py --reid`) for outdoor footage.
+2. More cameras (batching) and 3. per-camera tuning: when the user adds cameras.
 
 ## Critical files
 

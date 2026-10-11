@@ -283,6 +283,23 @@ timeline's bar), but only 24 of the 561 pairs are the same person; the closest l
 10 times of 26 (14 of 26 among the closest 3). On far or overhead cameras treat them as hints; the timeline
 already says "Same clothes can be a different person".
 
+**A person re-identification model was measured and not adopted** (2026-10-12). OSNet-AIN x1.0 (Torchreid, MIT
+code and weights, 8.9 MB, trained on research-only re-identification datasets; `labeler/reid.py`,
+`tools/relink_check.py --reid`) against SigLIP 2 on the 7 MOT16 clips with true identities (street, mall,
+square, night, a moving camera and a bus; walking people only), downloaded with the user's OK:
+
+| Test | SigLIP 2 (used) | OSNet-AIN | Both, half each |
+|---|---|---|---|
+| Inside the pipeline: closest look-alike is the same person (74 records with a repeat) | **34** | 24 | 31 |
+| MOT16's own boxes, 5 pictures early vs 5 late in each visit (200 people) | 61% | 60% | 66% |
+
+Inside the pipeline (the pictures it really keeps) the re-identification model was worse, and together they were
+no better than SigLIP alone, so nothing changed. It did better on far views (the bus clip: 18 vs 10 of 33 on
+MOT16's boxes) and worse close up (9 vs 15 of 19): measure it again on footage of the user's own outdoor
+cameras. On the same clips re-linking (security settings) made 11 joins, 2 right; 9 wrong joins came from the
+short-gap rule (within 5 s, near the same spot, similarity 0.76-0.93), 7 of them on the moving-camera street
+clip (MOT16-05). Fixed cameras gave too few joins (3) to change a setting on; check with the user's footage.
+
 ## Importing recorded videos
 
 The **Import** page (admin) adds old footage: a phone video, a recorder's files, a whole folder. People in it are
@@ -652,9 +669,9 @@ vision model, which the classifiers only stand in for until it answers. A larger
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-446 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+451 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, today at a glance, idle mode, the long-run check and the restore drill, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, today at a glance, idle mode, the long-run check and the restore drill, the re-identification wrapper, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 
@@ -694,3 +711,5 @@ Qwen3-VL: Apache-2.0. Age model: Apache-2.0. COCO photos: various Flickr license
 MOT16 (MOTChallenge, imported as the recorded camera `mot16` and used by the retrained classifiers since
 2026-10-12): CC BY-NC-SA 3.0, **non-commercial only**: before commercial use, delete that camera's people on the
 Import page and retrain (or delete `data\models\attributes.joblib` to go back to the shipped classifiers).
+OSNet-AIN re-identification weights (`data\models\reid`, measuring tool only, not used by the app): MIT, trained on
+MSMT17, DukeMTMC-reID and CUHK03 (research use; DukeMTMC was withdrawn by its authors in 2019).
