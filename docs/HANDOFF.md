@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **487 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~45 s).
+- Tests: **492 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~45 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -247,6 +247,15 @@ pipeline on 7 MOT16 clips (look-alikes 24/74 vs 34/74; README "One person, one r
 15 s for a camera loop at shutdown, so anything slow in its `finally` (person videos) must come after quick closes;
 the shared `.player` class in style.css is the full-screen video pop-up (don't reuse the name); CSS `display`
 overrides the `hidden` attribute unless a `[hidden]` rule wins. The user's own app records from its next restart.
+
+**Phase 14 (a camera at another site) is done** (2026-10-12, README "A camera at another site"): the user's
+second PC (Ti Xuan's, `XY-TIXUAN`, 100.106.249.52) joined their Tailscale network as a member and logged in to the
+app (their browser's antivirus HTTPS scanning first showed a different certificate; fixed on their side).
+`remote-camera/setup-camera.ps1` (MediaMTX v1.21.2 + FFmpeg, RTSP over TCP with a password, Tailscale-only firewall
+rule, autostart) tested here with a video file; network cameras are read over TCP and their passwords masked in
+logs. Ti Xuan still has to run it (the user sends them the folder); then the user adds the printed address on the
+Settings page (kiosk mode). Lessons: `$Input` is reserved in PowerShell; Start-Process in 5.1 does not quote
+arguments with spaces; Go programs (MediaMTX) refuse relative paths to commands, so runOnInit uses the full path.
 
 **Next**: with the user: a long-run check with recording on and the webcam measurement (lens cover). The rest of
 Phase 12 (more cameras, per-camera tuning, re-measuring re-identification and the short-gap re-link rule on

@@ -7,7 +7,8 @@ details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user use
 commercially yet. Phase 10 (long-run check, idle mode, restore drill) and Phase 11 (keyboard answer key, MOT16
 import, first kept retraining) are done (2026-10-12). Phase 12 step 1 (a re-identification model) was measured
 on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. Phase 13 (recording
-while people are in view) is done (2026-10-12). 487 tests pass.
+while people are in view) and Phase 14 (a camera at another site, through Tailscale) are done (2026-10-12).
+492 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -193,6 +194,14 @@ after; H.264 through FFmpeg on the graphics card; keep 3 days / 100 GB; admins a
 3. **Done**: Recordings page; admins the file, viewers a blurred stream; links from people and alerts.
 4. **Done**: Settings, Health, installer and offline package, README, data-protection template.
 Waiting for the user: a long-run check with recording on, and the webcam measurement (lens cover open).
+
+## Phase 14: A camera at another site (done 2026-10-12)
+
+The user's choices: a setup script for the other PC, kiosk mode. `remote-camera/` (setup-camera.bat,
+remove-camera.bat, README.txt): MediaMTX + FFmpeg, RTSP over TCP on 8554 with a random password, readable only from
+Tailscale addresses, firewall rule, autostart. Measured with a video file: 1.4 Mbit/s, read at ~20 frames/s, refused
+without the password or from the home network, recovers by itself after the stream stops. Waiting for Ti Xuan to run
+it on their PC.
 
 ## Critical files
 

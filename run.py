@@ -31,7 +31,7 @@ import sys  # noqa: E402
 import threading  # noqa: E402
 import time  # noqa: E402
 
-from labeler.config import load_config, resolve  # noqa: E402
+from labeler.config import load_config, mask_password, resolve  # noqa: E402
 from labeler.db import Database  # noqa: E402
 from labeler.pipeline import Pipeline  # noqa: E402
 from labeler.vlm import VLMClient, VLMWorker  # noqa: E402
@@ -155,7 +155,7 @@ def main() -> int:
         p.alerts = alerts
         p.age = age_model
     _start_recorders(cfg, db, pipelines)
-    log.info("cameras: %s", ", ".join(f"{p.name} ({p.cam['source']}, {p.mode})" for p in pipelines))
+    log.info("cameras: %s", ", ".join(f"{p.name} ({mask_password(p.cam['source'])}, {p.mode})" for p in pipelines))
 
     threads = [threading.Thread(target=p.run, kwargs={"max_frames": args.max_frames},
                                 name=f"pipeline-{p.name}", daemon=True) for p in pipelines]

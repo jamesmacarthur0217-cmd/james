@@ -17,7 +17,7 @@ from ultralytics import YOLO
 from . import colors, geometry, privacy, schema
 from . import zones as zones_mod
 from .clips import ClipRecorder, person_video_name
-from .config import resolve
+from .config import mask_password, resolve
 from .db import Database
 from .embed import Embedder
 from .sources import FrameSource, is_blank
@@ -255,7 +255,8 @@ class Pipeline:
     def run(self, max_frames: int | None = None) -> None:
         cam = self.cam
         source = FrameSource(cam["source"], loop=cam["loop_files"] and max_frames is None)
-        log.info("[%s] pipeline started: source=%s (%s), mode=%s", self.name, cam["source"], source.kind, self.mode)
+        log.info("[%s] pipeline started: source=%s (%s), mode=%s", self.name, mask_password(cam["source"]), source.kind,
+                 self.mode)
         t_last = self.started_mono = self.last_frame_at = time.monotonic()
         self.running = True
         try:

@@ -634,6 +634,28 @@ used the answer key, stopped the app, and account changes made with `users.py`, 
 Someone at this PC is recorded as "this PC". The Live page's once-a-second updates are not recorded. Entries
 older than `storage.audit_retention_days` (365) are deleted at startup.
 
+## A camera at another site
+
+A webcam on another PC (another house, another country) can be one of this PC's cameras: that PC sends it as an
+RTSP stream through Tailscale, and this PC does the detecting, labeling and recording as for its own cameras. The
+folder `remote-camera\` is for the other PC (copy it there; its `README.txt` says what to do in plain words):
+**setup-camera.bat** checks Tailscale, downloads MediaMTX (MIT, 28.6 MB) and FFmpeg (LGPL, 170.5 MB) after asking,
+each checked against its published checksum, finds and tests the webcam (1280×720 at 15 fps when it offers it),
+picks an H.264 encoder that works there, writes MediaMTX's settings with a new random password (only RTSP over TCP
+on port 8554; reading needs the password and a Tailscale address; publishing only from that PC itself), adds a
+Windows firewall rule for Tailscale addresses only (asks for administrator once), starts it now and at every login
+(no window), and prints the camera address. **remove-camera.bat** takes it all away again. Here: Settings page →
+Cameras → **Add camera** with that address as the source (the password is shown masked, and logs mask it too).
+Network cameras are read over TCP (`OPENCV_FFMPEG_CAPTURE_OPTIONS`), which gets through the internet more reliably.
+
+Measured (2026-10-12) with a video file as the webcam, on this PC through its own Tailscale address: the stream
+was H.264 1280×720 at 15 fps, **1.4 Mbit/s** (about 0.64 GB an hour, 15 GB a day of the other PC's upload if it
+runs all day); the test copy read it at ~20 frames/s, found and recorded the people in it; no password, a wrong
+one, or the right one from the home network (not Tailscale) were all refused; when the stream stopped, the camera
+showed "no picture from the camera" after 6 s and came back by itself 3 s after the stream did. Not tested here:
+a real webcam through DirectShow (this PC's webcam was in use by the app; the script tests the webcam for 3 s
+before setting anything up), and the firewall and autostart steps (they run on the other PC).
+
 ## Database
 
 PostgreSQL 17 with pgvector in Docker (`docker-compose.yml`), on 127.0.0.1:5432, data in the Docker volume
@@ -693,9 +715,9 @@ vision model, which the classifiers only stand in for until it answers. A larger
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-487 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+492 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, today at a glance, idle mode, the long-run check and the restore drill, the re-identification wrapper, recording and the Recordings page, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, today at a glance, idle mode, the long-run check and the restore drill, the re-identification wrapper, recording and the Recordings page, network-camera logging, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 
@@ -716,6 +738,7 @@ Changes are tracked with git.
 | `labeler/settings.py` | the Settings page (`data/settings.yaml` over config.yaml) |
 | `labeler/importer.py` | the Import page: recorded videos with real times |
 | `labeler/recorder.py`, `labeler/recordings_web.py` | recording while people are in view; the Recordings page |
+| `remote-camera/` | for another PC: send its webcam here through Tailscale (setup-camera.bat, remove-camera.bat) |
 | `run.py`, `start.bat`, `stop.bat` | starting and stopping |
 | `install.bat` / `install.ps1`, `tools/models.py`, `tools/pack_offline.ps1` | installing on a new PC, offline package |
 | `tools/` | benchmarks, evaluation, training, backups, long-run check (`soak.py`), restore drill, FFmpeg setup |

@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 import models  # noqa: E402
 
-SCRIPTS = ["install.ps1", "tools/pack_offline.ps1"]
+SCRIPTS = ["install.ps1", "tools/pack_offline.ps1", "remote-camera/setup-camera.ps1"]
 NAMES = {"detector": "yolo-test.pt", "huggingface": ["org/emb", "org/age"], "ollama": "qwen3-vl:4b-instruct"}
 
 

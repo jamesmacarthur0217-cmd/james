@@ -10,8 +10,13 @@ from pathlib import Path
 
 # Without this, Media Foundation takes ~8 s to open many USB webcams.
 os.environ.setdefault("OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS", "0")
+# Network cameras over TCP: over the internet (a camera at another site, through Tailscale) UDP packets get lost or
+# blocked, which shows as grey smears or no picture at all.
+os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp")
 import cv2  # noqa: E402
 import numpy as np
+
+from .config import mask_password  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -74,14 +79,14 @@ class FrameSource:
         while not self._stop.is_set():
             cap = self._open_live()
             if not cap.isOpened():
-                log.warning("cannot open %s %s; retrying in 3 s", self.kind, self.source)
+                log.warning("cannot open %s %s; retrying in 3 s", self.kind, mask_password(self.source))
                 time.sleep(3)
                 continue
-            log.info("opened %s %s", self.kind, self.source)
+            log.info("opened %s %s", self.kind, mask_password(self.source))
             while not self._stop.is_set():
                 ok, frame = cap.read()
                 if not ok:
-                    log.warning("lost %s %s; reconnecting", self.kind, self.source)
+                    log.warning("lost %s %s; reconnecting", self.kind, mask_password(self.source))
                     break
                 with self._lock:
                     self._latest = frame
