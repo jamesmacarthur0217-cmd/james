@@ -210,6 +210,11 @@ here receives), so it needs no incoming port: works through company firewalls, a
 Done: `labeler/receiver.py`, the sending `remote-camera/` script, the Settings page box. Waiting for the user: this
 PC's Tailscale connected again, the firewall rule for 8554/1935, then a phone or PC as a real test.
 
+## Phase 16: Search recordings by words (approved 2026-10-12, not started)
+
+**Approved plan: [PHASE16-PLAN.md](PHASE16-PLAN.md)**: type a description, get video moments from all cameras to
+play (built on the Ask box, the recordings table and the Recordings page). Start after the Phase 15 phone test.
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),

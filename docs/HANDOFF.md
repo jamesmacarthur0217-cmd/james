@@ -278,7 +278,8 @@ the zip is not in git); Ti Xuan's company PC only if their company allows it. Th
 "cameras from other devices" and that people are found and recorded. Note: the user's real app has never run the
 Phase 13-15 code yet (recording, receiver) until they restart it.
 
-**Next**: with the user: a long-run check with recording on and the webcam measurement (lens cover). The rest of
+**Next: [PHASE16-PLAN.md](PHASE16-PLAN.md)** (approved 2026-10-12, not started): search recordings by words. First
+finish the Phase 15 phone test with the user (above). Later, with the user: a long-run check with recording on and the webcam measurement (lens cover). The rest of
 Phase 12 (more cameras, per-camera tuning, re-measuring re-identification and the short-gap re-link rule on
 outdoor footage) when the user adds cameras.
 
