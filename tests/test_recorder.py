@@ -196,6 +196,13 @@ def test_pick_encoder_takes_the_first_that_works(tmp_path):
     recorder._encoder_cache.clear()
 
 
+def test_the_time_is_written_on_a_copy():
+    frame = np.zeros((360, 640, 3), np.uint8)
+    out = recorder.stamp(frame, "cam1  2026-10-12 14:00:00")
+    assert frame.max() == 0                              # the camera loop's picture is untouched
+    assert out[300:360, :400].max() == 255               # white text near the bottom left
+
+
 def test_encoder_quality_settings():
     assert recorder.encoder_args("h264_nvenc", 28)[recorder.encoder_args("h264_nvenc", 28).index("-cq") + 1] == "28"
     assert recorder.encoder_args("h264_mf", 28)[-1] == "60"

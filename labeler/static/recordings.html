@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recordings</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/session.js"></script>
+<style>
+  /* Day bar colors: categorical slots 1 (recorded) and 2 (a person appeared), each mode its own steps. */
+  main { --rec: #2a78d6; --person: #eb6834; --grid: #e6e6e3; }
+  @media (prefers-color-scheme: dark) { main { --rec: #3987e5; --person: #d95926; --grid: #2e3440; } }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .controls input[type=date] { font: inherit; }
+  .daybar { position: relative; margin-top: 14px; user-select: none; }
+  .daybar svg { display: block; width: 100%; height: 64px; cursor: pointer; }
+  .daybar .grid line { stroke: var(--grid); }
+  .daybar .axis text { fill: var(--muted); font-size: 11px; }
+  .daybar .hair { stroke: var(--text); stroke-width: 1; }
+  .daybar .tip { position: absolute; top: -6px; pointer-events: none; background: var(--text); color: var(--bg);
+    font-size: 12px; padding: 3px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -100%); }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+    background: var(--dot); margin-right: 5px; vertical-align: -1px; }
+  .rec-player { margin-top: 14px; }
+  .rec-player video, .rec-player img { width: 100%; max-height: 70vh; background: #000; border-radius: 8px; display: block; }
+  .rec-player [hidden], .rec-player[hidden] { display: none; }
+  .now { font-variant-numeric: tabular-nums; margin: 8px 0 0; }
+  table.recs { border-collapse: collapse; font-size: 13px; width: 100%; margin-top: 8px; }
+  table.recs td, table.recs th { border-bottom: 1px solid var(--border); padding: 5px 8px; text-align: left; }
+  table.recs td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.recs tr.playing td { background: var(--chip); }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>VisionLabeler</h1>
+  <nav><a href="/">Live</a><a href="/recordings" class="active">Recordings</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/audit" class="admin-only">Audit log</a><a href="/import" class="admin-only">Import</a><a href="/settings" class="admin-only">Settings</a><a href="/health">Health</a></nav>
+</header>
+<main>
+  <section class="panel">
+    <div class="controls">
+      <label for="camera">Camera</label> <select id="camera"></select>
+      <button id="prev" title="The day before">◀</button>
+      <input type="date" id="day">
+      <button id="next" title="The day after">▶</button>
+      <span class="muted" id="summary"></span>
+    </div>
+    <div class="daybar" id="daybar"></div>
+    <div class="legend"><span style="--dot: var(--rec)">recorded</span><span style="--dot: var(--person)">a person appeared</span></div>
+    <p class="hint" id="hint"></p>
+    <div class="rec-player" id="player" hidden>
+      <video id="video" controls playsinline muted hidden></video>
+      <img id="stream" alt="Recording" hidden>
+      <p class="now"><b id="now"></b> <span class="muted" id="now-note"></span>
+        <button id="stop" hidden>Stop</button></p>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>Recordings this day</h2>
+    <div id="list"></div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+let data = null, playing = null;   // playing: {rec, startMs}
+
+function pad(n) { return String(n).padStart(2, "0"); }
+function localDay(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function clock(ms) { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; }
+function length(s) { s = Math.round(s); return s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.floor(s % 3600 / 60)} min`
+  : s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`; }
+function ms(iso) { return new Date(iso).getTime(); }   // the server sends local times without a zone
+
+async function load(day, camera) {
+  const q = new URLSearchParams({ day });
+  if (camera) q.set("camera", camera);
+  const r = await fetch("/api/recordings?" + q);
+  if (!r.ok) { $("list").innerHTML = '<div class="empty">Could not load the recordings.</div>'; return; }
+  data = await r.json();
+  $("camera").replaceChildren(...data.cameras.map(c => Object.assign(document.createElement("option"),
+    { value: c, textContent: c, selected: c === data.camera })));
+  $("day").value = data.day;
+  const total = data.recordings.reduce((s, x) => s + ((x.end ? ms(x.end) : Date.now()) - ms(x.start)) / 1000, 0);
+  $("summary").textContent = data.recordings.length
+    ? `${data.recordings.length} recording${data.recordings.length === 1 ? "" : "s"}, ${length(total)}`
+      + (data.admin ? `, ${data.recordings.reduce((s, x) => s + (x.size_mb || 0), 0).toFixed(0)} MB` : "")
+    : "";
+  $("hint").textContent = !data.enabled ? "Recording is turned off (Settings, or recording.enabled in config.yaml)."
+    : `Recorded while people are in view; kept ${data.keep_days} days. Click the bar to play from that moment.`;
+  drawBar();
+  drawList();
+}
+
+// The day bar: one axis (hours), recorded stretches as bars, people as ticks; a crosshair shows the time.
+function drawBar() {
+  const box = $("daybar"), W = Math.max(300, box.clientWidth), H = 64, L = 4, R = 4, T = 6, B = 18;
+  const day0 = ms(data.day + "T00:00:00"), span = 86400000;
+  const x = (t) => L + (W - L - R) * Math.min(1, Math.max(0, (t - day0) / span));
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Recorded times on ${data.day}"><g class="grid">`;
+  for (let h = 0; h <= 24; h += 3) svg += `<line x1="${x(day0 + h * 3600000)}" x2="${x(day0 + h * 3600000)}" y1="${T}" y2="${H - B}"/>`;
+  svg += '</g><g class="axis">';
+  for (let h = 0; h < 24; h += 3) svg += `<text x="${x(day0 + h * 3600000) + 2}" y="${H - 4}">${pad(h)}:00</text>`;
+  svg += "</g>";
+  for (const r of data.recordings) {
+    const a = x(ms(r.start)), b = Math.max(a + 2, x(r.end ? ms(r.end) : Date.now()));
+    svg += `<rect x="${a}" y="${T + 8}" width="${b - a}" height="${H - B - T - 8}" rx="2" style="fill:var(--rec)"/>`;
+  }
+  for (const p of data.people) {
+    const px = x(ms(p.at));
+    svg += `<line x1="${px}" x2="${px}" y1="${T}" y2="${T + 6}" style="stroke:var(--person)" stroke-width="2"/>`;
+  }
+  svg += `<line class="hair" x1="0" x2="0" y1="${T}" y2="${H - B}" visibility="hidden"/></svg>`;
+  box.innerHTML = svg + '<div class="tip" hidden></div>';
+  const el = box.querySelector("svg"), hair = box.querySelector(".hair"), tip = box.querySelector(".tip");
+  const timeAt = (e) => { const b = el.getBoundingClientRect(); const px = (e.clientX - b.left) * W / b.width;
+    return day0 + span * Math.min(1, Math.max(0, (px - L) / (W - L - R))); };
+  el.addEventListener("pointermove", (e) => {
+    const t = timeAt(e), b = el.getBoundingClientRect();
+    hair.setAttribute("x1", x(t)); hair.setAttribute("x2", x(t)); hair.setAttribute("visibility", "visible");
+    const rec = data.recordings.find(r => ms(r.start) <= t && t <= (r.end ? ms(r.end) : Date.now()));
+    tip.hidden = false;
+    tip.style.left = (x(t) * b.width / W) + "px";
+    tip.textContent = clock(t) + (rec ? " · recorded" : " · not recorded");
+  });
+  el.addEventListener("pointerleave", () => { tip.hidden = true; hair.setAttribute("visibility", "hidden"); });
+  el.addEventListener("click", (e) => playAt(timeAt(e)));
+}
+new ResizeObserver(() => { if (data) drawBar(); }).observe($("daybar"));
+
+function drawList() {
+  if (!data.recordings.length) {
+    $("list").innerHTML = '<div class="empty">Nothing was recorded this day.</div>';
+    return;
+  }
+  const table = document.createElement("table");
+  table.className = "recs";
+  const head = table.insertRow();
+  ["From", "To", "Length", ...(data.admin ? ["Size"] : []), ""].forEach(h => {
+    const th = document.createElement("th"); th.textContent = h; head.append(th); });
+  for (const r of data.recordings) {
+    const tr = table.insertRow();
+    tr.dataset.id = r.id;
+    if (playing && playing.rec.id === r.id) tr.className = "playing";
+    const end = r.end ? ms(r.end) : Date.now();
+    tr.insertCell().textContent = clock(ms(r.start));
+    tr.insertCell().textContent = r.open ? "recording now" : clock(end);
+    Object.assign(tr.insertCell(), { className: "num", textContent: length((end - ms(r.start)) / 1000) });
+    if (data.admin) Object.assign(tr.insertCell(), { className: "num", textContent: r.size_mb + " MB" });
+    const cell = tr.insertCell(), actions = document.createElement("div");
+    actions.className = "actions";
+    const btn = (label, fn, cls) => { const b = document.createElement("button"); b.textContent = label;
+      if (cls) b.className = cls; b.onclick = fn; actions.append(b); };
+    btn("▶ Play", () => play(r, 0));
+    if (data.admin && !r.open) {
+      btn("Download", () => { location.href = `/api/recordings/${r.id}/download`; });
+      btn("Delete", () => remove(r), "danger-quiet");
+    }
+    cell.append(actions);
+  }
+  $("list").replaceChildren(table);
+}
+
+async function playAt(t) {
+  const r = await fetch(`/api/recordings/find?camera=${encodeURIComponent(data.camera)}&at=${encodeURIComponent(localIso(t))}`);
+  if (!r.ok) { $("hint").textContent = `Nothing was recorded at ${clock(t)}.`; return; }
+  const f = await r.json();
+  const rec = data.recordings.find(x => x.id === f.id) || { id: f.id, start: f.start, open: false };
+  play(rec, f.offset_s, f.video_s);
+}
+function localIso(t) { const d = new Date(t); return `${localDay(d)}T${clock(t)}`; }
+
+// Admins play the file (seeking by the browser); viewers a stream made by the app with faces blurred.
+function play(rec, offsetS, videoS) {
+  playing = { rec, startMs: ms(rec.start) };
+  $("player").hidden = false;
+  const v = $("video"), img = $("stream");
+  stopStream();
+  if (data.admin && !rec.open) {
+    img.hidden = true; v.hidden = false; $("stop").hidden = true;
+    v.src = `/recordings/file/${rec.id}`;
+    v.onloadedmetadata = () => { v.currentTime = videoS ?? offsetS * 1; v.play().catch(() => {}); };
+    v.ontimeupdate = null;
+    showNow(playing.startMs + (offsetS || 0) * 1000, "(the exact time is on the picture)");
+  } else {
+    v.pause(); v.removeAttribute("src"); v.load(); v.hidden = true;
+    img.hidden = false; $("stop").hidden = false;
+    img.src = `/recordings/stream/${rec.id}?t=${offsetS || 0}`;
+    showNow(playing.startMs + (offsetS || 0) * 1000, data.admin ? "(still being recorded; the exact time is on the picture)"
+      : "(faces blurred; the exact time is on the picture)");
+  }
+  drawList();
+  $("player").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+function showNow(t, note) { $("now").textContent = `${data.camera} · from ${localDay(new Date(t))} ${clock(t)}`; $("now-note").textContent = note; }
+function stopStream() { const img = $("stream"); if (img.src) { img.removeAttribute("src"); } }
+$("stop").onclick = () => { stopStream(); $("stream").hidden = true; $("stop").hidden = true; };
+
+async function remove(r) {
+  if (!confirm(`Delete the recording from ${clock(ms(r.start))} to ${clock(ms(r.end))}? This cannot be undone.`)) return;
+  const res = await fetch("/api/recordings/delete", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids: [r.id] }) });
+  if (!res.ok) { alert("Could not delete"); return; }
+  if (playing && playing.rec.id === r.id) { $("player").hidden = true; stopStream(); $("video").removeAttribute("src"); }
+  load(data.day, data.camera);
+}
+
+function shiftDay(n) { const d = new Date($("day").value + "T12:00:00"); d.setDate(d.getDate() + n); load(localDay(d), data.camera); }
+$("prev").onclick = () => shiftDay(-1);
+$("next").onclick = () => shiftDay(1);
+$("day").onchange = () => load($("day").value, data && data.camera);
+$("camera").onchange = () => load($("day").value, $("camera").value);
+
+// A link like /recordings?camera=cam1&at=2026-10-12T14:05:00 (from a person, an alert or the timeline) plays then.
+(async () => {
+  const at = params.get("at");
+  await load(at ? at.slice(0, 10) : localDay(new Date()), params.get("camera"));
+  if (at) playAt(ms(at));
+})();
+</script>
+</body>
+</html>

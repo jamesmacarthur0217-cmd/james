@@ -7,7 +7,7 @@ continues the same recording. `when: always` records all the time. Long recordin
 a crash still plays. Next to each video, <HHMMSS>.jsonl has one line per frame: its time in the file (seconds from
 `started_at`, from the real clock, so a camera that stalled is still found at the right moment) and the head boxes
 of the people in it (from the pipeline's keypoints), used to blur faces when a viewer watches. With
-storage.blur_faces the faces are blurred before writing.
+storage.blur_faces the faces are blurred before writing. The camera's name and the time are written on each frame.
 
 The camera loop only resizes the frame and hands it over; encoding runs in FFmpeg (on the graphics card with
 h264_nvenc), fed by a writer thread through a small queue. If the queue is full (a very slow disk), frames are
@@ -279,7 +279,7 @@ class Recorder:
     def _write(self, f: dict, image: np.ndarray, boxes: list, wall: datetime) -> None:
         if image.shape[1] != f["size"][0] or image.shape[0] != f["size"][1]:
             image = cv2.resize(image, f["size"])   # the camera changed size mid-file
-        f["writer"].write(image)
+        f["writer"].write(stamp(image, f"{self.camera}  {wall:%Y-%m-%d %H:%M:%S}"))
         f["t"] = max(f["t"], (wall - f["start"]).total_seconds())
         f["side"].write(json.dumps([round(f["t"], 2), boxes]) + "\n")
         f["frames"] += 1
@@ -299,6 +299,17 @@ class Recorder:
             log.warning("[%s] FFmpeg reported a problem with %s: %s", self.camera, path.name, message)
         self.db.update_recording(f["id"], frames=f["frames"], size_bytes=size,
                                  ended_at=f["start"] + timedelta(seconds=f["t"] + 1 / self.fps))
+
+
+def stamp(image: np.ndarray, text: str) -> np.ndarray:
+    """The camera and the time written on the picture (on a copy: the image may be the camera loop's own), so
+    the time is right in the player, in downloads and in viewers' streams, however unevenly the camera ran."""
+    out = image.copy()
+    h = out.shape[0]
+    size = max(0.45, h / 1100)
+    for color, width in (((0, 0, 0), 4), ((255, 255, 255), 1)):
+        cv2.putText(out, text, (10, h - 12), cv2.FONT_HERSHEY_SIMPLEX, size, color, width, cv2.LINE_AA)
+    return out
 
 
 # --- housekeeping (run.py) -------------------------------------------------------------------------

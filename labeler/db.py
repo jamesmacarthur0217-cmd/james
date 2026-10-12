@@ -1128,6 +1128,15 @@ class Database:
                 "ended_at": r.ended_at.isoformat(timespec="seconds") if r.ended_at else None,
                 "frames": r.frames, "size_bytes": r.size_bytes, "encoder": r.encoder}
 
+    def get_recording(self, rec_id: int) -> dict | None:
+        with self.Session() as s:
+            r = s.get(Recording, rec_id)
+            return self._recording_dict(r) if r is not None else None
+
+    def recording_cameras(self) -> list[str]:
+        with self.Session() as s:
+            return sorted(s.scalars(select(Recording.camera).distinct()))
+
     def open_recordings(self) -> list[dict]:
         """Recordings without an end: being written, or left open by a crash (closed at the next start)."""
         with self.Session() as s:

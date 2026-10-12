@@ -78,6 +78,15 @@ with MOT16-11 (busy mall, 1080p, no VLM) as the camera:
   stored head boxes and streams it like the live view (no direct file access).
 - Admins: download a time range (cut without re-encoding) and delete a time range. Everything audited.
 
+**Step 3 results (2026-10-12)**: `labeler/recordings_web.py` + `static/recordings.html` (menu link on every page,
+viewers too). Day bar (recorded stretches, people's arrivals, a crosshair with the time; click to play from that
+moment), list with Play / Download / Delete (admins), deep links `/recordings?camera=…&at=…` from each person on
+the Live page (and the timeline) and each alert. Admins: the MP4 itself (Range requests; the finished file has an
+`mfra` index, so seeking works); a recording still being written plays as a stream. Viewers: only the stream, faces
+blurred from the stored head boxes; the file, downloads and deletes answer 403. The camera's name and the time are
+written on every recorded frame (exact in the player, downloads and streams, however unevenly the camera ran). One
+audit entry per playback (not per seek). Checked in the browser pane at desktop width.
+
 ## Step 4: settings, health, docs
 
 - Settings page section *Recording*: on/off, when (people / always), keep days, max GB. Health page: recorder

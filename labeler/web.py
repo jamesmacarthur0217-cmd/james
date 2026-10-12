@@ -171,7 +171,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                 return JSONResponse({"detail": "wrong health token"}, status_code=401)
             request.state.user = MONITOR_USER
             return await call_next(request)
-        page = method == "GET" and not path.startswith(("/api/", "/stream", "/crops/", "/clips/", "/static/"))
+        page = method == "GET" and not path.startswith(("/api/", "/stream", "/crops/", "/clips/", "/static/",
+                                                         "/recordings/"))
         if is_this_pc(request):
             request.state.user = LOCAL_USER
         else:
@@ -254,6 +255,9 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         """Viewers see blurred faces (web.blur_faces_for_viewers); admins see faces."""
         user = getattr(request.state, "user", None) or {}
         return cfg["web"].get("blur_faces_for_viewers", True) and user.get("role") != "admin"
+
+    from . import recordings_web
+    recordings_web.add_routes(app, cfg, db, audit, blur_for)   # the Recordings page (labeler/recorder.py)
 
     # Same address, different picture for admins and viewers: never let a shared browser cache mix them up.
     PICTURE_HEADERS = {"Cache-Control": "private, max-age=60", "Vary": "Cookie"}

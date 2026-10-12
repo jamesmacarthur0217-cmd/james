@@ -23,7 +23,7 @@
 <body>
 <header>
   <h1>VisionLabeler</h1>
-  <nav><a href="/">Live</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="active admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/audit" class="admin-only">Audit log</a><a href="/import" class="admin-only">Import</a><a href="/settings" class="admin-only">Settings</a><a href="/health">Health</a></nav>
+  <nav><a href="/">Live</a><a href="/recordings">Recordings</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="active admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/audit" class="admin-only">Audit log</a><a href="/import" class="admin-only">Import</a><a href="/settings" class="admin-only">Settings</a><a href="/health">Health</a></nav>
 </header>
 <main class="cols">
   <div>
@@ -120,7 +120,8 @@ async function loadEvents() {
   const html = data.events.length ? data.events.map(e => `
     <div class="event">${e.crop ? `<img src="/crops/${encodeURIComponent(e.crop)}" alt="">` : '<img alt="">'}
       <div><b>${esc(e.message)}</b><br><small>person #${e.track_id} · ${esc(e.camera)} · ${esc(e.created_at.replace("T", " "))}</small>
-        ${e.clip ? `<br><button class="link play" data-clip="${esc(e.clip)}">▶ Play clip</button>` : ""}
+        ${e.clip ? `<br><button class="link play" data-clip="${esc(e.clip)}">▶ Play clip</button>` : "<br>"}
+        <a class="link" href="/recordings?camera=${encodeURIComponent(e.camera)}&amp;at=${encodeURIComponent(e.created_at)}">▶ Recording</a>
         <div class="clip-box"></div></div>
     </div>`).join("") : '<div class="empty">No alerts yet.</div>';
   if ($("events").dataset.html !== html) { $("events").innerHTML = html; $("events").dataset.html = html; }
