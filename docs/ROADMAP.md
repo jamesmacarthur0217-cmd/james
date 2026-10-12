@@ -201,7 +201,7 @@ The user's choices: a setup script for the other PC, kiosk mode. `remote-camera/
 remove-camera.bat, README.txt): MediaMTX + FFmpeg, RTSP over TCP on 8554 with a random password, readable only from
 Tailscale addresses, firewall rule, autostart. Measured with a video file: 1.4 Mbit/s, read at ~20 frames/s, refused
 without the password or from the home network, recovers by itself after the stream stops. Waiting for Ti Xuan to run
-it on their PC.
+it on their PC. Ran there 2026-10-12: blocked by the company ESET firewall; left aside by the user.
 
 ## Critical files
 

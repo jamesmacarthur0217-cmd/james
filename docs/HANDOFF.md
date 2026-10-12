@@ -254,7 +254,10 @@ app (their browser's antivirus HTTPS scanning first showed a different certifica
 `remote-camera/setup-camera.ps1` (MediaMTX v1.21.2 + FFmpeg, RTSP over TCP with a password, Tailscale-only firewall
 rule, autostart) tested here with a video file; network cameras are read over TCP and their passwords masked in
 logs. Ti Xuan still has to run it (the user sends them the folder); then the user adds the printed address on the
-Settings page (kiosk mode). Lessons: `$Input` is reserved in PowerShell; Start-Process in 5.1 does not quote
+Settings page (kiosk mode). **Result (2026-10-12)**: Ti Xuan ran it (stream fine on their PC, Windows firewall rule
+in place, Tailscale shields down), but their PC is a company PC with **ESET Firewall**, which replaces the Windows
+firewall and blocks port 8554 from outside; the user chose to leave the remote camera aside and was told to have
+Ti Xuan run remove-camera.bat. Viewing from that PC still works. Lessons: `$Input` is reserved in PowerShell; Start-Process in 5.1 does not quote
 arguments with spaces; Go programs (MediaMTX) refuse relative paths to commands, so runOnInit uses the full path.
 
 **Next**: with the user: a long-run check with recording on and the webcam measurement (lens cover). The rest of
