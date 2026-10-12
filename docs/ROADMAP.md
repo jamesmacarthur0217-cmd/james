@@ -183,6 +183,13 @@ long run).
    pipeline 24/74 vs 34/74). Kept as a measuring option (`tools/relink_check.py --reid`) for outdoor footage.
 2. More cameras (batching) and 3. per-camera tuning: when the user adds cameras.
 
+## Phase 13: Recording (planned 2026-10-12)
+
+**Plan: [PHASE13-PLAN.md](PHASE13-PLAN.md)** (user's choices: record while people are in view with 10 s before and
+after; H.264 through FFmpeg on the graphics card; keep 3 days / 100 GB; admins and viewers, viewers blurred).
+1. FFmpeg (download, ask first) and measurements. 2. The recorder. 3. Recordings page and playback. 4. Settings,
+Health, installer, docs.
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),

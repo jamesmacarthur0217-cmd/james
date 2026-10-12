@@ -241,8 +241,9 @@ pipeline on 7 MOT16 clips (look-alikes 24/74 vs 34/74; README "One person, one r
 `tools/relink_check.py --reid`. MOT16 train clips as videos with walking-people-only markings:
 `data/datasets/mot16/train_videos`, `data/datasets/mot16/gt` (use these with relink_check).
 
-**Next**: the rest of Phase 12 (more cameras, per-camera tuning, re-measuring re-identification and the short-gap
-re-link rule on outdoor footage) when the user adds cameras. Ask the user first.
+**Next**: Phase 13, recording ([PHASE13-PLAN.md](PHASE13-PLAN.md), choices made 2026-10-12); step 1 starts with
+the FFmpeg download (ask first). The rest of Phase 12 (more cameras, per-camera tuning, re-measuring
+re-identification and the short-gap re-link rule on outdoor footage) when the user adds cameras.
 
 Open items (also in that plan):
 - Pictures and person videos are not in the backups (restore drill, 2026-10-12). The user chose to leave it so
