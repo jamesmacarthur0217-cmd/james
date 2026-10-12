@@ -16,7 +16,7 @@ Roadmap Phase 1 (licenses) is deferred until they say otherwise. Under Malaysia'
 household use is generally outside the Act; their filled-in camera sign and data-protection summary are in
 `data/privacy/` (git-ignored, contains their email); the blank templates are in `docs/`.
 
-## 2. Current state (2026-10-12)
+## 2. Current state (2026-10-12, end of the session)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
   was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phase 13 (recording) done; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
@@ -268,8 +268,15 @@ shown once); `remote-camera/` now sends (FFmpeg loop, no admin). Lessons: MediaM
 (8892) by default: turn it off or a second copy fails; FFmpeg's RTSP output needs `-timeout` or it hangs forever
 when the server dies halfway; `timeout.exe` fails without a visible console (use ping); a `<select>` on the
 Settings page must be read as text (saving was broken by the Phase 13 "When" drop-down until this phase).
-**Waiting for the user:** this PC's Tailscale was stuck "starting" at the end; the firewall rule for ports
-8554/1935; a real phone or second PC as the test.
+**State at the end of the session (2026-10-12, checked):** this PC's Tailscale connected again (Ti Xuan's PC offline);
+the firewall rule "VisionLabeler cameras (Tailscale)" for 8554/1935 is in place; VisionLabeler was not running.
+**Still to do with the user (they have not done it yet):** (1) Settings → "Add camera sent from a phone or PC" →
+Save → copy the two send addresses (password shown once) → Restart now; (2) send from a device: their phone
+(Tailscale app + Larix Broadcaster, the phone/RTMP address) is the easiest test; another PC gets the NEW
+`remote-camera` folder (the `remote-camera.zip` in the project folder is the OLD serving version: zip it again;
+the zip is not in git); Ti Xuan's company PC only if their company allows it. Then check the Health page line
+"cameras from other devices" and that people are found and recorded. Note: the user's real app has never run the
+Phase 13-15 code yet (recording, receiver) until they restart it.
 
 **Next**: with the user: a long-run check with recording on and the webcam measurement (lens cover). The rest of
 Phase 12 (more cameras, per-camera tuning, re-measuring re-identification and the short-gap re-link rule on
@@ -293,5 +300,6 @@ Open items (also in that plan):
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE10-PLAN.md:
-> ask me before each phase starts, and do it step by step.
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then help me finish the Phase 15 test
+> (a camera sent from my phone), and continue with the newest plan in docs/ (ask me before each phase starts,
+> and do it step by step).
