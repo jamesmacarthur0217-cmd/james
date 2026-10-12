@@ -253,6 +253,7 @@ rtmp: false
 hls: false
 webrtc: false
 srt: false
+moq: false
 paths:
   cam:
     source: publisher

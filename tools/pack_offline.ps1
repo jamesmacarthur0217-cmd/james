@@ -72,6 +72,13 @@ if ($LASTEXITCODE -eq 0) {
   if ($LASTEXITCODE -ne 0) { $failed += "FFmpeg" }
 } else { Say "  not on this PC: the package has no FFmpeg (recording then needs internet on the new PC)" "Yellow" }
 
+Say ""; Say "== MediaMTX (cameras sent from other devices) ==" "Cyan"
+& $VenvPy tools\get_mediamtx.py check | Out-Host
+if ($LASTEXITCODE -eq 0) {
+  & $VenvPy tools\get_mediamtx.py pack $Out | Out-Host
+  if ($LASTEXITCODE -ne 0) { $failed += "MediaMTX" }
+} else { Say "  not on this PC: the package has no MediaMTX (only needed for cameras sent from other devices)" "Yellow" }
+
 $readme = @"
 VisionLabeler offline package (made $(Get-Date -Format "yyyy-MM-dd") on $env:COMPUTERNAME).
 
@@ -84,6 +91,7 @@ wheels\   Python packages (pip install --no-index), exact versions of the PC tha
 models\   detector, Hugging Face models, the Ollama vision model
 docker\   the database image (docker load)
 ffmpeg\   FFmpeg for recording (LGPL build, see its LICENSE.txt)
+mediamtx\ MediaMTX, receives cameras sent from other devices (MIT)
 "@
 [IO.File]::WriteAllText((Join-Path $Out "README.txt"), $readme, (New-Object Text.UTF8Encoding $false))
 

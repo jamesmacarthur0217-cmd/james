@@ -36,6 +36,8 @@ def main() -> None:
     cfg["settings_file"] = (folder / "settings.yaml").as_posix()   # the Settings page writes here, not data/
     cfg.setdefault("backup", {})["dir"] = (folder / "backups").as_posix()   # never the user's backups
     cfg.setdefault("recording", {})["dir"] = (folder / "recordings").as_posix()   # nor their recordings
+    # Cameras sent from other devices: own settings folder and ports, so a test copy runs next to the real app.
+    cfg.setdefault("receiver", {}).update(dir=(folder / "mediamtx").as_posix(), rtsp_port=18554, rtmp_port=11935)
     cfg.setdefault("student", {})["retrained_path"] = (folder / "models" / "attributes.joblib").as_posix()
     if args.https:
         cfg["web"].update({"https": True, "https_port": 8444, "cert_file": (folder / "tls" / "cert.pem").as_posix(),

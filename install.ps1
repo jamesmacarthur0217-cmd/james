@@ -306,6 +306,23 @@ if (-not (Venv-Report)) {
 }
 
 # ---------------------------------------------------------------------------------------------------
+Step "6c. MediaMTX (only for cameras sent from a phone or another PC)"
+if (-not (Venv-Report)) {
+  Info "MediaMTX" "checked after the Python environment is installed"
+} else {
+  & $VenvPy tools\get_mediamtx.py check | Out-Null
+  if ($LASTEXITCODE -eq 0) { Ok "MediaMTX" "ready (data\mediamtx)" }
+  else {
+    Info "MediaMTX" "not set up (only needed for cameras sent from a phone or another PC)"
+    if (-not $CheckOnly -and $Offline -and (Test-Path (Join-Path $Offline "mediamtx\mediamtx.exe"))) {
+      if (Ask "Copy MediaMTX from the offline package?") { [void](Run $VenvPy @("tools\get_mediamtx.py", "unpack", $Offline)) }
+    } elseif (-not $CheckOnly -and (Ask "Download MediaMTX (MIT license, from github.com/bluenviron/mediamtx, about 29 MB)?")) {
+      [void](Run $VenvPy @("tools\get_mediamtx.py", "download"))
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------------------------------
 Step "7. Login account for other devices (optional)"
 if (-not $dbReady -or -not (Venv-Report)) {
   Info "Accounts" "checked when the database is running"

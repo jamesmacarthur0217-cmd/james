@@ -182,6 +182,7 @@ class Pipeline:
         self.blank = False
         self.started_mono = self.last_frame_at = time.monotonic()   # for the camera health check
         self.recorder = None   # labeler/recorder.py, set by run.py when recording is on
+        self.source_override = None   # the address to read instead of cam["source"] (a camera sent from elsewhere)
         self.idle_cfg = cfg["idle"]
         self.idle = False                                        # nobody in view for a while: detector slowed
         self.last_person_at = self.last_processed_at = self.started_mono
@@ -254,7 +255,8 @@ class Pipeline:
 
     def run(self, max_frames: int | None = None) -> None:
         cam = self.cam
-        source = FrameSource(cam["source"], loop=cam["loop_files"] and max_frames is None)
+        source = FrameSource(getattr(self, "source_override", None) or cam["source"],
+                             loop=cam["loop_files"] and max_frames is None)
         log.info("[%s] pipeline started: source=%s (%s), mode=%s", self.name, mask_password(cam["source"]), source.kind,
                  self.mode)
         t_last = self.started_mono = self.last_frame_at = time.monotonic()

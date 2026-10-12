@@ -155,6 +155,7 @@ def main() -> int:
         p.alerts = alerts
         p.age = age_model
     _start_recorders(cfg, db, pipelines)
+    receiver = _start_receiver(cfg, pipelines)
     log.info("cameras: %s", ", ".join(f"{p.name} ({mask_password(p.cam['source'])}, {p.mode})" for p in pipelines))
 
     threads = [threading.Thread(target=p.run, kwargs={"max_frames": args.max_frames},
@@ -169,6 +170,8 @@ def main() -> int:
         except KeyboardInterrupt:
             for p in pipelines:
                 p.stop()
+        if receiver is not None:
+            receiver.stop()
         _finish_labeling(worker)
         return EXIT_CRASHED if any(p.crashed for p in pipelines) else 0
 
@@ -253,6 +256,8 @@ def main() -> int:
             p.stop()
         for t in threads:
             t.join(timeout=15)
+        if receiver is not None:
+            receiver.stop()
         importer.cancel()   # an import stops at once; the people it found are kept
         _finish_labeling(worker)
         pid_file.unlink(missing_ok=True)
@@ -261,6 +266,21 @@ def main() -> int:
 
 
 RETENTION_EVERY_S = 3600
+
+
+def _start_receiver(cfg: dict, pipelines: list):
+    """Cameras sent from other devices (labeler/receiver.py): MediaMTX receives them while the app runs; their
+    camera loops read it from this PC. None when no camera has `source: push`."""
+    from labeler import receiver as receiver_mod
+    pushed = [p for p in pipelines if receiver_mod.is_push(p.cam)]
+    if not pushed:
+        return None
+    rec = receiver_mod.Receiver(cfg)
+    rec.start()
+    for p in pushed:
+        p.source_override = rec.read_url(p.name)
+    threading.Thread(target=rec.watch, args=(threading.Event(),), name="receiver-watch", daemon=True).start()
+    return rec
 
 
 def _start_recorders(cfg: dict, db: Database, pipelines: list) -> None:

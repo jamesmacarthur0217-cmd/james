@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -243,6 +244,34 @@ def check_recording(cfg: dict, db, pipelines: list) -> dict:
     return _check("recording", "ok", detail)
 
 
+def check_receiver(cfg: dict, pipelines: list, rec=None, firewall: str | None = None, now: float | None = None) -> dict | None:
+    """Cameras sent from other devices (labeler/receiver.py): MediaMTX running, who is sending now, firewall."""
+    from . import receiver, remote
+    pushed = [p for p in pipelines if receiver.is_push(getattr(p, "cam", {}))]
+    if not pushed:
+        return None
+    rec = rec if rec is not None else receiver.CURRENT
+    if rec is None or not rec.running():
+        why = (rec.problem if rec is not None and rec.problem else "not running")
+        return _check("cameras from other devices", "problem", f"the receiver is {why}")
+    now = time.monotonic() if now is None else now
+    # A frame really arrived lately (last_frame_at alone is also the loop's start time).
+    sending = [p.name for p in pushed if getattr(p, "frames", 0) and now - getattr(p, "last_frame_at", -1e9) < 15]
+    waiting = [p.name for p in pushed if p.name not in sending]
+    detail = (("sending now: " + ", ".join(sending)) if sending else "none sending now") + \
+             ("; waiting for: " + ", ".join(waiting) if waiting else "")
+    ports = [int(cfg["receiver"]["rtsp_port"]), int(cfg["receiver"]["rtmp_port"])]
+    if firewall is not None:
+        missing = [port for port in ports if not remote.firewall_rules(port, firewall)]
+        if missing:
+            return _check("cameras from other devices", "warning", detail + "; the Windows firewall does not let "
+                          "Tailscale devices reach port " + " and ".join(map(str, missing)) + " (README: 'A camera at "
+                          "another site')")
+    if rec.restarts:
+        detail += f"; the receiver was started again {rec.restarts} time(s)"
+    return _check("cameras from other devices", "ok", detail)
+
+
 def check_errors(now: float) -> tuple[dict, list[dict]]:
     errors = logs.recent_errors.recent(now)
     latest = [{"at": datetime.fromtimestamp(t).isoformat(timespec="seconds"), "message": mask_password(m)[:300]}
@@ -264,6 +293,13 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
         checks.insert(-1, check_storage(cfg, db))
     except Exception as e:   # never break the health check
         checks.insert(-1, _check("storage", "warning", f"could not be measured ({e.__class__.__name__})"))
+    try:
+        from . import remote
+        line = check_receiver(cfg, pipelines, firewall=remote._system(subprocess.run)[1] if sys.platform == "win32" else None)
+        if line is not None:
+            checks.insert(-1, line)
+    except Exception as e:
+        checks.insert(-1, _check("cameras from other devices", "warning", f"could not be checked ({e.__class__.__name__})"))
     try:
         checks.insert(-1, check_recording(cfg, db, pipelines))
     except Exception as e:

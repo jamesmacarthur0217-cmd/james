@@ -39,6 +39,16 @@ the same with a personal PC or a phone at that site.
 - This PC's firewall: one more Tailscale-only rule for TCP 8554 and 1935 (the user runs one administrator line,
   as for 8443); `install.ps1` step and offline package include MediaMTX.
 
+**Step 1 results (2026-10-12)**: `labeler/receiver.py` (settings written at each start, start, watch, stop,
+leftovers), run.py `_start_receiver` (the camera keeps `source: push`; its loop gets the internal address at run time,
+so no password reaches the database), Health line "cameras from other devices" (receiver running, who is sending,
+firewall for both ports), `tools/get_mediamtx.py` (downloaded with OK, checksum), install step 6c, offline package,
+`receiver.publish_from` (default Tailscale only). Found and fixed: MediaMTX 1.21 has **MoQ** on by default with a fixed
+port (8892), so a second copy failed to start: `moq: false` here and in the Phase 14 script. Measured on a test copy
+(ports 18554/11935, sending from this PC because Tailscale here was stuck "starting"): 13 people found and recorded;
+wrong password, another camera's path and reading by anyone else refused (tests); sender stops → "no picture", back
+within seconds when it returns; MediaMTX killed → started again in 4 s, picture back ~30 s later (OpenCV's reconnect).
+
 ## Step 2: senders
 
 - **PC:** rework `remote-camera/` to send instead of serve: `setup-camera.bat` asks for the **send address**

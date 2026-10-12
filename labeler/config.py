@@ -26,6 +26,9 @@ DEFAULTS: dict = {
     "clips": {"enabled": True, "before_s": 5, "after_s": 5, "fps": 10, "max_width": 960},
     "person_videos": {"enabled": True, "max_s": 20, "fps": 5, "max_width": 480, "before_s": 1, "after_s": 1},
     "idle": {"enabled": True, "after_s": 60, "fps": 3},
+    # Cameras sent from other devices (labeler/receiver.py): MediaMTX runs only when a camera has `source: push`.
+    "receiver": {"exe": "data/mediamtx/mediamtx.exe", "dir": "data/mediamtx", "rtsp_port": 8554, "rtmp_port": 1935,
+                 "publish_from": ["100.64.0.0/10"]},   # who may send: Tailscale addresses
     # Off unless config.yaml (or the Settings page) turns it on: it uses a lot of disk and stores everything seen.
     "recording": {"enabled": False, "when": "people", "before_s": 10, "after_s": 10, "fps": 10, "max_width": 1280,
                   "quality": 28, "encoder": "auto", "max_file_min": 10, "keep_days": 3, "max_gb": 100,
