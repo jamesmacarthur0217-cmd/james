@@ -203,6 +203,11 @@ Tailscale addresses, firewall rule, autostart. Measured with a video file: 1.4 M
 without the password or from the home network, recovers by itself after the stream stops. Waiting for Ti Xuan to run
 it on their PC. Ran there 2026-10-12: blocked by the company ESET firewall; left aside by the user.
 
+## Phase 15: An extra camera that works anywhere (planned 2026-10-12)
+
+**Approved plan: [PHASE15-PLAN.md](PHASE15-PLAN.md)**: the other device sends its picture to this PC (MediaMTX
+here receives), so it needs no incoming port: works through company firewalls, and with a phone as a camera.
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),
