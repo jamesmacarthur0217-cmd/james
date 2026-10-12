@@ -23,6 +23,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from . import receiver
 from .config import CAMERA_DEFAULTS, MASK, ROOT, mask_password, resolve
 
 DEFAULT_FILE = "data/settings.yaml"
@@ -180,8 +181,20 @@ def current(cfg: dict) -> dict:
     return out
 
 
+def push_info(cfg: dict, tailscale_ip: str | None) -> dict:
+    """What the page needs to show send addresses: this PC's address and the receiver's ports, and which cameras
+    sent from other devices have a password yet (never the password itself)."""
+    rc = cfg["receiver"]
+    return {"host": tailscale_ip, "rtsp_port": int(rc["rtsp_port"]), "rtmp_port": int(rc["rtmp_port"]),
+            "ready": {c["name"]: bool(c.get("push_password")) for c in receiver.push_cameras(cfg)},
+            "mediamtx": receiver.exe_path(cfg).exists()}
+
+
 def check_source(source: str | int, stored: str | int | None) -> str | int:
-    """A webcam number, a file that exists, or a camera address. A masked password means "keep the stored one"."""
+    """A webcam number, a file that exists, a camera address, or "push" (a phone or another PC sends it here,
+    labeler/receiver.py). A masked password means "keep the stored one"."""
+    if isinstance(source, str) and source.strip().lower() == receiver.PUSH:
+        return receiver.PUSH
     if isinstance(source, int) or (isinstance(source, str) and source.strip().isdigit()):
         n = int(source)
         if not 0 <= n <= 9:
@@ -205,10 +218,12 @@ def check_source(source: str | int, stored: str | int | None) -> str | int:
     return s
 
 
-def build(body: SettingsIn, base: dict, effective: dict) -> tuple[dict, list[str]]:
+def build(body: SettingsIn, base: dict, effective: dict, new_passwords: dict | None = None) -> tuple[dict, list[str]]:
     """The new settings file (only what differs from config.yaml) and the changes in words, for the audit log.
 
-    base: config.yaml without the settings file; effective: with it (what the next start would use now)."""
+    base: config.yaml without the settings file; effective: with it (what the next start would use now).
+    A camera sent from another device gets a send password the first time it is saved: only its hash is kept,
+    the password itself goes into `new_passwords` (camera name -> password), to be shown once."""
     names = [c.name for c in body.cameras]
     if len(set(names)) != len(names):
         raise ValueError("two cameras have the same name")
@@ -226,6 +241,14 @@ def build(body: SettingsIn, base: dict, effective: dict) -> tuple[dict, list[str
                 c.pop(key, None)
             else:
                 c[key] = getattr(cam, key)
+        if source == receiver.PUSH:
+            if not c.get("push_password"):
+                password = receiver.new_password()
+                c["push_password"] = receiver.hash_password(password)
+                if new_passwords is not None:
+                    new_passwords[cam.name] = password
+        else:
+            c.pop("push_password", None)
         cameras.append(c)
 
     overlay: dict = {}
@@ -252,6 +275,20 @@ def build(body: SettingsIn, base: dict, effective: dict) -> tuple[dict, list[str
             changes += [f"camera {name} {k}: {_shown(old_cams[name][k])} → {_shown(c[k])}" for k in CAMERA_FIELDS[1:]
                         if old_cams[name][k] != c[k]]
     return overlay, changes
+
+
+def renew_password(path: Path, effective: dict, name: str) -> str:
+    """A new send password for a camera sent from another device; returns it (the file keeps only its hash)."""
+    cams = [dict(c) for c in effective["cameras"]]
+    cam = next((c for c in cams if c["name"] == name and receiver.is_push(c)), None)
+    if cam is None:
+        raise ValueError(f"{name!r} is not a camera sent from another device")
+    password = receiver.new_password()
+    cam["push_password"] = receiver.hash_password(password)
+    overlay = read(path)
+    overlay["cameras"] = cams
+    write(path, overlay)
+    return password
 
 
 def _shown(value) -> str:

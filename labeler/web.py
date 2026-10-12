@@ -7,6 +7,7 @@ import re
 import secrets
 import threading
 import shutil
+import subprocess
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -853,7 +854,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                 and getattr(app.state, "request_restart", None) is not None,
                 "cli_source": bool(cfg.get("_cli_source")),
                 "file": str(path), "error": effective.get("_settings_error"),
-                "ignored": effective.get("_settings_ignored", [])}
+                "ignored": effective.get("_settings_ignored", []),
+                "push": settings_mod.push_info(effective, _tailscale_ip())}
 
     @app.post("/api/settings")
     def save_settings(body: dict, request: Request):
@@ -862,14 +864,36 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         except ValidationError as e:
             raise HTTPException(400, settings_mod.validation_message(e))
         path, base, effective = settings_configs()
+        new_passwords: dict = {}
         try:
-            overlay, changes = settings_mod.build(parsed, base, effective)
+            overlay, changes = settings_mod.build(parsed, base, effective, new_passwords)
         except ValueError as e:
             raise HTTPException(400, str(e))
         if changes:
             settings_mod.write(path, overlay)
             audit(request, "settings changed", mask_password("; ".join(changes))[:2000])
-        return {"ok": True, "changes": changes, "restart_needed": restart_needed(path)}
+        # Shown once on the page (only their hashes are kept): never in the audit log or the app's log.
+        return {"ok": True, "changes": changes, "restart_needed": restart_needed(path), "new_passwords": new_passwords}
+
+    @app.post("/api/settings/cameras/{name}/new-password")
+    def new_camera_password(name: str, request: Request):
+        """A new send password for a camera sent from another device (the old one stops working after a restart)."""
+        path, _, effective = settings_configs()
+        try:
+            password = settings_mod.renew_password(path, effective, name)
+        except ValueError as e:
+            raise HTTPException(404, str(e))
+        audit(request, "settings changed", f"camera {name}: new send password")
+        return {"name": name, "password": password, "restart_needed": restart_needed(path)}
+
+    def _tailscale_ip() -> str | None:
+        """This PC's Tailscale address for the send addresses (labeler/remote.py, cached), or None."""
+        try:
+            from . import remote
+            ts, _ = remote._system(subprocess.run)
+            return ts["ip"] if ts and ts.get("state") == "Running" else None
+        except Exception:
+            return None
 
     @app.post("/api/restart")
     def restart(request: Request):

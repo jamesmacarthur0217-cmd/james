@@ -30,6 +30,13 @@
   .restart[hidden] { display: none; }
   .restart b { color: inherit; }
   .unsaved { color: var(--warn); font-size: 13px; }
+  .push-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-top: 12px; max-width: 1000px; }
+  .push-card h3 { font-size: 14px; margin: 0 0 8px; }
+  .push-card .addr { display: grid; grid-template-columns: 110px 1fr max-content; gap: 8px; align-items: center; margin: 4px 0; }
+  .push-card .addr span { font-weight: 600; font-size: 13px; }
+  .push-card code { background: var(--chip); padding: 3px 6px; border-radius: 4px; font-size: 12px; word-break: break-all; }
+  .push-card .bad { color: #c9372c; }
+  @media (max-width: 600px) { .push-card .addr { grid-template-columns: 1fr; } }
   @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -47,8 +54,9 @@
 
   <section class="panel">
     <h2>Cameras</h2>
-    <p class="hint">Source: a webcam number (0, 1, …), a video or picture file, or a camera address
-      (<code>rtsp://user:password@192.168.1.50:554/stream1</code>). A saved password shows as •••; leave it to keep
+    <p class="hint">Source: a webcam number (0, 1, …), a video or picture file, a camera address
+      (<code>rtsp://user:password@192.168.1.50:554/stream1</code>), or <code>push</code> for a camera that a phone or
+      another PC sends here (its send addresses appear below after saving). A saved password shows as •••; leave it to keep
       it. A camera's name cannot be changed later (zones, alert rules and recorded people use it). Removing a camera
       keeps its recorded people until their retention ends. Empty "Keep days" and "Detector size" use the
       general values below.</p>
@@ -58,7 +66,8 @@
         <tbody id="cams"></tbody>
       </table>
     </div>
-    <p><button id="add">Add camera</button></p>
+    <p><button id="add">Add camera</button> <button id="add-push">Add camera sent from a phone or PC</button></p>
+    <div id="push-box"></div>
   </section>
 
   <section class="panel">
@@ -164,6 +173,8 @@ const SIMPLE = ["retention_days", "audit_retention_days", "blur_faces", "blur_fa
                 "backup_enabled", "backup_copy_to", "person_videos", "idle_enabled", "idle_after_s",
                 "recording_enabled", "recording_when", "recording_keep_days", "recording_max_gb"];
 let loaded = null;        // values as saved (what the next start uses)
+let push = null;          // this PC's address and the receiver's ports (cameras sent from other devices)
+const fresh = {};         // camera -> send password made just now (shown once; only its hash is stored)
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
@@ -190,7 +201,8 @@ function readForm() {
   const v = {};
   for (const k of SIMPLE) {
     const el = $(k);
-    v[k] = el.type === "checkbox" ? el.checked : el.type === "text" ? el.value.trim()
+    // Drop-downs (recording_when) are words, not numbers.
+    v[k] = el.type === "checkbox" ? el.checked : (el.type === "text" || el.tagName === "SELECT") ? el.value.trim()
       : (el.value === "" ? null : Number(el.value));
   }
   v.cameras = [...$("cams").children].map(tr => {
@@ -242,7 +254,62 @@ async function load() {
   if (s.cli_source) notes.push("This copy was started with <code>--source</code>, which replaces the cameras below while it runs.");
   $("note").innerHTML = notes.join("<br>");
   $("note").hidden = !notes.length;
+  push = s.push;
+  renderPush(s.values);
   changed();
+}
+
+// Cameras sent from another device: where to send, for a PC (RTSP) and for a phone app (RTMP).
+function renderPush(values) {
+  const cams = values.cameras.filter(c => String(c.source).trim().toLowerCase() === "push");
+  const box = $("push-box");
+  box.replaceChildren();
+  if (!cams.length || !push) return;
+  const host = push.host || "<this PC's Tailscale address>";
+  for (const c of cams) {
+    const card = document.createElement("div");
+    card.className = "push-card";
+    const pw = fresh[c.name], ready = push.ready[c.name];
+    const secret = pw || "•••";
+    const pcAddr = `rtsp://${c.name}:${secret}@${host}:${push.rtsp_port}/${c.name}`;
+    const phoneAddr = `rtmp://${host}:${push.rtmp_port}/${c.name}?user=${c.name}&pass=${secret}`;
+    let html = `<h3>Camera ${esc(c.name)}: sent from a phone or another PC</h3>`;
+    if (!push.mediamtx) html += `<p class="bad">MediaMTX is not set up on this PC: run <code>tools\\get_mediamtx.py download</code> (or install.bat).</p>`;
+    if (!ready && !pw) {
+      html += `<p class="hint">Save to make its send addresses.</p>`;
+    } else {
+      html += `<div class="addr"><span>Another PC</span><code>${esc(pcAddr)}</code>${pw ? '<button class="copy" data-copy="pc">Copy</button>' : ""}</div>
+        <div class="addr"><span>A phone app</span><code>${esc(phoneAddr)}</code>${pw ? '<button class="copy" data-copy="phone">Copy</button>' : ""}</div>`;
+      html += pw ? `<p class="hint"><b>Copy them now:</b> the password is shown only this once. They work after <b>Restart now</b>.
+          Send them privately (they hold the password).</p>`
+        : `<p class="hint">The password is not kept here, so it is shown as •••. <button class="danger-quiet renew">New password</button>
+          (the old one stops working after a restart; senders then need the new address).</p>`;
+      html += `<details><summary>How to send</summary><p class="hint"><b>Another PC:</b> copy the folder
+        <code>remote-camera</code> to it and run <code>setup-camera.bat</code>; paste the PC address when it asks.<br>
+        <b>A phone:</b> install Tailscale (signed in to your network) and a streaming app that sends RTMP (for example
+        Larix Broadcaster); add a connection with the phone address, 1280×720, about 1.5 Mbit/s; keep the app open
+        and the phone charging.<br>
+        <b>This PC, once:</b> let Tailscale devices reach ports ${push.rtsp_port} and ${push.rtmp_port}: in PowerShell as
+        administrator: <code>New-NetFirewallRule -DisplayName "VisionLabeler cameras (Tailscale)" -Direction Inbound
+        -Protocol TCP -LocalPort ${push.rtsp_port},${push.rtmp_port} -RemoteAddress 100.64.0.0/10 -Action Allow -Profile Any</code>
+        (the Health page checks it).</p></details>`;
+    }
+    card.innerHTML = html;
+    card.querySelectorAll(".copy").forEach(b => b.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(b.dataset.copy === "pc" ? pcAddr : phoneAddr);
+      b.textContent = "Copied";
+    }));
+    const renew = card.querySelector(".renew");
+    if (renew) renew.addEventListener("click", async () => {
+      if (!confirm(`Make a new send password for ${c.name}? The old one stops working after a restart.`)) return;
+      const r = await fetch(`/api/settings/cameras/${encodeURIComponent(c.name)}/new-password`, { method: "POST" });
+      const out = await r.json();
+      if (!r.ok) { showMsg(out.detail || "No new password.", false); return; }
+      fresh[c.name] = out.password;
+      await load();
+    });
+    box.append(card);
+  }
 }
 
 $("add").addEventListener("click", () => {
@@ -255,6 +322,16 @@ $("add").addEventListener("click", () => {
   changed();
 });
 
+$("add-push").addEventListener("click", () => {
+  const names = new Set([...$("cams").querySelectorAll(".name")].map(i => i.value));
+  let n = 1;
+  while (names.has(`remote${n}`)) n++;
+  const tr = camRow({ name: `remote${n}`, source: "push", mode: "kiosk" }, true);
+  $("cams").append(tr);
+  tr.querySelector(".name").focus();
+  changed();
+});
+
 $("save").addEventListener("click", async () => {
   $("save").disabled = true;
   try {
@@ -262,6 +339,7 @@ $("save").addEventListener("click", async () => {
                                               body: JSON.stringify(readForm()) });
     const out = await r.json();
     if (!r.ok) { showMsg(out.detail || "Not saved.", false); return; }
+    Object.assign(fresh, out.new_passwords || {});
     await load();
     showMsg(out.changes.length ? `Saved: ${out.changes.join("; ")}` : "Nothing changed.", true);
   } catch { showMsg("Not saved: the app does not answer.", false); }

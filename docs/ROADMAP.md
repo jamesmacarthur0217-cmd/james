@@ -7,8 +7,8 @@ details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user use
 commercially yet. Phase 10 (long-run check, idle mode, restore drill) and Phase 11 (keyboard answer key, MOT16
 import, first kept retraining) are done (2026-10-12). Phase 12 step 1 (a re-identification model) was measured
 on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. Phase 13 (recording
-while people are in view) and Phase 14 (a camera at another site, through Tailscale) are done (2026-10-12).
-492 tests pass.
+while people are in view), Phase 14 (a camera at another site, through Tailscale) and Phase 15 (that camera sent
+from a phone or PC, so it works through company firewalls) are done (2026-10-12). 504 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -203,10 +203,12 @@ Tailscale addresses, firewall rule, autostart. Measured with a video file: 1.4 M
 without the password or from the home network, recovers by itself after the stream stops. Waiting for Ti Xuan to run
 it on their PC. Ran there 2026-10-12: blocked by the company ESET firewall; left aside by the user.
 
-## Phase 15: An extra camera that works anywhere (planned 2026-10-12)
+## Phase 15: An extra camera that works anywhere (done 2026-10-12, except a test with a real phone or PC)
 
 **Approved plan: [PHASE15-PLAN.md](PHASE15-PLAN.md)**: the other device sends its picture to this PC (MediaMTX
 here receives), so it needs no incoming port: works through company firewalls, and with a phone as a camera.
+Done: `labeler/receiver.py`, the sending `remote-camera/` script, the Settings page box. Waiting for the user: this
+PC's Tailscale connected again, the firewall rule for 8554/1935, then a phone or PC as a real test.
 
 ## Critical files
 

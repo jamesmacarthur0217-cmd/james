@@ -61,12 +61,27 @@ within seconds when it returns; MediaMTX killed → started again in 4 s, pictur
   (Tailscale app on the phone, a free RTMP streaming app such as Larix Broadcaster, 1280x720, ~1.5 Mbit/s;
   keep the app open and the phone charging; check the app's exact steps when writing).
 
+**Step 2 results (2026-10-12)**: `remote-camera/setup-camera.ps1` now sends (asks for the send address, FFmpeg only,
+webcam test, encoder, a 5 s test picture with clear messages for 401/404/no answer, a `send.cmd` loop at every login;
+no MediaMTX, firewall or administrator there; the earlier serving version is cleaned up). Found while testing: FFmpeg
+waited forever when the receiver died halfway, so `-timeout 10 s`; `timeout.exe` needs a visible console, so the
+pause uses ping. Measured: receiver killed → the sender connected again by itself, picture back in ~35 s.
+`docs/PHONE-CAMERA.md` was not made: the phone steps are in the README section and on the Settings page.
+
 ## Step 3: Settings page and docs
 
 - Settings → Cameras: source type "Sent from another device"; on save a name-based path and a random password;
   the page shows the two send addresses (PC: RTSP, phone: RTMP) with copy buttons, and "New password".
   Validation as for other cameras; audited (password never in the audit log).
 - README "A camera at another site" rewritten for sending; data-protection note; HANDOFF/ROADMAP.
+
+**Step 3 results (2026-10-12)**: Settings page: "Add camera sent from a phone or PC"; source `push`; on save a new
+password (only its hash in the settings file, returned once, never in the audit log); a box per such camera with the
+PC (RTSP) and phone (RTMP) addresses, Copy buttons, "New password", and "How to send" (incl. this PC's firewall
+line). Found in the browser: saving the Settings page had been broken since Phase 13 step 4 (the "When" drop-down
+was sent as a number); fixed. README section rewritten; data-protection template line. **Still to do with the
+user:** this PC's Tailscale was stuck "starting" (no coordination server), so no test with a real phone or a real
+second PC yet; the firewall rule for 8554/1935 (administrator).
 
 ## Critical files
 

@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **492 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~45 s).
+- Tests: **504 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~45 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -259,6 +259,17 @@ in place, Tailscale shields down), but their PC is a company PC with **ESET Fire
 firewall and blocks port 8554 from outside; the user chose to leave the remote camera aside and was told to have
 Ti Xuan run remove-camera.bat. Viewing from that PC still works. Lessons: `$Input` is reserved in PowerShell; Start-Process in 5.1 does not quote
 arguments with spaces; Go programs (MediaMTX) refuse relative paths to commands, so runOnInit uses the full path.
+
+**Phase 15 (a camera sent from a phone or another PC) is done** (2026-10-12, [PHASE15-PLAN.md](PHASE15-PLAN.md)):
+the device pushes to this PC; `labeler/receiver.py` runs MediaMTX (`data/mediamtx`) with the app (cameras with
+`source: push`, per-camera send passwords stored hashed, Tailscale-only, read from 127.0.0.1 with a per-start
+password via `Pipeline.source_override`, watchdog restart); Settings page box with the send addresses (password
+shown once); `remote-camera/` now sends (FFmpeg loop, no admin). Lessons: MediaMTX 1.21 has MoQ on a fixed port
+(8892) by default: turn it off or a second copy fails; FFmpeg's RTSP output needs `-timeout` or it hangs forever
+when the server dies halfway; `timeout.exe` fails without a visible console (use ping); a `<select>` on the
+Settings page must be read as text (saving was broken by the Phase 13 "When" drop-down until this phase).
+**Waiting for the user:** this PC's Tailscale was stuck "starting" at the end; the firewall rule for ports
+8554/1935; a real phone or second PC as the test.
 
 **Next**: with the user: a long-run check with recording on and the webcam measurement (lens cover). The rest of
 Phase 12 (more cameras, per-camera tuning, re-measuring re-identification and the short-gap re-link rule on

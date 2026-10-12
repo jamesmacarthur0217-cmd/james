@@ -228,3 +228,33 @@ def test_supervisor_restarts_on_request_without_counting_a_crash(monkeypatch, su
 def test_masked_source_without_a_stored_camera_is_refused():
     with pytest.raises(ValueError):
         settings_mod.check_source("rtsp://a:•••@h/x", None)
+
+
+def test_a_camera_sent_from_another_device(paths, db):
+    from labeler import receiver
+    app, _ = _app(paths, db)
+    client = TestClient(app, client=("127.0.0.1", 5000))
+    form = _form()
+    form["cameras"] = form["cameras"] + [{"name": "phone", "source": "PUSH", "mode": "kiosk"}]
+    r = client.post("/api/settings", json=form).json()
+    password = r["new_passwords"]["phone"]
+    assert len(password) == 24 and "camera phone added (push, kiosk)" in r["changes"]
+    saved = yaml.safe_load(paths[1].read_text(encoding="utf-8"))
+    phone = next(c for c in saved["cameras"] if c["name"] == "phone")
+    assert phone["source"] == "push" and phone["push_password"] == receiver.hash_password(password)
+    assert password not in paths[1].read_text(encoding="utf-8")
+    assert all(password not in e["detail"] for e in db.list_audit(20))
+    s = client.get("/api/settings").json()
+    assert s["push"]["ready"] == {"phone": True} and s["push"]["rtsp_port"] == 8554
+    again = client.post("/api/settings", json=form).json()                 # saved again: the same password
+    assert again["new_passwords"] == {}
+    renewed = client.post("/api/settings/cameras/phone/new-password").json()
+    assert renewed["password"] != password
+    saved = yaml.safe_load(paths[1].read_text(encoding="utf-8"))
+    assert next(c for c in saved["cameras"] if c["name"] == "phone")["push_password"] == receiver.hash_password(renewed["password"])
+    assert db.list_audit(1)[0]["detail"] == "camera phone: new send password"
+    assert client.post("/api/settings/cameras/cam1/new-password").status_code == 404   # not sent from elsewhere
+    form["cameras"][-1]["source"] = 1                                       # now a webcam: the password goes
+    client.post("/api/settings", json=form)
+    saved = yaml.safe_load(paths[1].read_text(encoding="utf-8"))
+    assert "push_password" not in next(c for c in saved["cameras"] if c["name"] == "phone")

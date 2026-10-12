@@ -34,7 +34,8 @@ deleted or changed settings, with time and network address.
 ## Where it is processed
 
 Everything runs on one computer at [location]: the camera picture, the analysis (local AI models) and the
-database. No pictures, descriptions or search texts are sent to any online service. When the app starts, it
+database. [If a camera at another place sends its picture here: it travels encrypted through our private
+Tailscale network from [other place] to this computer; nothing is stored on the sending device.] No pictures, descriptions or search texts are sent to any online service. When the app starts, it
 asks Hugging Face (a model library) whether newer versions of two of its models exist; only the model names
 are sent. [Optional: we turned this off with `HF_HUB_OFFLINE=1` in `.env`.]
 

@@ -634,27 +634,44 @@ used the answer key, stopped the app, and account changes made with `users.py`, 
 Someone at this PC is recorded as "this PC". The Live page's once-a-second updates are not recorded. Entries
 older than `storage.audit_retention_days` (365) are deleted at startup.
 
-## A camera at another site
+## A camera at another site (a phone or another PC sends it here)
 
-A webcam on another PC (another house, another country) can be one of this PC's cameras: that PC sends it as an
-RTSP stream through Tailscale, and this PC does the detecting, labeling and recording as for its own cameras. The
-folder `remote-camera\` is for the other PC (copy it there; its `README.txt` says what to do in plain words):
-**setup-camera.bat** checks Tailscale, downloads MediaMTX (MIT, 28.6 MB) and FFmpeg (LGPL, 170.5 MB) after asking,
-each checked against its published checksum, finds and tests the webcam (1280×720 at 15 fps when it offers it),
-picks an H.264 encoder that works there, writes MediaMTX's settings with a new random password (only RTSP over TCP
-on port 8554; reading needs the password and a Tailscale address; publishing only from that PC itself), adds a
-Windows firewall rule for Tailscale addresses only (asks for administrator once), starts it now and at every login
-(no window), and prints the camera address. **remove-camera.bat** takes it all away again. Here: Settings page →
-Cameras → **Add camera** with that address as the source (the password is shown masked, and logs mask it too).
-Network cameras are read over TCP (`OPENCV_FFMPEG_CAPTURE_OPTIONS`), which gets through the internet more reliably.
+A webcam on another PC, or a phone, anywhere (another house, another country) can be one of this PC's cameras:
+**the device sends its picture here** through Tailscale, and this PC does the detecting, labeling and recording as
+for its own cameras. Sending is an outgoing connection from the device, so it works even where the firewall blocks
+everything coming in (a company PC, a phone network); the device needs no open port and no server.
 
-Measured (2026-10-12) with a video file as the webcam, on this PC through its own Tailscale address: the stream
-was H.264 1280×720 at 15 fps, **1.4 Mbit/s** (about 0.64 GB an hour, 15 GB a day of the other PC's upload if it
-runs all day); the test copy read it at ~20 frames/s, found and recorded the people in it; no password, a wrong
-one, or the right one from the home network (not Tailscale) were all refused; when the stream stopped, the camera
-showed "no picture from the camera" after 6 s and came back by itself 3 s after the stream did. Not tested here:
-a real webcam through DirectShow (this PC's webcam was in use by the app; the script tests the webcam for 3 s
-before setting anything up), and the firewall and autostart steps (they run on the other PC).
+**On this PC (once per camera):** Settings page → Cameras → **Add camera sent from a phone or PC** → Save. The
+page then shows the camera's **send addresses**, one for a PC (`rtsp://…:8554/…`) and one for a phone app
+(`rtmp://…:1935/…`), with a new random password, **shown only that once** (only its SHA-256 hash is stored; the
+Audit log and the app's log never contain it; **New password** makes another). Restart now. Once for all such
+cameras: let Tailscale devices reach ports 8554 and 1935 (one line in PowerShell as administrator, shown on the
+page under "How to send"; the Health page checks it). The receiver is **MediaMTX** (MIT, `data\mediamtx`, set up by
+install.bat or `tools\get_mediamtx.py download`): it runs while VisionLabeler runs (started again within seconds if
+it stops); each camera may send only to its own name, with its own password, from a Tailscale address
+(`receiver.publish_from`); VisionLabeler reads it from 127.0.0.1 with a password made at each start; nothing else
+of MediaMTX is on (no HLS, WebRTC, SRT, MoQ or API). The Health page's **cameras from other devices** line says
+which are sending now.
+
+**On another PC:** copy the folder `remote-camera\` there and run **setup-camera.bat** (its `README.txt` says what
+to do in plain words): paste the PC send address; it downloads FFmpeg (LGPL, 170.5 MB) after asking, checked against
+its published checksum, finds and tests the webcam (1280×720 at 15 fps when it offers it), picks an H.264 encoder
+that works there, sends a 5-second test picture (clear messages for a wrong password, an unknown camera, or no
+answer), then sends from every login with no window, starting again by itself after any drop. No firewall change
+and no administrator on that PC. **remove-camera.bat** takes it all away. (The first version, 2026-10-12 morning,
+served the picture instead and was blocked by a company firewall; running the new setup cleans it up.)
+
+**On a phone:** install Tailscale (signed in to the same network) and a streaming app that sends RTMP, for example
+Larix Broadcaster (free, Android and iPhone); add a connection with the phone send address, 1280×720, about
+1.5 Mbit/s; keep the app open, the screen on if the phone asks, and the phone charging.
+
+Measured (2026-10-12) on test copies: H.264 1280×720 at 15 fps is **about 1.5 Mbit/s** (0.64 GB an hour, 15 GB a
+day of the device's upload if it sends all day); the test copy read it at ~20 frames/s and found and recorded the
+people in it; a wrong password, another camera's name and anyone else reading were refused (tests, with MediaMTX
+itself); sending stopped → "no picture from the camera", back within seconds when it returns; MediaMTX killed →
+started again in 4 s, and the PC sender connected again by itself, picture back in ~35 s. Found on the way: FFmpeg
+waits forever when the receiver dies halfway (now a 10 s limit), and MediaMTX 1.21's MoQ listens on a fixed port
+(turned off). Not yet tested with a real phone or a real second PC (this PC's Tailscale was not connected).
 
 ## Database
 
@@ -715,9 +732,9 @@ vision model, which the classifiers only stand in for until it answers. A larger
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-492 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+504 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, today at a glance, idle mode, the long-run check and the restore drill, the re-identification wrapper, recording and the Recordings page, network-camera logging, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, today at a glance, idle mode, the long-run check and the restore drill, the re-identification wrapper, recording and the Recordings page, network-camera logging, receiving cameras from other devices, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 
@@ -738,6 +755,7 @@ Changes are tracked with git.
 | `labeler/settings.py` | the Settings page (`data/settings.yaml` over config.yaml) |
 | `labeler/importer.py` | the Import page: recorded videos with real times |
 | `labeler/recorder.py`, `labeler/recordings_web.py` | recording while people are in view; the Recordings page |
+| `labeler/receiver.py` | receiving cameras sent from a phone or another PC (MediaMTX) |
 | `remote-camera/` | for another PC: send its webcam here through Tailscale (setup-camera.bat, remove-camera.bat) |
 | `run.py`, `start.bat`, `stop.bat` | starting and stopping |
 | `install.bat` / `install.ps1`, `tools/models.py`, `tools/pack_offline.ps1` | installing on a new PC, offline package |
@@ -757,6 +775,7 @@ Changes are tracked with git.
 Ultralytics YOLO: AGPL-3.0 (commercial license needed for closed products, or swap in RF-DETR, Apache-2.0).
 Qwen3-VL: Apache-2.0. Age model: Apache-2.0. COCO photos: various Flickr licenses. FairFace: CC BY 4.0.
 FFmpeg (recording): the LGPL build, used as a separate program (`data\ffmpeg`, its LICENSE.txt alongside).
+MediaMTX (receiving cameras from other devices): MIT (`data\mediamtx`, its license alongside).
 MOT16 (MOTChallenge, imported as the recorded camera `mot16` and used by the retrained classifiers since
 2026-10-12): CC BY-NC-SA 3.0, **non-commercial only**: before commercial use, delete that camera's people on the
 Import page and retrain (or delete `data\models\attributes.joblib` to go back to the shipped classifiers).
