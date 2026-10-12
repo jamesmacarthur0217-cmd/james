@@ -6,7 +6,8 @@
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
 commercially yet. Phase 10 (long-run check, idle mode, restore drill) and Phase 11 (keyboard answer key, MOT16
 import, first kept retraining) are done (2026-10-12). Phase 12 step 1 (a re-identification model) was measured
-on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. 451 tests pass.
+on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. Phase 13 (recording
+while people are in view) is done (2026-10-12). 487 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -183,12 +184,15 @@ long run).
    pipeline 24/74 vs 34/74). Kept as a measuring option (`tools/relink_check.py --reid`) for outdoor footage.
 2. More cameras (batching) and 3. per-camera tuning: when the user adds cameras.
 
-## Phase 13: Recording (planned 2026-10-12)
+## Phase 13: Recording (done 2026-10-12, except the long-run check with the user)
 
 **Plan: [PHASE13-PLAN.md](PHASE13-PLAN.md)** (user's choices: record while people are in view with 10 s before and
 after; H.264 through FFmpeg on the graphics card; keep 3 days / 100 GB; admins and viewers, viewers blurred).
-1. FFmpeg (download, ask first) and measurements. 2. The recorder. 3. Recordings page and playback. 4. Settings,
-Health, installer, docs.
+1. **Done**: FFmpeg 8.1 LGPL (downloaded with OK); NVENC 9-13 GB per camera per day on a busy street, 2-6% of a core.
+2. **Done**: `labeler/recorder.py`; camera loop speed unchanged within noise; crash-safe files.
+3. **Done**: Recordings page; admins the file, viewers a blurred stream; links from people and alerts.
+4. **Done**: Settings, Health, installer and offline package, README, data-protection template.
+Waiting for the user: a long-run check with recording on, and the webcam measurement (lens cover open).
 
 ## Critical files
 

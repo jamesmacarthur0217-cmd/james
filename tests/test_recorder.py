@@ -229,3 +229,25 @@ def test_a_real_h264_file_plays(db, tmp_path):
         n += 1
     cap.release()
     assert n == r["frames"] and n >= 25
+
+
+def test_health_line(db, tmp_path):
+    from types import SimpleNamespace
+
+    from labeler.healthcheck import check_recording
+    cfg = _cfg(tmp_path)
+    cfg["recording"]["enabled"] = False
+    assert check_recording(cfg, db, [])["level"] == "off"
+    cfg["recording"].update(enabled=True, ffmpeg=str(tmp_path / "nothing.exe"))
+    assert "FFmpeg is not found" in check_recording(cfg, db, [])["detail"]
+    (tmp_path / "ffmpeg.exe").write_bytes(b"")
+    cfg["recording"]["ffmpeg"] = str(tmp_path / "ffmpeg.exe")
+    rec = SimpleNamespace(encoder="h264_nvenc", paused="", dropped=0)
+    cams = [SimpleNamespace(name="cam1", recorder=rec)]
+    i = db.add_recording("cam1", "cam1/a.mp4", T0, "h264_nvenc")
+    db.update_recording(i, ended_at=T0, size_bytes=2_500_000_000)
+    ok = check_recording(cfg, db, cams)
+    assert ok["level"] == "ok" and ok["detail"].startswith("1 files, 2.5 of 100 GB, kept 3 days, oldest 2026-10-12 14:00")
+    rec.paused = "disk almost full (3.0 GB free)"
+    assert check_recording(cfg, db, cams)["level"] == "problem"
+    assert check_recording(cfg, db, [SimpleNamespace(name="cam1", recorder=None)])["level"] == "warning"

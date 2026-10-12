@@ -6,7 +6,7 @@ to go back to config.yaml. Changes apply after a restart (the page has a Restart
 
 Only the common settings are editable here, each validated: cameras (add, remove, source, mode, retention,
 detector size), how long people and the audit log are kept, face blurring, HTTPS, weekly retraining, the
-daily database backup and its second copy, idle mode. Zones and
+daily database backup and its second copy, idle mode, recording. Zones and
 alert rules have their own pages; accounts are managed with tools/users.py.
 
 A camera keeps its name for good (zones, alert rules and recorded people refer to it); removing a camera keeps
@@ -77,7 +77,18 @@ class SettingsIn(BaseModel):
     person_videos: bool
     idle_enabled: bool
     idle_after_s: int = Field(ge=10, le=3600)
+    recording_enabled: bool
+    recording_when: str
+    recording_keep_days: float = Field(gt=0, le=365)
+    recording_max_gb: float = Field(ge=1, le=100000)
     backup_copy_to: str = Field(default="", max_length=260)
+
+    @field_validator("recording_when")
+    @classmethod
+    def _when(cls, v: str) -> str:
+        if v not in ("people", "always"):
+            raise ValueError("record when people are in view, or always")
+        return v
 
     @field_validator("backup_copy_to")
     @classmethod
@@ -102,6 +113,10 @@ SIMPLE = {
     "backup_copy_to": ("backup", "copy_to"),
     "idle_enabled": ("idle", "enabled"),
     "idle_after_s": ("idle", "after_s"),
+    "recording_enabled": ("recording", "enabled"),
+    "recording_when": ("recording", "when"),
+    "recording_keep_days": ("recording", "keep_days"),
+    "recording_max_gb": ("recording", "max_gb"),
 }
 CAMERA_FIELDS = ("name", "source", "mode", "retention_days", "imgsz")
 

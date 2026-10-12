@@ -105,6 +105,26 @@
   </section>
 
   <section class="panel">
+    <h2>Recording</h2>
+    <div class="grid">
+      <label for="recording_enabled">Record video</label>
+      <div><input type="checkbox" id="recording_enabled"> <span class="hint">H.264 videos of each camera, watched on
+        the <a href="/recordings">Recordings</a> page (viewers see faces blurred). Needs FFmpeg (the Health page says
+        whether it is found).</span></div>
+      <label for="recording_when">When</label>
+      <div><select id="recording_when"><option value="people">while people are in view (10 s before to 10 s after)</option>
+        <option value="always">always</option></select></div>
+      <label for="recording_keep_days">Keep recordings (days)</label>
+      <div><input type="number" id="recording_keep_days" min="0.1" max="365" step="any"> <span class="hint">Older ones are
+        deleted every hour.</span></div>
+      <label for="recording_max_gb">At most (GB)</label>
+      <div><input type="number" id="recording_max_gb" min="1" max="100000" step="any"> <span class="hint">All recordings
+        together; the oldest are deleted first. About 9-13 GB per camera per day recording a busy street all the time;
+        much less at home recording only while people are in view.</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
     <h2>Power</h2>
     <div class="grid">
       <label for="idle_enabled">Idle mode</label>
@@ -141,7 +161,8 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const SIMPLE = ["retention_days", "audit_retention_days", "blur_faces", "blur_faces_for_viewers", "https", "retrain_enabled",
-                "backup_enabled", "backup_copy_to", "person_videos", "idle_enabled", "idle_after_s"];
+                "backup_enabled", "backup_copy_to", "person_videos", "idle_enabled", "idle_after_s",
+                "recording_enabled", "recording_when", "recording_keep_days", "recording_max_gb"];
 let loaded = null;        // values as saved (what the next start uses)
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }

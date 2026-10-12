@@ -95,6 +95,14 @@ audit entry per playback (not per seek). Checked in the browser pane at desktop 
   (recordings, 3 days), HANDOFF/ROADMAP. Deleting a person does not cut them out of recordings (said in the
   README; the time-range delete is the tool for that).
 
+**Step 4 results (2026-10-12)**: Settings page *Recording* (on/off, when, keep days, max GB; validated, audited);
+Health page *recording* line (off / FFmpeg missing / no encoder / paused: problem / frames dropped / files, GB,
+oldest, encoder); `tools/get_ffmpeg.py` (check, download with the release's checksum, pack, unpack), install.ps1
+step 6b and the offline package include FFmpeg; README *Recording*, the Web UI table, licenses (FFmpeg LGPL),
+`docs/data-protection.md` template rows (the user's filled copy in `data/privacy` is theirs to update). The code
+default is off (`DEFAULTS`), the project's config.yaml turns it on (the user's choice). Still to do with the user:
+a long-run check with recording on (needs the PC awake) and the webcam measurement (lens cover).
+
 ## Verification
 
 - Tests: start/stop and pre-buffer logic, file splitting, retention by age and size, the free-disk pause, viewer

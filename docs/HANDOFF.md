@@ -19,7 +19,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 ## 2. Current state (2026-10-12)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
-  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted); Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phase 13 (recording) done; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
   `2429790`/`bc23363` soak tool · `0449255` idle mode · `23273b1` restore drill. Phase 9 (small
   fixes): `8675c46` list redraw · `81dbcb2` backup.dir · `482bdd4` CI v7 · `0296435` relink_check help. Phase 8
   commits, newest first: `3794de3` today at a glance · `e3a6179` photo search · `ea97937` original excerpts ·
@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **451 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~45 s).
+- Tests: **487 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~45 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -241,9 +241,16 @@ pipeline on 7 MOT16 clips (look-alikes 24/74 vs 34/74; README "One person, one r
 `tools/relink_check.py --reid`. MOT16 train clips as videos with walking-people-only markings:
 `data/datasets/mot16/train_videos`, `data/datasets/mot16/gt` (use these with relink_check).
 
-**Next**: Phase 13, recording ([PHASE13-PLAN.md](PHASE13-PLAN.md), choices made 2026-10-12); step 1 starts with
-the FFmpeg download (ask first). The rest of Phase 12 (more cameras, per-camera tuning, re-measuring
-re-identification and the short-gap re-link rule on outdoor footage) when the user adds cameras.
+**Phase 13 (recording) is done** (2026-10-12, [PHASE13-PLAN.md](PHASE13-PLAN.md) has the numbers):
+`labeler/recorder.py` (fed from `Pipeline.run` with every frame read; FFmpeg in `data/ffmpeg`, NVENC),
+`labeler/recordings_web.py` + Recordings page, table `recordings`, `tools/get_ffmpeg.py`. Lessons: run.py waits only
+15 s for a camera loop at shutdown, so anything slow in its `finally` (person videos) must come after quick closes;
+the shared `.player` class in style.css is the full-screen video pop-up (don't reuse the name); CSS `display`
+overrides the `hidden` attribute unless a `[hidden]` rule wins. The user's own app records from its next restart.
+
+**Next**: with the user: a long-run check with recording on and the webcam measurement (lens cover). The rest of
+Phase 12 (more cameras, per-camera tuning, re-measuring re-identification and the short-gap re-link rule on
+outdoor footage) when the user adds cameras.
 
 Open items (also in that plan):
 - Pictures and person videos are not in the backups (restore drill, 2026-10-12). The user chose to leave it so

@@ -114,6 +114,7 @@ or another app (Teams, Discord) holding the camera.
 | **Review queue** | Disagreements between models first, then least confident; your answer settles every source |
 | **Reports** | People per hour/day, attribute breakdowns, date range and camera filters, **Download CSV** |
 | **Alerts** | Rules like "red top + backpack" or "anyone" (per camera); each fires once per person |
+| **Recordings** | Video of each camera while people are in view: a bar per day, play from any moment (viewers: faces blurred) |
 | **Answer key** | Label recorded people yourself, blind, and see how accurate the system is on this camera |
 | **Import** (admin) | Add recorded videos with their real times (see Importing recorded videos) |
 | **Settings** (admin) | Cameras, how long data is kept, backups, face blurring, HTTPS, weekly retraining; **Restart now** |
@@ -123,7 +124,7 @@ or another app (Teams, Discord) holding the camera.
 
 The common settings can be changed on the **Settings** page instead of editing `config.yaml`: cameras (add,
 remove, source, mode, own retention, detector size), how long people and the audit log are kept, face blurring
-(for viewers, and in saved pictures), HTTPS, the weekly retraining, and idle mode. Every value is checked before it is
+(for viewers, and in saved pictures), HTTPS, the weekly retraining, idle mode, and recording. Every value is checked before it is
 saved (a webcam number 0-9, a file that exists, or a camera address with a host; detector size 640/960/1280;
 0-3650 days), and every change is in the Audit log. Only the changed values are saved, in `data\settings.yaml`
 (config.yaml keeps its comments and stays the list of defaults; delete the file to go back to it).
@@ -389,6 +390,29 @@ the Audit log). Each camera keeps its last seconds in memory (about 5 MB); clips
 OpenCV, plays in every current browser), at most 960 pixels wide and 10 frames per second, about 1.5-3 MB each,
 written in the background a few seconds after the alert. They are deleted with the person (Delete, retention)
 or with their alert rule. With `storage.blur_faces: true` clips are made from the blurred picture.
+
+## Recording
+
+With `recording.enabled` (config.yaml, Settings page *Recording*) each live camera is recorded as H.264 video while
+people are in view: from 10 seconds before the first person appears (kept in memory) to 10 seconds after the last
+one leaves; someone returning within those 10 seconds continues the same recording (`recording.when: always`
+records all the time). Files of at most 10 minutes in `data\recordings\<camera>\<day>\`, 1280 px wide, 10 frames
+per second, with the camera name and the time written on every frame; kept 3 days and at most 100 GB in all, the
+oldest deleted first every hour; recording pauses (Health page: problem) when the disk is below
+`storage.min_free_gb`. FFmpeg makes the files (`tools\get_ffmpeg.py`, set up by install.bat: the LGPL build of
+FFmpeg 8.1), on the graphics card (NVENC) when there is an NVIDIA one, else with Windows' encoder or OpenH264.
+
+The **Recordings** page shows each day as a bar (when it recorded, when people appeared); click it to play from
+that moment. **▶ Recording** on a person (Live page, timeline) and on an alert opens the recording at that moment.
+Admins play the file itself (the browser seeks), download it and delete whole recordings; viewers get a stream
+made by the app with faces blurred (from the head positions saved for every frame) and never the file. Every
+playback, download and delete is in the Audit log. Deleting a person does not cut them out of a recording.
+
+Measured (2026-10-12): busy street footage (MOTChallenge) recorded all the time would be **9-13 GB per camera per
+day** at quality 28 (`recording.quality`; 23 looks the same at normal size, 17-22 GB); OpenCV's own encoders would
+have made 23-305 GB. FFmpeg uses 2-6% of one processor core; the camera loop kept its speed (18.5 frames/s without,
+17.9-18.4 with, on a busy 1080p clip), because shrinking, blurring and encoding happen outside it. After a crash or
+power cut the last ~3 seconds are lost and the file still plays; the next start closes it.
 
 ## A video of each person
 
@@ -669,9 +693,9 @@ vision model, which the classifiers only stand in for until it answers. A larger
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-451 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
+487 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
-blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, today at a glance, idle mode, the long-run check and the restore drill, the re-identification wrapper, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
+blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, today at a glance, idle mode, the long-run check and the restore drill, the re-identification wrapper, recording and the Recordings page, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
 every page's script, and a check that no text file holds stray control characters (one once broke `stop.bat`).
 Changes are tracked with git.
 
@@ -691,9 +715,10 @@ Changes are tracked with git.
 | `labeler/healthcheck.py` | the Health page and `/api/health` |
 | `labeler/settings.py` | the Settings page (`data/settings.yaml` over config.yaml) |
 | `labeler/importer.py` | the Import page: recorded videos with real times |
+| `labeler/recorder.py`, `labeler/recordings_web.py` | recording while people are in view; the Recordings page |
 | `run.py`, `start.bat`, `stop.bat` | starting and stopping |
 | `install.bat` / `install.ps1`, `tools/models.py`, `tools/pack_offline.ps1` | installing on a new PC, offline package |
-| `tools/` | benchmarks, evaluation, training, backups, long-run check (`soak.py`), restore drill |
+| `tools/` | benchmarks, evaluation, training, backups, long-run check (`soak.py`), restore drill, FFmpeg setup |
 | `tests/` | automated tests |
 | `data/` | person pictures, backups, log files, datasets (not in git) |
 
@@ -708,6 +733,7 @@ Changes are tracked with git.
 
 Ultralytics YOLO: AGPL-3.0 (commercial license needed for closed products, or swap in RF-DETR, Apache-2.0).
 Qwen3-VL: Apache-2.0. Age model: Apache-2.0. COCO photos: various Flickr licenses. FairFace: CC BY 4.0.
+FFmpeg (recording): the LGPL build, used as a separate program (`data\ffmpeg`, its LICENSE.txt alongside).
 MOT16 (MOTChallenge, imported as the recorded camera `mot16` and used by the retrained classifiers since
 2026-10-12): CC BY-NC-SA 3.0, **non-commercial only**: before commercial use, delete that camera's people on the
 Import page and retrain (or delete `data\models\attributes.joblib` to go back to the shipped classifiers).

@@ -65,6 +65,13 @@ if (-not $SkipModels) {
   if ($LASTEXITCODE -ne 0) { $failed += "models" }
 }
 
+Say ""; Say "== FFmpeg (recording) ==" "Cyan"
+& $VenvPy tools\get_ffmpeg.py check | Out-Host
+if ($LASTEXITCODE -eq 0) {
+  & $VenvPy tools\get_ffmpeg.py pack $Out | Out-Host
+  if ($LASTEXITCODE -ne 0) { $failed += "FFmpeg" }
+} else { Say "  not on this PC: the package has no FFmpeg (recording then needs internet on the new PC)" "Yellow" }
+
 $readme = @"
 VisionLabeler offline package (made $(Get-Date -Format "yyyy-MM-dd") on $env:COMPUTERNAME).
 
@@ -76,6 +83,7 @@ On the new PC:
 wheels\   Python packages (pip install --no-index), exact versions of the PC that made this package
 models\   detector, Hugging Face models, the Ollama vision model
 docker\   the database image (docker load)
+ffmpeg\   FFmpeg for recording (LGPL build, see its LICENSE.txt)
 "@
 [IO.File]::WriteAllText((Join-Path $Out "README.txt"), $readme, (New-Object Text.UTF8Encoding $false))
 

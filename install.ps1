@@ -288,6 +288,24 @@ if (-not (Venv-Report)) {
 }
 
 # ---------------------------------------------------------------------------------------------------
+Step "6b. FFmpeg (records video while people are in view)"
+if (-not (Venv-Report)) {
+  Info "FFmpeg" "checked after the Python environment is installed"
+} else {
+  & $VenvPy tools\get_ffmpeg.py check | Out-Null
+  if ($LASTEXITCODE -eq 0) { Ok "FFmpeg" "ready (data\ffmpeg)" }
+  else {
+    Miss "FFmpeg" "not set up: nothing is recorded until it is"
+    if (-not $CheckOnly -and $Offline -and (Test-Path (Join-Path $Offline "ffmpeg\ffmpeg.exe"))) {
+      if (Ask "Copy FFmpeg from the offline package?") { [void](Run $VenvPy @("tools\get_ffmpeg.py", "unpack", $Offline)) }
+    } elseif (-not $CheckOnly -and (Ask "Download FFmpeg (LGPL build from github.com/BtbN/FFmpeg-Builds, about 170 MB)?")) {
+      [void](Run $VenvPy @("tools\get_ffmpeg.py", "download"))
+    }
+    if (-not $CheckOnly) { & $VenvPy tools\get_ffmpeg.py check | Out-Null; if ($LASTEXITCODE -eq 0) { Ok "FFmpeg" "ready now" } }
+  }
+}
+
+# ---------------------------------------------------------------------------------------------------
 Step "7. Login account for other devices (optional)"
 if (-not $dbReady -or -not (Venv-Report)) {
   Info "Accounts" "checked when the database is running"

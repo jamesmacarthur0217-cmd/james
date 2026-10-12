@@ -210,6 +210,39 @@ def check_retraining(cfg: dict, db) -> dict:
                                              + ("new version kept" if last["kept"] else last["note"] or "not kept"))
 
 
+def check_recording(cfg: dict, db, pipelines: list) -> dict:
+    """Recording (labeler/recorder.py): FFmpeg found, each camera's recorder running, not paused, space used."""
+    rc = cfg["recording"]
+    if not rc["enabled"]:
+        return _check("recording", "off", "turned off (Settings page)")
+    from . import recorder
+    ffmpeg = recorder.ffmpeg_path(cfg)
+    if not ffmpeg.exists():
+        return _check("recording", "warning", f"on, but FFmpeg is not found at {ffmpeg}: nothing is recorded "
+                                              "(install.bat sets it up, or set recording.ffmpeg)")
+    recorders = [(p.name, getattr(p, "recorder", None)) for p in pipelines]
+    missing = [name for name, r in recorders if r is None]
+    if recorders and len(missing) == len(recorders):
+        return _check("recording", "warning", "on, but not recording: no working H.264 encoder was found "
+                                              "(see the log at start)")
+    stats = db.recording_stats()
+    gb, oldest = stats["bytes"] / 1e9, stats["oldest"]
+    detail = (f"{stats['files']} files, {gb:.1f} of {float(rc['max_gb']):g} GB, kept {float(rc['keep_days']):g} days"
+              + (f", oldest {oldest.replace('T', ' ')[:16]}" if oldest else "")
+              + f"; {'while people are in view' if rc['when'] == 'people' else 'always'}")
+    encoders = sorted({r.encoder for _, r in recorders if r is not None})
+    if encoders:
+        detail += f", {', '.join(encoders)}"
+    paused = [f"{name}: {r.paused}" for name, r in recorders if r is not None and r.paused]
+    dropped = [f"{name}: {r.dropped} frames dropped" for name, r in recorders if r is not None and r.dropped]
+    if paused:
+        return _check("recording", "problem", "paused (" + "; ".join(paused) + "); " + detail)
+    if missing or dropped:
+        return _check("recording", "warning", "; ".join([*(f"{m}: not recording" for m in missing), *dropped])
+                      + "; " + detail)
+    return _check("recording", "ok", detail)
+
+
 def check_errors(now: float) -> tuple[dict, list[dict]]:
     errors = logs.recent_errors.recent(now)
     latest = [{"at": datetime.fromtimestamp(t).isoformat(timespec="seconds"), "message": mask_password(m)[:300]}
@@ -231,6 +264,10 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
         checks.insert(-1, check_storage(cfg, db))
     except Exception as e:   # never break the health check
         checks.insert(-1, _check("storage", "warning", f"could not be measured ({e.__class__.__name__})"))
+    try:
+        checks.insert(-1, check_recording(cfg, db, pipelines))
+    except Exception as e:
+        checks.insert(-1, _check("recording", "warning", f"could not be checked ({e.__class__.__name__})"))
     try:   # access from other devices and Tailscale (labeler/remote.py); never breaks the health check
         from . import remote
         checks[-1:-1] = remote.checks(cfg, db)   # before "errors in the log"

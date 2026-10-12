@@ -23,6 +23,7 @@ For each person seen by a camera:
 | Estimated description | apparent age range or age group, apparent gender, clothing type and color, headwear, glasses, face mask, carried items (bag, phone, …). These are automatic estimates and can be wrong |
 | Appearance vector | a list of numbers describing the person's look (mostly clothing), used to search ("man in a red jacket") and to find the same-looking person on other visits or cameras. It is not a face template |
 | Corrections | labels a staff member checked or corrected, with their user name |
+| Video recordings | [if recording is on] video of the camera picture while people are in view (from 10 seconds before to 10 seconds after), with the camera name and time written on it; no sound |
 
 Not recorded: sound, names, ID numbers, face close-ups (off by default: `storage.save_face_crops`). Faces in the
 saved pictures can also be blurred for everyone (`storage.blur_faces`): [on / off at this site].
@@ -42,6 +43,7 @@ are sent. [Optional: we turned this off with `HF_HUB_OFFLINE=1` in `.env`.]
 | Data | Kept |
 |---|---|
 | People (picture, description, appearance vector) | [30] days ([per camera: e.g. entrance 7 days]), then deleted automatically (checked every hour) |
+| Video recordings | [3] days and at most [100] GB, the oldest deleted first (checked every hour). Deleting a person does not cut them out of a recording; an administrator can delete whole recordings |
 | Audit log | [365] days |
 | Backups of the database | the last 7 backups, at most one a day, so up to about [7–14] days after deletion |
 

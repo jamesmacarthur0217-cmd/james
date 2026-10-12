@@ -44,7 +44,8 @@ def _form(**changes):
             "retention_days": 30, "audit_retention_days": 365, "blur_faces": False,
             "blur_faces_for_viewers": True, "https": False, "retrain_enabled": True,
             "backup_enabled": True, "backup_copy_to": "", "person_videos": True,
-            "idle_enabled": True, "idle_after_s": 60}
+            "idle_enabled": True, "idle_after_s": 60, "recording_enabled": False, "recording_when": "people",
+            "recording_keep_days": 3, "recording_max_gb": 100}
     form.update(changes)
     return form
 
@@ -142,6 +143,8 @@ def test_masked_password_is_kept_and_never_logged(paths, db):
     ({"backup_copy_to": "Z:/not/plugged/in"}, "second-copy folder"),
     ({"backup_copy_to": "relative/folder"}, "second-copy folder"),
     ({"idle_after_s": 5}, "idle_after_s"),
+    ({"recording_when": "sometimes"}, "people are in view, or always"),
+    ({"recording_keep_days": 0}, "recording_keep_days"),
 ])
 def test_bad_values_are_refused(paths, db, change, message):
     app, _ = _app(paths, db)
@@ -159,6 +162,15 @@ def test_daily_backup_settings_are_saved(paths, db, tmp_path):
     assert r.status_code == 200, r.json()
     saved = yaml.safe_load(paths[1].read_text(encoding="utf-8"))
     assert saved == {"backup": {"enabled": False, "copy_to": str(usb)}}
+
+
+def test_recording_settings_are_saved(paths, db):
+    app, _ = _app(paths, db)
+    r = TestClient(app, client=("127.0.0.1", 5000)).post(
+        "/api/settings", json=_form(recording_when="always", recording_keep_days=1.5, recording_max_gb=50))
+    assert r.status_code == 200, r.json()
+    assert yaml.safe_load(paths[1].read_text(encoding="utf-8")) == {
+        "recording": {"when": "always", "keep_days": 1.5, "max_gb": 50}}
 
 
 def test_idle_mode_settings_are_saved(paths, db):
