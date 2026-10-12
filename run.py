@@ -154,6 +154,7 @@ def main() -> int:
     for p in pipelines:
         p.alerts = alerts
         p.age = age_model
+    _start_recorders(cfg, db, pipelines)
     log.info("cameras: %s", ", ".join(f"{p.name} ({p.cam['source']}, {p.mode})" for p in pipelines))
 
     threads = [threading.Thread(target=p.run, kwargs={"max_frames": args.max_frames},
@@ -262,6 +263,26 @@ def main() -> int:
 RETENTION_EVERY_S = 3600
 
 
+def _start_recorders(cfg: dict, db: Database, pipelines: list) -> None:
+    """Recording (labeler/recorder.py): one recorder per camera, when FFmpeg and an H.264 encoder are found."""
+    if not cfg["recording"]["enabled"]:
+        return
+    from labeler import recorder
+    ffmpeg = recorder.ffmpeg_path(cfg)
+    if not ffmpeg.exists():
+        log.warning("recording is on but FFmpeg was not found at %s; nothing is recorded", ffmpeg)
+        return
+    encoder = recorder.pick_encoder(ffmpeg, cfg["recording"]["encoder"])
+    if encoder is None:
+        log.warning("recording: no working H.264 encoder in %s; nothing is recorded", ffmpeg)
+        return
+    recorder.repair(db, cfg)
+    for p in pipelines:
+        p.recorder = recorder.Recorder(cfg, p.name, db, encoder)
+    log.info("recording: %s, %s, with %s, into %s", cfg["recording"]["when"],
+             f"{cfg['recording']['fps']:g} fps", encoder, recorder.folder(cfg))
+
+
 def _apply_retention(db: Database, cfg: dict, crop_dir) -> None:
     """Delete people (and their pictures) older than their camera's retention_days, and old audit entries."""
     from labeler.privacy import remove_picture
@@ -276,6 +297,8 @@ def _apply_retention(db: Database, cfg: dict, crop_dir) -> None:
     if old_audit:
         log.info("retention: deleted %d old audit log entries", old_audit)
     db.cleanup_camera_events(cfg["storage"]["audit_retention_days"])   # camera problems: kept as long
+    from labeler import recorder
+    recorder.prune(db, cfg)   # recordings: keep_days and max_gb
 
 
 def _retention_loop(db: Database, cfg: dict, crop_dir, stop: threading.Event) -> None:

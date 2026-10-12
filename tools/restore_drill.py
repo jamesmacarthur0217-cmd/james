@@ -60,6 +60,7 @@ def drill_config(project_cfg: dict, work: Path, password: str) -> dict:
     cfg["settings_file"] = (work / "settings.yaml").as_posix()
     cfg.setdefault("backup", {}).update(enabled=False, dir=(work / "backups").as_posix(), copy_to="")
     cfg.setdefault("retrain", {})["enabled"] = False
+    cfg.setdefault("recording", {}).update(enabled=False, dir=(work / "recordings").as_posix())
     cfg.setdefault("student", {})["retrained_path"] = (work / "models" / "attributes.joblib").as_posix()
     return cfg
 

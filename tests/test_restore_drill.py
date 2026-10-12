@@ -21,6 +21,7 @@ def test_drill_config_uses_only_the_drill_database_and_work_folder(tmp_path):
     assert cfg["storage"]["retention_days"] == 0                   # restored people are not deleted
     assert cfg["backup"]["enabled"] is False and cfg["backup"]["copy_to"] == ""
     assert cfg["retrain"]["enabled"] is False
+    assert cfg["recording"]["enabled"] is False and Path(cfg["recording"]["dir"]).is_relative_to(tmp_path)
     assert cfg["web"]["host"] == "127.0.0.1" and cfg["web"]["https"] is False
     assert cfg["cameras"] == [{"name": "drill", "source": "samples/bus.jpg"}]
     assert project["database"]["url"] == "${DATABASE_URL}"         # the project's config is not changed

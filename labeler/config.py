@@ -26,6 +26,9 @@ DEFAULTS: dict = {
     "clips": {"enabled": True, "before_s": 5, "after_s": 5, "fps": 10, "max_width": 960},
     "person_videos": {"enabled": True, "max_s": 20, "fps": 5, "max_width": 480, "before_s": 1, "after_s": 1},
     "idle": {"enabled": True, "after_s": 60, "fps": 3},
+    "recording": {"enabled": True, "when": "people", "before_s": 10, "after_s": 10, "fps": 10, "max_width": 1280,
+                  "quality": 28, "encoder": "auto", "max_file_min": 10, "keep_days": 3, "max_gb": 100,
+                  "dir": "data/recordings", "ffmpeg": "data/ffmpeg/ffmpeg.exe"},
     "health": {"enabled": True, "offline_after_s": 10, "blank_after_s": 10, "slow_after_s": 30, "min_fps": 5,
                "startup_grace_s": 30},
     "tracking": {

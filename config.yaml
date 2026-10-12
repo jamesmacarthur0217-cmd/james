@@ -88,6 +88,25 @@ idle:
   after_s: 60
   fps: 3
 
+# Recording (labeler/recorder.py): H.264 videos of each camera, made by FFmpeg (on the graphics card when there is
+# an NVIDIA one). Measured: 9-13 GB per camera per day recording a busy street all the time at 1280 px, 10 fps,
+# quality 28; much less at home recording only while people are in view. Viewers see faces blurred.
+recording:
+  enabled: true
+  when: people                # people: from before_s before someone appears to after_s after the last one leaves;
+                              # always: all the time
+  before_s: 10
+  after_s: 10
+  fps: 10
+  max_width: 1280             # wider cameras are scaled down
+  quality: 28                 # lower = better picture and bigger files (23 looks the same at normal size)
+  encoder: auto               # auto: h264_nvenc (NVIDIA), else h264_mf (Windows), else libopenh264
+  max_file_min: 10            # a long recording is split into files of this many minutes
+  keep_days: 3                # older recordings are deleted (every hour)
+  max_gb: 100                 # and the oldest first when all recordings together are bigger
+  dir: data/recordings
+  ffmpeg: data/ffmpeg/ffmpeg.exe
+
 health:
   enabled: true
   offline_after_s: 10         # no picture at all

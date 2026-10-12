@@ -165,7 +165,8 @@ def test_retention_removes_pictures_and_blurred_copies(db, camera, tmp_path):
     (tmp_path / f"{old}.jpg").write_bytes(b"x")
     privacy.blurred_path(tmp_path, f"{old}.jpg").parent.mkdir()
     privacy.blurred_path(tmp_path, f"{old}.jpg").write_bytes(b"x")
-    cfg = {"cameras": [{"name": "test-cam"}], "storage": {"retention_days": 30, "audit_retention_days": 365}}
+    cfg = {"cameras": [{"name": "test-cam"}], "storage": {"retention_days": 30, "audit_retention_days": 365},
+           "recording": {"dir": str(tmp_path / "recordings"), "keep_days": 3, "max_gb": 100}}
     _apply_retention(db, cfg, tmp_path)
     assert db.list_tracks() == [] and list(tmp_path.rglob("*.jpg")) == []
 

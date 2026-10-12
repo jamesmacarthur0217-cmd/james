@@ -56,6 +56,20 @@ while people are in view) comes with the first real run in step 2 (the lens cove
 - Retention every hour and while writing: older than `recording.keep_days` (3) or over `recording.max_gb` (100)
   → oldest deleted; below `storage.min_free_gb` recording pauses and the Health page says so.
 
+**Step 2 results (2026-10-12)**: `labeler/recorder.py`, table `recordings`, `recording:` in config.yaml (on by
+default: the user's choice), hooked into `Pipeline.run` (every frame read, before idle mode skips any), started by
+run.py when FFmpeg and an encoder are found; `repair()` at start, `prune()` with the hourly retention. Test copies
+record into their own folder (`tools/make_test_config.py`), the restore drill not at all. Measured on a test copy
+with MOT16-11 (busy mall, 1080p, no VLM) as the camera:
+- size: about 9 MB a minute while recording (13.6 GB/day if it never stopped);
+- camera loop: 18.5 frames/s without recording, 17.9-18.4 with, after moving shrinking, blurring and JPEG-making to
+  the writer thread (before that: 16.3-16.7); about 10% of one CPU core more in all, FFmpeg 4%;
+- a normal stop: frames in the video, the frame list and the database all equal (295, 304). Found and fixed on the
+  way: run.py waits 15 s for a camera loop, which wrote person videos first, so recordings were left open; the
+  recorder now closes first, and its frame list is written line by line;
+- killed with the whole process tree (like a power cut): the video lost its last ~3 s (265 of 299 frames); the
+  repair at the next start trusts the video (ffprobe) and records 266.
+
 ## Step 3: watching
 
 - **Recordings** page: pick a camera and a day; a bar shows the recorded stretches (and when people were seen);

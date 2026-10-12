@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 import numpy as np
 from sqlalchemy import (
-    Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, TypeDecorator, UniqueConstraint,
+    BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, TypeDecorator, UniqueConstraint,
     create_engine, delete, event, select, text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, selectinload, sessionmaker
@@ -246,6 +246,20 @@ class CameraEvent(Base):
     message: Mapped[str] = mapped_column(String(300))
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class Recording(Base):
+    """One recorded video file of a camera (labeler/recorder.py): from `started_at`, `frames` pictures; `ended_at`
+    stays empty while it is being written (and after a crash, until the next start closes it)."""
+    __tablename__ = "recordings"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    camera: Mapped[str] = mapped_column(String(100), index=True)
+    path: Mapped[str] = mapped_column(String(300))           # relative to recording.dir
+    started_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime)
+    frames: Mapped[int] = mapped_column(Integer, default=0)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    encoder: Mapped[str] = mapped_column(String(30), default="")
 
 
 class AuditEntry(Base):
@@ -1091,6 +1105,73 @@ class Database:
         with self.Session.begin() as s:
             return s.execute(delete(CameraEvent).where(
                 CameraEvent.started_at < datetime.now() - timedelta(days=retention_days))).rowcount
+
+    # --- recordings (labeler/recorder.py) -------------------------------------------------
+
+    def add_recording(self, camera: str, path: str, started_at: datetime, encoder: str) -> int:
+        with self.Session.begin() as s:
+            r = Recording(camera=camera, path=path, started_at=started_at, encoder=encoder)
+            s.add(r)
+            s.flush()
+            return r.id
+
+    def update_recording(self, rec_id: int, **fields) -> None:
+        with self.Session.begin() as s:
+            r = s.get(Recording, rec_id)
+            if r is not None:
+                for k, v in fields.items():
+                    setattr(r, k, v)
+
+    @staticmethod
+    def _recording_dict(r: Recording) -> dict:
+        return {"id": r.id, "camera": r.camera, "path": r.path, "started_at": r.started_at.isoformat(timespec="seconds"),
+                "ended_at": r.ended_at.isoformat(timespec="seconds") if r.ended_at else None,
+                "frames": r.frames, "size_bytes": r.size_bytes, "encoder": r.encoder}
+
+    def open_recordings(self) -> list[dict]:
+        """Recordings without an end: being written, or left open by a crash (closed at the next start)."""
+        with self.Session() as s:
+            return [self._recording_dict(r) for r in s.scalars(select(Recording).where(Recording.ended_at.is_(None)))]
+
+    def list_recordings(self, camera: str | None = None, start: datetime | None = None,
+                        end: datetime | None = None) -> list[dict]:
+        """Recordings overlapping [start, end) (open ones count as still going), oldest first."""
+        with self.Session() as s:
+            q = select(Recording).order_by(Recording.started_at)
+            if camera:
+                q = q.where(Recording.camera == camera)
+            if end is not None:
+                q = q.where(Recording.started_at < end)
+            if start is not None:
+                q = q.where((Recording.ended_at.is_(None)) | (Recording.ended_at >= start))
+            return [self._recording_dict(r) for r in s.scalars(q)]
+
+    def recordings_to_prune(self, keep_days: float, max_bytes: int, now: datetime | None = None) -> list[dict]:
+        """Finished recordings to delete: older than keep_days, then the oldest until the rest fit in max_bytes."""
+        now = now or datetime.now()
+        with self.Session() as s:
+            done = [self._recording_dict(r) for r in s.scalars(
+                select(Recording).where(Recording.ended_at.is_not(None)).order_by(Recording.started_at))]
+            total = sum(r["size_bytes"] for r in done)
+        out = []
+        cutoff = (now - timedelta(days=keep_days)).isoformat(timespec="seconds") if keep_days > 0 else None
+        for r in done:
+            if (cutoff and r["ended_at"] < cutoff) or (max_bytes > 0 and total > max_bytes):
+                out.append(r)
+                total -= r["size_bytes"]
+        return out
+
+    def delete_recordings(self, ids: list[int]) -> None:
+        if ids:
+            with self.Session.begin() as s:
+                s.execute(delete(Recording).where(Recording.id.in_(ids)))
+
+    def recording_stats(self) -> dict:
+        from sqlalchemy import func
+        with self.Session() as s:
+            n, size, oldest = s.execute(select(func.count(Recording.id), func.coalesce(func.sum(Recording.size_bytes), 0),
+                                               func.min(Recording.started_at))).one()
+        return {"files": n, "bytes": int(size), "oldest": oldest.isoformat(timespec="seconds") if oldest else None}
 
     # --- audit log ----------------------------------------------------------------------
 

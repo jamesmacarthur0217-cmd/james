@@ -2,7 +2,7 @@
 
     python tools/make_test_config.py <folder> [--https] [--network] [--two-cameras] [--fast-health]
 
-Copies config.yaml with the database (SQLite), pictures, log files, Settings page file and HTTPS certificate
+Copies config.yaml with the database (SQLite), pictures, recordings, log files, Settings page file and HTTPS certificate
 inside <folder>, and the app on
 this PC only (web.host 127.0.0.1, web.https false): the real config opens the app to the network with HTTPS.
 Then:  python run.py --config <folder>/test_config.yaml --source samples/bus.jpg --port 8001
@@ -35,6 +35,7 @@ def main() -> None:
     cfg.setdefault("logs", {})["dir"] = (folder / "logs").as_posix()
     cfg["settings_file"] = (folder / "settings.yaml").as_posix()   # the Settings page writes here, not data/
     cfg.setdefault("backup", {})["dir"] = (folder / "backups").as_posix()   # never the user's backups
+    cfg.setdefault("recording", {})["dir"] = (folder / "recordings").as_posix()   # nor their recordings
     cfg.setdefault("student", {})["retrained_path"] = (folder / "models" / "attributes.joblib").as_posix()
     if args.https:
         cfg["web"].update({"https": True, "https_port": 8444, "cert_file": (folder / "tls" / "cert.pem").as_posix(),

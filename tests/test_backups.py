@@ -94,6 +94,8 @@ def test_test_configs_keep_their_own_backups(tmp_path):
     cfg = load_config(out)
     assert backups.folder(cfg) == (tmp_path / "backups").resolve()
     assert "--dir" in backups.command(cfg, False) and str(tmp_path / "backups") in " ".join(backups.command(cfg, False))
+    from labeler import recorder
+    assert recorder.folder(cfg) == (tmp_path / "recordings").resolve()   # nor data/recordings
 
 
 def test_a_failed_backup_is_logged_as_an_error(caplog):

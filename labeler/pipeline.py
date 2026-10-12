@@ -181,6 +181,7 @@ class Pipeline:
         self.frames = 0
         self.blank = False
         self.started_mono = self.last_frame_at = time.monotonic()   # for the camera health check
+        self.recorder = None   # labeler/recorder.py, set by run.py when recording is on
         self.idle_cfg = cfg["idle"]
         self.idle = False                                        # nobody in view for a while: detector slowed
         self.last_person_at = self.last_processed_at = self.started_mono
@@ -264,6 +265,9 @@ class Pipeline:
                     if source.ended:
                         break
                     continue
+                recorder = getattr(self, "recorder", None)
+                if recorder is not None:   # every frame read, also those idle mode skips
+                    recorder.feed(frame, bool(self.tracks), self._head_boxes(), time.monotonic(), self.clock.wall())
                 if self.skip_while_idle(time.monotonic()):
                     continue   # still read: a file keeps its pace, a camera's newest frame is used next time
                 self.process(frame)
@@ -280,11 +284,17 @@ class Pipeline:
         finally:
             self.running = False
             source.release()
+            if getattr(self, "recorder", None) is not None:
+                self.recorder.close()   # first: quick, and run.py waits only so long for this thread
             for tid in list(self.tracks):
                 self._finish(tid)
             if self.clips is not None:
                 self.clips.close()   # alerts that fired just before stopping get a shorter clip
             log.info("pipeline stopped after %d frames", self.frames)
+
+    def _head_boxes(self) -> list[tuple]:
+        """Where the faces are, for blurring recordings (from the latest processed frame)."""
+        return [geometry.head_box(st.kpts, st.box) for st in self.tracks.values()]
 
     def skip_while_idle(self, now: float) -> bool:
         """Idle mode: when nobody has been in view for idle.after_s seconds, only idle.fps frames a second go
