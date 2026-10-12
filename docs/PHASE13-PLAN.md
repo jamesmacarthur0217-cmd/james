@@ -26,6 +26,22 @@ step 1), and a quiet room at home much smaller than a busy street.
   per hour, GPU/CPU use, effect on the pipeline's FPS; fallback `h264_mf` when there is no NVIDIA card. Pick the
   default size, frame rate (about 10 fps) and quality from the numbers.
 
+**Step 1 results (2026-10-12)**: FFmpeg n8.1 LGPL downloaded with the user's OK (checksum matched the release's
+checksums.sha256); `ffmpeg.exe`, `ffprobe.exe` and `LICENSE.txt` in `data/ffmpeg/`. Encoders: `h264_nvenc`
+(NVIDIA), `h264_mf` (Windows), `libopenh264`, also AMD/Intel ones. Measured on MOT16-04 and -09 (fixed cameras,
+busy streets) at 10 fps, recording all the time, raw frames piped in, fragmented MP4 out:
+
+| Size | Encoder, quality | GB per camera per day | FFmpeg CPU |
+|---|---|---|---|
+| 1280×720 | NVENC cq 23 / **28** / 33 | 17-22 / **9-13** / 5-7 | 2-6% of a core |
+| 1280×720 | Media Foundation, quality 60 | 10-24 | 13-15% |
+| 1280×720 | OpenH264, 2 Mbit/s | 21 | 5-7% |
+| 1920×1080 | NVENC cq 28 | 20-26 | 8-9% |
+
+Defaults: 1280×720 (smaller cameras keep their size), 10 fps, NVENC cq 28 (looks the same as cq 23 at normal size;
+cq 33 slightly soft); fallback Media Foundation, then OpenH264. The webcam measurement (quiet room, recording only
+while people are in view) comes with the first real run in step 2 (the lens cover was closed so far).
+
 ## Step 2: the recorder (`labeler/recorder.py`)
 
 - One per live camera, fed from `Pipeline.run` with every frame read (before idle mode skips any), sampled at
