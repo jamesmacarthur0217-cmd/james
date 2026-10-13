@@ -151,7 +151,7 @@ def main() -> int:
     from labeler.alerts import AlertEngine
     from labeler.arming import Arming
     arming = Arming(db, cfg)
-    alerts = AlertEngine(db)
+    alerts = AlertEngine(db, arming)
     if cfg["falls"]["enabled"]:
         alerts.ensure_fall_rule()
     pipelines.extend(Pipeline(cfg, db, worker, embedder, student, camera=cam) for cam in cfg["cameras"])

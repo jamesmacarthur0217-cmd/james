@@ -10,6 +10,10 @@ A rule with a "vehicle" condition is about vehicles (labeler/vehicles.py): "vehi
 described and when it enters a zone. Person rules never fire for vehicles and the other way round. "hours = 22-06"
 (people and vehicles) limits a rule to a time of day (from 22:00 until 06:00).
 
+"armed = away" (or "home"; people and vehicles) limits a rule to when the house is set to Away (or Home) on the
+pages' Home / Away switch or by its weekly schedule (labeler/arming.py). Rules without it work all the time, like the
+built-in "Fall" rule.
+
 "fallen = yes" is a fall (labeler/falls.py): rules with it are checked only when a fall is confirmed, and fire
 for every fall, also a second one of the same person. A built-in rule "Fall" is made at start when fall alerts
 are on and no rule asks for a fall (turn it off on the Alerts page to stop fall alerts; deleted, it comes back).
@@ -29,7 +33,7 @@ log = logging.getLogger(__name__)
 ZONE = "zone"   # condition on where the person went, not on how they look
 FALLEN = "fallen"   # condition on a fall having just been confirmed
 FALL_RULE = [[FALLEN, "yes"]]
-VEHICLE, VEHICLE_COLOR, HOURS = "vehicle", "vehicle_color", "hours"
+VEHICLE, VEHICLE_COLOR, HOURS, ARMED = "vehicle", "vehicle_color", "hours", "armed"
 CAR_GROUP = {"car", "SUV", "van", "pickup"}   # "car" in a rule, like in the Ask box
 HOUR_PRESETS = ["22-06", "20-06", "00-06", "18-24", "06-18", "08-18", "09-17"]
 
@@ -85,6 +89,8 @@ def describe(conditions: list[list[str]]) -> str:
             return "fell"
         if n == VEHICLE:
             return "any vehicle" if v == "any" else f"vehicle = {v}"
+        if n == ARMED:
+            return f"only when {v.capitalize()}"
         if n == HOURS:
             a, b = v.split("-")
             return f"between {int(a):02d}:00 and {int(b) % 24:02d}:00"
@@ -92,9 +98,15 @@ def describe(conditions: list[list[str]]) -> str:
     return ", ".join(one(n, v) for n, v in conditions)
 
 
+def _asks_armed(rules: list[dict]) -> bool:
+    return any(name == ARMED for r in rules for name, _ in r["conditions"])
+
+
 class AlertEngine:
-    def __init__(self, db: Database):
+    def __init__(self, db: Database, arming=None):
+        """arming: the app's one labeler.arming.Arming (the pages switch the same one); without it, always Home."""
         self.db = db
+        self.arming = arming
         self._lock = threading.Lock()
         self._rules: list[dict] | None = None
 
@@ -116,6 +128,10 @@ class AlertEngine:
             self.invalidate()
             log.info('alert rule "Fall" added (turn it off on the Alerts page to stop fall alerts)')
 
+    def _armed(self) -> str:
+        from .arming import HOME
+        return self.arming.current() if self.arming is not None else HOME
+
     def check(self, track_id: int, camera: str, fallen: bool = False) -> list[dict]:
         """Fire every enabled rule this person now matches (once per rule and person). fallen: a fall was just
         confirmed: only the rules asking for a fall are checked, and they fire again for a later fall."""
@@ -131,6 +147,8 @@ class AlertEngine:
         if fallen:
             attrs = {**attrs, FALLEN: "yes"}
         attrs = {**attrs, "hour": datetime.now().hour}
+        if _asks_armed(rules):
+            attrs[ARMED] = self._armed()
         fired = []
         for rule in rules:
             if matches(rule["conditions"], attrs):
@@ -151,6 +169,8 @@ class AlertEngine:
         if attrs is None:   # deleted, or the vision model saw no vehicle
             return []
         attrs["hour"] = datetime.now().hour
+        if _asks_armed(rules):
+            attrs[ARMED] = self._armed()
         fired = []
         for rule in rules:
             if matches(rule["conditions"], attrs):

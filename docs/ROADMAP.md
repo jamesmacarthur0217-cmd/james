@@ -249,6 +249,7 @@ Ask the user before each phase and each step.
 
 Phase 19 started 2026-10-14 (user's choices: admins **and viewers** may switch; a weekly schedule).
 1. **Done 2026-10-14**: Home/Away state (`labeler/arming.py`, table `arming`), weekly schedule, `/api/arming`.
+2. **Done 2026-10-14**: rule condition `armed = away / home` (people and vehicles; the Fall rule stays always on).
 
 ## Critical files
 

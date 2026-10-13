@@ -148,9 +148,9 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                alerts=None, agent=None, health=None, retrainer=None, importer=None, photo=None,
                arming=None) -> FastAPI:
     app = FastAPI(title="VisionLabeler")
-    if arming is None:
+    if arming is None:   # one shared with the alert checks, so a switch here counts there at once
         from .arming import Arming
-        arming = Arming(db, cfg)
+        arming = getattr(alerts, "arming", None) or Arming(db, cfg)
     app.state.stopping = threading.Event()
     app.state.started_at = time.time()
     health_token = str(cfg["web"].get("health_token") or "")
@@ -400,7 +400,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         allowed = {**schema.FIELDS, **{n: v + ["none"] for n, v in schema.LIST_FIELDS.items()},
                    "zone": sorted({z["name"] for z in db.list_zones()}), "fallen": ["yes"],
                    "vehicle": ["any", "car", "SUV", "van", "pickup", "lorry", "bus", "motorbike", "bicycle"],
-                   "vehicle_color": [c for c in VEHICLE_COLORS if c != "unknown"]}
+                   "vehicle_color": [c for c in VEHICLE_COLORS if c != "unknown"], "armed": ["away", "home"]}
         for cond in body.conditions:
             if len(cond) == 2 and cond[0] == "hours":
                 if not valid_hours(cond[1]):
@@ -411,8 +411,9 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         names = [c[0] for c in body.conditions]
         if "vehicle_color" in names and "vehicle" not in names:
             raise HTTPException(400, 'a vehicle color needs a "vehicle" condition too (e.g. vehicle = any)')
-        if "vehicle" in names and set(names) - {"vehicle", "vehicle_color", "zone", "hours"}:
-            raise HTTPException(400, "a vehicle rule can ask only for the vehicle, its color, a zone and the hours")
+        if "vehicle" in names and set(names) - {"vehicle", "vehicle_color", "zone", "hours", "armed"}:
+            raise HTTPException(400, "a vehicle rule can ask only for the vehicle, its color, a zone, the hours "
+                                     "and Home / Away")
         if not body.name.strip():
             raise HTTPException(400, "the rule needs a name")
         rule = db.add_rule(body.name.strip()[:100], body.conditions, body.camera)

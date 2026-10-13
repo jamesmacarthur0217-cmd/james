@@ -11,9 +11,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from fastapi.testclient import TestClient  # noqa: E402
 
 from labeler import accounts  # noqa: E402
+from labeler.alerts import AlertEngine, describe, matches  # noqa: E402
 from labeler.arming import (AWAY, HOME, Arming, last_change, next_change, parse_entry, parse_schedule,  # noqa: E402
                             scheduled_mode)
 from labeler.config import DEFAULTS, load_config  # noqa: E402
+from labeler.vehicles import VehicleStore  # noqa: E402
 from labeler.web import create_app  # noqa: E402
 
 # 2026-10-12 is a Monday.
@@ -176,3 +178,70 @@ def test_viewers_may_switch(db, tmp_path):
     assert db.latest_arming()["by"] == "tixuan"
     anonymous = _app(db, tmp_path, address="192.168.1.21")
     assert anonymous.post("/api/arming", json={"mode": "home"}).status_code == 401
+
+
+# --- rules "only when Away / Home" (step 2) ---
+
+def test_armed_condition_matches_and_reads():
+    assert matches([["armed", "away"]], {"armed": "away"})
+    assert not matches([["armed", "away"]], {"armed": "home"})
+    assert describe([["upper_color", "red"], ["armed", "away"]]) == "upper color = red, only when Away"
+
+
+def test_person_rules_only_when_away(db, camera):
+    arming, _ = _arming(db, [], at(MON, 12))
+    engine = AlertEngine(db, arming)
+    engine.ensure_fall_rule()
+    db.add_rule("anyone when away", [["armed", "away"]])
+    db.add_rule("anyone at home", [["armed", "home"]])
+    db.add_rule("anyone", [])
+    engine.invalidate()
+    a = db.create_track(camera, 1, datetime.now())
+    assert sorted(e["message"] for e in engine.check(a, "test-cam")) == ["anyone at home: only when Home",
+                                                                         "anyone: anyone"]
+    arming.set(AWAY, "james")
+    b = db.create_track(camera, 2, datetime.now())
+    assert sorted(e["message"] for e in engine.check(b, "test-cam")) == ["anyone when away: only when Away",
+                                                                         "anyone: anyone"]
+    assert [e["message"] for e in engine.check(a, "test-cam")] == ["anyone when away: only when Away"]  # later, Away
+    assert [e["message"] for e in engine.check(b, "test-cam", fallen=True)] == ["Fall: fell"]   # falls: always
+
+
+def test_vehicle_rules_only_when_away(db, camera, tmp_path):
+    arming, _ = _arming(db, ["daily 00:00-24:00"], at(MON, 12))   # Away all the time
+    engine = AlertEngine(db, arming)
+    db.add_rule("car at home", [["vehicle", "car"], ["armed", "home"]])
+    db.add_rule("car away", [["vehicle", "car"], ["armed", "away"]])
+    car = VehicleStore(db, camera, tmp_path).create("car", datetime.now(), 1)
+    assert [e["message"] for e in engine.check_vehicle(car, "test-cam")] == ["car away: vehicle = car, only when Away"]
+
+
+def test_engine_without_arming_is_home(db, camera):
+    engine = AlertEngine(db)
+    db.add_rule("away", [["armed", "away"]])
+    db.add_rule("home", [["armed", "home"]])
+    t = db.create_track(camera, 1, datetime.now())
+    assert [e["message"] for e in engine.check(t, "test-cam")] == ["home: only when Home"]
+
+
+def test_pages_switch_the_state_the_alerts_use(db, camera, tmp_path):
+    arming, _ = _arming(db, [], at(MON, 12))
+    engine = AlertEngine(db, arming)
+    cfg = copy.deepcopy(DEFAULTS)
+    cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
+    client = TestClient(create_app(cfg, db, None, None, engine), client=("127.0.0.1", 5000))
+    r = client.post("/api/alerts/rules", json={"name": "intruder", "conditions": [["armed", "away"]]})
+    assert r.status_code == 200
+    client.post("/api/arming", json={"mode": "away"})
+    t = db.create_track(camera, 1, datetime.now())
+    assert [e["message"] for e in engine.check(t, "test-cam")] == ["intruder: only when Away"]
+
+
+def test_rule_api_checks_armed(db, tmp_path):
+    client = _app(db, tmp_path)
+    add = lambda conds: client.post("/api/alerts/rules", json={"name": "r", "conditions": conds}).status_code  # noqa: E731
+    assert add([["armed", "away"]]) == 200
+    assert add([["armed", "home"], ["upper_color", "red"]]) == 200
+    assert add([["vehicle", "any"], ["armed", "away"], ["hours", "22-06"]]) == 200
+    assert add([["fallen", "yes"], ["armed", "home"]]) == 200
+    assert add([["armed", "holiday"]]) == 400
