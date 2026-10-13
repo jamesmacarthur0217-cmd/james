@@ -34,7 +34,8 @@
         "fell" is a fall: the built-in rule "Fall" pops up with a sound on every page until OK is clicked;
         turn it off below to stop fall alerts (deleted, it comes back at the next start).
         "Home / Away" = only when the switch at the top of every page says Away (or Home); its weekly schedule is
-        on the <a href="/settings">Settings</a> page.</p>
+        on the <a href="/settings">Settings</a> page. "stayed in area" = someone (or, with "vehicle", a vehicle)
+        inside an area drawn on the Live page at least that long, e.g. at the gate for 2 minutes.</p>
       <div class="row"><label for="name">Name</label><input id="name" placeholder="e.g. Red top with backpack" style="flex:1"></div>
       <div class="row"><label for="camera">Camera</label><select id="camera"><option value="">Any camera</option></select></div>
       <div id="conds"></div>
@@ -66,12 +67,12 @@ function condRow() {
   div.className = "cond";
   const names = Object.keys(fields);
   const NICE = { zone: "entered zone", fallen: "fell", vehicle: "vehicle (a rule about vehicles)", vehicle_color: "vehicle color",
-                 hours: "time of day", armed: "Home / Away" };
+                 hours: "time of day", armed: "Home / Away", stayed: "stayed in area (loitering)" };
   div.innerHTML = `<select class="c-name">${names.map(n => `<option value="${n}">${NICE[n] || n.replace(/_/g, " ")}</option>`).join("")}</select>
     <select class="c-value"></select><button class="c-del" title="Remove">✕</button>`;
   const fill = () => {
     const vals = fields[div.querySelector(".c-name").value].filter(v => v !== "unknown");
-    const show = (n, v) => n === "armed" ? `only when ${v === "away" ? "Away" : "Home"}` : n === "hours" ? `${v.split("-")[0].padStart(2, "0")}:00 to ${(+v.split("-")[1] % 24 + "").padStart(2, "0")}:00`
+    const show = (n, v) => n === "stayed" ? stayText(v, " · ") : n === "armed" ? `only when ${v === "away" ? "Away" : "Home"}` : n === "hours" ? `${v.split("-")[0].padStart(2, "0")}:00 to ${(+v.split("-")[1] % 24 + "").padStart(2, "0")}:00`
                                          : n === "vehicle" && v === "any" ? "any vehicle" : n === "vehicle" && v === "car" ? "car (with SUVs, vans, pickups)" : v;
     const n = div.querySelector(".c-name").value;
     div.querySelector(".c-value").innerHTML = vals.map(v => `<option value="${esc(v)}">${esc(show(n, v))}</option>`).join("");
@@ -82,9 +83,18 @@ function condRow() {
   $("conds").appendChild(div);
 }
 
+// "gate:120" -> "gate · 2 min" (the seconds are after the last colon, as in labeler/alerts.py).
+const STAYS = [30, 60, 120, 300, 600, 1800, 3600];
+function niceSeconds(s) { return s % 3600 === 0 ? `${s / 3600} h` : s % 60 === 0 ? `${s / 60} min` : `${s} s`; }
+function stayText(v, sep) {
+  const i = v.lastIndexOf(":");
+  return `${v.slice(0, i)}${sep}${niceSeconds(+v.slice(i + 1))}`;
+}
+
 function describe(conds) {
   return conds.length ? conds.map(([n, v]) => n === "zone" ? `in zone ${v}` : n === "fallen" ? "fell"
                                               : n === "armed" ? `only when ${v === "away" ? "Away" : "Home"}`
+                                              : n === "stayed" ? `stayed in ${stayText(v, " ")}`
                                               : n === "vehicle" ? (v === "any" ? "any vehicle" : `vehicle = ${v}`)
                                               : n === "hours" ? `between ${v.split("-")[0].padStart(2, "0")}:00 and ${(+v.split("-")[1] % 24 + "").padStart(2, "0")}:00`
                                               : `${n.replace(/_/g, " ")} = ${v}`).join(", ")
@@ -161,8 +171,12 @@ async function loadCameraEvents() {
 async function init() {
   fields = (await (await fetch("/api/schema")).json()).all_fields;
   // Zones drawn on the Live page: "entered zone" is a condition like any attribute.
-  const zoneNames = [...new Set((await (await fetch("/api/zones")).json()).map(z => z.name))].sort();
+  const zoneList = await (await fetch("/api/zones")).json();
+  const zoneNames = [...new Set(zoneList.map(z => z.name))].sort();
   if (zoneNames.length) fields = { zone: zoneNames, ...fields };
+  // Loitering: stayed inside an area (lines have no inside) at least this long; one choice per area and time.
+  const areas = [...new Set(zoneList.filter(z => z.kind === "area").map(z => z.name))].sort();
+  if (areas.length) fields = { ...fields, stayed: areas.flatMap(a => STAYS.map(s => `${a}:${s}`)) };
   fields = { fallen: ["yes"], ...fields };   // a fall (labeler/falls.py)
   // Vehicles (labeler/vehicles.py) and the time of day (people and vehicles).
   fields = { ...fields, vehicle: ["any", "car", "SUV", "van", "pickup", "lorry", "bus", "motorbike", "bicycle"],

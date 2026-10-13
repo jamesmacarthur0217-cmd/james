@@ -113,7 +113,7 @@ or another app (Teams, Discord) holding the camera.
 | **People seen** (on Live) | Everyone recorded. **Ask** box for questions or descriptions; filter by attribute; look-alikes; tick people and **Delete selected** or **Delete all…** |
 | **Review queue** | Disagreements between models first, then least confident; your answer settles every source |
 | **Reports** | People per hour/day, attribute breakdowns, date range and camera filters, **Download CSV** |
-| **Alerts** | Rules like "red top + backpack" or "anyone" (per camera, time of day, only when Away); each fires once per person |
+| **Alerts** | Rules like "red top + backpack", "anyone" or "stayed at the gate 2 min" (per camera, time of day, only when Away); each fires once per person |
 | **Recordings** | Video of each camera while people are in view: a bar per day, play from any moment (viewers: faces blurred) |
 | **Answer key** | Label recorded people yourself, blind, and see how accurate the system is on this camera |
 | **Import** (admin) | Add recorded videos with their real times (see Importing recorded videos) |
@@ -383,6 +383,17 @@ it on your own camera. People recorded before this version have no times.
 
 After updating the app, press Ctrl+F5 once on each device so the browser loads the new pages; from this
 version on, pages are always checked for updates.
+
+### Loitering (stayed in an area too long)
+
+An alert rule can ask how long someone stayed inside an **area** (not a counting line): on the Alerts page add the
+condition **stayed in area (loitering)** and pick the area and the time (30 s, 1, 2, 5, 10 or 30 min, 1 h), e.g.
+*stayed in gate 2 min, between 22:00 and 06:00, only when Away*. With a **vehicle** condition it is about vehicles:
+*any vehicle, stayed in gate 10 min*. The camera checks everyone inside an area once a second; the rule fires once per
+person (or vehicle), with a pop-up and a clip like other alerts. Time is measured from when the person's point (the
+middle of the person on kiosk cameras, the feet on security cameras) was inside the area for `zones.min_frames` frames.
+A person out of sight for more than `tracking.lost_after_s` (4 s) counts as having left, so their time starts again;
+a parked vehicle hidden for a moment keeps its time.
 
 ## Home / Away
 

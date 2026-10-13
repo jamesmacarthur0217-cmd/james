@@ -156,3 +156,9 @@ def test_rule_api_checks_stayed(db):
     assert "no area named 'yard'" in add([["stayed", "yard:60"]]).json()["detail"]
     assert add([["stayed", "gate:soon"]]).status_code == 400
     assert add([["fallen", "yes"], ["stayed", "gate:60"]]).status_code == 400
+
+
+def test_alerts_page_offers_stayed():
+    from pathlib import Path
+    page = (Path(__file__).resolve().parent.parent / "labeler" / "static" / "alerts.html").read_text(encoding="utf-8")
+    assert 'z.kind === "area"' in page and "STAYS.map" in page and 'n === "stayed"' in page

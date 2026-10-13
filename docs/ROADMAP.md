@@ -258,6 +258,8 @@ Phase 19 started 2026-10-14 (user's choices: admins **and viewers** may switch; 
 Phase 20 started 2026-10-14.
 1. **Done 2026-10-14**: condition `stayed = <area>:<seconds>` for people and vehicles, checked once a second
    (`Pipeline._check_stays`, `AlertEngine.stay_limits`); real run: 4 people and a bus alerted 21 s into a 20 s rule.
+2. **Done 2026-10-14**: Alerts page "stayed in area (loitering)" (area x 30 s ... 1 h); with hours and Away: none at
+   Home, all 4 people within 3 s of switching to Away; README "Loitering".
 
 ## Critical files
 
