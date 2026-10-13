@@ -240,6 +240,13 @@ plates; type, color and make/model).
 4. **Done 2026-10-13**: alert rules on vehicles (type, color, zone, time of day), pop-ups and clips.
 5. **Done 2026-10-13**: Settings, Health, installer/offline package, docs. **Phase 18 is done.**
 
+## Phases 19-22: Home/Away, loitering, animals, scene questions (approved 2026-10-13, not started)
+
+**Plan: [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md)**: the user chose all four new ideas as future phases, in this order:
+19 Home/Away arming (rules "only when Away"), 20 loitering alert (stayed in an area too long), 21 animals (with the
+vehicle detector), 22 scene questions (the vision model answers yes/no questions about a camera every few minutes).
+Ask the user before each phase and each step.
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),
