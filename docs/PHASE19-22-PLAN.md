@@ -57,6 +57,8 @@ said honestly). **Answers (2026-10-14): dogs, cats and birds; security cameras o
 ## Phase 22: Scene questions
 
 Ask at the start: default interval; alert after one "yes" or two in a row.
+**Answers (2026-10-14, given before stopping for the day; the phase itself is not started): every 5 minutes by default;
+alert after two "yes" in a row.** Ask the user before starting the phase and before each step.
 1. Table `scene_questions` (camera, question, every_s default 300, alert on yes/no, enabled, last answer/time/picture)
    and `scene_answers` (history, kept like the audit log). Admins write them on the Alerts page.
 2. Runner: for each due question, the camera's latest clean frame (the pipeline keeps an unannotated copy every
