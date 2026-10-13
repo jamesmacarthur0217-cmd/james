@@ -327,9 +327,10 @@ motorbikes, bicycles, buses, lorries; no number plates; make/model by the vision
   `alert_events.vehicle_id`, `track_id` nullable (`db.NULLABLE_NOW`).
 - Measured with `tools/vehicle_check.py` (coco, speed, count on MOT16, makes on `data/datasets/stanford_cars`).
 
-**The user's own app has not run Phases 13-18 yet**: at its next restart it gets them and changes the PostgreSQL
+**The user's own app has not run Phases 13-21 yet**: at its next restart it gets them and changes the PostgreSQL
 database by itself (zones.lying_ok; the alert "one per rule and person" constraint dropped; alert_events.vehicle_id and
-track_id nullable; new tables vehicles, vehicle_zone_events). Each change was checked on a scratch database on the same
+track_id nullable; new tables vehicles, vehicle_zone_events; Phases 19-21: new tables arming, animals,
+animal_zone_events and the column alert_events.animal_id). Each change was checked on a scratch database on the same
 server (scripts in the session scratchpad, not kept: create a database, recreate the old layout, start `Database(url)`,
 check, drop it). Ask the user to restart (stop.bat, start.bat) and look at the Health page.
 
