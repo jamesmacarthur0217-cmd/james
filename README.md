@@ -117,7 +117,7 @@ or another app (Teams, Discord) holding the camera.
 | **Recordings** | Video of each camera while people are in view: a bar per day, play from any moment (viewers: faces blurred) |
 | **Answer key** | Label recorded people yourself, blind, and see how accurate the system is on this camera |
 | **Import** (admin) | Add recorded videos with their real times (see Importing recorded videos) |
-| **Settings** (admin) | Cameras, how long data is kept, backups, face blurring, HTTPS, weekly retraining, the Home / Away schedule; **Restart now** |
+| **Settings** (admin) | Cameras, how long data is kept, backups, face blurring, HTTPS, weekly retraining, the Home / Away schedule, vehicles and animals; **Restart now** |
 | **Health** | Whether the database, Ollama, cameras, disk, backups and storage are fine (see Reliability) |
 
 ### Settings page
@@ -709,7 +709,12 @@ videos (100, 8.3 minutes, color half) **3**: each a person crawling on all fours
 Tried and not kept: leaving out an "animal" box that is the same box as a person the person detector found. It lost real
 animals (boxes overlapping 50%: dogs 156 → 147, cats 166 → 159, birds 131 → 123; the person detector sometimes "sees a
 person" on a close-up animal), and when nearly identical (70%: dogs 150, cats 160, birds 123) it removed only 1 of the 3
-false dogs. Not measured: the user's own camera, night (infrared) pictures, and animals common in Malaysia
+false dogs.
+
+**Settings and Health**: the Settings page has an **Animals** section (on/off, which kinds) and an "Animals" column per
+camera (default: ticked for security cameras; only a choice that differs is saved). The Health page has an "animals"
+line: which cameras look for them and how many came today, or a warning when the detector file `yolo11s.pt` (shared
+with vehicles) is missing. Not measured: the user's own camera, night (infrared) pictures, and animals common in Malaysia
 (stray cats and dogs should be like COCO's; monitor lizards and monkeys are not found at all).
 
 ## Detection: how far can a camera see?

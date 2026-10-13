@@ -292,6 +292,26 @@ def check_vehicles(cfg: dict, db, pipelines: list) -> dict | None:
                                     + ("" if vcfg.get("describe", True) else "; not described (vehicles.describe off)"))
 
 
+def check_animals(cfg: dict, db, pipelines: list) -> dict | None:
+    """Animals (labeler/animals.py): which cameras look for them, the detector file (the vehicles'), how many today."""
+    acfg = cfg.get("animals") or {}
+    if not acfg.get("enabled"):
+        return _check("animals", "off", "turned off (Settings page)")
+    missing = [p for p in pipelines if getattr(p, "vehicles_missing", None)]
+    if missing:
+        return _check("animals", "warning", f"the vehicle detector {missing[0].vehicles_missing} is missing, so "
+                      f"{', '.join(p.name for p in missing)} sees no animals: run install.bat again or "
+                      "python tools/models.py download")
+    on = [p.name for p in pipelines if getattr(p, "animals", None) is not None]
+    if not on:
+        return _check("animals", "off", "no camera looks for animals (on by default for security cameras; "
+                                        "per camera on the Settings page)")
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    n = len(db.animal_rows(today, datetime.now() + timedelta(minutes=1)))
+    return _check("animals", "ok", f"{', '.join(on)}: {n} {'animal' if n == 1 else 'animals'} today "
+                                   f"({', '.join(acfg.get('kinds') or [])})")
+
+
 def check_arming(arming) -> dict:
     """Home / Away (labeler/arming.py): never a problem, but good to see from another device."""
     s = arming.state()
@@ -339,6 +359,12 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
             checks.insert(-1, line)
     except Exception as e:
         checks.insert(-1, _check("vehicles", "warning", f"could not be checked ({e.__class__.__name__})"))
+    try:
+        line = check_animals(cfg, db, pipelines)
+        if line is not None:
+            checks.insert(-1, line)
+    except Exception as e:
+        checks.insert(-1, _check("animals", "warning", f"could not be checked ({e.__class__.__name__})"))
     try:
         checks.insert(-1, check_recording(cfg, db, pipelines))
     except Exception as e:

@@ -46,6 +46,7 @@ def _form(**changes):
             "backup_enabled": True, "backup_copy_to": "", "person_videos": True, "mobility_aids": True,
             "falls_enabled": True, "fall_after_s": 10, "vehicles_enabled": True,
             "vehicle_kinds": ["car", "motorbike", "bicycle", "bus", "lorry"], "vehicle_parked_after_s": 60,
+            "animals_enabled": True, "animal_kinds": ["dog", "cat", "bird"],
             "idle_enabled": True, "idle_after_s": 60, "recording_enabled": False, "recording_when": "people",
             "recording_keep_days": 3, "recording_max_gb": 100}
     form.update(changes)
@@ -151,6 +152,8 @@ def test_masked_password_is_kept_and_never_logged(paths, db):
     ({"vehicle_kinds": []}, "vehicle_kinds"),
     ({"vehicle_kinds": ["car", "spaceship"]}, "vehicle kinds are some of"),
     ({"vehicle_parked_after_s": 5}, "vehicle_parked_after_s"),
+    ({"animal_kinds": []}, "animal_kinds"),
+    ({"animal_kinds": ["dog", "monkey"]}, "animal kinds are some of"),
     ({"fall_after_s": 1000}, "fall_after_s"),
     ({"away_schedule": ["weekdays 08:00-18:00"]}, "unknown day 'weekdays'"),
     ({"away_schedule": ["mon-fri 8-18"]}, "write days and times like mon-fri 08:00-18:00"),

@@ -275,3 +275,46 @@ def test_rule_api_checks_animal_rules(db, tmp_path):
     assert post([["animal", "unicorn"]]) == 400
     assert post([["animal", "dog"], ["vehicle", "car"]]) == 400                           # one or the other
     assert post([["animal", "dog"], ["upper_color", "red"]]) == 400                       # a person's label
+
+
+# --- step 5: Settings, Health ---
+
+def test_animal_settings_are_saved(tmp_path, db):
+    import yaml
+    from fastapi.testclient import TestClient
+    from labeler.config import load_config
+    from labeler.web import create_app
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("cameras:\n  - name: cam1\n    source: samples/bus.jpg\n  - name: gate\n    source: samples/bus.jpg\n"
+                        f"    mode: security\nsettings_file: {(tmp_path / 'settings.yaml').as_posix()}\n", encoding="utf-8")
+    client = TestClient(create_app(load_config(cfg_file), db, None), client=("127.0.0.1", 5000))
+    form = client.get("/api/settings").json()["values"]
+    assert form["animals_enabled"] is True and form["animal_kinds"] == ["dog", "cat", "bird"]
+    assert [c["animals"] for c in form["cameras"]] == [False, True]          # security cameras by default
+    form["animal_kinds"] = ["cat", "dog"]
+    form["cameras"][0]["animals"] = True                                      # the kiosk camera too
+    r = client.post("/api/settings", json=form)
+    assert r.status_code == 200, r.json()
+    saved = yaml.safe_load((tmp_path / "settings.yaml").read_text(encoding="utf-8"))
+    assert saved["animals"] == {"kinds": ["dog", "cat"]}
+    cams = {c["name"]: c for c in saved["cameras"]}
+    assert cams["cam1"]["animals"] is True and "animals" not in cams["gate"]   # the default is not written
+    assert client.post("/api/settings", json={**form, "animal_kinds": ["monkey"]}).status_code == 400
+
+
+def test_health_line_for_animals(db, camera):
+    import copy
+    from labeler.healthcheck import check_animals
+    cfg = copy.deepcopy(DEFAULTS)
+
+    class Cam:
+        def __init__(self, name, animals=None, missing=None):
+            self.name, self.animals, self.vehicles_missing = name, animals, missing
+
+    db.create_animal(camera, 1, "dog", datetime.now())
+    line = check_animals(cfg, db, [Cam("gate", animals=object()), Cam("kiosk")])
+    assert line["level"] == "ok" and line["detail"] == "gate: 1 animal today (dog, cat, bird)"
+    assert check_animals(cfg, db, [Cam("kiosk")])["level"] == "off"
+    assert "sees no animals" in check_animals(cfg, db, [Cam("gate", missing="yolo11s.pt")])["detail"]
+    cfg["animals"]["enabled"] = False
+    assert check_animals(cfg, db, [])["detail"] == "turned off (Settings page)"

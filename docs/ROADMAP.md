@@ -9,7 +9,7 @@ import, first kept retraining) are done (2026-10-12). Phase 12 step 1 (a re-iden
 on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. Phase 13 (recording
 while people are in view), Phase 14 (a camera at another site, through Tailscale) and Phase 15 (that camera sent
 from a phone or PC, so it works through company firewalls) are done (2026-10-12). Phase 17 (mobility aids and fall
-alerts) is done (2026-10-13). Phase 18 (vehicles) is done. Phase 19 (Home / Away) and Phase 20 (loitering) are done (2026-10-14). 634 tests pass.
+alerts) is done (2026-10-13). Phase 18 (vehicles) is done. Phases 19 (Home / Away), 20 (loitering) and 21 (animals) are done (2026-10-14). 662 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -240,7 +240,7 @@ plates; type, color and make/model).
 4. **Done 2026-10-13**: alert rules on vehicles (type, color, zone, time of day), pop-ups and clips.
 5. **Done 2026-10-13**: Settings, Health, installer/offline package, docs. **Phase 18 is done.**
 
-## Phases 19-22: Home/Away, loitering, animals, scene questions (approved 2026-10-13; Phases 19-20 done 2026-10-14)
+## Phases 19-22: Home/Away, loitering, animals, scene questions (approved 2026-10-13; Phases 19-21 done 2026-10-14)
 
 **Plan: [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md)**: the user chose all four new ideas as future phases, in this order:
 19 Home/Away arming (rules "only when Away"), 20 loitering alert (stayed in an area too long), 21 animals (with the
@@ -280,6 +280,8 @@ Phase 21 started 2026-10-14 (user's choices: dogs, cats and birds; security came
 4. **Done 2026-10-14**: `tools/animal_check.py`: COCO dogs 75%, cats 83%, birds 68% (medium/large, at 0.5; 0.4 not
    worth it); false alarms 0 on MOT16, 3 on UR Fall (a person crawling = "dog"). Tried, not kept: ignoring animal boxes
    that are a found person (lost real animals). README "Animals".
+5. **Done 2026-10-14**: Settings (Animals section and column), Health "animals" line, docs. **Phase 21 is done.**
+   Next: Phase 22 (scene questions); ask the user first.
 
 ## Critical files
 

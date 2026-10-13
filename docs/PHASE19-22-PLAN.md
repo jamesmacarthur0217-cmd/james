@@ -1,4 +1,4 @@
-# Phases 19-22 plan: Home/Away, loitering, animals, scene questions (approved 2026-10-13; Phases 19-20 done 2026-10-14)
+# Phases 19-22 plan: Home/Away, loitering, animals, scene questions (approved 2026-10-13; Phases 19-21 done 2026-10-14)
 
 ## Context
 
@@ -52,7 +52,7 @@ said honestly). **Answers (2026-10-14): dogs, cats and birds; security cameras o
 2b. **Done 2026-10-14**: the alert rules `animal = dog` (with zone, hours, armed, stayed).
 3. **Done 2026-10-14** (`tools/animal_check.py`, README "Animals"). Measure: COCO val2017 animal detection (marked boxes already here), false alarms on MOT16 and the UR Fall
    activities (indoors, no animals).
-4. Settings/Health, docs.
+4. **Done 2026-10-14** (step 5 after the split). Settings/Health, docs. **Phase 21 is done.**
 
 ## Phase 22: Scene questions
 

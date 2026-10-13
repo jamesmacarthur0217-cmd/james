@@ -19,7 +19,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 ## 2. Current state (2026-10-14)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
-  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15 and 17-20 done (20: `98f436a` rule · `89af3de` page · `3141852` live picture · tool; 19: `46daf57` Home/Away state · `1843a06` rules · `b41530b` pages; 17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings; 18: vehicles `2790822` · `91d90e4` · `8374fad` · `0d87bc0` · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15 and 17-21 done (21: `98be1cd` · `5bc87d8` · `7215d4c` · `8f694b4` · Settings; 20: `98f436a` rule · `89af3de` page · `3141852` live picture · tool; 19: `46daf57` Home/Away state · `1843a06` rules · `b41530b` pages; 17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings; 18: vehicles `2790822` · `91d90e4` · `8374fad` · `0d87bc0` · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
   `2429790`/`bc23363` soak tool · `0449255` idle mode · `23273b1` restore drill. Phase 9 (small
   fixes): `8675c46` list redraw · `81dbcb2` backup.dir · `482bdd4` CI v7 · `0296435` relink_check help. Phase 8
   commits, newest first: `3794de3` today at a glance · `e3a6179` photo search · `ea97937` original excerpts ·
@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **634 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **662 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -354,8 +354,17 @@ Measured with `tools/loiter_check.py` (MOT16 02/04/09, true markings, people at 
 not kept: carrying the area time over a re-link (no gain, 2 more false alarms; most broken tracks are not re-linked on
 security cameras). Not measured: minutes-long stays, the user's own footage.
 
-**Next: Phase 21 (animals)** in [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md), then 22 scene questions. Ask the user before
-the phase (its opening questions: which animals; all cameras or security only), then before each step.
+**Phase 21 (animals) is done** (2026-10-14; README "Animals"). User's choices: dogs, cats and birds; security cameras only.
+`labeler/animals.py`: the vehicle detector's pass also asks for the animals' COCO classes (`Pipeline._object_classes`);
+the vehicle watcher follows them with their own names ("resting" = parked); tables `animals`, `animal_zone_events`;
+`alert_events.animal_id`; Live "Animals seen", Ask box words, Reports, alert rules `animal = dog` (+ zone, hours, armed,
+stayed), Settings section/column, Health line. Measured with `tools/animal_check.py`: COCO dogs 75%, cats 83%, birds 68%
+at 0.5 (0.4 not worth it); 0 false on MOT16, 3 on UR Fall (a person crawling). Pitfall: UR Fall videos are a depth map
+(left) next to the color picture (right): use the right half. Tried, not kept: ignoring animal boxes that are a found
+person. All new tables/columns checked on scratch PostgreSQL databases. Not measured: the user's camera, night pictures.
+
+**Next: Phase 22 (scene questions)** in [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md). Ask the user before the phase (its
+opening questions: default interval; alert after one "yes" or two in a row), then before each step.
 Later, with the user: a long-run check with recording on, the webcam measurement (lens cover), the rest of Phase 12
 when cameras are added.
 
@@ -380,4 +389,4 @@ Open items (also in that plan):
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with the newest plan in docs/
-> (docs/PHASE19-22-PLAN.md, Phase 21 next; ask me before each phase and each step starts, and do it step by step).
+> (docs/PHASE19-22-PLAN.md, Phase 22 next; ask me before each phase and each step starts, and do it step by step).

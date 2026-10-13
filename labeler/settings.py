@@ -6,7 +6,8 @@ to go back to config.yaml. Changes apply after a restart (the page has a Restart
 
 Only the common settings are editable here, each validated: cameras (add, remove, source, mode, retention,
 detector size), how long people and the audit log are kept, face blurring, HTTPS, weekly retraining, the
-daily database backup and its second copy, idle mode, recording, the weekly Home / Away schedule. Zones and
+daily database backup and its second copy, idle mode, recording, the weekly Home / Away schedule, vehicles and
+animals. Zones and
 alert rules have their own pages; accounts are managed with tools/users.py.
 
 A camera keeps its name for good (zones, alert rules and recorded people refer to it); removing a camera keeps
@@ -44,6 +45,7 @@ class CameraIn(BaseModel):
     imgsz: int | None = None
     fall_alert: bool = True       # off for a camera that never sees the floor
     vehicles: bool | None = None  # look for vehicles; None = the default (security cameras yes, kiosk no)
+    animals: bool | None = None   # look for animals; None = the default (security cameras yes, kiosk no)
 
     @field_validator("name")
     @classmethod
@@ -84,6 +86,17 @@ class SettingsIn(BaseModel):
     vehicles_enabled: bool
     vehicle_kinds: list[str] = Field(min_length=1)
     vehicle_parked_after_s: float = Field(ge=10, le=3600)
+    animals_enabled: bool
+    animal_kinds: list[str] = Field(min_length=1)
+
+    @field_validator("animal_kinds")
+    @classmethod
+    def _animal_kinds(cls, v: list[str]) -> list[str]:
+        from .animals import ALL_KINDS
+        allowed = list(ALL_KINDS.values())
+        if not v or any(k not in allowed for k in v):
+            raise ValueError(f"animal kinds are some of {', '.join(allowed)}")
+        return [k for k in ("dog", "cat", "bird", "horse", "sheep", "cow") if k in v]
 
     @field_validator("vehicle_kinds")
     @classmethod
@@ -142,6 +155,8 @@ SIMPLE = {
     "vehicles_enabled": ("vehicles", "enabled"),
     "vehicle_kinds": ("vehicles", "kinds"),
     "vehicle_parked_after_s": ("vehicles", "parked_after_s"),
+    "animals_enabled": ("animals", "enabled"),
+    "animal_kinds": ("animals", "kinds"),
     "backup_copy_to": ("backup", "copy_to"),
     "idle_enabled": ("idle", "enabled"),
     "idle_after_s": ("idle", "after_s"),
@@ -151,7 +166,7 @@ SIMPLE = {
     "recording_max_gb": ("recording", "max_gb"),
     "away_schedule": ("arming", "schedule"),
 }
-CAMERA_FIELDS = ("name", "source", "mode", "retention_days", "imgsz", "fall_alert", "vehicles")
+CAMERA_FIELDS = ("name", "source", "mode", "retention_days", "imgsz", "fall_alert", "vehicles", "animals")
 
 
 def settings_path(cfg: dict) -> Path | None:
@@ -211,7 +226,8 @@ def current(cfg: dict) -> dict:
                        else c["source"], "mode": c.get("mode", cfg["mode"]),
                        "retention_days": c.get("retention_days"), "imgsz": c.get("imgsz"),
                        "fall_alert": c.get("fall_alert", True),
-                       "vehicles": c.get("vehicles", c.get("mode", cfg["mode"]) == "security")} for c in cfg["cameras"]]
+                       "vehicles": c.get("vehicles", c.get("mode", cfg["mode"]) == "security"),
+                       "animals": c.get("animals", c.get("mode", cfg["mode"]) == "security")} for c in cfg["cameras"]]
     return out
 
 
@@ -279,10 +295,12 @@ def build(body: SettingsIn, base: dict, effective: dict, new_passwords: dict | N
             c.pop("fall_alert", None)   # on is the default: not written
         else:
             c["fall_alert"] = False
-        if cam.vehicles is None or cam.vehicles == (cam.mode == "security"):
-            c.pop("vehicles", None)     # the default for its mode: not written (follows a mode change)
-        else:
-            c["vehicles"] = cam.vehicles
+        for key in ("vehicles", "animals"):
+            value = getattr(cam, key)
+            if value is None or value == (cam.mode == "security"):
+                c.pop(key, None)        # the default for its mode: not written (follows a mode change)
+            else:
+                c[key] = value
         if source == receiver.PUSH:
             if not c.get("push_password"):
                 password = receiver.new_password()
