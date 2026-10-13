@@ -84,7 +84,7 @@ def engagement(people: list[dict], looked_s: float = 3.0) -> dict:
 
 
 def summarize_vehicles(rows: list[tuple[datetime, str]], start: datetime, end: datetime) -> dict:
-    """Vehicles per hour (or day) and per kind. rows: (arrived, kind)."""
+    """Vehicles (or animals) per hour (or day) and per kind. rows: (arrived, kind)."""
     unit, slots = buckets(start, end)
     counts = Counter()
     for t, _ in rows:

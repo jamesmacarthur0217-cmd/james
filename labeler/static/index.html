@@ -91,6 +91,21 @@
     </div>
     <div class="people" id="vehicles"><div class="empty">No vehicles yet.</div></div>
   </section>
+  <section class="panel" id="animals-panel" hidden>
+    <h2>Animals seen</h2>
+    <div class="search">
+      <select id="a-kind" title="Kind"><option value="">All animals</option><option value="dog">dogs</option>
+        <option value="cat">cats</option><option value="bird">birds</option></select>
+      <select id="a-color" title="Color"><option value="">Any color</option></select>
+      <input type="date" id="a-day" title="Day">
+      <button id="a-clear">Clear</button>
+    </div>
+    <div class="banner" id="a-banner" hidden></div>
+    <div class="select-bar admin-only">
+      <button id="a-del" class="danger" disabled>Delete selected</button>
+    </div>
+    <div class="people" id="animals"><div class="empty">No animals yet.</div></div>
+  </section>
   </div>
 </main>
 <div id="player" class="player" hidden>
@@ -251,6 +266,14 @@ async function fetchTracks() {
                                         body: JSON.stringify({ question: view.q, limit: 30 }) });
     if (r.ok) {
       const res = await r.json();
+      if (res.animals) {    // a question about animals: the answer is in the Animals list
+        animalView = { kind: "ask", items: res.animals, explanation: `${res.explanation} · ${res.total} found` };
+        drawAnimals();
+        $("animals-panel").hidden = false;
+        $("animals-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+        view.explanation = `${res.explanation} · ${res.total} found: see Animals seen below`;
+        return [];
+      }
       if (res.vehicles) {   // a question about vehicles: the answer is in the Vehicles list
         vehicleView = { kind: "ask", items: res.vehicles, explanation: `${res.explanation} · ${res.total} found` };
         drawVehicles();
@@ -715,6 +738,73 @@ $("v-del").onclick = async () => {
 };
 fetch("/api/cameras").then(r => r.json()).then(cams => { anyVehicleCamera = cams.some(c => c.vehicles); loadVehicles(); });
 setInterval(loadVehicles, 5000);
+
+// --- Animals (security cameras; labeler/animals.py): like vehicles ----------------------------------------------
+let animalView = { kind: "recent" }, animalHtml = "", anyAnimalCamera = false;
+const aSelected = new Set();
+for (const c of ["white", "black", "gray", "brown", "beige", "orange", "yellow", "red", "blue", "green"])
+  $("a-color").add(new Option(c, c));
+
+function animalCard(a) {
+  const when = new Date(a.started_at).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  const state = a.resting ? (a.left_at ? "rested, then left" : (a.ended_at ? "resting" : "resting here now"))
+                          : (a.ended_at ? "passed" : "in view");
+  const what = [a.color, a.kind].filter(Boolean).join(" ");
+  return `<div class="person">
+    <input type="checkbox" class="admin-only" data-aselect="${a.id}" ${aSelected.has(a.id) ? "checked" : ""} aria-label="Select animal ${a.id}">
+    ${a.crop ? `<img src="/crops/${encodeURIComponent(a.crop)}?v=${encodeURIComponent(a.ended_at || "")}" alt="">` : "<img alt=\"\">"}
+    <div><div class="meta">#${a.id}${cameraNames.length > 1 ? ` · ${esc(a.camera)}` : ""} · ${when} · ${state}</div>
+    <div class="chips"><span class="chip" title="The color is a rough guess">${esc(what)}</span></div>
+    <a class="link" href="/recordings?camera=${encodeURIComponent(a.camera)}&amp;at=${encodeURIComponent(a.started_at)}">▶ Recording</a></div></div>`;
+}
+
+function drawAnimals(items) {
+  const list = animalView.kind === "ask" ? animalView.items : items || [];
+  $("a-banner").hidden = animalView.kind !== "ask";
+  if (animalView.kind === "ask") $("a-banner").innerHTML = esc(animalView.explanation)
+    + ' <button class="link" id="a-back">Show all</button>';
+  const html = list.length ? list.map(animalCard).join("") : '<div class="empty">No matching animals.</div>';
+  if (html !== animalHtml) { $("animals").innerHTML = html; animalHtml = html; }
+  $("a-del").disabled = !aSelected.size;
+}
+
+async function loadAnimals() {
+  if (animalView.kind === "ask") return;
+  const q = { limit: 40 };
+  if ($("a-kind").value) q.kind = $("a-kind").value;
+  if ($("a-color").value) q.color = $("a-color").value;
+  if ($("a-day").value) q.day = $("a-day").value;
+  if ($("f-camera").value) q.camera = $("f-camera").value;
+  try {
+    const r = await fetch("/api/animals?" + new URLSearchParams(q));
+    if (!r.ok) return;
+    const items = await r.json();
+    $("animals-panel").hidden = !anyAnimalCamera && !items.length && !Object.keys(q).some(k => k !== "limit");
+    drawAnimals(items);
+  } catch {}
+}
+
+for (const id of ["a-kind", "a-color", "a-day"]) $(id).addEventListener("change", () => { animalView = { kind: "recent" }; loadAnimals(); });
+$("a-clear").onclick = () => { $("a-kind").value = $("a-color").value = $("a-day").value = ""; animalView = { kind: "recent" }; loadAnimals(); };
+$("animals-panel").addEventListener("click", (e) => {
+  if (e.target.id === "a-back") { animalView = { kind: "recent" }; loadAnimals(); }
+});
+$("animals").addEventListener("change", (e) => {
+  const id = Number(e.target.dataset.aselect);
+  if (!id) return;
+  e.target.checked ? aSelected.add(id) : aSelected.delete(id);
+  $("a-del").disabled = !aSelected.size;
+});
+$("a-del").onclick = async () => {
+  if (!aSelected.size || !confirm(`Delete ${aSelected.size} animal(s) with their pictures?`)) return;
+  await fetch("/api/animals/delete", { method: "POST", headers: { "Content-Type": "application/json" },
+                                       body: JSON.stringify({ ids: [...aSelected] }) });
+  aSelected.clear();
+  if (animalView.kind === "ask") animalView = { kind: "recent" };
+  loadAnimals();
+};
+fetch("/api/cameras").then(r => r.json()).then(cams => { anyAnimalCamera = cams.some(c => c.animals); loadAnimals(); });
+setInterval(loadAnimals, 5000);
 
 // Alert pop-ups (falls with a sound) are shown on every page by session.js.
 

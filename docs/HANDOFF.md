@@ -100,7 +100,8 @@ labeler/vehicles.py  vehicles: second detector (yolo11s.pt) + tracker, VehicleWa
                      vehicle_<id>.jpg + blurred copy), VehicleStore (db), apply_description (vision model's answer)
 labeler/animals.py   animals (Phase 21): dogs, cats, birds from the vehicle detector's pass (Pipeline._update_vehicles,
                      _object_classes); VehicleWatch(names=kinds_map(..), still_word="resting") + AnimalStore; tables
-                     animals, animal_zone_events; cameras[].animals (security by default); no idle wake, no recording
+                     animals, animal_zone_events; cameras[].animals (security by default); no idle wake, no recording;
+                     /api/animals (+ /delete), Live "Animals seen", agent.animal_query, Reports "animals"
 labeler/falls.py     fall detection from body points (FallWatch.update per person, tick per frame); Pipeline._on_fall
                      -> AlertEngine.check(fallen=True) (rule "Fall", alerts.FALLEN); pop-ups for every page in
                      static/session.js (falls: red, beep until OK); zones.lying_ok; tools/fall_check.py measures it

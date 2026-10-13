@@ -270,7 +270,10 @@ Phase 21 started 2026-10-14 (user's choices: dogs, cats and birds; security came
 1. **Done 2026-10-14**: one detector pass for vehicles and animals; `labeler/animals.py` (AnimalStore; the vehicle
    watcher with animal names, "resting"), tables `animals`, `animal_zone_events` (checked on PostgreSQL), retention,
    orange boxes on the live picture. Seen on a COCO photo: the husky (0.40-0.45) is below the tracker's 0.5 start
-   threshold: to be measured in step 3.
+   threshold: to be measured in step 4.
+2. **Done 2026-10-14**: "Animals seen" on the Live page (kind, color, day, delete; viewers may look), Ask box words
+   (dog, puppy, cat, kitten, bird, crow, pigeon, pet, animal ...; `agent.animal_query`), Reports "Animals per hour".
+   Plan split with the user: 3 alert rules, 4 measuring, 5 Settings/Health/docs.
 
 ## Critical files
 

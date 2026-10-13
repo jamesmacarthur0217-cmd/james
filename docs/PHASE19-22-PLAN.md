@@ -47,7 +47,7 @@ said honestly). **Answers (2026-10-14): dogs, cats and birds; security cameras o
 1. **Done 2026-10-14.** One detector call for vehicles and animals (the classes added to the vehicle detector's list: no extra cost);
    generalize `VehicleWatch` (kinds map + store) and add table `animals` (+ zone events) with an AnimalStore; animals
    resting stay one record like parked vehicles; on all cameras or security only (asked).
-2. Live page "Animals seen", Ask box words (dog, cat, bird...), Reports counts, alert rules `animal = dog`
+2. **Done 2026-10-14** (list, Ask box, Reports; the alert rules became step 2b with the user). Live page "Animals seen", Ask box words (dog, cat, bird...), Reports counts, alert rules `animal = dog`
    (with zone, hours, armed).
 3. Measure: COCO val2017 animal detection (marked boxes already here), false alarms on MOT16 and the UR Fall
    activities (indoors, no animals).

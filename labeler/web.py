@@ -370,7 +370,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                                       + (f", camera {camera}" if camera else ""))
         return {**reports.summarize(db.people_between(s, e, camera), s, e, cfg["engagement"]["looked_s"]),
                 "zones": db.zone_counts(s, e, camera),
-                "vehicles": reports.summarize_vehicles(db.vehicle_rows(s, e, camera), s, e)}
+                "vehicles": reports.summarize_vehicles(db.vehicle_rows(s, e, camera), s, e),
+                "animals": reports.summarize_vehicles(db.animal_rows(s, e, camera), s, e)}
 
     @app.get("/api/reports/export.csv")
     def report_csv(request: Request, start: str | None = None, end: str | None = None, camera: str | None = None):
@@ -532,7 +533,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         "live" false, so the Live page shows no video tab for them but lists their people."""
         # Masked: viewers may call this, and an IP camera address can hold its password.
         out = [{"name": p.name, "mode": p.mode, "source": mask_password(p.cam["source"]), "live": True,
-                "vehicles": getattr(p, "vehicles", None) is not None} for p in pipelines]
+                "vehicles": getattr(p, "vehicles", None) is not None,
+                "animals": getattr(p, "animals", None) is not None} for p in pipelines]
         out += [{"name": c["name"], "mode": c["mode"], "source": "imported videos" if c["imported"] else "recorded",
                  "live": False} for c in db.list_cameras()
                 if c["name"] not in by_name and (c["people"] or c["imported"])]
@@ -748,6 +750,30 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         kinds = sorted(VEHICLE_WORDS.get(kind, {kind})) if kind else None
         colors = sorted(VEHICLE_COLOR_WORDS.get(color, {color})) if color else None
         return db.list_vehicles(min(limit, 500), camera=camera, kinds=kinds, colors=colors, start=start, end=end)
+
+    @app.get("/api/animals")
+    def animals_list(limit: int = 50, camera: str | None = None, kind: str | None = None, color: str | None = None,
+                     day: str | None = None):
+        """Animals seen (labeler/animals.py), newest first."""
+        from .agent import VEHICLE_COLOR_WORDS
+        start = end = None
+        if day:
+            try:
+                start = datetime.fromisoformat(day).replace(hour=0, minute=0, second=0, microsecond=0)
+            except ValueError:
+                raise HTTPException(400, "day must look like 2026-10-13")
+            end = start + timedelta(days=1)
+        colors = sorted(VEHICLE_COLOR_WORDS.get(color, {color})) if color else None
+        return db.list_animals(min(limit, 500), camera=camera, kinds=[kind] if kind else None, colors=colors,
+                               start=start, end=end)
+
+    @app.post("/api/animals/delete")
+    def delete_animals(body: DeleteIn, request: Request):
+        deleted, paths = db.delete_animals(body.ids)
+        if deleted:
+            audit(request, "delete", f"{len(deleted)} animals (" + ", ".join(f"#{i}" for i in sorted(deleted)[:50]) + ")")
+        removed = sum(privacy.remove_picture(crop_dir, name) for name in paths)
+        return {"deleted": len(deleted), "pictures_removed": removed}
 
     @app.post("/api/vehicles/delete")
     def delete_vehicles(body: DeleteIn, request: Request):

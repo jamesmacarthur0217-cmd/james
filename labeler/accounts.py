@@ -55,7 +55,7 @@ PUBLIC = {("GET", "/login"), ("POST", "/api/login"), ("GET", "/static/style.css"
 VIEWER = {
     "GET": ["/", "/stream", "/api/live", "/api/live/thumb/", "/api/status", "/api/schema", "/api/cameras",
             "/api/tracks", "/api/tracks/", "/api/search", "/api/alerts/events", "/api/me", "/crops/", "/static/",
-            "/health", "/api/health", "/api/today", "/api/vehicles", "/api/arming",
+            "/health", "/api/health", "/api/today", "/api/vehicles", "/api/animals", "/api/arming",
             "/recordings", "/api/recordings", "/api/recordings/find", "/recordings/stream/"],   # not the file itself
     "POST": ["/api/ask", "/api/logout", "/api/search/photo", "/api/arming"],   # Home / Away: family switch it
 }

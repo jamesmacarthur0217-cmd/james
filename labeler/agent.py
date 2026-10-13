@@ -207,6 +207,16 @@ class QueryAgent:
         makes, models = self.db.vehicle_names()
         vq = vehicle_query(question, makes, models)
         plan = self.plan(question, now)
+        aq = animal_query(question) if vq is None else None
+        if aq is not None:   # about animals: like vehicles
+            start, end = plan["start"], plan["end"]
+            animals = self.db.list_animals(limit, camera=plan["camera"] or None, kinds=aq["kinds"] or None,
+                                           colors=aq["colors"] or None, start=start, end=end)
+            return {"question": question, "explanation": explain_vehicles({**aq, "make": None, "model": None},
+                                                                          plan, "animals"),
+                    "plan": {**plan, "start": start and start.isoformat(timespec="minutes"),
+                             "end": end and end.isoformat(timespec="minutes"), "animals": aq},
+                    "total": len(animals), "people": [], "animals": animals}
         if vq is not None:   # about vehicles: the model's plan gives the time and camera, the words the rest
             start, end = plan["start"], plan["end"]
             vehicles = self.db.list_vehicles(limit, camera=plan["camera"] or None, kinds=vq["kinds"] or None,
@@ -289,10 +299,35 @@ def vehicle_query(question: str, makes: set[str] | None = None, models: set[str]
     return {"kinds": sorted(kinds), "colors": sorted(colors), "make": make, "model": model}
 
 
-def explain_vehicles(vq: dict, plan: dict) -> str:
+# --- animals (labeler/animals.py) ----------------------------------------------------------------------------
+ANIMAL_WORDS = {
+    "dog": {"dog"}, "dogs": {"dog"}, "puppy": {"dog"}, "puppies": {"dog"},
+    "cat": {"cat"}, "cats": {"cat"}, "kitten": {"cat"}, "kittens": {"cat"},
+    "bird": {"bird"}, "birds": {"bird"}, "crow": {"bird"}, "crows": {"bird"}, "pigeon": {"bird"}, "pigeons": {"bird"},
+    "horse": {"horse"}, "horses": {"horse"}, "sheep": {"sheep"}, "cow": {"cow"}, "cows": {"cow"},
+    "animal": set(), "animals": set(), "pet": {"dog", "cat"}, "pets": {"dog", "cat"},
+}
+
+
+def animal_query(question: str) -> dict | None:
+    """What a question asks about animals, or None if it is not about animals: kinds and colors."""
+    words = _words(question)
+    kinds: set[str] = set()
+    found = False
+    for w, k in ANIMAL_WORDS.items():
+        if w in words:
+            found = True
+            kinds |= k
+    if not found:
+        return None
+    colors = set().union(*(c for w, c in VEHICLE_COLOR_WORDS.items() if w in words)) if words else set()
+    return {"kinds": sorted(kinds), "colors": sorted(colors)}
+
+
+def explain_vehicles(vq: dict, plan: dict, things: str = "vehicles") -> str:
     what = " ".join(filter(None, [" or ".join(vq["colors"]) if vq["colors"] else "",
                                   (vq["make"] or "").title(), (vq["model"] or "").title(),
-                                  " / ".join(vq["kinds"]) if vq["kinds"] else "vehicles"]))
+                                  " / ".join(vq["kinds"]) if vq["kinds"] else things]))
     parts = [f"Looked for: {what}"]
     if plan.get("start") or plan.get("end"):
         s, e = plan.get("start"), plan.get("end")

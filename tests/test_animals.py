@@ -126,3 +126,75 @@ def test_one_detector_pass_for_vehicles_and_animals(db, camera, tmp_path):
     p.vehicles = None                                                 # vehicles off on this camera: animals only
     p._update_vehicles(np.zeros((100, 100, 3), np.uint8), 0.0)
     assert sorted(got["classes"]) == [BIRD, CAT, DOG]
+
+
+# --- step 2: the list, the Ask box, Reports ---
+
+def _app(db, tmp_path, address="127.0.0.1"):
+    import copy
+    from fastapi.testclient import TestClient
+    from labeler.web import create_app
+    cfg = copy.deepcopy(DEFAULTS)
+    cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
+    return TestClient(create_app(cfg, db, None), client=(address, 5000))
+
+
+def _animals(db, camera):
+    ids = {}
+    for name, kind, color, ago in [("rex", "dog", "brown", 1), ("tom", "cat", "black", 2), ("crow", "bird", "black", 3),
+                                   ("old", "dog", "white", 50)]:
+        i = db.create_animal(camera, 1, kind, datetime(2026, 10, 14, 12) - timedelta(hours=ago))
+        db.update_animal(i, color=color)
+        ids[name] = i
+    return ids
+
+
+def test_animals_api_filters_and_delete(db, camera, tmp_path):
+    ids = _animals(db, camera)
+    client = _app(db, tmp_path)
+    got = lambda **q: [a["id"] for a in client.get("/api/animals", params=q).json()]   # noqa: E731
+    assert got(kind="dog") == [ids["rex"], ids["old"]]
+    assert got(color="black") == [ids["tom"], ids["crow"]]
+    assert got(day="2026-10-14") == [ids["rex"], ids["tom"], ids["crow"]]
+    assert client.get("/api/animals", params={"day": "14/10"}).status_code == 400
+    r = client.post("/api/animals/delete", json={"ids": [ids["crow"], 999]})
+    assert r.json()["deleted"] == 1 and ids["crow"] not in got()
+    assert "1 animals" in client.get("/api/audit").json()["entries"][0]["detail"]
+
+
+def test_viewers_can_list_but_not_delete_animals(db, camera, tmp_path):
+    from labeler import accounts
+    _animals(db, camera)
+    db.add_user("vic", accounts.hash_password("correct horse battery"), "viewer")
+    viewer = _app(db, tmp_path, address="192.168.1.20")
+    viewer.post("/api/login", json={"username": "vic", "password": "correct horse battery"})
+    assert len(viewer.get("/api/animals").json()) == 4
+    assert viewer.post("/api/animals/delete", json={"ids": [1]}).status_code == 403
+
+
+def test_ask_box_words_for_animals():
+    from labeler.agent import animal_query, vehicle_query
+    assert animal_query("any dogs yesterday?") == {"kinds": ["dog"], "colors": []}
+    assert animal_query("black cat at night") == {"kinds": ["cat"], "colors": ["black"]}
+    assert animal_query("pets in the garden")["kinds"] == ["cat", "dog"]
+    assert animal_query("animals today") == {"kinds": [], "colors": []}
+    assert animal_query("man in a red shirt") is None
+    assert vehicle_query("any dogs yesterday?") is None
+
+
+def test_ask_box_answers_with_animals(db, camera):
+    from labeler.agent import QueryAgent
+    ids = _animals(db, camera)
+    agent = QueryAgent.__new__(QueryAgent)
+    agent.db, agent.embedder, agent.cameras = db, None, ["test-cam"]
+    agent._ask_llm = lambda q, now: {}                                  # the model gives no time or camera
+    res = agent.run("black cat", now=datetime(2026, 10, 14, 13))
+    assert [a["id"] for a in res["animals"]] == [ids["tom"]] and res["people"] == []
+    assert res["explanation"].startswith("Looked for: black cat")
+
+
+def test_reports_count_animals(db, camera, tmp_path):
+    _animals(db, camera)
+    r = _app(db, tmp_path).get("/api/reports/summary", params={"start": "2026-10-14", "end": "2026-10-14"}).json()
+    assert r["animals"]["total"] == 3
+    assert {k["value"]: k["count"] for k in r["animals"]["kinds"]} == {"dog": 1, "cat": 1, "bird": 1}

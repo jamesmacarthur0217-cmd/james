@@ -738,6 +738,15 @@ class Database:
                 s.add_all(AnimalZoneEvent(animal_id=animal_id, camera=camera, zone_id=e["zone_id"],
                                           zone_name=e["zone_name"], kind=e["kind"], at=e["at"]) for e in events)
 
+    def animal_rows(self, start: datetime, end: datetime, camera: str | None = None) -> list[tuple[datetime, str]]:
+        """(arrived, kind) of the animals in [start, end), for Reports."""
+        q = (select(Animal.started_at, Animal.kind).join(Camera, Camera.id == Animal.camera_id)
+             .where(Animal.started_at >= start, Animal.started_at < end))
+        if camera:
+            q = q.where(Camera.name == camera)
+        with self.Session() as s:
+            return [tuple(r) for r in s.execute(q).all()]
+
     def delete_animals(self, ids: list[int]) -> tuple[list[int], list[str]]:
         """Delete animals; returns the ids deleted and their picture names (for the caller to remove)."""
         with self.Session.begin() as s:

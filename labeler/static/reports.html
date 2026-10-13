@@ -88,6 +88,12 @@
     <div class="hbars" id="veh-kinds" style="margin-top:10px"></div>
     <details><summary>Show as a table</summary><div id="veh-table"></div></details>
   </section>
+  <section class="panel" id="animals-panel" style="margin-top:14px" hidden>
+    <h2 id="ani-title">Animals per hour</h2>
+    <div class="chart" id="ani-timeline"></div>
+    <div class="hbars" id="ani-kinds" style="margin-top:10px"></div>
+    <details><summary>Show as a table</summary><div id="ani-table"></div></details>
+  </section>
   <section class="panel" id="zones-panel" style="margin-top:14px" hidden>
     <h2>Zones and counting lines</h2>
     <div id="zones"></div>
@@ -261,6 +267,25 @@ function drawVehicles(data) {
       `<tr><td>${esc(label(r.t, v.unit))}</td><td>${r.count}</td></tr>`).join("") + "</table>";
 }
 
+// Animals (dogs, cats, birds): the same, per hour or day and per kind.
+function drawAnimals(data) {
+  const v = data.animals;
+  $("animals-panel").hidden = !v || !v.total;
+  if (!v || !v.total) return;
+  const many = (n) => `${n} ${n === 1 ? "animal" : "animals"}`;
+  drawBars("ani-timeline", v.timeline.map(r => ({ label: label(r.t, v.unit), value: r.count,
+                                                 tip: `${label(r.t, v.unit)}: ${many(r.count)}` })),
+           `Animals per ${v.unit}`);
+  $("ani-title").textContent = `Animals per ${v.unit} (${many(v.total)})`;
+  const max = v.kinds[0].count;
+  $("ani-kinds").innerHTML = v.kinds.map(r => `<span>${esc(r.value)}</span>
+    <div class="track" title="${esc(r.value)}: ${r.count}"><div class="fill" style="width:${r.count / max * 100}%"></div></div>
+    <span class="n">${r.count}</span>`).join("");
+  $("ani-table").innerHTML = '<table class="data"><tr><th>' + (v.unit === "hour" ? "Hour" : "Day")
+    + '</th><th>Animals</th></tr>' + v.timeline.filter(r => r.count).map(r =>
+      `<tr><td>${esc(label(r.t, v.unit))}</td><td>${r.count}</td></tr>`).join("") + "</table>";
+}
+
 // Areas count entries and the average stay; lines count crossings each way.
 function drawZones(data) {
   const rows = data.zones || [];
@@ -316,6 +341,7 @@ async function load() {
   drawDwell(data);
   drawZones(data);
   drawVehicles(data);
+  drawAnimals(data);
   drawBreakdowns(data);
 }
 
