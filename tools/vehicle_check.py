@@ -151,6 +151,9 @@ class _Store:
     def describe(self, vehicle_id, crop):
         pass
 
+    def changed(self, vehicle_id):
+        pass
+
     def zone_events(self, vehicle_id, events):
         pass
 

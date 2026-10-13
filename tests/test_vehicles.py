@@ -32,6 +32,9 @@ class FakeStore:
     def describe(self, vehicle_id, crop):
         self.rows[vehicle_id]["described"] = self.rows[vehicle_id].get("described", 0) + 1
 
+    def changed(self, vehicle_id):
+        pass
+
     def zone_events(self, vehicle_id, events):
         self.rows[vehicle_id].setdefault("zones", []).extend(e["kind"] for e in events)
 
@@ -122,12 +125,18 @@ def test_moving_and_shown():
     assert not watch.moving(t - 0.2) and "parked" in watch.shown(t - 0.2)[0][1]
 
 
-def test_picture_skips_boxes_cut_by_the_border():
+def test_picture_prefers_boxes_not_cut_by_the_border_but_always_has_one():
     store = FakeStore()
     watch = VehicleWatch(CFG, store)
-    end = run(watch, standing(n=10, box=(0, 200, 300, 400)))   # touches the left border
+    end = run(watch, standing(n=10, box=(0, 200, 300, 400)))   # touches the left border: only an unclear picture
     run(watch, [[]] * 30, t0=end)
-    assert store.rows and store.pictures == {}
+    assert store.pictures[1] == (220, 315, 3)
+    store = FakeStore()
+    watch = VehicleWatch(CFG, store)
+    frames = standing(n=10, box=(0, 100, 400, 400)) + standing(n=10, box=(100, 200, 220, 280))   # cut big, then clear
+    end = run(watch, frames)
+    run(watch, [[]] * 30, t0=end)
+    assert store.pictures[1] == (88, 132, 3)                    # the clear one, though smaller
 
 
 def test_vehicles_table_store_list_delete_and_retention(db, camera, tmp_path):
@@ -336,3 +345,97 @@ def test_counting_lines_count_vehicles_apart_from_people(db, camera, tmp_path):
     vid = db.list_vehicles()[0]["id"]
     db.delete_vehicles([vid])
     assert db.zone_counts(day, day + timedelta(days=1)) == []
+
+
+# --- step 4: alert rules on vehicles ---
+
+from labeler.alerts import describe, in_hours, matches  # noqa: E402
+
+
+def test_vehicle_conditions_match():
+    car = {"vehicle": "SUV", "vehicle_color": "silver", "zone": "gate", "hour": 23}
+    assert matches([["vehicle", "any"]], car) and matches([["vehicle", "car"]], car)       # "car" includes SUVs
+    assert not matches([["vehicle", "motorbike"]], car)
+    assert matches([["vehicle", "any"], ["vehicle_color", "gray"]], car)                  # silver = gray here
+    assert matches([["vehicle", "any"], ["zone", "gate"], ["hours", "22-06"]], car)
+    assert not matches([["vehicle", "any"], ["hours", "06-18"]], car)
+    assert not matches([["vehicle", "any"]], {"upper_color": "red"})                     # a person is no vehicle
+    assert describe([["vehicle", "any"], ["hours", "22-06"]]) == "any vehicle, between 22:00 and 06:00"
+    assert in_hours("22-06", 2) and not in_hours("22-06", 12) and in_hours("18-24", 23) and not in_hours("18-24", 0)
+
+
+def test_vehicle_rules_fire_once_per_vehicle_and_never_for_people(db, camera, tmp_path):
+    engine = AlertEngine(db)
+    db.add_rule("night vehicle", [["vehicle", "any"], ["hours", "00-24"]])
+    db.add_rule("red motorbike", [["vehicle", "motorbike"], ["vehicle_color", "red"]])
+    db.add_rule("anyone", [])                                                            # a person rule
+    store = VehicleStore(db, camera, tmp_path)
+    bike = store.create("motorbike", datetime.now(), 1)
+    assert [e["message"] for e in engine.check_vehicle(bike, "test-cam")] == ["night vehicle: any vehicle, between 00:00 and 00:00"]
+    db.update_vehicle(bike, color="red")
+    assert [e["message"] for e in engine.check_vehicle(bike, "test-cam")] == ["red motorbike: vehicle = motorbike, vehicle color = red"]
+    assert engine.check_vehicle(bike, "test-cam") == []                                  # once per rule and vehicle
+    person = db.create_track(camera, 1, datetime.now())
+    assert [e["message"] for e in engine.check(person, "test-cam")] == ["anyone: anyone"]  # vehicle rules skip people
+    db.update_vehicle(bike, not_vehicle=True)
+    other = store.create("car", datetime.now(), 2)
+    db.update_vehicle(other, not_vehicle=True)
+    assert engine.check_vehicle(other, "test-cam") == []                                 # "not a vehicle": no alert
+
+
+def test_vehicle_alerts_are_listed_and_deleted_with_the_vehicle(db, camera, tmp_path):
+    engine = AlertEngine(db)
+    db.add_rule("any vehicle", [["vehicle", "any"]])
+    store = VehicleStore(db, camera, tmp_path)
+    vid = store.create("car", datetime.now(), 1)
+    store.picture(vid, np.zeros((40, 60, 3), np.uint8))
+    event = engine.check_vehicle(vid, "test-cam")[0]
+    shown = db.list_alerts()[0]
+    assert shown["vehicle_id"] == vid and shown["track_id"] is None and shown["crop"] == f"vehicle_{vid}.jpg"
+    _, paths = db.delete_vehicles([vid])
+    assert f"clips/alert_{event['id']}.webm" in paths and db.list_alerts() == []
+
+
+def test_rule_api_checks_vehicle_rules(db, tmp_path):
+    client = _app(db, tmp_path)
+    post = lambda conds: client.post("/api/alerts/rules", json={"name": "r", "conditions": conds})   # noqa: E731
+    assert post([["vehicle", "motorbike"], ["vehicle_color", "red"], ["hours", "22-06"]]).status_code == 200
+    assert post([["hours", "09-17"]]).status_code == 200                                 # people at office hours
+    assert post([["vehicle", "spaceship"]]).status_code == 400
+    assert post([["hours", "25-06"]]).status_code == 400
+    assert post([["vehicle_color", "red"]]).status_code == 400                           # color without "vehicle"
+    assert post([["vehicle", "any"], ["upper_color", "red"]]).status_code == 400         # a person's label
+
+
+def test_pipeline_checks_vehicle_rules_and_saves_a_clip(db, camera, tmp_path):
+    from test_pipeline_logic import make_pipeline
+    p = make_pipeline(db)
+    asked = []
+
+    class Alerts:
+        def check_vehicle(self, vehicle_id, camera_name):
+            asked.append(vehicle_id)
+            return [{"id": 7}]
+
+    class Clips:
+        def request(self, event_id, before_s=None):
+            asked.append(("clip", event_id))
+
+    p.alerts, p.clips = Alerts(), Clips()
+    p._check_vehicle_alerts(5)
+    assert asked == [5, ("clip", 7)]
+
+
+def test_old_sqlite_database_skips_vehicle_alerts_instead_of_failing(tmp_path):
+    from sqlalchemy import text
+    from labeler.db import Database
+    db = Database("sqlite:///" + (tmp_path / "old.db").as_posix())
+    with db.engine.begin() as conn:   # the table as it was before: track_id required
+        conn.execute(text("DROP TABLE alert_events"))
+        conn.execute(text("CREATE TABLE alert_events (id INTEGER PRIMARY KEY, rule_id INTEGER NOT NULL, "
+                          "track_id INTEGER NOT NULL, vehicle_id INTEGER, camera VARCHAR(100), message VARCHAR(300), "
+                          "created_at DATETIME)"))
+    cam = db.get_or_create_camera("c", "x", "security")
+    vid = db.create_vehicle(cam, 1, "car", datetime.now())
+    rule = db.add_rule("v", [["vehicle", "any"]])["id"]
+    assert db.record_alert(rule, None, "c", "v", vehicle_id=vid) is None

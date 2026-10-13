@@ -5,6 +5,11 @@ to one camera. "zone = X" means the person entered area X or crossed line X. A r
 anyone (useful for a camera that should normally see nobody). Each rule fires at most once per person.
 Rules are checked whenever a person's labels change or they enter a zone.
 
+A rule with a "vehicle" condition is about vehicles (labeler/vehicles.py): "vehicle = any / car / motorbike ...",
+"vehicle_color = red", "zone = gate"; it fires once per vehicle, checked when the vehicle is first counted, when it is
+described and when it enters a zone. Person rules never fire for vehicles and the other way round. "hours = 22-06"
+(people and vehicles) limits a rule to a time of day (from 22:00 until 06:00).
+
 "fallen = yes" is a fall (labeler/falls.py): rules with it are checked only when a fall is confirmed, and fire
 for every fall, also a second one of the same person. A built-in rule "Fall" is made at start when fall alerts
 are on and no rule asks for a fall (turn it off on the Alerts page to stop fall alerts; deleted, it comes back).
@@ -13,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from datetime import datetime
 
 from . import schema
 from .db import Database
@@ -23,6 +29,26 @@ log = logging.getLogger(__name__)
 ZONE = "zone"   # condition on where the person went, not on how they look
 FALLEN = "fallen"   # condition on a fall having just been confirmed
 FALL_RULE = [[FALLEN, "yes"]]
+VEHICLE, VEHICLE_COLOR, HOURS = "vehicle", "vehicle_color", "hours"
+CAR_GROUP = {"car", "SUV", "van", "pickup"}   # "car" in a rule, like in the Ask box
+HOUR_PRESETS = ["22-06", "20-06", "00-06", "18-24", "06-18", "08-18", "09-17"]
+
+
+def is_vehicle_rule(conditions: list[list[str]]) -> bool:
+    return any(name == VEHICLE for name, _ in conditions)
+
+
+def valid_hours(value: str) -> bool:
+    parts = value.split("-")
+    return len(parts) == 2 and all(p.isdigit() and 0 <= int(p) <= 24 for p in parts) and parts[0] != parts[1]
+
+
+def in_hours(value: str, hour: int) -> bool:
+    """"22-06" = from 22:00 until 06:00 (over midnight); "18-24" = from 18:00 until midnight."""
+    start, end = (int(p) % 24 for p in value.split("-"))
+    if start < end:
+        return start <= hour < end
+    return hour >= start or hour < end
 
 
 def is_fall_rule(conditions: list[list[str]]) -> bool:
@@ -32,7 +58,16 @@ def is_fall_rule(conditions: list[list[str]]) -> bool:
 def matches(conditions: list[list[str]], attrs: dict[str, str]) -> bool:
     for name, value in conditions:
         current = attrs.get(name)
-        if name in schema.LIST_FIELDS or name in (ZONE, FALLEN):
+        if name == HOURS:
+            if not in_hours(value, int(attrs.get("hour", datetime.now().hour))):
+                return False
+        elif name == VEHICLE:
+            if not current or (value != "any" and current != value and not (value == "car" and current in CAR_GROUP)):
+                return False
+        elif name == VEHICLE_COLOR:
+            if current != value and {current, value} != {"gray", "silver"}:
+                return False
+        elif name in schema.LIST_FIELDS or name in (ZONE, FALLEN):
             if value not in (current or "").split(","):
                 return False
         elif current != value:
@@ -43,8 +78,18 @@ def matches(conditions: list[list[str]], attrs: dict[str, str]) -> bool:
 def describe(conditions: list[list[str]]) -> str:
     if not conditions:
         return "anyone"
-    return ", ".join(f"in zone {v}" if n == ZONE else "fell" if n == FALLEN else f"{n.replace('_', ' ')} = {v}"
-                     for n, v in conditions)
+    def one(n: str, v: str) -> str:
+        if n == ZONE:
+            return f"in zone {v}"
+        if n == FALLEN:
+            return "fell"
+        if n == VEHICLE:
+            return "any vehicle" if v == "any" else f"vehicle = {v}"
+        if n == HOURS:
+            a, b = v.split("-")
+            return f"between {int(a):02d}:00 and {int(b) % 24:02d}:00"
+        return f"{n.replace('_', ' ')} = {v}"
+    return ", ".join(one(n, v) for n, v in conditions)
 
 
 class AlertEngine:
@@ -75,7 +120,7 @@ class AlertEngine:
         """Fire every enabled rule this person now matches (once per rule and person). fallen: a fall was just
         confirmed: only the rules asking for a fall are checked, and they fire again for a later fall."""
         rules = [r for r in self._enabled_rules() if (not r["camera"] or r["camera"] == camera)
-                 and is_fall_rule(r["conditions"]) == fallen]
+                 and is_fall_rule(r["conditions"]) == fallen and not is_vehicle_rule(r["conditions"])]
         if not rules:
             return []
         attrs = self.db.resolved_values(track_id)
@@ -85,6 +130,7 @@ class AlertEngine:
             attrs = {**attrs, ZONE: ",".join(self.db.zones_entered(track_id))}
         if fallen:
             attrs = {**attrs, FALLEN: "yes"}
+        attrs = {**attrs, "hour": datetime.now().hour}
         fired = []
         for rule in rules:
             if matches(rule["conditions"], attrs):
@@ -92,5 +138,25 @@ class AlertEngine:
                                              f"{rule['name']}: {describe(rule['conditions'])}", repeat=fallen)
                 if event is not None:
                     log.warning("ALERT [%s] %s -> person #%s", camera, rule["name"], track_id)
+                    fired.append(event)
+        return fired
+
+    def check_vehicle(self, vehicle_id: int, camera: str) -> list[dict]:
+        """Fire every enabled vehicle rule this vehicle now matches (once per rule and vehicle)."""
+        rules = [r for r in self._enabled_rules() if (not r["camera"] or r["camera"] == camera)
+                 and is_vehicle_rule(r["conditions"])]
+        if not rules:
+            return []
+        attrs = self.db.vehicle_attrs(vehicle_id)
+        if attrs is None:   # deleted, or the vision model saw no vehicle
+            return []
+        attrs["hour"] = datetime.now().hour
+        fired = []
+        for rule in rules:
+            if matches(rule["conditions"], attrs):
+                event = self.db.record_alert(rule["id"], None, camera, f"{rule['name']}: {describe(rule['conditions'])}",
+                                             vehicle_id=vehicle_id)
+                if event is not None:
+                    log.warning("ALERT [%s] %s -> vehicle #%s", camera, rule["name"], vehicle_id)
                     fired.append(event)
         return fired

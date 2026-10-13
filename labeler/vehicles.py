@@ -53,7 +53,9 @@ class VehicleState:
     best_area: float = 0.0
     best_crop: np.ndarray | None = None
     best_heads: list = field(default_factory=list)   # heads of people in the best picture (crop coordinates)
-    picture_area: float = 0.0          # area of the picture stored so far
+    best_clear: bool = False           # the best picture is confident and not cut off by the border
+    best_version: int = 0              # counts picture changes
+    picture_version: int = 0           # the version stored
     described: bool = False            # sent to be described (color, make/model) once
     zones: object = None               # zones.PersonZones: where it is relative to the camera's zones
     zone_log: list = field(default_factory=list)   # zone events not stored yet (no record yet)
@@ -112,6 +114,7 @@ class VehicleWatch:
             if st.db_id is None and st.n >= self.min_frames:
                 st.db_id = self.store.create(st.kind, st.first_wall, key)
                 self._store_picture(st)
+                self.store.changed(st.db_id)   # after the picture: an alert pop-up shows it
             if st.db_id is not None and st.zone_log:
                 self.store.zone_events(st.db_id, st.zone_log)
                 st.zone_log = []
@@ -177,15 +180,18 @@ class VehicleWatch:
     def _keep_picture(self, st: VehicleState, frame: np.ndarray, box: tuple, conf: float, w: int, h: int,
                       heads: list) -> None:
         x1, y1, x2, y2 = box
-        if conf < 0.5 or x1 <= EDGE * w or y1 <= EDGE * h or x2 >= (1 - EDGE) * w or y2 >= (1 - EDGE) * h:
-            return   # unsure, or cut off by the picture's border
+        clear = conf >= 0.5 and x1 > EDGE * w and y1 > EDGE * h and x2 < (1 - EDGE) * w and y2 < (1 - EDGE) * h
         area = (x2 - x1) * (y2 - y1)
-        if area > st.best_area * 1.15:   # clearly bigger: closer to the camera
+        # A clear picture (confident, not cut off by the border) beats any unclear one; among the same, clearly
+        # bigger is better (closer to the camera). Unclear ones are kept only while no clear one came: a bicycle
+        # half hidden all the time still gets a picture (MOT16-04).
+        if (clear and not st.best_clear) or (clear == st.best_clear and area > st.best_area * 1.15):
             pad_x, pad_y = 0.05 * (x2 - x1), 0.05 * (y2 - y1)
             ox, oy = max(0, int(x1 - pad_x)), max(0, int(y1 - pad_y))
             crop = frame[oy:min(h, int(y2 + pad_y)), ox:min(w, int(x2 + pad_x))]
             if crop.size:
-                st.best_area, st.best_crop = area, crop.copy()
+                st.best_area, st.best_crop, st.best_clear = area, crop.copy(), clear
+                st.best_version += 1
                 st.best_heads = [(hx1 - ox, hy1 - oy, hx2 - ox, hy2 - oy) for hx1, hy1, hx2, hy2 in
                                  (tuple(b[:4]) for b in heads if b is not None)
                                  if hx2 > ox and hy2 > oy and hx1 < ox + crop.shape[1] and hy1 < oy + crop.shape[0]]
@@ -199,9 +205,9 @@ class VehicleWatch:
             self.store.describe(st.db_id, st.best_crop)
 
     def _store_picture(self, st: VehicleState) -> None:
-        if st.db_id is not None and st.best_crop is not None and st.best_area > st.picture_area:
+        if st.db_id is not None and st.best_crop is not None and st.best_version > st.picture_version:
             self.store.picture(st.db_id, st.best_crop, st.best_heads)
-            st.picture_area = st.best_area
+            st.picture_version = st.best_version
 
     def _finish(self, key: int) -> None:
         st = self.tracks.pop(key)
@@ -219,14 +225,21 @@ class VehicleWatch:
 class VehicleStore:
     """VehicleWatch's storage: the `vehicles` table and pictures in <crop_dir>/vehicles/."""
 
-    def __init__(self, db, camera_id: int, crop_dir, describe=None, blur_all: bool = False, camera: str = ""):
+    def __init__(self, db, camera_id: int, crop_dir, describe=None, blur_all: bool = False, camera: str = "",
+                 changed=None):
         self.db, self.camera_id, self.crop_dir, self.camera = db, camera_id, crop_dir, camera
+        self._changed = changed   # (vehicle id) -> None: check the alert rules again
         self._describe = describe   # (vehicle id, picture) -> None: color now, the vision model's answer later
         self.blur_all = blur_all    # storage.blur_faces: faces blurred in the stored picture too
         (crop_dir / "blurred").mkdir(parents=True, exist_ok=True)
 
     def create(self, kind: str, started_at: datetime, tracker_id: int) -> int:
         return self.db.create_vehicle(self.camera_id, tracker_id, kind, started_at)
+
+    def changed(self, vehicle_id: int) -> None:
+        """Counted (with its first picture) or entered a zone: check the alert rules."""
+        if self._changed is not None:
+            self._changed(vehicle_id)
 
     def update(self, vehicle_id: int, **fields) -> None:
         self.db.update_vehicle(vehicle_id, **fields)
@@ -242,6 +255,7 @@ class VehicleStore:
 
     def zone_events(self, vehicle_id: int, events: list[dict]) -> None:
         self.db.add_vehicle_zone_events(vehicle_id, self.camera, events)
+        self.changed(vehicle_id)
 
     def describe(self, vehicle_id: int, crop: np.ndarray) -> None:
         if self._describe is not None:

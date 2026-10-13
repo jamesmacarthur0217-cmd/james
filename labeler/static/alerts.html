@@ -63,11 +63,16 @@ function condRow() {
   const div = document.createElement("div");
   div.className = "cond";
   const names = Object.keys(fields);
-  div.innerHTML = `<select class="c-name">${names.map(n => `<option value="${n}">${n === "zone" ? "entered zone" : n === "fallen" ? "fell" : n.replace(/_/g, " ")}</option>`).join("")}</select>
+  const NICE = { zone: "entered zone", fallen: "fell", vehicle: "vehicle (a rule about vehicles)", vehicle_color: "vehicle color",
+                 hours: "time of day" };
+  div.innerHTML = `<select class="c-name">${names.map(n => `<option value="${n}">${NICE[n] || n.replace(/_/g, " ")}</option>`).join("")}</select>
     <select class="c-value"></select><button class="c-del" title="Remove">✕</button>`;
   const fill = () => {
     const vals = fields[div.querySelector(".c-name").value].filter(v => v !== "unknown");
-    div.querySelector(".c-value").innerHTML = vals.map(v => `<option>${esc(v)}</option>`).join("");
+    const show = (n, v) => n === "hours" ? `${v.split("-")[0].padStart(2, "0")}:00 to ${(+v.split("-")[1] % 24 + "").padStart(2, "0")}:00`
+                                         : n === "vehicle" && v === "any" ? "any vehicle" : n === "vehicle" && v === "car" ? "car (with SUVs, vans, pickups)" : v;
+    const n = div.querySelector(".c-name").value;
+    div.querySelector(".c-value").innerHTML = vals.map(v => `<option value="${esc(v)}">${esc(show(n, v))}</option>`).join("");
   };
   div.querySelector(".c-name").onchange = fill;
   div.querySelector(".c-del").onclick = () => div.remove();
@@ -77,6 +82,8 @@ function condRow() {
 
 function describe(conds) {
   return conds.length ? conds.map(([n, v]) => n === "zone" ? `in zone ${v}` : n === "fallen" ? "fell"
+                                              : n === "vehicle" ? (v === "any" ? "any vehicle" : `vehicle = ${v}`)
+                                              : n === "hours" ? `between ${v.split("-")[0].padStart(2, "0")}:00 and ${(+v.split("-")[1] % 24 + "").padStart(2, "0")}:00`
                                               : `${n.replace(/_/g, " ")} = ${v}`).join(", ")
                       : "anyone";
 }
@@ -122,7 +129,7 @@ async function loadEvents() {
   // Keep an open clip playing: only redraw when the list changed.
   const html = data.events.length ? data.events.map(e => `
     <div class="event">${e.crop ? `<img src="/crops/${encodeURIComponent(e.crop)}" alt="">` : '<img alt="">'}
-      <div><b>${esc(e.message)}</b><br><small>person #${e.track_id} · ${esc(e.camera)} · ${esc(e.created_at.replace("T", " "))}</small>
+      <div><b>${esc(e.message)}</b><br><small>${e.vehicle_id ? `vehicle #${e.vehicle_id}` : `person #${e.track_id}`} · ${esc(e.camera)} · ${esc(e.created_at.replace("T", " "))}</small>
         ${e.clip ? `<br><button class="link play" data-clip="${esc(e.clip)}">▶ Play clip</button>` : "<br>"}
         <a class="link" href="/recordings?camera=${encodeURIComponent(e.camera)}&amp;at=${encodeURIComponent(e.created_at)}">▶ Recording</a>
         <div class="clip-box"></div></div>
@@ -154,6 +161,10 @@ async function init() {
   const zoneNames = [...new Set((await (await fetch("/api/zones")).json()).map(z => z.name))].sort();
   if (zoneNames.length) fields = { zone: zoneNames, ...fields };
   fields = { fallen: ["yes"], ...fields };   // a fall (labeler/falls.py)
+  // Vehicles (labeler/vehicles.py) and the time of day (people and vehicles).
+  fields = { ...fields, vehicle: ["any", "car", "SUV", "van", "pickup", "lorry", "bus", "motorbike", "bicycle"],
+             vehicle_color: ["white", "black", "silver", "gray", "red", "blue", "green", "yellow", "orange", "brown", "beige", "purple", "pink"],
+             hours: ["22-06", "20-06", "00-06", "18-24", "06-18", "08-18", "09-17"] };
   for (const c of await (await fetch("/api/cameras")).json()) $("camera").add(new Option(c.name, c.name));
   loadRules();
   loadEvents();

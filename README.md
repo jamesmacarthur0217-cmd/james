@@ -610,6 +610,19 @@ Checked on a test copy with MOT16-04: the list with pictures, "white car" in the
 Reports showed 8 vehicles by kind; no vehicle crossed the two lines drawn there (the clip's moving bicycles stay at
 its edges), so line counting is checked by the tests only.
 
+**Alerts**: an alert rule with the condition **"vehicle"** (any, car, SUV, van, pickup, lorry, bus, motorbike,
+bicycle) is about vehicles; it can also ask for a **vehicle color**, an **entered zone** and a **time of day** (e.g.
+*motorbike, entered zone gate, 22:00 to 06:00*). "Time of day" also works in rules about people. A vehicle rule
+fires once per vehicle, checked when the vehicle is first counted (after its first picture), when the vision model
+has described it and when it enters a zone; rules about people never fire for vehicles and the other way round; a
+record the vision model called "not a vehicle" never alerts. The pop-up (every page), the Alerts list, the clip and
+▶ Recording work as for people. For this, `alert_events` got a `vehicle_id`, and its `track_id` may now be empty:
+PostgreSQL databases are changed at start (checked on a scratch database 2026-10-13; an old SQLite file skips vehicle
+alerts with a warning). Checked on a test copy with a "Bicycle" rule: pop-ups with the picture on the Health page,
+clips and the list on the Alerts page. Found: an alert fired before the vehicle's first picture was saved (now after
+it), and a bicycle seen only half hidden got no picture at all (now the best unclear one is kept until a clear one
+comes).
+
 ## Detection: how far can a camera see?
 
 Each frame is shrunk to `detector.imgsz` (640) pixels on its long side before people are looked for. What

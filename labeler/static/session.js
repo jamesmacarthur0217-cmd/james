@@ -99,7 +99,7 @@
     } else {
       t.className = "toast";
       t.innerHTML = `${picture}<div><b>Alert</b> · ${escHtml(e.camera)}<br>${escHtml(e.message)}<br>
-        <small>person #${e.track_id}</small></div>`;
+        <small>${e.vehicle_id ? `vehicle #${e.vehicle_id}` : `person #${e.track_id}`}</small></div>`;
       t.addEventListener("click", () => t.remove());
       setTimeout(() => t.remove(), 20000);
     }

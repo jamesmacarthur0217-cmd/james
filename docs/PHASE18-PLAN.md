@@ -88,6 +88,13 @@ there (tests only for line counting).
   `alert_events` gets a `vehicle_id` and `track_id` may be empty (PostgreSQL change at start, checked on a scratch
   database first, like Phase 17); pop-ups on every page and clips as for people.
 
+**Step 4 results (2026-10-13)**: done (README "Vehicles", Alerts). Conditions `vehicle`, `vehicle_color`, `hours` (also
+for people) in `labeler/alerts.py` (`is_vehicle_rule`, `in_hours`, `AlertEngine.check_vehicle`); `alert_events.vehicle_id`
+and `track_id` nullable (`db.NULLABLE_NOW`, PostgreSQL at start; checked on a scratch database), `db.vehicle_attrs`,
+alerts deleted with their vehicle; `VehicleStore.changed` -> `Pipeline._check_vehicle_alerts` (clip); rule validation
+in web.py; Alerts page and pop-ups say "vehicle #N". Found in the real run: the alert came before the picture, and
+some bicycles never had a clear picture (fallback kept now).
+
 ## Step 5: Settings, Health, docs
 
 - Settings: vehicles on/off per camera (default: security cameras on), which kinds, parked after (s). Health: the

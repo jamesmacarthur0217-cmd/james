@@ -387,11 +387,24 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
 
     @app.post("/api/alerts/rules")
     def add_rule(body: RuleIn, request: Request):
+        from .alerts import valid_hours
+        from .vlm import VEHICLE_COLORS
         allowed = {**schema.FIELDS, **{n: v + ["none"] for n, v in schema.LIST_FIELDS.items()},
-                   "zone": sorted({z["name"] for z in db.list_zones()}), "fallen": ["yes"]}
+                   "zone": sorted({z["name"] for z in db.list_zones()}), "fallen": ["yes"],
+                   "vehicle": ["any", "car", "SUV", "van", "pickup", "lorry", "bus", "motorbike", "bicycle"],
+                   "vehicle_color": [c for c in VEHICLE_COLORS if c != "unknown"]}
         for cond in body.conditions:
+            if len(cond) == 2 and cond[0] == "hours":
+                if not valid_hours(cond[1]):
+                    raise HTTPException(400, f"hours must look like 22-06, not {cond[1]!r}")
+                continue
             if len(cond) != 2 or cond[0] not in allowed or cond[1] not in allowed[cond[0]]:
                 raise HTTPException(400, f"unknown condition {cond}")
+        names = [c[0] for c in body.conditions]
+        if "vehicle_color" in names and "vehicle" not in names:
+            raise HTTPException(400, 'a vehicle color needs a "vehicle" condition too (e.g. vehicle = any)')
+        if "vehicle" in names and set(names) - {"vehicle", "vehicle_color", "zone", "hours"}:
+            raise HTTPException(400, "a vehicle rule can ask only for the vehicle, its color, a zone and the hours")
         if not body.name.strip():
             raise HTTPException(400, "the rule needs a name")
         rule = db.add_rule(body.name.strip()[:100], body.conditions, body.camera)
