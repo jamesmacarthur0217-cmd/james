@@ -1,4 +1,4 @@
-# Phases 19-22 plan: Home/Away, loitering, animals, scene questions (approved 2026-10-13; Phase 19 done 2026-10-14)
+# Phases 19-22 plan: Home/Away, loitering, animals, scene questions (approved 2026-10-13; Phases 19-20 done 2026-10-14)
 
 ## Context
 
@@ -38,7 +38,7 @@ Ask at the start: may viewers (family) switch it, or admins only; a weekly sched
    once per rule and person as now. Vehicles the same in `VehicleWatch` (a car standing at the gate 10 minutes).
 2. **Done 2026-10-14** (with the Alerts page picker). Combines with `hours` and `armed` (e.g. *stayed at gate 2 min, 22:00-06:00, only when Away*).
 3. **Done 2026-10-14.** Live picture: seconds inside an area next to the person (only for areas with such a rule).
-4. Measure: MOT16 (people waiting at a crossing) and the user's own footage when there is some; tests; docs.
+4. **Done 2026-10-14** (`tools/loiter_check.py`; README "Loitering"; the user's footage: later). Measure: MOT16 (people waiting at a crossing) and the user's own footage when there is some; tests; docs.
 
 ## Phase 21: Animals
 

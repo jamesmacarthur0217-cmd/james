@@ -396,6 +396,25 @@ A person out of sight for more than `tracking.lost_after_s` (4 s) counts as havi
 a parked vehicle hidden for a moment keeps its time. On the live picture, people and vehicles inside an area that has
 such a rule show the time they have been in it, e.g. "gate 1:03" above a person's labels.
 
+**Measured** (2026-10-14, `tools/loiter_check.py`: the real pipeline on the fixed-camera MOT16 street videos 02, 04 and
+09, 17-35 s each, security mode, 10 frames a second, against the true per-person markings; two areas: the whole picture
+and its middle third; counting people at least half visible on average, since MOT16 also marks people hidden behind
+others):
+
+| Rule | Found | False alarms | Missed because: never detected / the track broke |
+|---|---|---|---|
+| stayed 5 s | 51 of 93 (55%) | 6 of 75 alerts | 29 / 13 |
+| stayed 10 s | 32 of 67 (48%) | 3 of 41 | 25 / 10 |
+| stayed 15 s | 13 of 47 (28%) | 2 of 15 | 16 / 18 |
+
+The alert comes about 1-2 s after the person reached the time (median; at worst 26 s, probably after the first track of that person broke). A false alarm is
+an alert on a record that mostly follows someone who stayed less (causes not looked into one by one). What this says for real use: people the camera sees
+clearly are found; people far away or half hidden in a crowd are not; and the longer the time, the more often a track
+breaks (someone walks in front) and the time starts again, so a rule of minutes on a busy street will miss many. At a
+quiet gate or door this matters much less, but it is **not measured on minutes-long stays** (no such marked footage
+here). Tried and not kept: carrying the time over when a lost person is re-linked to their record (same found, 2 more
+false alarms: most broken tracks are not re-linked on security cameras).
+
 ## Home / Away
 
 A switch at the top of every page says whether the house is empty: **🏠 Home** or **🔒 Away**. Alert rules can use

@@ -19,7 +19,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 ## 2. Current state (2026-10-14)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
-  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15, 17, 18 and 19 done (19: `46daf57` Home/Away state · `1843a06` rules · `b41530b` pages; 17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings; 18: vehicles `2790822` · `91d90e4` · `8374fad` · `0d87bc0` · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15 and 17-20 done (20: `98f436a` rule · `89af3de` page · `3141852` live picture · tool; 19: `46daf57` Home/Away state · `1843a06` rules · `b41530b` pages; 17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings; 18: vehicles `2790822` · `91d90e4` · `8374fad` · `0d87bc0` · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
   `2429790`/`bc23363` soak tool · `0449255` idle mode · `23273b1` restore drill. Phase 9 (small
   fixes): `8675c46` list redraw · `81dbcb2` backup.dir · `482bdd4` CI v7 · `0296435` relink_check help. Phase 8
   commits, newest first: `3794de3` today at a glance · `e3a6179` photo search · `ea97937` original excerpts ·
@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **618 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **634 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -113,6 +113,7 @@ labeler/settings.py  Settings page: data/settings.yaml merged over config.yaml i
 start.bat / stop.bat daily start/stop (wait for Docker + Ollama; stop waits for app exit, backs up DB)
 install.bat/.ps1     new PC: winget Python/Docker/Ollama, .venv, .env, DB, models, admin, autostart,
                      health; -CheckOnly, -Offline <pkg>; PowerShell 5.1 + ASCII only (tests check)
+tools/loiter_check.py loitering alerts against MOT16 true markings (found, false, late; --min-visibility)
 tools/relink_check.py counting check against MOTChallenge gt.txt (true identities); per-join right/wrong
 tools/models.py      check / download / pack / unpack models (HF cache, Ollama manifest+blobs, YOLO)
 tools/pack_offline.ps1 offline package: pip freeze wheels (cu128 index), models, docker save
@@ -339,8 +340,16 @@ app gets it at its next restart (new table only, no change to old ones). Docker 
 (2026-10-14) and left running. Small thing noticed, not fixed: on the Settings page the "unsaved changes" mark reacts
 only to the cameras table, not to the other fields (saving works).
 
-**Next: Phase 20 (loitering alert)** in [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md), then 21 animals, 22 scene questions.
-Ask the user before the phase (and its opening questions, if any), then before each step.
+**Phase 20 (loitering) is done** (2026-10-14; README "Loitering"): condition `stayed = <area>:<seconds>` (people and
+vehicles; `alerts.parse_stayed`, `AlertEngine.stay_limits`), `Pipeline._check_stays` once a second, the Alerts page
+picker (area x 30 s ... 1 h), the time on the live picture (`Pipeline._stay_text`, `VehicleWatch.shown(t, extra)`).
+Measured with `tools/loiter_check.py` (MOT16 02/04/09, true markings, people at least half visible): 5 s found 51/93,
+15 s 13/47; misses are people never detected (far, half hidden) and broken tracks (the time starts again). Tried and
+not kept: carrying the area time over a re-link (no gain, 2 more false alarms; most broken tracks are not re-linked on
+security cameras). Not measured: minutes-long stays, the user's own footage.
+
+**Next: Phase 21 (animals)** in [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md), then 22 scene questions. Ask the user before
+the phase (its opening questions: which animals; all cameras or security only), then before each step.
 Later, with the user: a long-run check with recording on, the webcam measurement (lens cover), the rest of Phase 12
 when cameras are added.
 
@@ -365,4 +374,4 @@ Open items (also in that plan):
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with the newest plan in docs/
-> (docs/PHASE19-22-PLAN.md, Phase 20 next; ask me before each phase and each step starts, and do it step by step).
+> (docs/PHASE19-22-PLAN.md, Phase 21 next; ask me before each phase and each step starts, and do it step by step).

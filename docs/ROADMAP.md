@@ -9,7 +9,7 @@ import, first kept retraining) are done (2026-10-12). Phase 12 step 1 (a re-iden
 on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. Phase 13 (recording
 while people are in view), Phase 14 (a camera at another site, through Tailscale) and Phase 15 (that camera sent
 from a phone or PC, so it works through company firewalls) are done (2026-10-12). Phase 17 (mobility aids and fall
-alerts) is done (2026-10-13). Phase 18 (vehicles) is done. Phase 19 (Home / Away) is done (2026-10-14). 618 tests pass.
+alerts) is done (2026-10-13). Phase 18 (vehicles) is done. Phase 19 (Home / Away) and Phase 20 (loitering) are done (2026-10-14). 634 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -240,7 +240,7 @@ plates; type, color and make/model).
 4. **Done 2026-10-13**: alert rules on vehicles (type, color, zone, time of day), pop-ups and clips.
 5. **Done 2026-10-13**: Settings, Health, installer/offline package, docs. **Phase 18 is done.**
 
-## Phases 19-22: Home/Away, loitering, animals, scene questions (approved 2026-10-13; Phase 19 done 2026-10-14)
+## Phases 19-22: Home/Away, loitering, animals, scene questions (approved 2026-10-13; Phases 19-20 done 2026-10-14)
 
 **Plan: [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md)**: the user chose all four new ideas as future phases, in this order:
 19 Home/Away arming (rules "only when Away"), 20 loitering alert (stayed in an area too long), 21 animals (with the
@@ -262,6 +262,9 @@ Phase 20 started 2026-10-14.
    Home, all 4 people within 3 s of switching to Away; README "Loitering".
 3. **Done 2026-10-14**: the live picture shows the time inside areas that have a loitering rule ("street 1:03" above a
    person's label, "#2 bus parked street 1:02" on a vehicle).
+4. **Done 2026-10-14**: `tools/loiter_check.py` on MOT16-02/04/09 (people at least half visible): stayed 5 s found
+   51/93, 6 false of 75 alerts; 15 s found 13/47 (tracks break). Tried, not kept: carrying the time over a re-link
+   (same found, 2 more false). **Phase 20 is done.** Next: Phase 21 (animals); ask the user first.
 
 ## Critical files
 
