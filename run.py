@@ -117,7 +117,7 @@ def main() -> int:
 
     worker = None
     if cfg["vlm"]["enabled"]:
-        client = VLMClient(cfg["vlm"], cfg["mode"])
+        client = VLMClient(cfg["vlm"], cfg["mode"], cfg["labels"])
         ok, reason = client.available()
         if ok:
             worker = VLMWorker(client, route_result, cfg["vlm"]["max_queue"], cfg["vlm"]["workers"])

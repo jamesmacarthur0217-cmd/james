@@ -208,6 +208,7 @@ function phrases(a) {
   if (known("eyewear")) add(known("eyewear"), ["eyewear"]);
   if (a.face_mask && a.face_mask.value === "yes") add("face mask", ["face_mask"]);
   if (known("carrying")) add("carrying " + known("carrying").replace(/,/g, ", "), ["carrying"]);
+  if (known("mobility_aid")) add("using " + known("mobility_aid").replace(/,/g, ", "), ["mobility_aid"]);
   return out;
 }
 

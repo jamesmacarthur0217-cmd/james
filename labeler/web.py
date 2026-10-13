@@ -656,13 +656,15 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
 
     @app.get("/api/schema")
     def get_schema():
-        fields = schema.MODE_FIELDS[cfg["mode"]]
+        fields = schema.mode_fields(cfg["mode"], cfg.get("labels"))
+        # Fields turned off in Settings are never stored: not offered for filters or alert rules either.
+        off = set(schema.OPTIONAL_FIELDS) - set(schema.mode_fields("kiosk", cfg.get("labels")))
         return {
             "mode": cfg["mode"],
             "fields": {n: schema.allowed_values(n) or schema.LIST_FIELDS[n] + ["none"] for n in fields},
             "list_fields": list(schema.LIST_FIELDS),
             # Every attribute of every mode, for alert rules (cameras can use different modes).
-            "all_fields": {**{n: v for n, v in schema.FIELDS.items()}, **schema.LIST_FIELDS},
+            "all_fields": {n: v for n, v in {**schema.FIELDS, **schema.LIST_FIELDS}.items() if n not in off},
         }
 
     def videos(request: Request, people: list[dict]) -> list[dict]:

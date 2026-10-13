@@ -11,7 +11,7 @@ from . import schema
 HIDDEN = ("unknown", "none", "no")
 # Attributes shown on the reports page, in this order.
 REPORT_FIELDS = ["apparent_gender", "age_range", "age_group", "upper_color", "upper_type", "lower_color",
-                 "lower_type", "headwear", "eyewear", "carrying"]
+                 "lower_type", "headwear", "eyewear", "carrying", "mobility_aid"]
 CSV_FIELDS = sorted({f for fields in schema.MODE_FIELDS.values() for f in fields})
 
 

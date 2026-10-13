@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **504 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~45 s).
+- Tests: **518 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -278,8 +278,16 @@ the zip is not in git); Ti Xuan's company PC only if their company allows it. Th
 "cameras from other devices" and that people are found and recorded. Note: the user's real app has never run the
 Phase 13-15 code yet (recording, receiver) until they restart it.
 
-**Next: [PHASE16-PLAN.md](PHASE16-PLAN.md)** (approved 2026-10-12, not started): search recordings by words. First
-finish the Phase 15 phone test with the user (above). Later, with the user: a long-run check with recording on and the webcam measurement (lens cover). The rest of
+**Phase 17 (mobility aids and fall alerts), step 1 done (2026-10-13, [PHASE17-PLAN.md](PHASE17-PLAN.md))**: the user
+skipped the Phase 15 phone test and Phase 16 for now ("skip both"; don't push them again unless asked). New label
+`mobility_aid` (wheelchair, walking stick, crutches, walker), asked as one choice with look-alike answers stored as
+"none" (`schema.DECOYS`), switch `labels.mobility_aids` (Settings; off = not asked, not stored; `schema.mode_fields`
+is the list of fields to use, not `MODE_FIELDS`). Measured with `tools/mobility_check.py` on COCO and on 166 Open
+Images photos (`tools/get_aid_photos.py`, `data/datasets/openimages_aids`, truth checked by eye in
+`mobility_truth.json`). The user's own app labels aids from its next restart.
+
+**Next: Phase 17 step 2 (fall detection)**, then steps 3-5; ask the user before each step. Phase 16
+([PHASE16-PLAN.md](PHASE16-PLAN.md), search recordings by words) stays approved but not started. Later, with the user: a long-run check with recording on and the webcam measurement (lens cover). The rest of
 Phase 12 (more cameras, per-camera tuning, re-measuring re-identification and the short-gap re-link rule on
 outdoor footage) when the user adds cameras.
 

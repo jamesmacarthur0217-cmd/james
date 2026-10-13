@@ -41,6 +41,16 @@ probably does not), is not seen. README says so.
   3. cost: VLM seconds per person (`tools/bench_vlm.py`) and the other fields' scores unchanged
      (`tools/evaluate.py` COCO answer key; the user's 26 webcam people on the Answer key page).
 
+**Step 1 results (2026-10-13)**: done (README "Mobility aids"). Asked yes/no per aid, the model called ski and hiking
+poles a walking stick (8 of 8 "aids" in the first 200 COCO people wrong); now **one choice with look-alike answers**
+(`schema.DECOYS`: poles, sports equipment, an ordinary chair, a trolley/pram, pushing or standing next to a
+wheelchair), stored as "none". COCO had only 2 real aids, so 166 **Open Images** photos with wheelchairs and crutches
+were downloaded (OK given; `tools/get_aid_photos.py`) and checked by eye; the prompt was tuned on the validation half
+only. Final: COCO 2 of 2 caught, 0 false alarms in 1,532; Open Images test half wheelchair 211 of 218, walking stick
+3 of 3, 3 false alarms in 556 (2 people kneeling next to a wheelchair user); +0.13 s per person; answer key without
+age 89.5% → 90.4%. Crutches and walkers too rare to measure. Lesson: asking Ollama twice in a row about the same
+picture makes the second request look ~25% faster (it reuses its work on the picture): time whole passes.
+
 ## Step 2: fall detection (`labeler/falls.py`)
 
 - Per person, each frame, from body points: **lying** when the shoulders-to-hips line is closer to horizontal than

@@ -107,6 +107,10 @@
       <label for="person_videos">A short video of each person</label>
       <div><input type="checkbox" id="person_videos"> <span class="hint">Up to 20 seconds from when they appear,
         for admins only (the ▶ Video button on a person); deleted with the person. About 1-2 MB each.</span></div>
+      <label for="mobility_aids">Label mobility aids</label>
+      <div><input type="checkbox" id="mobility_aids"> <span class="hint">Wheelchair, walking stick, crutches, walker:
+        searchable and usable in alert rules. This is health-related information; turned off, it is no longer asked
+        or stored (labels stored earlier stay until the person is deleted).</span></div>
       <label for="https">HTTPS for other devices</label>
       <div><input type="checkbox" id="https"> <span class="hint">Other devices use https://&lt;this PC&gt;:8443
         (encrypted); plain http then works on this PC only.</span></div>
@@ -170,7 +174,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const SIMPLE = ["retention_days", "audit_retention_days", "blur_faces", "blur_faces_for_viewers", "https", "retrain_enabled",
-                "backup_enabled", "backup_copy_to", "person_videos", "idle_enabled", "idle_after_s",
+                "backup_enabled", "backup_copy_to", "person_videos", "mobility_aids", "idle_enabled", "idle_after_s",
                 "recording_enabled", "recording_when", "recording_keep_days", "recording_max_gb"];
 let loaded = null;        // values as saved (what the next start uses)
 let push = null;          // this PC's address and the receiver's ports (cameras sent from other devices)

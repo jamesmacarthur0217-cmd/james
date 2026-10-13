@@ -42,6 +42,16 @@ age_group is a rough apparent estimate. upper_* is clothing on the upper body, l
 If the head is visible and nothing is on it, headwear is "none".
 For carrying, answer "yes" only for an item you can actually see the person holding or wearing as a bag."""
 
+# Added to either prompt when mobility aids are labeled (schema.OPTIONAL_FIELDS). The look-alikes named here are
+# the likely mistakes: chairs, umbrellas and anything pushed on wheels.
+PROMPT_MOBILITY = """
+mobility_aid: what the person uses to sit or walk, if anything. Answer a mobility aid (wheelchair, walking stick,
+crutches, walker) only when the person is clearly using it for support. Poles held while skiing or hiking are "ski or
+hiking poles"; bats, rackets, boards and other sport gear are "other sports equipment"; a seat that is not a
+wheelchair is "an ordinary chair or bench"; something pushed that is not a walker frame is "a trolley, pram or
+luggage"; a person who stands behind, pushes or stands next to a wheelchair that someone else sits in is "pushing or
+standing next to a wheelchair". Answer "none" when the person uses nothing."""
+
 
 def _b64(image: np.ndarray, max_side: int) -> str:
     h, w = image.shape[:2]
@@ -55,12 +65,20 @@ def _b64(image: np.ndarray, max_side: int) -> str:
 
 
 class VLMClient:
-    def __init__(self, cfg: dict, mode: str):
+    def __init__(self, cfg: dict, mode: str, labels: dict | None = None):
         self.host = cfg["host"].rstrip("/")
         self.model = cfg["model"]
         self.timeout = cfg["timeout_s"]
         self.mode = mode
+        self.labels = labels or {}   # the `labels:` config section: optional fields turned on or off
         self._send_think = True
+
+    def prompt(self, mode: str, with_face: bool) -> str:
+        prompt = (PROMPT_KIOSK.replace("{images}", IMAGES_KIOSK[with_face]) if mode == "kiosk"
+                  else PROMPT_SECURITY)
+        if "mobility_aid" in schema.mode_fields(mode, self.labels):
+            prompt += PROMPT_MOBILITY
+        return prompt
 
     def available(self) -> tuple[bool, str]:
         try:
@@ -91,16 +109,14 @@ class VLMClient:
         images = [_b64(person, 512)]
         if face is not None and mode == "kiosk":
             images.append(_b64(face, 256))
-        prompt = (PROMPT_KIOSK.replace("{images}", IMAGES_KIOSK[len(images) > 1]) if mode == "kiosk"
-                  else PROMPT_SECURITY)
         body = {
             "model": self.model,
             "messages": [{
                 "role": "user",
-                "content": prompt,
+                "content": self.prompt(mode, len(images) > 1),
                 "images": images,
             }],
-            "format": schema.json_schema(mode),
+            "format": schema.json_schema(mode, self.labels),
             "stream": False,
             # The JSON answer is ~100 tokens; the cap stops a runaway generation early.
             "options": {"temperature": 0, "num_predict": 400},
@@ -116,7 +132,7 @@ class VLMClient:
             r = requests.post(f"{self.host}/api/chat", json=body, timeout=self.timeout)
         r.raise_for_status()
         content = r.json()["message"]["content"]
-        return schema.clean(json.loads(content), mode)
+        return schema.clean(json.loads(content), mode, self.labels)
 
 
 Job = tuple[int, list[tuple[np.ndarray, np.ndarray | None]], str | None]

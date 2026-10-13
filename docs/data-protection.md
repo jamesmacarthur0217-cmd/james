@@ -20,7 +20,7 @@ For each person seen by a camera:
 |---|---|
 | When and where | camera name, time first and last seen |
 | One picture | the clearest frame of the person (whole body), kept on this computer |
-| Estimated description | apparent age range or age group, apparent gender, clothing type and color, headwear, glasses, face mask, carried items (bag, phone, …). These are automatic estimates and can be wrong |
+| Estimated description | apparent age range or age group, apparent gender, clothing type and color, headwear, glasses, face mask, carried items (bag, phone, …), [if on] a mobility aid in use (wheelchair, walking stick, crutches, walker: health-related, can be turned off). These are automatic estimates and can be wrong |
 | Appearance vector | a list of numbers describing the person's look (mostly clothing), used to search ("man in a red jacket") and to find the same-looking person on other visits or cameras. It is not a face template |
 | Corrections | labels a staff member checked or corrected, with their user name |
 | Video recordings | [if recording is on] video of the camera picture while people are in view (from 10 seconds before to 10 seconds after), with the camera name and time written on it; no sound |

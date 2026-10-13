@@ -76,6 +76,7 @@ class SettingsIn(BaseModel):
     retrain_enabled: bool
     backup_enabled: bool
     person_videos: bool
+    mobility_aids: bool
     idle_enabled: bool
     idle_after_s: int = Field(ge=10, le=3600)
     recording_enabled: bool
@@ -111,6 +112,7 @@ SIMPLE = {
     "retrain_enabled": ("retrain", "enabled"),
     "backup_enabled": ("backup", "enabled"),
     "person_videos": ("person_videos", "enabled"),
+    "mobility_aids": ("labels", "mobility_aids"),
     "backup_copy_to": ("backup", "copy_to"),
     "idle_enabled": ("idle", "enabled"),
     "idle_after_s": ("idle", "after_s"),

@@ -134,6 +134,9 @@ vlm:
   timeout_s: 90
   max_queue: 32
 
+labels:
+  mobility_aids: true         # wheelchair, walking stick, crutches, walker (health-related: false = never stored)
+
 embeddings:
   enabled: true               # appearance vectors for text search and look-alike search
   model: google/siglip2-base-patch16-224

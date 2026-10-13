@@ -43,7 +43,7 @@ def _form(**changes):
                         {"name": "door", "source": "rtsp://admin:•••@192.168.1.50:554/stream1", "mode": "security"}],
             "retention_days": 30, "audit_retention_days": 365, "blur_faces": False,
             "blur_faces_for_viewers": True, "https": False, "retrain_enabled": True,
-            "backup_enabled": True, "backup_copy_to": "", "person_videos": True,
+            "backup_enabled": True, "backup_copy_to": "", "person_videos": True, "mobility_aids": True,
             "idle_enabled": True, "idle_after_s": 60, "recording_enabled": False, "recording_when": "people",
             "recording_keep_days": 3, "recording_max_gb": 100}
     form.update(changes)

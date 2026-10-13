@@ -25,7 +25,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from labeler import schema  # noqa: E402
-from labeler.vlm import PROMPT_KIOSK, VLMClient  # noqa: E402
+from labeler.vlm import PROMPT_KIOSK, PROMPT_MOBILITY, VLMClient  # noqa: E402
 
 PEOPLE = ROOT / "data" / "datasets" / "coco_people"
 FIELDS = ["apparent_gender", "age_group", "upper_type", "upper_color", "lower_type", "lower_color",
@@ -78,19 +78,23 @@ def student(ids: list[str]) -> tuple[dict, float | None]:
     return preds, None
 
 
-def vlm(spec: str, ids: list[str]) -> tuple[dict, float]:
+def vlm(spec: str, ids: list[str], labels: dict | None = None) -> tuple[dict, float]:
     model = spec[len("vlm:"):]
     noface = model.endswith(":noface")
     model = model.removesuffix(":noface")
     import hashlib
-    prompt_id = hashlib.sha1(PROMPT_KIOSK.encode()).hexdigest()[:6]   # a changed prompt gets fresh answers
+    # A changed prompt gets fresh answers. Without mobility aids the id is the one used before they existed.
+    asked = PROMPT_KIOSK
+    if "mobility_aid" in schema.mode_fields("kiosk", labels):
+        asked += PROMPT_MOBILITY + json.dumps(schema.json_schema("kiosk", labels), sort_keys=True)
+    prompt_id = hashlib.sha1(asked.encode()).hexdigest()[:6]
     cache = PEOPLE / f"eval-{spec.replace(':', '_').replace('/', '_')}-{prompt_id}.jsonl"
     done = {}
     if cache.exists():
         done = {r["id"]: r for r in map(json.loads, cache.read_text("utf-8").splitlines())}
     from labeler.config import load_config
     cfg = load_config()["vlm"]
-    client = VLMClient({**cfg, "model": model}, "kiosk")
+    client = VLMClient({**cfg, "model": model}, "kiosk", labels)
     meta = {r["id"]: r for r in map(json.loads, (PEOPLE / "people.jsonl").read_text("utf-8").splitlines())}
     with open(cache, "a", encoding="utf-8") as f:
         for i in ids:
@@ -128,7 +132,9 @@ def score(key: dict, preds: dict) -> dict[str, dict]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("sources", nargs="+")
+    ap.add_argument("--no-mobility-aids", action="store_true", help="ask the VLM without the mobility-aid question")
     args = ap.parse_args()
+    labels = {"mobility_aids": not args.no_mobility_aids}
     key = load_key()
     ids = list(key)
     print(f"answer key: {len(ids)} people, {sum(len(v) for v in key.values())} labels\n")
@@ -139,7 +145,7 @@ def main() -> None:
         elif src == "student":
             preds, secs = student(ids)
         elif src.startswith("vlm:"):
-            preds, secs = vlm(src, ids)
+            preds, secs = vlm(src, ids, labels)
         else:
             raise SystemExit(f"unknown source {src}")
         results[src] = (score(key, preds), secs)

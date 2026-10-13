@@ -581,7 +581,7 @@ class Pipeline:
         if self.student is None:
             return False
         covered = set(st.student_labels) | ({st.age_label[0]} if st.age_label else set())
-        return all(n in covered for n in schema.MODE_FIELDS[self.mode])
+        return all(n in covered for n in schema.mode_fields(self.mode, self.cfg.get("labels")))
 
     def _store_age(self, st: TrackState) -> None:
         """Apparent age from the person's best face crops (the age model beats the VLM on age)."""
@@ -750,7 +750,7 @@ class Pipeline:
         else:
             pool = results
         items = []
-        for name in schema.MODE_FIELDS[self.mode]:
+        for name in schema.mode_fields(self.mode, self.cfg.get("labels")):
             if name in ("age_range", "age_group") and db_id in self.age_ids:
                 continue   # the age model's answer is used instead (more accurate, see labeler/age.py)
             votes = Counter(r[name] for r in pool if r.get(name) not in (None, "unknown"))

@@ -63,6 +63,7 @@ DEFAULTS: dict = {
         "timeout_s": 90,
         "max_queue": 32,
     },
+    "labels": {"mobility_aids": True},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored
     "embeddings": {"enabled": True, "model": "google/siglip2-base-patch16-224", "device": "cuda"},
     "reid": {"weights": "data/models/reid/osnet_ain_x1_0.pt", "device": "cuda"},   # tools/relink_check.py --reid
     "age_model": {"enabled": True, "model": "dima806/fairface_age_image_detection"},

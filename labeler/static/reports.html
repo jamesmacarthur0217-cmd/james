@@ -94,7 +94,7 @@ const $ = (id) => document.getElementById(id);
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 const NAMES = { apparent_gender: "Gender (apparent)", age_range: "Age range (apparent)", age_group: "Age group",
   upper_color: "Top color", upper_type: "Top", lower_color: "Bottoms color", lower_type: "Bottoms",
-  headwear: "Headwear", eyewear: "Eyewear", carrying: "Carrying" };
+  headwear: "Headwear", eyewear: "Eyewear", carrying: "Carrying", mobility_aid: "Mobility aid" };
 const iso = (d) => d.toISOString().slice(0, 10);
 function localDay(offset) { const d = new Date(); d.setDate(d.getDate() + offset); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return iso(d); }
 

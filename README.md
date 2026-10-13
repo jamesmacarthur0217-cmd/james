@@ -1,7 +1,7 @@
 # VisionLabeler
 
 Local camera system that detects people, tracks them, and labels each person with a fixed set of attributes
-(apparent age, gender, clothing type and color, headwear, eyewear, carried items). Uncertain labels go to a
+(apparent age, gender, clothing type and color, headwear, eyewear, carried items, mobility aids). Uncertain labels go to a
 human review queue; reviewed labels become training data. Everything runs on this PC: no cloud calls.
 
 **Daily use: see [START-STOP-GUIDE.md](START-STOP-GUIDE.md).** `start.bat` after turning on the PC,
@@ -458,6 +458,44 @@ each time the person is labeled, so someone still in view when the camera switch
 real colors; guesses made at night never count. The live picture shows "LOW COLOR (IR/night)" meanwhile, and
 the person is marked "low light" in the people list.
 
+## Mobility aids
+
+Each person also gets a **mobility aid** label: wheelchair, walking stick, crutches, walker, or none. A camera
+cannot see a disability, only an aid the person is using. It is searchable ("person in a wheelchair", "old man
+with a cane"), usable in alert rules (*mobility aid = wheelchair*), counted on the Reports page, and shown in the
+people list ("using wheelchair"). It is health-related information: **Settings → "Label mobility aids"** turns
+it off (no longer asked or stored; labels stored earlier stay until the person is deleted). On by default.
+
+The vision model answers it as **one choice that includes look-alikes**: "ski or hiking poles", "other sports
+equipment", "an ordinary chair or bench", "a trolley, pram or luggage", "pushing or standing next to a
+wheelchair". A look-alike answer is stored as "none" (`schema.DECOYS`). Asked yes/no per aid instead, the model
+called ski and hiking poles a walking stick: all 8 "aids" in the first 200 COCO people were wrong, and 5 still
+after the prompt said poles are not walking sticks. The fast classifiers do not learn this label (too rare).
+
+Measured 2026-10-13 (`tools/mobility_check.py`; answers checked by eye):
+
+| | people | aids caught | false alarms |
+|---|---|---|---|
+| COCO people (everyday photos, almost no aids) | 1,532 | 2 of 2 (wheelchair, walking stick) | **0** |
+| Open Images photos with a wheelchair or crutch: test half (held out) | 556 | wheelchair **211 of 218**, walking stick 3 of 3 | 3 |
+| the same, validation half (the prompt was tuned on it) | 168 | wheelchair 75 of 82, walking stick 1, walker 1 | 0 |
+
+- The Open Images photos (`tools/get_aid_photos.py`, 166 photos, downloaded with the user's OK; CC BY 2.0, boxes
+  CC BY 4.0, measuring only) are mostly wheelchair sports, with helpers and bystanders next to the chairs. The
+  "pushing or standing next to a wheelchair" answer was added after the validation half: helpers called
+  "wheelchair" 3 of 7 → 0 of 7, at the cost of 3 hard crops (the chair barely visible). On the held-out half the
+  3 false alarms are 2 people crouching or kneeling next to a wheelchair user (the cut-out shows both) and a
+  blurry wheelchair player called "crutches". Missed: 7 wheelchair users, mostly with little of the chair in view.
+- Crutches and walkers were too rare to measure (4 of Open Images' 5 "crutch" boxes were walking sticks, 1 unclear; one walker
+  with a seat). COCO has almost no aids, so its row measures false alarms only.
+- Cost: **+0.13 s per person** (2.12 → 2.26 s median over 80 COCO people, and 1.93 → 2.06 s in the other order).
+  The 39-person COCO answer key without age: 89.5% → 90.4% (each step is one person; no loss). Age from the vision
+  model went 57% → 46% there, but the app takes age from the age model.
+- With mobility aids on, the fast classifiers can never cover every attribute, so the vision model always looks
+  at each person (`student.skip_vlm_when_confident` was rare before: "rare with current data").
+- People counted as "no aid" when no aid box touched them and the model said none; people too cut-off or
+  blurry to tell were left out (69 of 793).
+
 ## Detection: how far can a camera see?
 
 Each frame is shrunk to `detector.imgsz` (640) pixels on its long side before people are looked for. What
@@ -759,7 +797,7 @@ Changes are tracked with git.
 | `remote-camera/` | for another PC: send its webcam here through Tailscale (setup-camera.bat, remove-camera.bat) |
 | `run.py`, `start.bat`, `stop.bat` | starting and stopping |
 | `install.bat` / `install.ps1`, `tools/models.py`, `tools/pack_offline.ps1` | installing on a new PC, offline package |
-| `tools/` | benchmarks, evaluation, training, backups, long-run check (`soak.py`), restore drill, FFmpeg setup |
+| `tools/` | benchmarks, evaluation, training, backups, long-run check (`soak.py`), restore drill, FFmpeg setup, mobility-aid check (`mobility_check.py`, `get_aid_photos.py`) |
 | `tests/` | automated tests |
 | `data/` | person pictures, backups, log files, datasets (not in git) |
 
@@ -767,6 +805,8 @@ Changes are tracked with git.
 
 - Face crops are not saved (`storage.save_face_crops: false`); faces are used in memory for age only.
 - Data older than `storage.retention_days` (30) is deleted on startup.
+- Mobility aids (wheelchair, walking stick, crutches, walker) are health-related: Settings → "Label mobility aids"
+  turns them off (not asked, not stored from then on).
 - Gender and age are visual estimates, not facts. Put up visible notice signage where cameras run, and check
   local law (PDPA/GDPR or equivalent) before deploying.
 
@@ -779,5 +819,7 @@ MediaMTX (receiving cameras from other devices): MIT (`data\mediamtx`, its licen
 MOT16 (MOTChallenge, imported as the recorded camera `mot16` and used by the retrained classifiers since
 2026-10-12): CC BY-NC-SA 3.0, **non-commercial only**: before commercial use, delete that camera's people on the
 Import page and retrain (or delete `data\models\attributes.joblib` to go back to the shipped classifiers).
+Open Images photos with wheelchairs and crutches (`data\datasets\openimages_aids`, measuring only): CC BY 2.0
+(each photo's author), boxes CC BY 4.0.
 OSNet-AIN re-identification weights (`data\models\reid`, measuring tool only, not used by the app): MIT, trained on
 MSMT17, DukeMTMC-reID and CUHK03 (research use; DukeMTMC was withdrawn by its authors in 2019).
