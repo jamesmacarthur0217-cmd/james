@@ -104,6 +104,26 @@ class Track(Base):
     embeddings: Mapped[list[Embedding]] = relationship(cascade="all, delete-orphan")
 
 
+class Vehicle(Base):
+    """One vehicle's visit to one camera (labeler/vehicles.py): from first seen until out of view; a parked vehicle
+    stays one record while it stands there, also when it is hidden for a while."""
+    __tablename__ = "vehicles"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    camera_id: Mapped[int] = mapped_column(ForeignKey("cameras.id"), index=True)
+    tracker_id: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(20), index=True)          # car, motorbike, bicycle, bus, lorry
+    started_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime)
+    n_frames: Mapped[int] = mapped_column(Integer, default=0)
+    crop_path: Mapped[str | None] = mapped_column(String(300))
+    color: Mapped[str | None] = mapped_column(String(20))
+    make: Mapped[str | None] = mapped_column(String(60))
+    model: Mapped[str | None] = mapped_column(String(60))
+    parked: Mapped[bool] = mapped_column(Boolean, default=False)
+    parked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    left_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
 class Attribute(Base):
     """One label for a track from one source (color estimator, VLM, ...)."""
     __tablename__ = "attributes"
@@ -501,6 +521,61 @@ class Database:
                 for uc in insp.get_unique_constraints(table):
                     if uc.get("name") and sorted(uc["column_names"]) == sorted(columns):
                         conn.execute(text(f'ALTER TABLE {table} DROP CONSTRAINT "{uc["name"]}"'))
+
+    # --- vehicles (labeler/vehicles.py) ---------------------------------------------------------------------
+
+    VEHICLE_FIELDS = {"kind", "ended_at", "n_frames", "crop_path", "color", "make", "model", "parked", "parked_at",
+                      "left_at"}
+
+    def create_vehicle(self, camera_id: int, tracker_id: int, kind: str, started_at: datetime) -> int:
+        with self.Session.begin() as s:
+            v = Vehicle(camera_id=camera_id, tracker_id=tracker_id, kind=kind, started_at=started_at)
+            s.add(v)
+            s.flush()
+            return v.id
+
+    def update_vehicle(self, vehicle_id: int, **fields) -> None:
+        unknown = set(fields) - self.VEHICLE_FIELDS
+        if unknown:
+            raise ValueError(f"not vehicle fields: {sorted(unknown)}")
+        with self.Session.begin() as s:
+            v = s.get(Vehicle, vehicle_id)
+            if v is not None:   # deleted meanwhile
+                for k, value in fields.items():
+                    setattr(v, k, value)
+
+    @staticmethod
+    def _vehicle_dict(v: Vehicle, camera: str) -> dict:
+        iso = lambda d: d.isoformat(timespec="seconds") if d else None   # noqa: E731
+        return {"id": v.id, "camera": camera, "kind": v.kind, "started_at": iso(v.started_at),
+                "ended_at": iso(v.ended_at), "crop": v.crop_path, "color": v.color, "make": v.make, "model": v.model,
+                "parked": bool(v.parked), "parked_at": iso(v.parked_at), "left_at": iso(v.left_at),
+                "n_frames": v.n_frames}
+
+    def list_vehicles(self, limit: int = 50, camera: str | None = None, kind: str | None = None,
+                      start: datetime | None = None, end: datetime | None = None) -> list[dict]:
+        """Newest first."""
+        q = select(Vehicle, Camera.name).join(Camera, Camera.id == Vehicle.camera_id)
+        if camera:
+            q = q.where(Camera.name == camera)
+        if kind:
+            q = q.where(Vehicle.kind == kind)
+        if start:
+            q = q.where(Vehicle.started_at >= start)
+        if end:
+            q = q.where(Vehicle.started_at < end)
+        with self.Session() as s:
+            return [self._vehicle_dict(v, cam) for v, cam in
+                    s.execute(q.order_by(Vehicle.started_at.desc(), Vehicle.id.desc()).limit(limit)).all()]
+
+    def delete_vehicles(self, ids: list[int]) -> list[str]:
+        """Delete vehicles; returns their picture names (for the caller to remove)."""
+        with self.Session.begin() as s:
+            old = s.scalars(select(Vehicle).where(Vehicle.id.in_(ids))).all()
+            paths = [v.crop_path for v in old if v.crop_path]
+            for v in old:
+                s.delete(v)
+        return paths
 
     def update_track(self, track_id: int, **fields) -> None:
         with self.Session.begin() as s:
@@ -1348,6 +1423,15 @@ class Database:
                 s.execute(delete(ZoneEvent).where(ZoneEvent.track_id.in_([t.id for t in old])))
             for t in old:
                 s.delete(t)
+            # Vehicles: kept as long as the camera's people.
+            for cam in s.scalars(select(Camera)):
+                days = per_camera.get(cam.name, retention_days)
+                if days and days > 0:
+                    gone = s.scalars(select(Vehicle).where(Vehicle.camera_id == cam.id,
+                                                           Vehicle.started_at < now - timedelta(days=days))).all()
+                    paths += [v.crop_path for v in gone if v.crop_path]
+                    for v in gone:
+                        s.delete(v)
         if old:
             with self._vec_lock:
                 self._vectors = None

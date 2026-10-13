@@ -1,0 +1,10 @@
+# ByteTrack for vehicles (labeler/vehicles.py), with the same thresholds as for people (people.yaml).
+# The vehicle detector runs on every vehicles.every_n_frames frame, so a lost vehicle is remembered for
+# track_buffer of those frames (~6 s at 30 fps and every 2nd frame).
+tracker_type: bytetrack
+track_high_thresh: 0.4
+track_low_thresh: 0.1
+new_track_thresh: 0.5
+track_buffer: 90
+match_thresh: 0.8
+fuse_score: True

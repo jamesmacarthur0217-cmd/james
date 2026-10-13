@@ -36,6 +36,16 @@ one would need a filter.
 - Measure: COCO val2017 detection (found / wrong, per kind; at 640 and 960); MOT16-13 and -04 counting against the
   marked identities (one record per vehicle, parked car once); frame rate and GPU memory with vehicles on and off.
 
+**Step 1 results (2026-10-13)**: done (README "Vehicles"). yolo11s.pt downloaded with OK (19.3 MB). `labeler/vehicles.py`
+(VehicleWatch + VehicleStore), table `vehicles`, retention, pipeline hook (every 2nd frame, own tracker
+`trackers/vehicles.yaml`, purple boxes, recording and idle mode woken by moving vehicles, ignore zones), config
+`vehicles:` and `cameras[].vehicles` (default: security cameras). Measured: COCO cars 79% found (medium/large),
+cost 9.7 → 14.8 ms per 1080p frame at every 2nd frame; MOT16-04 looping: parked car/motorbikes one record; found and
+fixed: standing bicycles lost now and then became new records and never parked (now remembered after 5 s still,
+median position); MOT16-13 is from a moving bus (splits from camera motion, not tuned on). A shop sign was taken
+for a car: the vision model should say "not a vehicle" in step 2. Not done yet: the offline package/installer and
+Health for the new model (step 5); delete from the page (step 3).
+
 ## Step 2: describe them (type, color, make/model)
 
 - Type from the detector: car, motorbike, bicycle, bus, lorry (COCO "truck" includes pickups: they are

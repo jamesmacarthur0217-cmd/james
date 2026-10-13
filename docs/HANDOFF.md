@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **553 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **568 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -293,7 +293,12 @@ Step 2 (fall detection) done: `labeler/falls.py`, measured with `tools/fall_chec
 tracker does around a fall. The pipeline only logs `FALL [...]` and draws a red box so far; alerts are step 3.
 
 Step 3 done: fall alerts ("Fall" rule, pop-ups in `session.js` on every page, `db.DROPPED_UNIQUE`).
-Step 5 done (Settings). **Phase 17 is done.** Next: ask the user what to do (propose a plan, as on 2026-10-13); ask the user before each step. Phase 16
+Step 5 done (Settings). **Phase 17 is done.**
+
+**Phase 18 (vehicles, [PHASE18-PLAN.md](PHASE18-PLAN.md)) step 1 done (2026-10-13)**: `labeler/vehicles.py`, table
+`vehicles`, `yolo11s.pt` (downloaded with OK, git-ignored like the pose model), measured with `tools/vehicle_check.py`
+(COCO, speed, MOT16 counting). Next: step 2 (color, make/model by the vision model; Stanford Cars needs a download OK),
+then 3-5; ask the user before each step; ask the user before each step. Phase 16
 ([PHASE16-PLAN.md](PHASE16-PLAN.md), search recordings by words) stays approved but not started. Later, with the user: a long-run check with recording on and the webcam measurement (lens cover). The rest of
 Phase 12 (more cameras, per-camera tuning, re-measuring re-identification and the short-gap re-link rule on
 outdoor footage) when the user adds cameras.

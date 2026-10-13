@@ -21,6 +21,7 @@ from .config import mask_password, resolve
 from .db import Database
 from .embed import Embedder
 from .falls import FallWatch
+from .vehicles import KINDS as VEHICLE_KINDS, VehicleStore, VehicleWatch
 from .sources import FrameSource, is_blank
 from .student import Student
 from .vlm import VLMWorker
@@ -170,7 +171,15 @@ class Pipeline:
                       if cfg["clips"]["enabled"] or pv.get("enabled") else None)
         if self.falls is not None and self.clips is not None:
             self.clips.keep_at_least(self.fall_clip_s)
-
+        # Vehicles (labeler/vehicles.py): a second detector with its own tracker; security cameras by default.
+        vcfg = cfg.get("vehicles") or {}
+        self.vehicles = None
+        if vcfg.get("enabled") and cam.get("vehicles", self.mode == "security"):
+            self.vehicle_cfg = vcfg
+            self.vehicle_model = YOLO(vcfg["model"])
+            vt = resolve(vcfg["tracker"])
+            self.vehicle_tracker = str(vt) if vt.exists() else "bytetrack.yaml"
+            self.vehicles = VehicleWatch(vcfg, VehicleStore(db, self.camera_id, self.crop_dir), vcfg["kinds"])
         self.tracks: dict[int, TrackState] = {}
         self.by_db_id: dict[int, TrackState] = {}
         # People who recently left the view, kept briefly so a returning person continues
@@ -279,7 +288,8 @@ class Pipeline:
                     continue
                 recorder = getattr(self, "recorder", None)
                 if recorder is not None:   # every frame read, also those idle mode skips
-                    recorder.feed(frame, bool(self.tracks), self._head_boxes(), time.monotonic(), self.clock.wall())
+                    busy = bool(self.tracks) or (self.vehicles is not None and self.vehicles.moving(self.clock.mono()))
+                    recorder.feed(frame, busy, self._head_boxes(), time.monotonic(), self.clock.wall())
                 if self.skip_while_idle(time.monotonic()):
                     continue   # still read: a file keeps its pace, a camera's newest frame is used next time
                 self.process(frame)
@@ -300,6 +310,8 @@ class Pipeline:
                 self.recorder.close()   # first: quick, and run.py waits only so long for this thread
             for tid in list(self.tracks):
                 self._finish(tid)
+            if self.vehicles is not None:
+                self.vehicles.close()
             if self.clips is not None:
                 self.clips.close()   # alerts that fired just before stopping get a shorter clip
             log.info("pipeline stopped after %d frames", self.frames)
@@ -316,8 +328,8 @@ class Pipeline:
         call process() themselves."""
         if not self.idle_cfg["enabled"]:
             return False
-        if self.tracks:
-            self.last_person_at = now
+        if self.tracks or (self.vehicles is not None and self.vehicles.moving(self.clock.mono())):
+            self.last_person_at = now   # a vehicle driving by keeps full speed too (a parked one does not)
         idle = now - self.last_person_at >= self.idle_cfg["after_s"]
         if idle != self.idle:
             self.idle = idle
@@ -402,6 +414,8 @@ class Pipeline:
         if self.falls is not None:
             for tid, _ in self.falls.tick(now):   # falls confirmed although the person is no longer seen
                 self._on_fall(tid)
+        if self.vehicles is not None and self.frames % max(1, int(self.vehicle_cfg["every_n_frames"])) == 0:
+            self._update_vehicles(frame, now)
 
         for tid, st in list(self.tracks.items()):
             if tid not in seen and now - st.last_seen > tcfg["lost_after_s"]:
@@ -425,6 +439,23 @@ class Pipeline:
             blurred = self._draw(privacy.blur_boxes(frame, heads), seen, low_color, now)
         self._publish(self._draw(frame, seen, low_color, now), blurred)
         self._publish_live(seen, now)
+
+    def _update_vehicles(self, frame: np.ndarray, now: float) -> None:
+        r = self.vehicle_model.track(
+            frame, persist=True, tracker=self.vehicle_tracker, classes=list(VEHICLE_KINDS), conf=self.det_cfg["conf"],
+            imgsz=int(self.vehicle_cfg["imgsz"]), device=self.det_cfg["device"], verbose=False)[0]
+        dets = []
+        if r.boxes is not None and r.boxes.id is not None:
+            h, w = frame.shape[:2]
+            for tid, box, cls, conf in zip(r.boxes.id.int().cpu().tolist(), r.boxes.xyxy.cpu().numpy(),
+                                           r.boxes.cls.int().cpu().tolist(), r.boxes.conf.cpu().tolist()):
+                cx, cy = (box[0] + box[2]) / 2 / w, (box[1] + box[3]) / 2 / h
+                if any(zx1 <= cx <= zx2 and zy1 <= cy <= zy2 for zx1, zy1, zx2, zy2 in self.ignore_zones):
+                    continue   # a poster or a screen showing a car
+                dets.append((tid, tuple(box), cls, conf))
+                if self.idle and conf >= self.wake_conf:
+                    self.last_person_at = now   # a vehicle arriving wakes idle mode, like a person
+        self.vehicles.update(now, self.clock.wall(), frame, dets)
 
     def _on_fall(self, tid: int) -> None:
         """A fall is confirmed: the person was down for falls.after_s (labeler/falls.py)."""
@@ -899,6 +930,13 @@ class Pipeline:
                 cv2.rectangle(out, (x1, y - th - 6), (x1 + tw + 6, y + 2), color, -1)
                 cv2.putText(out, line, (x1 + 3, y - 3), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 1, cv2.LINE_AA)
                 y += th + 8
+        if self.vehicles is not None:
+            for (x1, y1, x2, y2), label in self.vehicles.shown(now):
+                cv2.rectangle(out, (int(x1), int(y1)), (int(x2), int(y2)), (200, 90, 200), 2)   # purple: a vehicle
+                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+                cv2.rectangle(out, (int(x1), int(y1) - th - 8), (int(x1) + tw + 6, int(y1)), (200, 90, 200), -1)
+                cv2.putText(out, label, (int(x1) + 3, int(y1) - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1,
+                            cv2.LINE_AA)
         if self.blank:
             for i, line in enumerate(["NO PICTURE FROM CAMERA", "Check the lens cover, and close other apps",
                                       "that use the camera (Teams, Discord, ...)"]):

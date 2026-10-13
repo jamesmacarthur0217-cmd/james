@@ -548,6 +548,35 @@ videos' color picture is only 320×240; each clip's last picture is held 15 s, a
   someone kneeling right at the bottom edge until the clip ends.
 - Settings near the chosen ones give similar results (head drop 30-50%, collapsed below 40-60% of standing height).
 
+## Vehicles
+
+Security cameras also see **cars, motorbikes, bicycles, buses and lorries** (a second detector, YOLO11s, 19 MB,
+downloaded with the user's OK, AGPL-3.0 like the pose model; `labeler/vehicles.py`; `vehicles:` in config.yaml; per
+camera `vehicles: true/false`, default on for security cameras and off for kiosk ones). Each vehicle's visit is one
+record (table `vehicles`, picture in `data\cropsehicles`), drawn in purple on the live picture. A vehicle that
+stands still for 60 s is **parked**: it stays one record however long it stands there, also when people walking past
+hide it for a while, and is marked "left" when it drives off. Vehicles are kept as long as the camera's people
+(retention), a moving vehicle starts a recording and wakes idle mode, a parked one does neither, and ignore zones
+apply to them too. No number plates are read (the user's choice).
+
+Measured 2026-10-13 (`tools/vehicle_check.py`):
+- **COCO val2017** (5,000 photos, one look each, medium and large vehicles; detector size 640, confidence 0.35):
+  cars 79% found, buses 85%, motorbikes 69%, lorries 65%, bicycles 59%; most mix-ups are lorry ↔ car (COCO's
+  "truck" includes pickups, so a pickup is shown as "lorry/pickup"). Size 960 added little (cars 81%) and costs more.
+- **Cost**: the vehicle detector doubles the detector time on every frame (9.7 → 19.9 ms on a 1080p frame); on
+  every 2nd frame (the default) 14.8 ms on average. Looking at every frame found no more vehicles on MOT16.
+- **MOT16-04** (a fixed camera over a street; 1 car, 1 motorbike and 9 bicycles marked, most standing): the
+  standing car and motorbikes became parked and stayed one record over 2.5 minutes of the clip looping. Found:
+  the tracker loses standing bicycles behind passing people for several seconds at a time, and each return was a new
+  record that never became parked (19 records in 3 loops); now a vehicle that had stood still 5 s is remembered for
+  2 minutes and continues its record when found again in the same place (11 records, the rack bicycles parked), and
+  stillness is judged from the median position of the last second. 6 of the 11 marked vehicles were found at all
+  (small bicycles far away, half hidden in a rack). A lit shop sign was taken for a car each loop (draw an ignore
+  zone there; the vision model's check in the next step should catch most of these).
+- **MOT16-13** (a street filmed from a moving bus): 17 of 22 cars found, 3 split into 2-3 records, 5 records not
+  matching a marked vehicle. A fixed gate camera has no camera motion; there is no fixed street footage with marked
+  vehicles here, so the user's own gate camera is the real test.
+
 ## Detection: how far can a camera see?
 
 Each frame is shrunk to `detector.imgsz` (640) pixels on its long side before people are looked for. What
@@ -847,10 +876,11 @@ Changes are tracked with git.
 | `labeler/recorder.py`, `labeler/recordings_web.py` | recording while people are in view; the Recordings page |
 | `labeler/receiver.py` | receiving cameras sent from a phone or another PC (MediaMTX) |
 | `labeler/falls.py` | fall detection from body points |
+| `labeler/vehicles.py` | vehicles: tracking, parked vehicles, the `vehicles` table |
 | `remote-camera/` | for another PC: send its webcam here through Tailscale (setup-camera.bat, remove-camera.bat) |
 | `run.py`, `start.bat`, `stop.bat` | starting and stopping |
 | `install.bat` / `install.ps1`, `tools/models.py`, `tools/pack_offline.ps1` | installing on a new PC, offline package |
-| `tools/` | benchmarks, evaluation, training, backups, long-run check (`soak.py`), restore drill, FFmpeg setup, mobility-aid check (`mobility_check.py`, `get_aid_photos.py`), fall check (`fall_check.py`) |
+| `tools/` | benchmarks, evaluation, training, backups, long-run check (`soak.py`), restore drill, FFmpeg setup, mobility-aid check (`mobility_check.py`, `get_aid_photos.py`), fall check (`fall_check.py`), vehicle check (`vehicle_check.py`) |
 | `tests/` | automated tests |
 | `data/` | person pictures, backups, log files, datasets (not in git) |
 
