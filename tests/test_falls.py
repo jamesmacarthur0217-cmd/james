@@ -244,3 +244,97 @@ def test_out_of_sight_respects_lying_is_normal_here():
         watch.update(1, i / FPS, *standing(top=180, h=300), lying_ok=True, frame_h=480)
     watch.update(1, 3.0, *lying(floor=480), lying_ok=True, frame_h=480)
     assert sum(len(watch.tick(i / FPS)) for i in range(31, 200)) == 0
+
+
+# --- fall alerts (step 3) ---
+
+def test_built_in_fall_rule_is_made_once(db):
+    engine = AlertEngine(db)
+    engine.ensure_fall_rule()
+    engine.ensure_fall_rule()
+    rules = [r for r in db.list_rules() if r["conditions"] == [["fallen", "yes"]]]
+    assert len(rules) == 1 and rules[0]["name"] == "Fall" and rules[0]["enabled"]
+
+
+def test_fall_rules_fire_only_for_falls_and_every_fall(db, camera):
+    engine = AlertEngine(db)
+    engine.ensure_fall_rule()
+    db.add_rule("anyone", [])
+    t = db.create_track(camera, 1, datetime.now())
+    assert [e["message"] for e in engine.check(t, "test-cam")] == ["anyone: anyone"]   # labels changed: no fall
+    first = engine.check(t, "test-cam", fallen=True)
+    assert [e["message"] for e in first] == ["Fall: fell"]
+    assert len(engine.check(t, "test-cam", fallen=True)) == 1                          # a second fall alerts again
+    events = db.list_alerts()
+    assert [e["fall"] for e in events] == [True, True, False]
+
+
+def test_fall_rule_with_more_conditions_and_a_camera(db, camera):
+    engine = AlertEngine(db)
+    db.add_rule("Old person fell", [["fallen", "yes"], ["age_group", "senior"]], camera="other-cam")
+    t = db.create_track(camera, 1, datetime.now())
+    db.add_attributes(t, [("age_group", "senior", 1.0)], "vlm", "q", threshold=0.6)
+    assert engine.check(t, "test-cam", fallen=True) == []          # another camera's rule
+    db.add_rule("Senior fell here", [["fallen", "yes"], ["age_group", "senior"]], camera="test-cam")
+    engine.invalidate()
+    assert [e["message"] for e in engine.check(t, "test-cam", fallen=True)] == ["Senior fell here: fell, age group = senior"]
+
+
+def test_rule_api_accepts_fell(db, tmp_path):
+    import copy
+    cfg = copy.deepcopy(DEFAULTS)
+    cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
+    client = TestClient(create_app(cfg, db, None, None, AlertEngine(db)), client=("127.0.0.1", 5000))
+    r = client.post("/api/alerts/rules", json={"name": "fell at the door", "conditions": [["fallen", "yes"]]})
+    assert r.status_code == 200
+    assert client.post("/api/alerts/rules", json={"name": "x", "conditions": [["fallen", "maybe"]]}).status_code == 400
+
+
+def test_pipeline_fall_goes_to_the_rules_with_a_long_clip(db, camera):
+    p = make_pipeline(db)
+    p.falls, p._fall_db, p.fall_clip_s = FallWatch(CFG), {}, 15.0
+    asked = []
+
+    class Alerts:
+        def check(self, track_id, camera_name, fallen=False):
+            asked.append((track_id, fallen))
+            return [{"id": 9}]
+
+    class Clips:
+        def request(self, event_id, before_s=None):
+            asked.append(("clip", event_id, before_s))
+
+    p.alerts, p.clips = Alerts(), Clips()
+    st = TrackState(7, datetime.now(), 0.0, db_id=db.create_track(camera, 7, datetime.now()))
+    p.tracks[7] = st
+    p._on_fall(7)
+    assert asked == [(st.db_id, True), ("clip", 9, 15.0)]
+
+
+def test_clip_buffer_reaches_back_for_falls(tmp_path):
+    from labeler.clips import ClipRecorder
+    rec = ClipRecorder(tmp_path, {**DEFAULTS["clips"], "before_s": 5}, None)
+    try:
+        rec.keep_at_least(15)
+        for i in range(200):                       # 20 s of frames at 10 fps
+            rec.add_frame(b"jpeg", now=i / 10)
+        rec.request(1, now=19.9)                   # an ordinary alert: the last 5 s
+        rec.request(2, now=19.9, before_s=15)      # a fall: the last 15 s
+        normal, fall = rec._recording
+        assert 45 <= len(normal["frames"]) <= 51 and 145 <= len(fall["frames"]) <= 151
+    finally:
+        rec.close() if hasattr(rec, "close") else None
+
+
+def test_old_database_rule_makes_a_repeat_fall_skip_not_crash(tmp_path):
+    """An old SQLite database still has "once per rule and person": the second fall is skipped, not an error."""
+    from sqlalchemy import text
+    from labeler.db import Database
+    db = Database("sqlite:///" + (tmp_path / "old.db").as_posix())
+    with db.engine.begin() as conn:
+        conn.execute(text("CREATE UNIQUE INDEX old_rule ON alert_events (rule_id, track_id)"))
+    cam = db.get_or_create_camera("c", "x", "kiosk")
+    t = db.create_track(cam, 1, datetime.now())
+    rule = db.add_rule("Fall", [["fallen", "yes"]])["id"]
+    assert db.record_alert(rule, t, "c", "Fall: fell", repeat=True) is not None
+    assert db.record_alert(rule, t, "c", "Fall: fell", repeat=True) is None

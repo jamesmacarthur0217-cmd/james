@@ -29,8 +29,10 @@
   <div>
     <section class="panel">
       <h2>New alert rule</h2>
-      <p class="hint">Get notified on the Live page when someone matching these conditions appears.
-        With no conditions, the rule matches anyone (e.g. a camera that should see nobody at night).</p>
+      <p class="hint">Get notified on every open page when someone matching these conditions appears.
+        With no conditions, the rule matches anyone (e.g. a camera that should see nobody at night).
+        "fell" is a fall: the built-in rule "Fall" pops up with a sound on every page until OK is clicked;
+        turn it off below to stop fall alerts (deleted, it comes back at the next start).</p>
       <div class="row"><label for="name">Name</label><input id="name" placeholder="e.g. Red top with backpack" style="flex:1"></div>
       <div class="row"><label for="camera">Camera</label><select id="camera"><option value="">Any camera</option></select></div>
       <div id="conds"></div>
@@ -61,7 +63,7 @@ function condRow() {
   const div = document.createElement("div");
   div.className = "cond";
   const names = Object.keys(fields);
-  div.innerHTML = `<select class="c-name">${names.map(n => `<option value="${n}">${n === "zone" ? "entered zone" : n.replace(/_/g, " ")}</option>`).join("")}</select>
+  div.innerHTML = `<select class="c-name">${names.map(n => `<option value="${n}">${n === "zone" ? "entered zone" : n === "fallen" ? "fell" : n.replace(/_/g, " ")}</option>`).join("")}</select>
     <select class="c-value"></select><button class="c-del" title="Remove">✕</button>`;
   const fill = () => {
     const vals = fields[div.querySelector(".c-name").value].filter(v => v !== "unknown");
@@ -74,7 +76,8 @@ function condRow() {
 }
 
 function describe(conds) {
-  return conds.length ? conds.map(([n, v]) => n === "zone" ? `in zone ${v}` : `${n.replace(/_/g, " ")} = ${v}`).join(", ")
+  return conds.length ? conds.map(([n, v]) => n === "zone" ? `in zone ${v}` : n === "fallen" ? "fell"
+                                              : `${n.replace(/_/g, " ")} = ${v}`).join(", ")
                       : "anyone";
 }
 
@@ -150,6 +153,7 @@ async function init() {
   // Zones drawn on the Live page: "entered zone" is a condition like any attribute.
   const zoneNames = [...new Set((await (await fetch("/api/zones")).json()).map(z => z.name))].sort();
   if (zoneNames.length) fields = { zone: zoneNames, ...fields };
+  fields = { fallen: ["yes"], ...fields };   // a fall (labeler/falls.py)
   for (const c of await (await fetch("/api/cameras")).json()) $("camera").add(new Option(c.name, c.name));
   loadRules();
   loadEvents();

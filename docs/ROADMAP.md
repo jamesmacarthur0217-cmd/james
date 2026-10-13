@@ -9,7 +9,7 @@ import, first kept retraining) are done (2026-10-12). Phase 12 step 1 (a re-iden
 on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. Phase 13 (recording
 while people are in view), Phase 14 (a camera at another site, through Tailscale) and Phase 15 (that camera sent
 from a phone or PC, so it works through company firewalls) are done (2026-10-12). Phase 17 (mobility aids and fall
-alerts) steps 1-2 are done (2026-10-13). 543 tests pass.
+alerts) steps 1-3 are done (2026-10-13). 550 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -226,7 +226,9 @@ for now by the user (2026-10-13).
 2. **Done 2026-10-13** (with step 4's measuring): fall detection from body points; side camera 13/15 falls and 1/20
    false alarms on the second half of UR Fall (15/15, 0/20 on the first), 0/7 on walking videos; ceiling cameras not
    supported.
-3, 5. Fall alerts everywhere (pop-up with sound), Settings and docs: next.
+3. **Done 2026-10-13**: the built-in "Fall" rule, a red pop-up with a beep on every page until OK, clips that show
+   the fall; a person can be alerted for a second fall.
+5. Settings (fall alerts per camera) and docs: next.
 
 ## Critical files
 

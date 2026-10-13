@@ -387,7 +387,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     @app.post("/api/alerts/rules")
     def add_rule(body: RuleIn, request: Request):
         allowed = {**schema.FIELDS, **{n: v + ["none"] for n, v in schema.LIST_FIELDS.items()},
-                   "zone": sorted({z["name"] for z in db.list_zones()})}
+                   "zone": sorted({z["name"] for z in db.list_zones()}), "fallen": ["yes"]}
         for cond in body.conditions:
             if len(cond) != 2 or cond[0] not in allowed or cond[1] not in allowed[cond[0]]:
                 raise HTTPException(400, f"unknown condition {cond}")

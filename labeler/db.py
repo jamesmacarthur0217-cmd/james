@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import secrets
 import threading
 import time
@@ -14,11 +15,14 @@ from sqlalchemy import (
     BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, TypeDecorator, UniqueConstraint,
     create_engine, delete, event, select, text,
 )
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, selectinload, sessionmaker
 
 from . import schema
 from .clips import clip_name
 from .config import sqlite_url
+
+log = logging.getLogger(__name__)
 
 UNKNOWN = ("unknown", "none")
 
@@ -146,7 +150,8 @@ class AlertRule(Base):
 
 class AlertEvent(Base):
     __tablename__ = "alert_events"
-    __table_args__ = (UniqueConstraint("rule_id", "track_id"),)       # each rule fires once per person
+    # Each rule fires once per person (record_alert), except fall rules: a person can fall again. So this is not a
+    # database rule any more; older PostgreSQL databases lose it at start (DROPPED_UNIQUE).
     id: Mapped[int] = mapped_column(primary_key=True)
     rule_id: Mapped[int] = mapped_column(ForeignKey("alert_rules.id", ondelete="CASCADE"), index=True)
     track_id: Mapped[int] = mapped_column(ForeignKey("tracks.id", ondelete="CASCADE"), index=True)
@@ -317,6 +322,8 @@ NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT", "video_path
                           "source_offset_s": "FLOAT"},
                "cameras": {"retention_days": "INTEGER"},
                "zones": {"lying_ok": "BOOLEAN"}}
+# Uniqueness rules taken off existing tables at start (table, columns): falls alert again for the same person.
+DROPPED_UNIQUE = [("alert_events", ("rule_id", "track_id"))]
 
 
 def _videos(value: str | None) -> list[str]:
@@ -375,6 +382,7 @@ class Database:
                 conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         Base.metadata.create_all(self.engine)
         self._add_missing_columns()
+        self._drop_old_unique()
         if self.is_postgres:
             # Approximate nearest-neighbour index, so search stays fast with millions of people.
             with self.engine.begin() as conn:
@@ -481,6 +489,18 @@ class Database:
                 for name, sql_type in columns.items():
                     if name not in have:
                         conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}"))
+
+    def _drop_old_unique(self) -> None:
+        """PostgreSQL only: SQLite cannot drop a constraint (only tests use it; tables made now have none)."""
+        if self.engine.dialect.name != "postgresql":
+            return
+        from sqlalchemy import inspect
+        insp = inspect(self.engine)
+        with self.engine.begin() as conn:
+            for table, columns in DROPPED_UNIQUE:
+                for uc in insp.get_unique_constraints(table):
+                    if uc.get("name") and sorted(uc["column_names"]) == sorted(columns):
+                        conn.execute(text(f'ALTER TABLE {table} DROP CONSTRAINT "{uc["name"]}"'))
 
     def update_track(self, track_id: int, **fields) -> None:
         with self.Session.begin() as s:
@@ -812,26 +832,33 @@ class Database:
                 return None
             return {n: a["value"] for n, a in resolve(t.attributes).items()}
 
-    def record_alert(self, rule_id: int, track_id: int, camera: str, message: str) -> dict | None:
-        """Store an alert unless this rule already fired for this person."""
+    def record_alert(self, rule_id: int, track_id: int, camera: str, message: str, repeat: bool = False) -> dict | None:
+        """Store an alert unless this rule already fired for this person (repeat: a fall, which can happen again)."""
         with self.Session.begin() as s:
-            exists = s.scalar(select(AlertEvent.id).where(AlertEvent.rule_id == rule_id,
-                                                          AlertEvent.track_id == track_id))
+            exists = None if repeat else s.scalar(select(AlertEvent.id).where(AlertEvent.rule_id == rule_id,
+                                                                              AlertEvent.track_id == track_id))
             if exists is not None or s.get(Track, track_id) is None:
                 return None
             e = AlertEvent(rule_id=rule_id, track_id=track_id, camera=camera, message=message)
             s.add(e)
-            s.flush()
+            try:
+                s.flush()
+            except IntegrityError:   # an old SQLite database still has "once per rule and person": no repeat
+                log.warning("a repeated fall alert was not stored (old database rule)")
+                return None
             return {"id": e.id, "rule_id": rule_id, "track_id": track_id, "camera": camera, "message": message,
                     "created_at": e.created_at.isoformat(timespec="seconds")}
 
     def list_alerts(self, since_id: int = 0, limit: int = 50) -> list[dict]:
         with self.Session() as s:
-            rows = s.execute(select(AlertEvent, Track.crop_path).join(Track, Track.id == AlertEvent.track_id)
+            rows = s.execute(select(AlertEvent, Track.crop_path, AlertRule.conditions)
+                             .join(Track, Track.id == AlertEvent.track_id)
+                             .outerjoin(AlertRule, AlertRule.id == AlertEvent.rule_id)
                              .where(AlertEvent.id > since_id).order_by(AlertEvent.id.desc()).limit(limit)).all()
             return [{"id": e.id, "rule_id": e.rule_id, "track_id": e.track_id, "camera": e.camera,
-                     "message": e.message, "crop": crop, "created_at": e.created_at.isoformat(timespec="seconds")}
-                    for e, crop in rows]
+                     "message": e.message, "crop": crop, "created_at": e.created_at.isoformat(timespec="seconds"),
+                     "fall": any(n == "fallen" for n, _ in json.loads(conds or "[]"))}
+                    for e, crop, conds in rows]
 
     def latest_alert_id(self) -> int:
         from sqlalchemy import func

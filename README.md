@@ -384,7 +384,8 @@ version on, pages are always checked for updates.
 
 ## Alert clips
 
-Each alert gets a short video: the 5 seconds before it fired and the 5 after (`clips:` in config.yaml), with the
+Each alert gets a short video: the 5 seconds before it fired and the 5 after (`clips:` in config.yaml; a fall: the
+15 s before), with the
 boxes and labels as on the Live page. On the Alerts page, **Play clip** shows it (admins only; watching is in
 the Audit log). Each camera keeps its last seconds in memory (about 5 MB); clips are WebM (VP8, built into
 OpenCV, plays in every current browser), at most 960 pixels wide and 10 frames per second, about 1.5-3 MB each,
@@ -510,7 +511,19 @@ per frame (measured on 13,197 person-frames), against tens of milliseconds for t
 
 **Not a medical device.** Only falls in view are seen; a camera looking straight down from the ceiling does not
 work (from above, standing and lying look alike: 0 of 30 on such a camera); the user's desk webcam probably does
-not see the floor. Pop-ups with a sound on every page follow (Phase 17 step 3).
+not see the floor.
+
+**The alert**: a built-in alert rule **"Fall"** (made at start when fall alerts are on; turn it off on the Alerts
+page to stop fall alerts; deleted, it comes back at the next start). Every open page (this PC, another PC, a phone's
+browser through Tailscale; admins and viewers, pictures blurred for viewers) shows a red pop-up **"FALL · camera ·
+time"** that stays until **OK** is clicked and beeps every 2 seconds until then. Browsers play sound only after a
+click on the page: until then the pop-up says "Click anywhere on this page to hear the alarm" (any click turns it on
+for that page). Its clip (Alerts page, admins) starts 15 s before the alert, so it shows the fall itself, not only
+the person lying (the camera keeps 15 s in memory then, about 9 MB). Other rules can ask for a fall too ("fell" as a
+condition, e.g. *fell* + *age group = senior* on one camera). Unlike other rules, fall rules fire again when the same
+person falls again: for that, the database's "one alert per rule and person" rule is dropped at start (PostgreSQL;
+checked on a scratch database 2026-10-13), and the app keeps it for all other rules itself. Nothing is sent outside
+this PC: when no page is open, nobody is told (the user chose no phone messages).
 
 Measured 2026-10-13 on the **UR Fall Detection** videos (University of Rzeszow; 30 falls, 40 everyday activities;
 CC BY-NC-SA 4.0, downloaded with the user's OK, 116 MB in `data\datasets\urfd`; `tools/fall_check.py`). The

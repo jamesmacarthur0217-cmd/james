@@ -608,26 +608,7 @@ async function loadCameras() {
   if (wanted && cameraNames.includes(wanted)) $("f-camera").value = wanted;
 }
 
-// Alert pop-ups: new alerts since the page opened appear bottom-right for 20 seconds.
-let lastAlert = null;
-async function pollAlerts() {
-  try {
-    const data = await (await fetch("/api/alerts/events?since_id=" + (lastAlert ?? 0) + "&limit=10")).json();
-    if (lastAlert === null) { lastAlert = data.latest_id; return; }   // don't replay old alerts
-    for (const e of data.events.reverse()) {
-      lastAlert = Math.max(lastAlert, e.id);
-      const t = document.createElement("div");
-      t.className = "toast";
-      t.innerHTML = `${e.crop ? `<img src="/crops/${encodeURIComponent(e.crop)}" alt="">` : ""}
-        <div><b>Alert</b> · ${esc(e.camera)}<br>${esc(e.message)}<br><small>person #${e.track_id}</small></div>`;
-      t.onclick = () => t.remove();
-      $("toasts").prepend(t);
-      setTimeout(() => t.remove(), 20000);
-    }
-  } catch {}
-}
-pollAlerts();
-setInterval(pollAlerts, 3000);
+// Alert pop-ups (falls with a sound) are shown on every page by session.js.
 
 loadCameras().then(refresh);
 loadSchema().then(refresh);

@@ -84,6 +84,16 @@ measuring tool did not (two alerts for one fall, no alert in a video's second lo
   Browsers play sound only after one click on the page: the page says "click once to turn on sound".
 - Viewers (e.g. family) also get fall pop-ups, picture blurred as everywhere; other alerts stay admin-only.
 
+**Step 3 results (2026-10-13)**: done. `alerts.FALLEN` condition ("fell"), `AlertEngine.ensure_fall_rule` (run.py),
+`check(..., fallen=True)` for confirmed falls (repeat allowed: `db.DROPPED_UNIQUE` drops the old
+"one alert per rule and person" constraint on PostgreSQL at start, checked on a scratch database; an old SQLite file
+skips the repeat with a warning), events carry `fall`; clips reach back 15 s for falls (`ClipRecorder.keep_at_least`,
+`request(before_s=)`); the pop-ups moved from the Live page into `session.js` (every page; fall: red, stays until
+OK, two-tone beep every 2 s, a hint while the browser blocks sound). Checked in the browser pane on the Health page
+of a test copy: the pop-up with picture and hint, a click turns sound on (the hint goes; the beep itself was not
+heard), OK closes, the next fall pops up again; the clip (19 s) shows standing, falling and lying. Found: the
+ClipRecorder was used before it was made in Pipeline.__init__ (a test caught it); db.py had no logger.
+
 ## Step 4: measure on fall videos (`tools/fall_check.py`)
 
 - After the user's OK: URFD camera-0 RGB of the 30 falls and 40 activities (PNG sequences → MP4 with the FFmpeg in

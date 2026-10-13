@@ -70,13 +70,13 @@ def test_an_alert_that_fires_starts_a_clip(db, camera):
     p = make_pipeline(db)
 
     class Alerts:
-        def check(self, track_id, camera_name):
+        def check(self, track_id, camera_name, fallen=False):
             return [{"id": 41}, {"id": 42}]
 
     class Clips:
         requested = []
 
-        def request(self, event_id):
+        def request(self, event_id, before_s=None):
             self.requested.append(event_id)
 
     p.alerts, p.clips = Alerts(), Clips()

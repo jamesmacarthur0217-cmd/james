@@ -1,11 +1,13 @@
 :root {
   --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --border: #e3e6ec;
   --accent: #2f6fde; --warn-bg: #fff4e0; --warn: #a15c00; --ok: #1f8a4c; --chip: #eef1f6;
+  --bad: #c4320a; --bad-bg: #fff1ed;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #12151b; --panel: #1b2029; --text: #e6e9ef; --muted: #98a2b3; --border: #2b3240;
     --accent: #6b9cff; --warn-bg: #3a2a10; --warn: #f5b454; --ok: #4cc38a; --chip: #262d39;
+    --bad: #ff7a5c; --bad-bg: #3d1a12;
   }
 }
 * { box-sizing: border-box; }
@@ -87,6 +89,12 @@ button.danger-quiet { margin-left: auto; color: #c9372c; border-color: transpare
   border-radius: 8px; padding: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.25); cursor: pointer; font-size: 13px; }
 .toast img { width: 44px; height: 58px; object-fit: cover; border-radius: 4px; flex: none; }
 .toast small { color: var(--muted); }
+.toast.fall { border-color: var(--bad); border-left: 6px solid var(--bad); background: var(--bad-bg); cursor: default;
+  font-size: 14px; animation: fall-pulse 1.5s ease-in-out infinite; }
+.toast.fall b { color: var(--bad); }
+.toast.fall button { margin-top: 6px; }
+@keyframes fall-pulse { 50% { box-shadow: 0 0 0 4px var(--bad); } }
+@media (prefers-reduced-motion: reduce) { .toast.fall { animation: none; } }
 .muted { color: var(--muted); font-size: 12px; }
 /* Accounts: admin controls are hidden until the page knows the user is an admin (static/session.js). */
 body:not(.is-admin) .admin-only { display: none !important; }

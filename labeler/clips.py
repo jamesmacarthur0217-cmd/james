@@ -45,6 +45,7 @@ class ClipRecorder:
         self.person = person_cfg if person_cfg and person_cfg.get("enabled") else None
         if self.person:
             self.before_s = max(self.before_s, self.person["before_s"])
+        self.keep_s = self.before_s   # how long the buffer reaches back (longer for fall clips: keep_at_least)
         self._buffer: deque[tuple[float, bytes]] = deque()
         self._recording: list[dict] = []
         self._people: dict = {}   # key -> person recording still open (the person is in view)
@@ -69,20 +70,25 @@ class ClipRecorder:
                 for rec in self._people.values():
                     if now <= rec["cap"]:
                         rec["frames"].append((now, jpeg))
-            while self._buffer and now - self._buffer[0][0] > self.before_s:
+            while self._buffer and now - self._buffer[0][0] > self.keep_s:
                 self._buffer.popleft()
             done = [r for r in self._recording if now >= r["until"]]
             self._recording = [r for r in self._recording if now < r["until"]]
         for rec in done:
             self._queue.put(rec)
 
-    def request(self, event_id: int, now: float | None = None) -> None:
-        """An alert fired: save the last before_s seconds and the next after_s seconds."""
+    def keep_at_least(self, seconds: float) -> None:
+        """Keep this many seconds in memory (a fall is confirmed 10 s after it happens; its clip must show it)."""
+        self.keep_s = max(self.keep_s, seconds)
+
+    def request(self, event_id: int, now: float | None = None, before_s: float | None = None) -> None:
+        """An alert fired: save the last before_s seconds (default: the clip setting) and the next after_s."""
         now = time.monotonic() if now is None else now
+        before = self.before_s if before_s is None else before_s
         with self._lock:
             if self._closed:   # a late labeling result after the camera stopped: no picture to show
                 return
-            self._recording.append({"event_id": event_id, "frames": list(self._buffer),
+            self._recording.append({"event_id": event_id, "frames": [f for f in self._buffer if now - f[0] <= before],
                                     "until": now + self.after_s})
 
     # --- person videos ---------------------------------------------------------------------------

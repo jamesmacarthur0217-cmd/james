@@ -163,9 +163,13 @@ class Pipeline:
         fcfg = cfg.get("falls") or {}
         self.falls = FallWatch(fcfg) if fcfg.get("enabled") and self.cam.get("fall_alert", True) else None
         self._fall_db: dict[int, int] = {}   # tracker number -> person, kept after the track ends (falls out of sight)
+        # A fall's clip starts 5 s before the fall (confirmed after_s later), so the buffer reaches back further.
+        self.fall_clip_s = float(fcfg.get("after_s", 10)) + 5
         pv = cfg.get("person_videos") or {}
         self.clips = (ClipRecorder(self.crop_dir, cfg["clips"], pv)
                       if cfg["clips"]["enabled"] or pv.get("enabled") else None)
+        if self.falls is not None and self.clips is not None:
+            self.clips.keep_at_least(self.fall_clip_s)
 
         self.tracks: dict[int, TrackState] = {}
         self.by_db_id: dict[int, TrackState] = {}
@@ -429,6 +433,7 @@ class Pipeline:
             self._ensure_db(st)
         db_id = st.db_id if st is not None else self._fall_db.get(tid)
         log.warning("FALL [%s] person #%s has been down for %d s", self.name, db_id, self.falls.after_s)
+        self._check_alerts(db_id, fallen=True)
 
     def _should_ignore(self, box: tuple, shape: tuple) -> bool:
         """Skip detections that cannot be a person we care about: inside an ignore zone (a monitor,
@@ -533,16 +538,16 @@ class Pipeline:
         if any(e["kind"] in ("enter", "in", "out") for e in events):
             self._check_alerts(st.db_id)   # rules can ask for "entered zone X"
 
-    def _check_alerts(self, db_id: int | None) -> None:
+    def _check_alerts(self, db_id: int | None, fallen: bool = False) -> None:
         if self.alerts is not None and db_id is not None and db_id not in self.deleted_ids:
             try:
-                fired = self.alerts.check(db_id, self.name)
+                fired = self.alerts.check(db_id, self.name, fallen=fallen)
             except Exception:
                 log.exception("checking alert rules failed")
                 return
             if self.clips is not None and self.cfg["clips"]["enabled"]:
-                for event in fired:
-                    self.clips.request(event["id"])   # a clip around the moment the alert fired
+                for event in fired:   # a clip around the moment the alert fired (for a fall: the fall itself)
+                    self.clips.request(event["id"], before_s=self.fall_clip_s if fallen else None)
 
     def _store_colors(self, st: TrackState) -> None:
         items = [(name, value, round(conf, 3)) for name, (value, conf) in st.colors().items()]
