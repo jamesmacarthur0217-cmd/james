@@ -10,7 +10,10 @@ A rule with a "vehicle" condition is about vehicles (labeler/vehicles.py): "vehi
 described and when it enters a zone. Person rules never fire for vehicles and the other way round. "hours = 22-06"
 (people and vehicles) limits a rule to a time of day (from 22:00 until 06:00).
 
-"armed = away" (or "home"; people and vehicles) limits a rule to when the house is set to Away (or Home) on the
+A rule with an "animal" condition is about animals (labeler/animals.py): "animal = any / dog / cat / bird", with a
+zone, the hours, Home / Away and how long it stayed; once per animal visit, like vehicles.
+
+"armed = away" (or "home"; people, vehicles and animals) limits a rule to when the house is set to Away (or Home) on the
 pages' Home / Away switch or by its weekly schedule (labeler/arming.py). Rules without it work all the time, like the
 built-in "Fall" rule.
 
@@ -40,12 +43,22 @@ FALLEN = "fallen"   # condition on a fall having just been confirmed
 FALL_RULE = [[FALLEN, "yes"]]
 VEHICLE, VEHICLE_COLOR, HOURS, ARMED, STAYED = "vehicle", "vehicle_color", "hours", "armed", "stayed"
 MAX_STAY_S = 24 * 3600
+ANIMAL = "animal"
 CAR_GROUP = {"car", "SUV", "van", "pickup"}   # "car" in a rule, like in the Ask box
 HOUR_PRESETS = ["22-06", "20-06", "00-06", "18-24", "06-18", "08-18", "09-17"]
 
 
 def is_vehicle_rule(conditions: list[list[str]]) -> bool:
     return any(name == VEHICLE for name, _ in conditions)
+
+
+def is_animal_rule(conditions: list[list[str]]) -> bool:
+    return any(name == ANIMAL for name, _ in conditions)
+
+
+def rule_kind(conditions: list[list[str]]) -> str:
+    """Who a rule is about: "person", "vehicle" or "animal"."""
+    return "vehicle" if is_vehicle_rule(conditions) else "animal" if is_animal_rule(conditions) else "person"
 
 
 def valid_hours(value: str) -> bool:
@@ -95,6 +108,9 @@ def matches(conditions: list[list[str]], attrs: dict[str, str]) -> bool:
         elif name == VEHICLE:
             if not current or (value != "any" and current != value and not (value == "car" and current in CAR_GROUP)):
                 return False
+        elif name == ANIMAL:
+            if not current or (value != "any" and current != value):
+                return False
         elif name == VEHICLE_COLOR:
             if current != value and {current, value} != {"gray", "silver"}:
                 return False
@@ -116,6 +132,8 @@ def describe(conditions: list[list[str]]) -> str:
             return "fell"
         if n == VEHICLE:
             return "any vehicle" if v == "any" else f"vehicle = {v}"
+        if n == ANIMAL:
+            return "any animal" if v == "any" else f"animal = {v}"
         if n == ARMED:
             return f"only when {v.capitalize()}"
         if n == STAYED:
@@ -162,12 +180,13 @@ class AlertEngine:
         from .arming import HOME
         return self.arming.current() if self.arming is not None else HOME
 
-    def stay_limits(self, camera: str, vehicles: bool = False) -> dict[str, int]:
-        """{area name: the shortest stay a rule asks for} on this camera, for people (or vehicles): the camera only
-        asks check() with `stayed` for someone inside such an area that long."""
+    def stay_limits(self, camera: str, vehicles: bool = False, animals: bool = False) -> dict[str, int]:
+        """{area name: the shortest stay a rule asks for} on this camera, for people (or vehicles, or animals): the
+        camera only asks check() with `stayed` for someone inside such an area that long."""
         out: dict[str, int] = {}
+        want = "vehicle" if vehicles else "animal" if animals else "person"
         for r in self._enabled_rules():
-            if (r["camera"] and r["camera"] != camera) or is_vehicle_rule(r["conditions"]) != vehicles:
+            if (r["camera"] and r["camera"] != camera) or rule_kind(r["conditions"]) != want:
                 continue
             for name, value in r["conditions"]:
                 if name == STAYED:
@@ -180,7 +199,7 @@ class AlertEngine:
         confirmed: only the rules asking for a fall are checked, and they fire again for a later fall.
         stayed: {area name: seconds inside} (the camera's once-a-second check of people inside areas)."""
         rules = [r for r in self._enabled_rules() if (not r["camera"] or r["camera"] == camera)
-                 and is_fall_rule(r["conditions"]) == fallen and not is_vehicle_rule(r["conditions"])]
+                 and is_fall_rule(r["conditions"]) == fallen and rule_kind(r["conditions"]) == "person"]
         if not rules:
             return []
         attrs = self.db.resolved_values(track_id)
@@ -200,6 +219,28 @@ class AlertEngine:
                                              f"{rule['name']}: {describe(rule['conditions'])}", repeat=fallen)
                 if event is not None:
                     log.warning("ALERT [%s] %s -> person #%s", camera, rule["name"], track_id)
+                    fired.append(event)
+        return fired
+
+    def check_animal(self, animal_id: int, camera: str, stayed: dict | None = None) -> list[dict]:
+        """Fire every enabled animal rule this animal now matches (once per rule and animal visit)."""
+        rules = [r for r in self._enabled_rules() if (not r["camera"] or r["camera"] == camera)
+                 and is_animal_rule(r["conditions"])]
+        if not rules:
+            return []
+        attrs = self.db.animal_attrs(animal_id)
+        if attrs is None:
+            return []
+        attrs.update({"hour": datetime.now().hour, STAYED: stayed or {}})
+        if _asks_armed(rules):
+            attrs[ARMED] = self._armed()
+        fired = []
+        for rule in rules:
+            if matches(rule["conditions"], attrs):
+                event = self.db.record_alert(rule["id"], None, camera, f"{rule['name']}: {describe(rule['conditions'])}",
+                                             animal_id=animal_id)
+                if event is not None:
+                    log.warning("ALERT [%s] %s -> animal #%s", camera, rule["name"], animal_id)
                     fired.append(event)
         return fired
 

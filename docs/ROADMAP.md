@@ -274,6 +274,9 @@ Phase 21 started 2026-10-14 (user's choices: dogs, cats and birds; security came
 2. **Done 2026-10-14**: "Animals seen" on the Live page (kind, color, day, delete; viewers may look), Ask box words
    (dog, puppy, cat, kitten, bird, crow, pigeon, pet, animal ...; `agent.animal_query`), Reports "Animals per hour".
    Plan split with the user: 3 alert rules, 4 measuring, 5 Settings/Health/docs.
+3. **Done 2026-10-14**: alert rules `animal = any/dog/cat/bird` with zone, hours, Away and stayed
+   (`AlertEngine.check_animal`, `alerts.rule_kind`); `alert_events.animal_id` (NEW_COLUMNS, checked on PostgreSQL);
+   pop-ups, clips, Alerts list; deleting an animal deletes its alerts.
 
 ## Critical files
 

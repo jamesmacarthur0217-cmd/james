@@ -198,3 +198,80 @@ def test_reports_count_animals(db, camera, tmp_path):
     r = _app(db, tmp_path).get("/api/reports/summary", params={"start": "2026-10-14", "end": "2026-10-14"}).json()
     assert r["animals"]["total"] == 3
     assert {k["value"]: k["count"] for k in r["animals"]["kinds"]} == {"dog": 1, "cat": 1, "bird": 1}
+
+
+# --- step 3: alert rules on animals ---
+
+def test_animal_rules_match_and_describe():
+    from labeler.alerts import describe, matches, rule_kind
+    dog = {"animal": "dog", "zone": "yard"}
+    assert matches([["animal", "any"]], dog) and matches([["animal", "dog"], ["zone", "yard"]], dog)
+    assert not matches([["animal", "cat"]], dog)
+    assert not matches([["animal", "any"]], {"upper_color": "red"})                       # a person is no animal
+    assert describe([["animal", "dog"], ["armed", "away"]]) == "animal = dog, only when Away"
+    assert describe([["animal", "any"]]) == "any animal"
+    assert [rule_kind(c) for c in ([], [["vehicle", "any"]], [["animal", "cat"]])] == ["person", "vehicle", "animal"]
+
+
+def test_animal_rules_fire_once_per_animal_and_never_for_people_or_vehicles(db, camera):
+    from labeler.alerts import AlertEngine
+    engine = AlertEngine(db)
+    db.add_rule("dog in yard", [["animal", "dog"], ["zone", "yard"]])
+    db.add_rule("any animal", [["animal", "any"]])
+    db.add_rule("anyone", [])                                                            # a person rule
+    db.add_rule("any vehicle", [["vehicle", "any"]])
+    dog = db.create_animal(camera, 1, "dog", datetime.now())
+    db.update_animal(dog, crop_path=f"animal_{dog}.jpg")
+    assert [e["message"] for e in engine.check_animal(dog, "test-cam")] == ["any animal: any animal"]
+    db.add_animal_zone_events(dog, "test-cam", [{"zone_id": 1, "zone_name": "yard", "kind": "enter", "at": T0}])
+    assert [e["message"] for e in engine.check_animal(dog, "test-cam")] == ["dog in yard: animal = dog, in zone yard"]
+    assert engine.check_animal(dog, "test-cam") == []                                     # once per rule and animal
+    shown = db.list_alerts()[0]
+    assert shown["animal_id"] == dog and shown["track_id"] is None and shown["crop"] == f"animal_{dog}.jpg"
+    person = db.create_track(camera, 1, datetime.now())
+    assert [e["message"] for e in engine.check(person, "test-cam")] == ["anyone: anyone"]
+    _, paths = db.delete_animals([dog])
+    assert any(p.startswith("clips/alert_") for p in paths)
+    assert all(e["animal_id"] is None for e in db.list_alerts())                         # its alerts went with it
+
+
+def test_animal_stay_rules(db, camera):
+    from labeler.alerts import AlertEngine
+    engine = AlertEngine(db)
+    db.add_rule("cat in kitchen", [["animal", "cat"], ["stayed", "kitchen:300"]])
+    db.add_rule("person in kitchen", [["stayed", "kitchen:30"]])
+    assert engine.stay_limits("test-cam", animals=True) == {"kitchen": 300}
+    assert engine.stay_limits("test-cam") == {"kitchen": 30}
+    assert engine.stay_limits("test-cam", vehicles=True) == {}
+    cat = db.create_animal(camera, 1, "cat", datetime.now())
+    assert engine.check_animal(cat, "test-cam", stayed={"kitchen": 200}) == []
+    assert len(engine.check_animal(cat, "test-cam", stayed={"kitchen": 301})) == 1
+
+
+def test_pipeline_checks_animal_rules_and_saves_a_clip(db, camera):
+    p = make_pipeline(db)
+    asked = []
+
+    class Alerts:
+        def check_animal(self, animal_id, camera_name, stayed=None):
+            asked.append(animal_id)
+            return [{"id": 7}]
+
+    class Clips:
+        def request(self, event_id, before_s=None):
+            asked.append(("clip", event_id))
+
+    p.alerts, p.clips = Alerts(), Clips()
+    p._check_animal_alerts(5)
+    assert asked == [5, ("clip", 7)]
+
+
+def test_rule_api_checks_animal_rules(db, tmp_path):
+    db.add_zone("test-cam", "yard", "area", [(0, 0), (1, 0), (1, 1)])
+    client = _app(db, tmp_path)
+    post = lambda conds: client.post("/api/alerts/rules", json={"name": "r", "conditions": conds}).status_code  # noqa: E731
+    assert post([["animal", "dog"], ["zone", "yard"], ["hours", "22-06"], ["armed", "away"]]) == 200
+    assert post([["animal", "cat"], ["stayed", "yard:300"]]) == 200
+    assert post([["animal", "unicorn"]]) == 400
+    assert post([["animal", "dog"], ["vehicle", "car"]]) == 400                           # one or the other
+    assert post([["animal", "dog"], ["upper_color", "red"]]) == 400                       # a person's label

@@ -199,7 +199,8 @@ class Pipeline:
                 self.vehicles.zone_counter = self.zone_counter
             if want_animals:
                 self.animal_kinds = animal_kinds(acfg["kinds"])
-                self.animals = VehicleWatch(acfg, AnimalStore(db, self.camera_id, self.crop_dir, blur_all, self.name),
+                self.animals = VehicleWatch(acfg, AnimalStore(db, self.camera_id, self.crop_dir, blur_all, self.name,
+                                                              self._check_animal_alerts),
                                             acfg["kinds"], names=self.animal_kinds, still_word="resting")
                 self.animals.zone_counter = self.zone_counter
         self.tracks: dict[int, TrackState] = {}
@@ -208,6 +209,7 @@ class Pipeline:
         # Areas with a loitering rule (people, vehicles): the live picture shows how long someone is in them.
         self._stay_areas: frozenset[str] = frozenset()
         self._stay_areas_v: frozenset[str] = frozenset()
+        self._stay_areas_a: frozenset[str] = frozenset()
         # People who recently left the view, kept briefly so a returning person continues
         # the same record instead of becoming a new one: db_id -> (state, time lost).
         self.recently_lost: dict[int, tuple[TrackState, float]] = {}
@@ -529,6 +531,13 @@ class Pipeline:
                     s = stays(v.zones)
                     if v.db_id is not None and due(s, limits):
                         self._check_vehicle_alerts(v.db_id, stayed=s)
+            limits = self.alerts.stay_limits(self.name, animals=True) if self.animals is not None else {}
+            self._stay_areas_a = frozenset(limits)
+            if limits:
+                for a in list(self.animals.tracks.values()):
+                    s = stays(a.zones)
+                    if a.db_id is not None and due(s, limits):
+                        self._check_animal_alerts(a.db_id, stayed=s)
         except Exception:
             log.exception("checking loitering rules failed")
 
@@ -543,6 +552,18 @@ class Pipeline:
                 parts.append(f"{name} {s // 3600}:{s // 60 % 60:02d}:{s % 60:02d}" if s >= 3600
                              else f"{name} {s // 60}:{s % 60:02d}")
         return " ".join(parts)
+
+    def _check_animal_alerts(self, animal_id: int, stayed: dict | None = None) -> None:
+        if self.alerts is None:
+            return
+        try:
+            fired = self.alerts.check_animal(animal_id, self.name, stayed=stayed)
+        except Exception:
+            log.exception("checking animal alert rules failed")
+            return
+        if self.clips is not None and self.cfg["clips"]["enabled"]:
+            for event in fired:
+                self.clips.request(event["id"])
 
     def _check_vehicle_alerts(self, vehicle_id: int, stayed: dict | None = None) -> None:
         if self.alerts is None:
@@ -1050,7 +1071,8 @@ class Pipeline:
                 cv2.putText(out, line, (x1 + 3, y - 3), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 1, cv2.LINE_AA)
                 y += th + 8
         if self.animals is not None:
-            for (x1, y1, x2, y2), label in self.animals.shown(now):
+            for (x1, y1, x2, y2), label in self.animals.shown(
+                    now, lambda a: self._stay_text(a.zones, self._stay_areas_a, wall)):
                 cv2.rectangle(out, (int(x1), int(y1)), (int(x2), int(y2)), (40, 160, 255), 2)   # orange: an animal
                 (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
                 cv2.rectangle(out, (int(x1), int(y1) - th - 8), (int(x1) + tw + 6, int(y1)), (40, 160, 255), -1)

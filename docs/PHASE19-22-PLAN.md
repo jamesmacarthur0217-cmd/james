@@ -49,6 +49,7 @@ said honestly). **Answers (2026-10-14): dogs, cats and birds; security cameras o
    resting stay one record like parked vehicles; on all cameras or security only (asked).
 2. **Done 2026-10-14** (list, Ask box, Reports; the alert rules became step 2b with the user). Live page "Animals seen", Ask box words (dog, cat, bird...), Reports counts, alert rules `animal = dog`
    (with zone, hours, armed).
+2b. **Done 2026-10-14**: the alert rules `animal = dog` (with zone, hours, armed, stayed).
 3. Measure: COCO val2017 animal detection (marked boxes already here), false alarms on MOT16 and the UR Fall
    activities (indoors, no animals).
 4. Settings/Health, docs.

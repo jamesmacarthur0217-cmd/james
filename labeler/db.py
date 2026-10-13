@@ -196,6 +196,7 @@ class AlertEvent(Base):
     # track_id NOT NULL: relaxed at start (NULLABLE_NOW).
     track_id: Mapped[int | None] = mapped_column(ForeignKey("tracks.id", ondelete="CASCADE"), index=True, nullable=True)
     vehicle_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+    animal_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)   # an animal's (labeler/animals.py)
     camera: Mapped[str] = mapped_column(String(100))
     message: Mapped[str] = mapped_column(String(300))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
@@ -397,7 +398,7 @@ NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT", "video_path
                           "source_offset_s": "FLOAT"},
                "cameras": {"retention_days": "INTEGER"},
                "zones": {"lying_ok": "BOOLEAN"},
-               "alert_events": {"vehicle_id": "INTEGER"}}
+               "alert_events": {"vehicle_id": "INTEGER", "animal_id": "INTEGER"}}
 # Columns that may be empty now (table, column): an alert can be about a vehicle instead of a person.
 NULLABLE_NOW = [("alert_events", "track_id")]
 # Uniqueness rules taken off existing tables at start (table, columns): falls alert again for the same person.
@@ -732,6 +733,16 @@ class Database:
                      "resting_at": iso(a.resting_at), "left_at": iso(a.left_at), "n_frames": a.n_frames}
                     for a, cam in s.execute(q.order_by(Animal.started_at.desc(), Animal.id.desc()).limit(limit)).all()]
 
+    def animal_attrs(self, animal_id: int) -> dict[str, str] | None:
+        """What alert rules ask about an animal (labeler/alerts.py), or None if it is gone."""
+        with self.Session() as s:
+            a = s.get(Animal, animal_id)
+            if a is None:
+                return None
+            zones = sorted(s.scalars(select(AnimalZoneEvent.zone_name).distinct().where(
+                AnimalZoneEvent.animal_id == animal_id, AnimalZoneEvent.kind.in_(("enter", "in", "out")))))
+            return {"animal": a.kind, "zone": ",".join(zones)}
+
     def add_animal_zone_events(self, animal_id: int, camera: str, events: list[dict]) -> None:
         with self.Session.begin() as s:
             if s.get(Animal, animal_id) is not None:
@@ -754,6 +765,8 @@ class Database:
             deleted, paths = [a.id for a in old], [a.crop_path for a in old if a.crop_path]
             if deleted:
                 s.execute(delete(AnimalZoneEvent).where(AnimalZoneEvent.animal_id.in_(deleted)))
+                paths += [clip_name(i) for i in s.scalars(select(AlertEvent.id).where(AlertEvent.animal_id.in_(deleted)))]
+                s.execute(delete(AlertEvent).where(AlertEvent.animal_id.in_(deleted)))
             for a in old:
                 s.delete(a)
         return deleted, paths
@@ -1089,39 +1102,47 @@ class Database:
             return {n: a["value"] for n, a in resolve(t.attributes).items()}
 
     def record_alert(self, rule_id: int, track_id: int | None, camera: str, message: str, repeat: bool = False,
-                     vehicle_id: int | None = None) -> dict | None:
-        """Store an alert unless this rule already fired for this person (or vehicle). repeat: a fall, which can
-        happen again."""
+                     vehicle_id: int | None = None, animal_id: int | None = None) -> dict | None:
+        """Store an alert unless this rule already fired for this person (or vehicle, or animal). repeat: a fall,
+        which can happen again."""
         with self.Session.begin() as s:
-            who = AlertEvent.vehicle_id == vehicle_id if vehicle_id is not None else AlertEvent.track_id == track_id
+            if animal_id is not None:
+                who, gone = AlertEvent.animal_id == animal_id, s.get(Animal, animal_id) is None
+            elif vehicle_id is not None:
+                who, gone = AlertEvent.vehicle_id == vehicle_id, s.get(Vehicle, vehicle_id) is None
+            else:
+                who, gone = AlertEvent.track_id == track_id, s.get(Track, track_id) is None
             exists = None if repeat else s.scalar(select(AlertEvent.id).where(AlertEvent.rule_id == rule_id, who))
-            gone = s.get(Vehicle, vehicle_id) is None if vehicle_id is not None else s.get(Track, track_id) is None
             if exists is not None or gone:
                 return None
-            e = AlertEvent(rule_id=rule_id, track_id=track_id if vehicle_id is None else None, vehicle_id=vehicle_id,
-                           camera=camera, message=message)
+            person = vehicle_id is None and animal_id is None
+            e = AlertEvent(rule_id=rule_id, track_id=track_id if person else None, vehicle_id=vehicle_id,
+                           animal_id=animal_id, camera=camera, message=message)
             s.add(e)
             try:
                 s.flush()
             except IntegrityError:   # an old SQLite database: "once per rule and person", or no vehicle alerts
                 log.warning("an alert was not stored (old database rule; PostgreSQL databases are updated at start)")
                 return None
-            return {"id": e.id, "rule_id": rule_id, "track_id": e.track_id, "vehicle_id": vehicle_id, "camera": camera,
-                    "message": message, "created_at": e.created_at.isoformat(timespec="seconds")}
+            return {"id": e.id, "rule_id": rule_id, "track_id": e.track_id, "vehicle_id": vehicle_id,
+                    "animal_id": animal_id, "camera": camera, "message": message,
+                    "created_at": e.created_at.isoformat(timespec="seconds")}
 
     def list_alerts(self, since_id: int = 0, limit: int = 50) -> list[dict]:
         with self.Session() as s:
-            rows = s.execute(select(AlertEvent, Track.crop_path, Vehicle.crop_path, AlertRule.conditions)
+            rows = s.execute(select(AlertEvent, Track.crop_path, Vehicle.crop_path, Animal.crop_path, AlertRule.conditions)
                              .outerjoin(Track, Track.id == AlertEvent.track_id)
                              .outerjoin(Vehicle, Vehicle.id == AlertEvent.vehicle_id)
+                             .outerjoin(Animal, Animal.id == AlertEvent.animal_id)
                              .outerjoin(AlertRule, AlertRule.id == AlertEvent.rule_id)
-                             .where(AlertEvent.id > since_id, (Track.id.is_not(None)) | (Vehicle.id.is_not(None)))
+                             .where(AlertEvent.id > since_id, (Track.id.is_not(None)) | (Vehicle.id.is_not(None))
+                                    | (Animal.id.is_not(None)))
                              .order_by(AlertEvent.id.desc()).limit(limit)).all()
             return [{"id": e.id, "rule_id": e.rule_id, "track_id": e.track_id, "vehicle_id": e.vehicle_id,
-                     "camera": e.camera, "message": e.message, "crop": tcrop or vcrop,
+                     "animal_id": e.animal_id, "camera": e.camera, "message": e.message, "crop": tcrop or vcrop or acrop,
                      "created_at": e.created_at.isoformat(timespec="seconds"),
                      "fall": any(n == "fallen" for n, _ in json.loads(conds or "[]"))}
-                    for e, tcrop, vcrop, conds in rows]
+                    for e, tcrop, vcrop, acrop, conds in rows]
 
     def latest_alert_id(self) -> int:
         from sqlalchemy import func
@@ -1660,7 +1681,11 @@ class Database:
                                                           Animal.started_at < now - timedelta(days=days))).all()
                     paths += [a.crop_path for a in gone if a.crop_path]
                     if gone:
-                        s.execute(delete(AnimalZoneEvent).where(AnimalZoneEvent.animal_id.in_([a.id for a in gone])))
+                        gone_ids = [a.id for a in gone]
+                        s.execute(delete(AnimalZoneEvent).where(AnimalZoneEvent.animal_id.in_(gone_ids)))
+                        paths += [clip_name(i) for i in s.scalars(select(AlertEvent.id).where(
+                            AlertEvent.animal_id.in_(gone_ids)))]
+                        s.execute(delete(AlertEvent).where(AlertEvent.animal_id.in_(gone_ids)))
                     for a in gone:
                         s.delete(a)
         if old:

@@ -401,7 +401,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         allowed = {**schema.FIELDS, **{n: v + ["none"] for n, v in schema.LIST_FIELDS.items()},
                    "zone": sorted({z["name"] for z in db.list_zones()}), "fallen": ["yes"],
                    "vehicle": ["any", "car", "SUV", "van", "pickup", "lorry", "bus", "motorbike", "bicycle"],
-                   "vehicle_color": [c for c in VEHICLE_COLORS if c != "unknown"], "armed": ["away", "home"]}
+                   "vehicle_color": [c for c in VEHICLE_COLORS if c != "unknown"], "armed": ["away", "home"],
+                   "animal": ["any", "dog", "cat", "bird", "horse", "sheep", "cow"]}
         areas = {z["name"] for z in db.list_zones() if z["kind"] == "area"}
         for cond in body.conditions:
             if len(cond) == 2 and cond[0] == "hours":
@@ -421,6 +422,11 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         names = [c[0] for c in body.conditions]
         if "vehicle_color" in names and "vehicle" not in names:
             raise HTTPException(400, 'a vehicle color needs a "vehicle" condition too (e.g. vehicle = any)')
+        if "animal" in names and "vehicle" in names:
+            raise HTTPException(400, "a rule is about a vehicle or an animal, not both")
+        if "animal" in names and set(names) - {"animal", "zone", "hours", "armed", "stayed"}:
+            raise HTTPException(400, "an animal rule can ask only for the animal, a zone, how long it stayed, the hours "
+                                     "and Home / Away")
         if "fallen" in names and "stayed" in names:
             raise HTTPException(400, "a fall rule cannot also ask how long someone stayed")
         if "vehicle" in names and set(names) - {"vehicle", "vehicle_color", "zone", "hours", "armed", "stayed"}:
