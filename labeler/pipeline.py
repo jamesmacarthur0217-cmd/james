@@ -193,6 +193,7 @@ class Pipeline:
             self.vehicles.zone_counter = self.zone_counter
         self.tracks: dict[int, TrackState] = {}
         self.by_db_id: dict[int, TrackState] = {}
+        self._stay_checked = 0.0   # when people and vehicles inside areas were last checked for loitering rules
         # People who recently left the view, kept briefly so a returning person continues
         # the same record instead of becoming a new one: db_id -> (state, time lost).
         self.recently_lost: dict[int, tuple[TrackState, float]] = {}
@@ -427,6 +428,9 @@ class Pipeline:
                 self._on_fall(tid)
         if self.vehicles is not None and self.frames % max(1, int(self.vehicle_cfg["every_n_frames"])) == 0:
             self._update_vehicles(frame, now)
+        if self.alerts is not None and self.zone_counter.zones and now - self._stay_checked >= 1.0:
+            self._stay_checked = now
+            self._check_stays()
 
         for tid, st in list(self.tracks.items()):
             if tid not in seen and now - st.last_seen > tcfg["lost_after_s"]:
@@ -468,11 +472,41 @@ class Pipeline:
                     self.last_person_at = now   # a vehicle arriving wakes idle mode, like a person
         self.vehicles.update(now, self.clock.wall(), frame, dets, self._head_boxes())
 
-    def _check_vehicle_alerts(self, vehicle_id: int) -> None:
+    def _check_stays(self) -> None:
+        """Loitering rules ("stayed = gate:120"): people and vehicles inside areas long enough are checked against
+        the rules, once a second (alerts.py; once per rule and person or vehicle)."""
+        wall = self.clock.wall()
+
+        def stays(z) -> dict[str, float]:
+            out: dict[str, float] = {}
+            for name, since in (z.inside.values() if z is not None else ()):
+                out[name] = max(out.get(name, 0.0), (wall - since).total_seconds())
+            return out
+
+        def due(s: dict, limits: dict) -> bool:
+            return any(s.get(zone, 0.0) >= secs for zone, secs in limits.items())
+
+        try:
+            limits = self.alerts.stay_limits(self.name)
+            if limits:
+                for st in list(self.tracks.values()):
+                    s = stays(st.zones)
+                    if st.db_id is not None and due(s, limits):
+                        self._check_alerts(st.db_id, stayed=s)
+            limits = self.alerts.stay_limits(self.name, vehicles=True) if self.vehicles is not None else {}
+            if limits:
+                for v in list(self.vehicles.tracks.values()):
+                    s = stays(v.zones)
+                    if v.db_id is not None and due(s, limits):
+                        self._check_vehicle_alerts(v.db_id, stayed=s)
+        except Exception:
+            log.exception("checking loitering rules failed")
+
+    def _check_vehicle_alerts(self, vehicle_id: int, stayed: dict | None = None) -> None:
         if self.alerts is None:
             return
         try:
-            fired = self.alerts.check_vehicle(vehicle_id, self.name)
+            fired = self.alerts.check_vehicle(vehicle_id, self.name, stayed=stayed)
         except Exception:
             log.exception("checking vehicle alert rules failed")
             return
@@ -603,10 +637,10 @@ class Pipeline:
         if any(e["kind"] in ("enter", "in", "out") for e in events):
             self._check_alerts(st.db_id)   # rules can ask for "entered zone X"
 
-    def _check_alerts(self, db_id: int | None, fallen: bool = False) -> None:
+    def _check_alerts(self, db_id: int | None, fallen: bool = False, stayed: dict | None = None) -> None:
         if self.alerts is not None and db_id is not None and db_id not in self.deleted_ids:
             try:
-                fired = self.alerts.check(db_id, self.name, fallen=fallen)
+                fired = self.alerts.check(db_id, self.name, fallen=fallen, stayed=stayed)
             except Exception:
                 log.exception("checking alert rules failed")
                 return

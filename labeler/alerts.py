@@ -14,6 +14,11 @@ described and when it enters a zone. Person rules never fire for vehicles and th
 pages' Home / Away switch or by its weekly schedule (labeler/arming.py). Rules without it work all the time, like the
 built-in "Fall" rule.
 
+"stayed = gate:120" (people and vehicles) is someone staying in area "gate" at least 120 s (loitering). The time inside
+an area is kept by labeler/zones.py; the camera checks people and vehicles inside areas once a second with how long
+they have been in each (`stayed`), and the rule fires once per person or vehicle like the others. A person out of sight
+for more than tracking.lost_after_s leaves the area (their time starts again); a parked vehicle hidden a moment keeps it.
+
 "fallen = yes" is a fall (labeler/falls.py): rules with it are checked only when a fall is confirmed, and fire
 for every fall, also a second one of the same person. A built-in rule "Fall" is made at start when fall alerts
 are on and no rule asks for a fall (turn it off on the Alerts page to stop fall alerts; deleted, it comes back).
@@ -33,7 +38,8 @@ log = logging.getLogger(__name__)
 ZONE = "zone"   # condition on where the person went, not on how they look
 FALLEN = "fallen"   # condition on a fall having just been confirmed
 FALL_RULE = [[FALLEN, "yes"]]
-VEHICLE, VEHICLE_COLOR, HOURS, ARMED = "vehicle", "vehicle_color", "hours", "armed"
+VEHICLE, VEHICLE_COLOR, HOURS, ARMED, STAYED = "vehicle", "vehicle_color", "hours", "armed", "stayed"
+MAX_STAY_S = 24 * 3600
 CAR_GROUP = {"car", "SUV", "van", "pickup"}   # "car" in a rule, like in the Ask box
 HOUR_PRESETS = ["22-06", "20-06", "00-06", "18-24", "06-18", "08-18", "09-17"]
 
@@ -55,6 +61,23 @@ def in_hours(value: str, hour: int) -> bool:
     return hour >= start or hour < end
 
 
+def parse_stayed(value: str) -> tuple[str, int]:
+    """"gate:120" -> ("gate", 120). A zone name may itself hold a colon: the seconds are after the last one."""
+    zone, sep, secs = str(value).rpartition(":")
+    if not sep or not zone or not secs.isdigit() or not 1 <= int(secs) <= MAX_STAY_S:
+        raise ValueError(f"stayed must look like gate:120 (an area and 1-{MAX_STAY_S} seconds), not {value!r}")
+    return zone, int(secs)
+
+
+def nice_seconds(s: float) -> str:
+    s = int(s)
+    if s % 3600 == 0:
+        return f"{s // 3600} h"
+    if s % 60 == 0:
+        return f"{s // 60} min"
+    return f"{s} s"
+
+
 def is_fall_rule(conditions: list[list[str]]) -> bool:
     return any(name == FALLEN for name, _ in conditions)
 
@@ -64,6 +87,10 @@ def matches(conditions: list[list[str]], attrs: dict[str, str]) -> bool:
         current = attrs.get(name)
         if name == HOURS:
             if not in_hours(value, int(attrs.get("hour", datetime.now().hour))):
+                return False
+        elif name == STAYED:   # attrs[STAYED]: {area name: seconds inside}, only from the once-a-second check
+            zone, secs = parse_stayed(value)
+            if (attrs.get(STAYED) or {}).get(zone, 0) < secs:
                 return False
         elif name == VEHICLE:
             if not current or (value != "any" and current != value and not (value == "car" and current in CAR_GROUP)):
@@ -91,6 +118,9 @@ def describe(conditions: list[list[str]]) -> str:
             return "any vehicle" if v == "any" else f"vehicle = {v}"
         if n == ARMED:
             return f"only when {v.capitalize()}"
+        if n == STAYED:
+            zone, secs = parse_stayed(v)
+            return f"stayed in {zone} {nice_seconds(secs)}"
         if n == HOURS:
             a, b = v.split("-")
             return f"between {int(a):02d}:00 and {int(b) % 24:02d}:00"
@@ -132,9 +162,23 @@ class AlertEngine:
         from .arming import HOME
         return self.arming.current() if self.arming is not None else HOME
 
-    def check(self, track_id: int, camera: str, fallen: bool = False) -> list[dict]:
+    def stay_limits(self, camera: str, vehicles: bool = False) -> dict[str, int]:
+        """{area name: the shortest stay a rule asks for} on this camera, for people (or vehicles): the camera only
+        asks check() with `stayed` for someone inside such an area that long."""
+        out: dict[str, int] = {}
+        for r in self._enabled_rules():
+            if (r["camera"] and r["camera"] != camera) or is_vehicle_rule(r["conditions"]) != vehicles:
+                continue
+            for name, value in r["conditions"]:
+                if name == STAYED:
+                    zone, secs = parse_stayed(value)
+                    out[zone] = min(secs, out.get(zone, secs))
+        return out
+
+    def check(self, track_id: int, camera: str, fallen: bool = False, stayed: dict | None = None) -> list[dict]:
         """Fire every enabled rule this person now matches (once per rule and person). fallen: a fall was just
-        confirmed: only the rules asking for a fall are checked, and they fire again for a later fall."""
+        confirmed: only the rules asking for a fall are checked, and they fire again for a later fall.
+        stayed: {area name: seconds inside} (the camera's once-a-second check of people inside areas)."""
         rules = [r for r in self._enabled_rules() if (not r["camera"] or r["camera"] == camera)
                  and is_fall_rule(r["conditions"]) == fallen and not is_vehicle_rule(r["conditions"])]
         if not rules:
@@ -146,7 +190,7 @@ class AlertEngine:
             attrs = {**attrs, ZONE: ",".join(self.db.zones_entered(track_id))}
         if fallen:
             attrs = {**attrs, FALLEN: "yes"}
-        attrs = {**attrs, "hour": datetime.now().hour}
+        attrs = {**attrs, "hour": datetime.now().hour, STAYED: stayed or {}}
         if _asks_armed(rules):
             attrs[ARMED] = self._armed()
         fired = []
@@ -159,8 +203,8 @@ class AlertEngine:
                     fired.append(event)
         return fired
 
-    def check_vehicle(self, vehicle_id: int, camera: str) -> list[dict]:
-        """Fire every enabled vehicle rule this vehicle now matches (once per rule and vehicle)."""
+    def check_vehicle(self, vehicle_id: int, camera: str, stayed: dict | None = None) -> list[dict]:
+        """Fire every enabled vehicle rule this vehicle now matches (once per rule and vehicle). stayed: as check()."""
         rules = [r for r in self._enabled_rules() if (not r["camera"] or r["camera"] == camera)
                  and is_vehicle_rule(r["conditions"])]
         if not rules:
@@ -169,6 +213,7 @@ class AlertEngine:
         if attrs is None:   # deleted, or the vision model saw no vehicle
             return []
         attrs["hour"] = datetime.now().hour
+        attrs[STAYED] = stayed or {}
         if _asks_armed(rules):
             attrs[ARMED] = self._armed()
         fired = []

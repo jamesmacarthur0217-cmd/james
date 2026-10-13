@@ -255,6 +255,10 @@ Phase 19 started 2026-10-14 (user's choices: admins **and viewers** may switch; 
 4. **Done 2026-10-14**: the new table checked on PostgreSQL (scratch database), docs. **Phase 19 is done.**
    Next: Phase 20 (loitering alert); ask the user first.
 
+Phase 20 started 2026-10-14.
+1. **Done 2026-10-14**: condition `stayed = <area>:<seconds>` for people and vehicles, checked once a second
+   (`Pipeline._check_stays`, `AlertEngine.stay_limits`); real run: 4 people and a bus alerted 21 s into a 20 s rule.
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),

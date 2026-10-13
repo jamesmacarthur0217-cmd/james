@@ -413,7 +413,7 @@ def test_pipeline_checks_vehicle_rules_and_saves_a_clip(db, camera, tmp_path):
     asked = []
 
     class Alerts:
-        def check_vehicle(self, vehicle_id, camera_name):
+        def check_vehicle(self, vehicle_id, camera_name, stayed=None):
             asked.append(vehicle_id)
             return [{"id": 7}]
 

@@ -32,7 +32,7 @@ Ask at the start: may viewers (family) switch it, or admins only; a weekly sched
 
 ## Phase 20: Loitering alert (staying too long)
 
-1. Condition `stayed = <zone>:<seconds>` (e.g. `gate:120`): the person (or vehicle) has been inside that area at least
+1. **Done 2026-10-14.** Condition `stayed = <zone>:<seconds>` (e.g. `gate:120`): the person (or vehicle) has been inside that area at least
    that long. The time inside is already kept (`zones.PersonZones.inside` = zone -> entered at); the pipeline checks
    people inside areas once a second (not every frame) with `AlertEngine.check(..., attrs with stayed seconds)`;
    once per rule and person as now. Vehicles the same in `VehicleWatch` (a car standing at the gate 10 minutes).

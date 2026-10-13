@@ -56,6 +56,7 @@ camera(s) ─ labeler/sources.py (MSMF webcam, files/images at their frame rate,
         per person: colors (colors.py), embedding (embed.py, SigLIP 2), fast classifiers (student.py),
                     age model (age.py), VLM job (vlm.py → Ollama qwen3-vl:4b-instruct), re-analysis every 15 s,
                     alerts (alerts.py; conditions on labels and "zone"), alert clips (clips.py, WebM/VP8)
+        loitering: _check_stays once a second: people/vehicles inside areas -> alerts.check(stayed={area: s})
         night mode: mostly black-and-white frames → no colors from any source (_is_night, night_ids)
         zones.py: areas (enter/exit, dwell) and counting lines (in/out); drawn on the live picture
    └─ labeler/db.py  SQLAlchemy models + queries (Postgres+pgvector; SQLite for tests)
