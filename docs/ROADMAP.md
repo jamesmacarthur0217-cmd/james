@@ -1,6 +1,6 @@
 # VisionLabeler: next improvements roadmap
 
-## Status (2026-10-12)
+## Status (2026-10-14)
 
 **Phases 0 and 2-11 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
@@ -9,7 +9,7 @@ import, first kept retraining) are done (2026-10-12). Phase 12 step 1 (a re-iden
 on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. Phase 13 (recording
 while people are in view), Phase 14 (a camera at another site, through Tailscale) and Phase 15 (that camera sent
 from a phone or PC, so it works through company firewalls) are done (2026-10-12). Phase 17 (mobility aids and fall
-alerts) is done (2026-10-13). Phase 18 (vehicles) is done. 592 tests pass.
+alerts) is done (2026-10-13). Phase 18 (vehicles) is done. Phase 19 (Home / Away) is done (2026-10-14). 618 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -240,7 +240,7 @@ plates; type, color and make/model).
 4. **Done 2026-10-13**: alert rules on vehicles (type, color, zone, time of day), pop-ups and clips.
 5. **Done 2026-10-13**: Settings, Health, installer/offline package, docs. **Phase 18 is done.**
 
-## Phases 19-22: Home/Away, loitering, animals, scene questions (approved 2026-10-13, not started)
+## Phases 19-22: Home/Away, loitering, animals, scene questions (approved 2026-10-13; Phase 19 done 2026-10-14)
 
 **Plan: [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md)**: the user chose all four new ideas as future phases, in this order:
 19 Home/Away arming (rules "only when Away"), 20 loitering alert (stayed in an area too long), 21 animals (with the
@@ -252,6 +252,8 @@ Phase 19 started 2026-10-14 (user's choices: admins **and viewers** may switch; 
 2. **Done 2026-10-14**: rule condition `armed = away / home` (people and vehicles; the Fall rule stays always on).
 3. **Done 2026-10-14**: Home/Away button on every page (asks first), Live tile, Health line, Alerts page condition,
    Settings schedule box, README "Home / Away".
+4. **Done 2026-10-14**: the new table checked on PostgreSQL (scratch database), docs. **Phase 19 is done.**
+   Next: Phase 20 (loitering alert); ask the user first.
 
 ## Critical files
 

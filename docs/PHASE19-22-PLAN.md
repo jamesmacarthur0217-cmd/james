@@ -1,4 +1,4 @@
-# Phases 19-22 plan: Home/Away, loitering, animals, scene questions (approved 2026-10-13, not started)
+# Phases 19-22 plan: Home/Away, loitering, animals, scene questions (approved 2026-10-13; Phase 19 done 2026-10-14)
 
 ## Context
 
@@ -27,7 +27,8 @@ Ask at the start: may viewers (family) switch it, or admins only; a weekly sched
    work as now. The built-in "Fall" rule stays always on.
 3. **Done 2026-10-14** (a tap asks first, the user's choice). Pages: a Home/Away switch in the header of every page (session.js, big enough for a phone), shown on the Live
    page's "Today" tiles and the Health page; Alerts page "only when Away/Home".
-4. Tests (schedule edges, override until the next change, rule matching), real run, docs.
+4. **Done 2026-10-14** (PostgreSQL checked on a scratch database). Tests (schedule edges, override until the next
+   change, rule matching), real run, docs. **Phase 19 is done** (commits `46daf57`, `1843a06`, `b41530b`, docs).
 
 ## Phase 20: Loitering alert (staying too long)
 

@@ -16,10 +16,10 @@ Roadmap Phase 1 (licenses) is deferred until they say otherwise. Under Malaysia'
 household use is generally outside the Act; their filled-in camera sign and data-protection summary are in
 `data/privacy/` (git-ignored, contains their email); the blank templates are in `docs/`.
 
-## 2. Current state (2026-10-13, end of the session)
+## 2. Current state (2026-10-14)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
-  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15, 17 and 18 done (17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings; 18: vehicles `2790822` · `91d90e4` · `8374fad` · `0d87bc0` · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15, 17, 18 and 19 done (19: `46daf57` Home/Away state · `1843a06` rules · `b41530b` pages; 17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings; 18: vehicles `2790822` · `91d90e4` · `8374fad` · `0d87bc0` · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
   `2429790`/`bc23363` soak tool · `0449255` idle mode · `23273b1` restore drill. Phase 9 (small
   fixes): `8675c46` list redraw · `81dbcb2` backup.dir · `482bdd4` CI v7 · `0296435` relink_check help. Phase 8
   commits, newest first: `3794de3` today at a glance · `e3a6179` photo search · `ea97937` original excerpts ·
@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **592 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **618 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -329,9 +329,17 @@ Waiting for the user: a camera that sees a room from the side (falls) and one th
 mode (vehicles), then real numbers (makes like Perodua and Proton are not measured); marking beds/sofas "Lying is
 normal here". Phase 16 ([PHASE16-PLAN.md](PHASE16-PLAN.md), search recordings by words) stays approved, not started.
 
-**Next: [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md)** (approved 2026-10-13, not started): 19 Home/Away arming, 20 loitering
-alert, 21 animals, 22 scene questions, in that order. Start with Phase 19: ask the user its opening questions
-(who may switch Home/Away; a weekly schedule), then before each step.
+**Phase 19 (Home / Away) is done** (2026-10-14, [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md); README "Home / Away"). User's
+choices: admins **and viewers** may switch; a weekly schedule; a tap asks first. `labeler/arming.py` (table `arming`,
+column `changed_by`, not the reserved word `by`), rule condition `armed = away/home`, button in `static/session.js`, Live
+tile, Health line, Settings box `away_schedule` (-> `arming.schedule`, applies after a restart like every setting).
+The new table was checked on a scratch PostgreSQL database (script in the session scratchpad, not kept). The user's own
+app gets it at its next restart (new table only, no change to old ones). Docker Desktop was started for that check
+(2026-10-14) and left running. Small thing noticed, not fixed: on the Settings page the "unsaved changes" mark reacts
+only to the cameras table, not to the other fields (saving works).
+
+**Next: Phase 20 (loitering alert)** in [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md), then 21 animals, 22 scene questions.
+Ask the user before the phase (and its opening questions, if any), then before each step.
 Later, with the user: a long-run check with recording on, the webcam measurement (lens cover), the rest of Phase 12
 when cameras are added.
 
@@ -356,4 +364,4 @@ Open items (also in that plan):
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with the newest plan in docs/
-> (docs/PHASE19-22-PLAN.md, Phase 19 first; ask me before each phase and each step starts, and do it step by step).
+> (docs/PHASE19-22-PLAN.md, Phase 20 next; ask me before each phase and each step starts, and do it step by step).
