@@ -19,7 +19,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 ## 2. Current state (2026-10-13, end of the session)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
-  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15 and 17 done (17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15, 17 and 18 done (17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings; 18: vehicles `2790822` · `91d90e4` · `8374fad` · `0d87bc0` · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
   `2429790`/`bc23363` soak tool · `0449255` idle mode · `23273b1` restore drill. Phase 9 (small
   fixes): `8675c46` list redraw · `81dbcb2` backup.dir · `482bdd4` CI v7 · `0296435` relink_check help. Phase 8
   commits, newest first: `3794de3` today at a glance · `e3a6179` photo search · `ea97937` original excerpts ·
@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **585 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **592 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -300,9 +300,10 @@ Step 5 done (Settings). **Phase 17 is done.**
 (COCO, speed, MOT16 counting). Step 2 done: the vision model describes each vehicle once (`vlm.PROMPT_VEHICLE`,
 negative job ids), Stanford Cars in `data/datasets/stanford_cars` (`tools/vehicle_check.py makes --seed 1` = the
 unseen sample). Step 3 done: Vehicles list, Ask box (`agent.vehicle_query`), Reports, `vehicle_zone_events`. Next:
-Step 4 done (vehicle alert rules; `db.NULLABLE_NOW` relaxes alert_events.track_id on PostgreSQL at start). Next: step 5
-(Settings: vehicles per camera, kinds, parked after; Health: the vehicle detector; installer/offline package and
-tools/models.py for yolo11s.pt; data-protection template), ask the user first; ask the user before each step. Phase 16
+Step 4 done (vehicle alert rules; `db.NULLABLE_NOW` relaxes alert_events.track_id on PostgreSQL at start). Step 5 done
+(Settings, Health, `tools/models.py`). **Phase 18 is done.** The user's own app gets all of Phases 17-18 (and the
+PostgreSQL changes: zones.lying_ok, the dropped alert unique rule, alert_events.vehicle_id, track_id nullable, new
+tables vehicles and vehicle_zone_events) at its next restart. Next: ask the user (offer a short list of proposals); ask the user before each step. Phase 16
 ([PHASE16-PLAN.md](PHASE16-PLAN.md), search recordings by words) stays approved but not started. Later, with the user: a long-run check with recording on and the webcam measurement (lens cover). The rest of
 Phase 12 (more cameras, per-camera tuning, re-measuring re-identification and the short-gap re-link rule on
 outdoor footage) when the user adds cameras.

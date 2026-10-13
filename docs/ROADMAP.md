@@ -9,7 +9,7 @@ import, first kept retraining) are done (2026-10-12). Phase 12 step 1 (a re-iden
 on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. Phase 13 (recording
 while people are in view), Phase 14 (a camera at another site, through Tailscale) and Phase 15 (that camera sent
 from a phone or PC, so it works through company firewalls) are done (2026-10-12). Phase 17 (mobility aids and fall
-alerts) is done (2026-10-13). Phase 18 (vehicles) steps 1-4 are done. 585 tests pass.
+alerts) is done (2026-10-13). Phase 18 (vehicles) is done. 592 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -230,7 +230,7 @@ for now by the user (2026-10-13).
    the fall; a person can be alerted for a second fall.
 5. **Done 2026-10-13**: Settings (fall alerts on/off, seconds, per camera) and docs. **Phase 17 is done.**
 
-## Phase 18: Vehicles (approved 2026-10-13; step 1 done)
+## Phase 18: Vehicles (done 2026-10-13)
 
 **Plan: [PHASE18-PLAN.md](PHASE18-PLAN.md)** (user's choices: cars, motorbikes, bicycles, buses and lorries; no number
 plates; type, color and make/model).
@@ -238,7 +238,7 @@ plates; type, color and make/model).
 2. **Done 2026-10-13**: type, color, make and model by the vision model (Stanford Cars: make 88%, model 57%, type 93%).
 3. **Done 2026-10-13**: Vehicles list on the Live page, Ask box questions, Reports, counting lines.
 4. **Done 2026-10-13**: alert rules on vehicles (type, color, zone, time of day), pop-ups and clips.
-5. Settings/Health/installer/docs: next.
+5. **Done 2026-10-13**: Settings, Health, installer/offline package, docs. **Phase 18 is done.**
 
 ## Critical files
 

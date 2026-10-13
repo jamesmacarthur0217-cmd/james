@@ -124,7 +124,8 @@ or another app (Teams, Discord) holding the camera.
 
 The common settings can be changed on the **Settings** page instead of editing `config.yaml`: cameras (add,
 remove, source, mode, own retention, detector size, fall alerts), how long people and the audit log are kept, face
-blurring (for viewers, and in saved pictures), mobility-aid labels, fall alerts (on/off, seconds down: 3-300), HTTPS,
+blurring (for viewers, and in saved pictures), mobility-aid labels, fall alerts (on/off, seconds down: 3-300), vehicles
+(on/off, per camera, which kinds, parked after 10-3600 s), HTTPS,
 the weekly retraining, idle mode, and recording. Every value is checked before it is
 saved (a webcam number 0-9, a file that exists, or a camera address with a host; detector size 640/960/1280;
 0-3650 days), and every change is in the Audit log. Only the changed values are saved, in `data\settings.yaml`
@@ -622,6 +623,13 @@ alerts with a warning). Checked on a test copy with a "Bicycle" rule: pop-ups wi
 clips and the list on the Alerts page. Found: an alert fired before the vehicle's first picture was saved (now after
 it), and a bicycle seen only half hidden got no picture at all (now the best unclear one is kept until a clear one
 comes).
+
+**Settings and Health**: the Settings page has a **Vehicles** section (on/off, which kinds, parked after) and a
+"Vehicles" column per camera (default: ticked for security cameras; only a choice that differs from that is saved,
+so a camera changed to security mode gets vehicles by itself). The Health page has a "vehicles" line: which cameras
+look for them and how many came today, or a warning when `yolo11s.pt` is missing: the app then does not download it
+at start (an offline PC would fail) but turns vehicles off for those cameras; `install.bat`, the offline package and
+`python tools/models.py check/download/pack/unpack` include it.
 
 ## Detection: how far can a camera see?
 

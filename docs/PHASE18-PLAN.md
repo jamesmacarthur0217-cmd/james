@@ -101,6 +101,13 @@ some bicycles never had a clear picture (fallback kept now).
   vehicle detector loaded, frame rate. README "Vehicles" with all numbers; data-protection template (vehicle pictures
   can show number plates and people; kept as long as people's). HANDOFF/ROADMAP.
 
+**Step 5 results (2026-10-13)**: done. Settings: `vehicles_enabled`, `vehicle_kinds`, `vehicle_parked_after_s`, per camera
+`vehicles` (written only when it differs from the mode's default); checked in the browser pane (saved and audited).
+Health: `check_vehicles`. A missing `yolo11s.pt` is not downloaded at start (`Pipeline.vehicles_missing`, a warning on
+Health); `tools/models.py` (used by install.ps1 and pack_offline.ps1) handles it. Data-protection template: vehicles.
+**Phase 18 is done.** Waiting for the user: a camera that sees the gate or street (security mode), then real numbers
+(found, parked, makes such as Perodua and Proton, lines at the gate).
+
 ## Critical files
 
 New: `labeler/vehicles.py`, `labeler/trackers/vehicles.yaml`, `tools/vehicle_check.py`, tests. Changed:

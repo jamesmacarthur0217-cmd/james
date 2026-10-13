@@ -44,7 +44,8 @@ def _form(**changes):
             "retention_days": 30, "audit_retention_days": 365, "blur_faces": False,
             "blur_faces_for_viewers": True, "https": False, "retrain_enabled": True,
             "backup_enabled": True, "backup_copy_to": "", "person_videos": True, "mobility_aids": True,
-            "falls_enabled": True, "fall_after_s": 10,
+            "falls_enabled": True, "fall_after_s": 10, "vehicles_enabled": True,
+            "vehicle_kinds": ["car", "motorbike", "bicycle", "bus", "lorry"], "vehicle_parked_after_s": 60,
             "idle_enabled": True, "idle_after_s": 60, "recording_enabled": False, "recording_when": "people",
             "recording_keep_days": 3, "recording_max_gb": 100}
     form.update(changes)
@@ -147,6 +148,9 @@ def test_masked_password_is_kept_and_never_logged(paths, db):
     ({"recording_when": "sometimes"}, "people are in view, or always"),
     ({"recording_keep_days": 0}, "recording_keep_days"),
     ({"fall_after_s": 1}, "fall_after_s"),
+    ({"vehicle_kinds": []}, "vehicle_kinds"),
+    ({"vehicle_kinds": ["car", "spaceship"]}, "vehicle kinds are some of"),
+    ({"vehicle_parked_after_s": 5}, "vehicle_parked_after_s"),
     ({"fall_after_s": 1000}, "fall_after_s"),
 ])
 def test_bad_values_are_refused(paths, db, change, message):
@@ -278,3 +282,20 @@ def test_fall_alert_settings_are_saved(paths, db):
     page = shown.get("values", shown)
     assert page["fall_after_s"] == 20 and [c["fall_alert"] for c in page["cameras"]] == [True, False]
     assert "camera door fall_alert: True → False" in db.list_audit(10)[0]["detail"]
+
+
+def test_vehicle_settings_are_saved(paths, db):
+    app, _ = _app(paths, db)
+    client = TestClient(app, client=("127.0.0.1", 5000))
+    form = _form(vehicle_kinds=["motorbike", "car"], vehicle_parked_after_s=120)
+    form["cameras"][0]["vehicles"] = True                       # a kiosk camera that does look for vehicles
+    form["cameras"][1]["vehicles"] = True                       # a security camera: that is its default
+    r = client.post("/api/settings", json=form)
+    assert r.status_code == 200, r.json()
+    saved = yaml.safe_load(paths[1].read_text(encoding="utf-8"))
+    assert saved["vehicles"] == {"kinds": ["car", "motorbike"], "parked_after_s": 120}
+    cams = {c["name"]: c for c in saved["cameras"]}
+    assert cams["cam1"]["vehicles"] is True and "vehicles" not in cams["door"]   # the default is not written
+    shown = client.get("/api/settings").json()
+    page = shown.get("values", shown)
+    assert [c["vehicles"] for c in page["cameras"]] == [True, True]

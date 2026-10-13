@@ -439,3 +439,44 @@ def test_old_sqlite_database_skips_vehicle_alerts_instead_of_failing(tmp_path):
     vid = db.create_vehicle(cam, 1, "car", datetime.now())
     rule = db.add_rule("v", [["vehicle", "any"]])["id"]
     assert db.record_alert(rule, None, "c", "v", vehicle_id=vid) is None
+
+
+# --- step 5: Health, a missing detector file, the models tool ---
+
+def test_missing_vehicle_detector_turns_vehicles_off_and_health_says_so(db, monkeypatch, tmp_path):
+    from labeler import healthcheck
+    monkeypatch.setattr("labeler.pipeline.YOLO", lambda path: object())
+    cfg = copy.deepcopy(DEFAULTS)
+    cfg["storage"]["crop_dir"] = str(tmp_path)
+    cfg["clips"]["enabled"] = False
+    cfg["vehicles"]["model"] = str(tmp_path / "no-such-model.pt")
+    gate = Pipeline(cfg, db, None, camera={"name": "gate", "source": "rtsp://x", "mode": "security"})
+    assert gate.vehicles is None and gate.vehicles_missing.endswith("no-such-model.pt")
+    line = healthcheck.check_vehicles(cfg, db, [gate])
+    assert line["level"] == "warning" and "tools/models.py download" in line["detail"]
+    cfg["vehicles"]["model"] = DEFAULTS["vehicles"]["model"]
+    desk = Pipeline(cfg, db, None, camera={"name": "desk", "source": 0, "mode": "kiosk"})
+    assert healthcheck.check_vehicles(cfg, db, [desk])["level"] == "off"
+    cfg["vehicles"]["enabled"] = False
+    assert healthcheck.check_vehicles(cfg, db, [desk])["detail"].startswith("turned off")
+
+
+def test_health_counts_todays_vehicles(db, camera, tmp_path):
+    from labeler import healthcheck
+
+    class P:
+        name, vehicles, vehicles_missing = "gate", object(), None
+
+    VehicleStore(db, camera, tmp_path).create("car", datetime.now(), 1)
+    line = healthcheck.check_vehicles(DEFAULTS, db, [P()])
+    assert line["level"] == "ok" and line["detail"] == "gate: 1 vehicle today"
+
+
+def test_models_tool_knows_the_vehicle_detector():
+    import sys
+    from pathlib import Path as P
+    sys.path.insert(0, str(P(__file__).resolve().parent.parent / "tools"))
+    import models
+    n = models.names()
+    assert n["vehicles"] == "yolo11s.pt" and models.detectors(n) == ["yolo11s-pose.pt", "yolo11s.pt"]
+    assert models.detectors({**n, "vehicles": None}) == ["yolo11s-pose.pt"]

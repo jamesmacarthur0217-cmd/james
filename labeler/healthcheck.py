@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
@@ -272,6 +272,26 @@ def check_receiver(cfg: dict, pipelines: list, rec=None, firewall: str | None = 
     return _check("cameras from other devices", "ok", detail)
 
 
+def check_vehicles(cfg: dict, db, pipelines: list) -> dict | None:
+    """Vehicles (labeler/vehicles.py): which cameras look for them, the detector file, how many today."""
+    vcfg = cfg.get("vehicles") or {}
+    if not vcfg.get("enabled"):
+        return _check("vehicles", "off", "turned off (Settings page)")
+    missing = [p for p in pipelines if getattr(p, "vehicles_missing", None)]
+    if missing:
+        return _check("vehicles", "warning", f"the vehicle detector {missing[0].vehicles_missing} is missing, so "
+                      f"{', '.join(p.name for p in missing)} sees no vehicles: run install.bat again or "
+                      "python tools/models.py download")
+    on = [p.name for p in pipelines if getattr(p, "vehicles", None) is not None]
+    if not on:
+        return _check("vehicles", "off", "no camera looks for vehicles (on by default for security cameras; "
+                                         "per camera on the Settings page)")
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    n = len(db.vehicle_rows(today, datetime.now() + timedelta(minutes=1)))
+    return _check("vehicles", "ok", f"{', '.join(on)}: {n} {'vehicle' if n == 1 else 'vehicles'} today"
+                                    + ("" if vcfg.get("describe", True) else "; not described (vehicles.describe off)"))
+
+
 def check_errors(now: float) -> tuple[dict, list[dict]]:
     errors = logs.recent_errors.recent(now)
     latest = [{"at": datetime.fromtimestamp(t).isoformat(timespec="seconds"), "message": mask_password(m)[:300]}
@@ -300,6 +320,12 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
             checks.insert(-1, line)
     except Exception as e:
         checks.insert(-1, _check("cameras from other devices", "warning", f"could not be checked ({e.__class__.__name__})"))
+    try:
+        line = check_vehicles(cfg, db, pipelines)
+        if line is not None:
+            checks.insert(-1, line)
+    except Exception as e:
+        checks.insert(-1, _check("vehicles", "warning", f"could not be checked ({e.__class__.__name__})"))
     try:
         checks.insert(-1, check_recording(cfg, db, pipelines))
     except Exception as e:

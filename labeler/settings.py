@@ -43,6 +43,7 @@ class CameraIn(BaseModel):
     retention_days: int | None = Field(default=None, ge=0, le=MAX_DAYS)
     imgsz: int | None = None
     fall_alert: bool = True       # off for a camera that never sees the floor
+    vehicles: bool | None = None  # look for vehicles; None = the default (security cameras yes, kiosk no)
 
     @field_validator("name")
     @classmethod
@@ -80,6 +81,17 @@ class SettingsIn(BaseModel):
     mobility_aids: bool
     falls_enabled: bool
     fall_after_s: float = Field(ge=3, le=300)
+    vehicles_enabled: bool
+    vehicle_kinds: list[str] = Field(min_length=1)
+    vehicle_parked_after_s: float = Field(ge=10, le=3600)
+
+    @field_validator("vehicle_kinds")
+    @classmethod
+    def _kinds(cls, v: list[str]) -> list[str]:
+        allowed = ["car", "motorbike", "bicycle", "bus", "lorry"]
+        if not v or any(k not in allowed for k in v):
+            raise ValueError("vehicle kinds are some of car, motorbike, bicycle, bus, lorry")
+        return [k for k in allowed if k in v]
     idle_enabled: bool
     idle_after_s: int = Field(ge=10, le=3600)
     recording_enabled: bool
@@ -118,6 +130,9 @@ SIMPLE = {
     "mobility_aids": ("labels", "mobility_aids"),
     "falls_enabled": ("falls", "enabled"),
     "fall_after_s": ("falls", "after_s"),
+    "vehicles_enabled": ("vehicles", "enabled"),
+    "vehicle_kinds": ("vehicles", "kinds"),
+    "vehicle_parked_after_s": ("vehicles", "parked_after_s"),
     "backup_copy_to": ("backup", "copy_to"),
     "idle_enabled": ("idle", "enabled"),
     "idle_after_s": ("idle", "after_s"),
@@ -126,7 +141,7 @@ SIMPLE = {
     "recording_keep_days": ("recording", "keep_days"),
     "recording_max_gb": ("recording", "max_gb"),
 }
-CAMERA_FIELDS = ("name", "source", "mode", "retention_days", "imgsz", "fall_alert")
+CAMERA_FIELDS = ("name", "source", "mode", "retention_days", "imgsz", "fall_alert", "vehicles")
 
 
 def settings_path(cfg: dict) -> Path | None:
@@ -185,7 +200,8 @@ def current(cfg: dict) -> dict:
     out["cameras"] = [{"name": c["name"], "source": mask_password(c["source"]) if isinstance(c["source"], str)
                        else c["source"], "mode": c.get("mode", cfg["mode"]),
                        "retention_days": c.get("retention_days"), "imgsz": c.get("imgsz"),
-                       "fall_alert": c.get("fall_alert", True)} for c in cfg["cameras"]]
+                       "fall_alert": c.get("fall_alert", True),
+                       "vehicles": c.get("vehicles", c.get("mode", cfg["mode"]) == "security")} for c in cfg["cameras"]]
     return out
 
 
@@ -253,6 +269,10 @@ def build(body: SettingsIn, base: dict, effective: dict, new_passwords: dict | N
             c.pop("fall_alert", None)   # on is the default: not written
         else:
             c["fall_alert"] = False
+        if cam.vehicles is None or cam.vehicles == (cam.mode == "security"):
+            c.pop("vehicles", None)     # the default for its mode: not written (follows a mode change)
+        else:
+            c["vehicles"] = cam.vehicles
         if source == receiver.PUSH:
             if not c.get("push_password"):
                 password = receiver.new_password()

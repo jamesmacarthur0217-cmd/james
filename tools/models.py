@@ -31,8 +31,15 @@ def names(config: Path = ROOT / "config.yaml") -> dict:
     cfg = json.loads(json.dumps(DEFAULTS))
     if config.exists():
         _merge(cfg, yaml.safe_load(config.read_text(encoding="utf-8")) or {})
+    vehicles = cfg.get("vehicles") or {}
     return {"detector": cfg["detector"]["model"], "huggingface": [cfg["embeddings"]["model"], cfg["age_model"]["model"]],
-            "ollama": cfg["vlm"]["model"]}
+            "ollama": cfg["vlm"]["model"],
+            # The vehicle detector (labeler/vehicles.py; security cameras), when vehicles are on.
+            "vehicles": vehicles.get("model") if vehicles.get("enabled", True) else None}
+
+
+def detectors(n: dict) -> list[str]:
+    return [m for m in (n["detector"], n.get("vehicles")) if m]
 
 
 # --- Hugging Face (SigLIP 2 embeddings, age model) ------------------------------------------------
@@ -93,18 +100,19 @@ def ollama_present(model: str, root: Path | None = None) -> bool:
 # --- commands -------------------------------------------------------------------------------------
 
 def check(n: dict) -> list[tuple[str, bool]]:
-    out = [(f"detector {n['detector']}", (ROOT / n["detector"]).is_file())]
+    out = [(f"detector {m}", (ROOT / m).is_file()) for m in detectors(n)]
     out += [(f"Hugging Face {repo}", hf_present(repo)) for repo in n["huggingface"]]
     out.append((f"Ollama {n['ollama']}", ollama_present(n["ollama"])))
     return out
 
 
 def download(n: dict) -> None:
-    if not (ROOT / n["detector"]).is_file():
-        print(f"downloading {n['detector']}...", flush=True)
-        os.chdir(ROOT)   # Ultralytics saves the weights in the current folder
-        from ultralytics import YOLO
-        YOLO(n["detector"])
+    for m in detectors(n):
+        if not (ROOT / m).is_file():
+            print(f"downloading {m}...", flush=True)
+            os.chdir(ROOT)   # Ultralytics saves the weights in the current folder
+            from ultralytics import YOLO
+            YOLO(m)
     for repo in n["huggingface"]:
         if not hf_present(repo):
             print(f"downloading {repo}...", flush=True)
@@ -130,7 +138,8 @@ def _copy_file(src: Path, dst: Path) -> None:
 def pack(n: dict, folder: Path, hf_root: Path | None = None, ollama_root: Path | None = None) -> None:
     out = folder / "models"
     out.mkdir(parents=True, exist_ok=True)
-    _copy_file(ROOT / n["detector"], out / Path(n["detector"]).name)
+    for m in detectors(n):
+        _copy_file(ROOT / m, out / Path(m).name)
     for repo in n["huggingface"]:
         if not hf_present(repo, hf_root):
             raise SystemExit(f"{repo} is not on this PC; run: python tools/models.py download")
@@ -150,8 +159,9 @@ def pack(n: dict, folder: Path, hf_root: Path | None = None, ollama_root: Path |
 
 def unpack(n: dict, folder: Path, hf_root: Path | None = None, ollama_root: Path | None = None) -> None:
     src = folder / "models"
-    if not (ROOT / n["detector"]).is_file():
-        _copy_file(src / Path(n["detector"]).name, ROOT / n["detector"])
+    for m in detectors(n):
+        if not (ROOT / m).is_file() and (src / Path(m).name).is_file():
+            _copy_file(src / Path(m).name, ROOT / m)
     for repo in n["huggingface"]:
         if not hf_present(repo, hf_root):
             _copy_tree(src / "huggingface" / hf_folder(repo, hf_root).name, hf_folder(repo, hf_root))

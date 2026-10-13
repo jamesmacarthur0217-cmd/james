@@ -174,7 +174,14 @@ class Pipeline:
         # Vehicles (labeler/vehicles.py): a second detector with its own tracker; security cameras by default.
         vcfg = cfg.get("vehicles") or {}
         self.vehicles = None
-        if vcfg.get("enabled") and cam.get("vehicles", self.mode == "security"):
+        self.vehicles_missing = None   # the vehicle detector file, when it should be used but is not there
+        if vcfg.get("enabled") and cam.get("vehicles", self.mode == "security") and not resolve(vcfg["model"]).is_file():
+            # Not downloaded at start (Ultralytics would try, and an offline PC would fail): install.bat or
+            # `python tools/models.py download` gets it; the Health page says so meanwhile.
+            self.vehicles_missing = str(resolve(vcfg["model"]))
+            log.warning("[%s] vehicles are off: the vehicle detector %s is missing (python tools/models.py download)",
+                        self.name, self.vehicles_missing)
+        elif vcfg.get("enabled") and cam.get("vehicles", self.mode == "security"):
             self.vehicle_cfg = vcfg
             self.vehicle_model = YOLO(vcfg["model"])
             vt = resolve(vcfg["tracker"])
