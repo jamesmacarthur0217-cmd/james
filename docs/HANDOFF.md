@@ -322,6 +322,10 @@ check, drop it). Ask the user to restart (stop.bat, start.bat) and look at the H
 Waiting for the user: a camera that sees a room from the side (falls) and one that sees the gate or street in security
 mode (vehicles), then real numbers (makes like Perodua and Proton are not measured); marking beds/sofas "Lying is
 normal here". Phase 16 ([PHASE16-PLAN.md](PHASE16-PLAN.md), search recordings by words) stays approved, not started.
+
+**Next: [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md)** (approved 2026-10-13, not started): 19 Home/Away arming, 20 loitering
+alert, 21 animals, 22 scene questions, in that order. Start with Phase 19: ask the user its opening questions
+(who may switch Home/Away; a weekly schedule), then before each step.
 Later, with the user: a long-run check with recording on, the webcam measurement (lens cover), the rest of Phase 12
 when cameras are added.
 
@@ -346,4 +350,4 @@ Open items (also in that plan):
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with the newest plan in docs/
-> (PHASE19-PLAN.md if it is there; ask me before each phase and each step starts, and do it step by step).
+> (docs/PHASE19-22-PLAN.md, Phase 19 first; ask me before each phase and each step starts, and do it step by step).
