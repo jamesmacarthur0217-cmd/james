@@ -82,6 +82,12 @@
       <div class="hbars" id="dwell"></div>
     </section>
   </div>
+  <section class="panel" id="vehicles-panel" style="margin-top:14px" hidden>
+    <h2 id="veh-title">Vehicles per hour</h2>
+    <div class="chart" id="veh-timeline"></div>
+    <div class="hbars" id="veh-kinds" style="margin-top:10px"></div>
+    <details><summary>Show as a table</summary><div id="veh-table"></div></details>
+  </section>
   <section class="panel" id="zones-panel" style="margin-top:14px" hidden>
     <h2>Zones and counting lines</h2>
     <div id="zones"></div>
@@ -235,16 +241,40 @@ function duration(s) {
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
 }
 
+// Vehicles (cars, motorbikes, ...): arrivals per hour or day, and how many of each kind.
+const KIND_NAMES = { lorry: "lorry/pickup", SUV: "SUV" };
+function drawVehicles(data) {
+  const v = data.vehicles;
+  $("vehicles-panel").hidden = !v || !v.total;
+  if (!v || !v.total) return;
+  const many = (n) => `${n} ${n === 1 ? "vehicle" : "vehicles"}`;
+  drawBars("veh-timeline", v.timeline.map(r => ({ label: label(r.t, v.unit), value: r.count,
+                                                 tip: `${label(r.t, v.unit)}: ${many(r.count)}` })),
+           `Vehicles per ${v.unit}`);
+  $("veh-title").textContent = `Vehicles per ${v.unit} (${many(v.total)})`;
+  const max = v.kinds[0].count;
+  $("veh-kinds").innerHTML = v.kinds.map(r => `<span>${esc(KIND_NAMES[r.value] || r.value)}</span>
+    <div class="track" title="${esc(r.value)}: ${r.count}"><div class="fill" style="width:${r.count / max * 100}%"></div></div>
+    <span class="n">${r.count}</span>`).join("");
+  $("veh-table").innerHTML = '<table class="data"><tr><th>' + (v.unit === "hour" ? "Hour" : "Day")
+    + '</th><th>Vehicles</th></tr>' + v.timeline.filter(r => r.count).map(r =>
+      `<tr><td>${esc(label(r.t, v.unit))}</td><td>${r.count}</td></tr>`).join("") + "</table>";
+}
+
 // Areas count entries and the average stay; lines count crossings each way.
 function drawZones(data) {
   const rows = data.zones || [];
   $("zones-panel").hidden = !rows.length;
-  $("zones").innerHTML = '<table class="data"><tr><th>Zone</th><th>Camera</th><th>Entered / in</th>'
-    + '<th>Left / out</th><th>Average stay</th></tr>' + rows.map(z => {
-      const line = z.in + z.out > 0 && z.enter === 0;
+  const veh = rows.some(z => z.vehicles_in + z.vehicles_out + z.vehicles_enter > 0);
+  $("zones").innerHTML = '<table class="data"><tr><th>Zone</th><th>Camera</th><th>People entered / in</th>'
+    + '<th>Left / out</th><th>Average stay</th>' + (veh ? '<th>Vehicles in</th><th>Vehicles out</th>' : "")
+    + '</tr>' + rows.map(z => {
+      const line = z.in + z.out + z.vehicles_in + z.vehicles_out > 0 && z.enter + z.vehicles_enter === 0;
       return `<tr><td>${esc(z.zone)}</td><td>${esc(z.camera)}</td>`
         + (line ? `<td>${z.in} in</td><td>${z.out} out</td><td>-</td>`
-                : `<td>${z.enter}</td><td>${z.exit}</td><td>${duration(z.avg_dwell_s)}</td>`) + "</tr>";
+                : `<td>${z.enter}</td><td>${z.exit}</td><td>${duration(z.avg_dwell_s)}</td>`)
+        + (veh ? (line ? `<td>${z.vehicles_in}</td><td>${z.vehicles_out}</td>`
+                       : `<td>${z.vehicles_enter} entered</td><td>${z.vehicles_exit} left</td>`) : "") + "</tr>";
     }).join("") + "</table>";
 }
 
@@ -285,6 +315,7 @@ async function load() {
   drawWhoWhen(data);
   drawDwell(data);
   drawZones(data);
+  drawVehicles(data);
   drawBreakdowns(data);
 }
 

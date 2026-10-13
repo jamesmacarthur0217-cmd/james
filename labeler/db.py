@@ -238,6 +238,18 @@ class ZoneEvent(Base):
     dwell_s: Mapped[float | None] = mapped_column(Float)   # on exit: time spent inside
 
 
+class VehicleZoneEvent(Base):
+    """A vehicle entering/exiting an area or crossing a line (like ZoneEvent for people, counted apart)."""
+    __tablename__ = "vehicle_zone_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id", ondelete="CASCADE"), index=True)
+    camera: Mapped[str] = mapped_column(String(100))
+    zone_id: Mapped[int] = mapped_column(Integer)
+    zone_name: Mapped[str] = mapped_column(String(100), index=True)
+    kind: Mapped[str] = mapped_column(String(10))       # enter | exit (areas), in | out (lines)
+    at: Mapped[datetime] = mapped_column(DateTime, index=True)
+
+
 class ModelHistory(Base):
     """One run of the weekly retraining of the fast classifiers (labeler/retrain.py), kept or not."""
     __tablename__ = "model_history"
@@ -345,6 +357,11 @@ NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT", "video_path
                "zones": {"lying_ok": "BOOLEAN"}}
 # Uniqueness rules taken off existing tables at start (table, columns): falls alert again for the same person.
 DROPPED_UNIQUE = [("alert_events", ("rule_id", "track_id"))]
+
+
+def _zone_stats(camera: str, zone: str) -> dict:
+    return {"camera": camera, "zone": zone, "enter": 0, "exit": 0, "in": 0, "out": 0, "_dwell": [],
+            "vehicles_enter": 0, "vehicles_exit": 0, "vehicles_in": 0, "vehicles_out": 0}
 
 
 def _videos(value: str | None) -> list[str]:
@@ -554,14 +571,23 @@ class Database:
                 "n_frames": v.n_frames}
 
     def list_vehicles(self, limit: int = 50, camera: str | None = None, kind: str | None = None,
-                      start: datetime | None = None, end: datetime | None = None) -> list[dict]:
-        """Newest first."""
+                      start: datetime | None = None, end: datetime | None = None, kinds: list[str] | None = None,
+                      colors: list[str] | None = None, make: str | None = None, model: str | None = None) -> list[dict]:
+        """Newest first. make/model: the answer contains it, any case ("toyota" finds "Toyota")."""
         q = select(Vehicle, Camera.name).join(Camera, Camera.id == Vehicle.camera_id).where(
             Vehicle.not_vehicle.is_not(True))
         if camera:
             q = q.where(Camera.name == camera)
         if kind:
             q = q.where(Vehicle.kind == kind)
+        if kinds:
+            q = q.where(Vehicle.kind.in_(kinds))
+        if colors:
+            q = q.where(Vehicle.color.in_(colors))
+        if make:
+            q = q.where(Vehicle.make.ilike(f"%{make}%"))
+        if model:
+            q = q.where(Vehicle.model.ilike(f"%{model}%"))
         if start:
             q = q.where(Vehicle.started_at >= start)
         if end:
@@ -570,14 +596,38 @@ class Database:
             return [self._vehicle_dict(v, cam) for v, cam in
                     s.execute(q.order_by(Vehicle.started_at.desc(), Vehicle.id.desc()).limit(limit)).all()]
 
-    def delete_vehicles(self, ids: list[int]) -> list[str]:
-        """Delete vehicles; returns their picture names (for the caller to remove)."""
+    def add_vehicle_zone_events(self, vehicle_id: int, camera: str, events: list[dict]) -> None:
+        with self.Session.begin() as s:
+            if s.get(Vehicle, vehicle_id) is not None:
+                s.add_all(VehicleZoneEvent(vehicle_id=vehicle_id, camera=camera, zone_id=e["zone_id"],
+                                           zone_name=e["zone_name"], kind=e["kind"], at=e["at"]) for e in events)
+
+    def vehicle_names(self) -> tuple[set[str], set[str]]:
+        """Makes and models answered so far (the Ask box recognises them in questions)."""
+        with self.Session() as s:
+            makes = {m for m in s.scalars(select(Vehicle.make).distinct()) if m}
+            models = {m for m in s.scalars(select(Vehicle.model).distinct()) if m}
+        return makes, models
+
+    def vehicle_rows(self, start: datetime, end: datetime, camera: str | None = None) -> list[tuple[datetime, str]]:
+        """(arrived, kind) of the vehicles in [start, end), for Reports."""
+        q = (select(Vehicle.started_at, Vehicle.kind).join(Camera, Camera.id == Vehicle.camera_id)
+             .where(Vehicle.started_at >= start, Vehicle.started_at < end, Vehicle.not_vehicle.is_not(True)))
+        if camera:
+            q = q.where(Camera.name == camera)
+        with self.Session() as s:
+            return [tuple(r) for r in s.execute(q).all()]
+
+    def delete_vehicles(self, ids: list[int]) -> tuple[list[int], list[str]]:
+        """Delete vehicles; returns the ids deleted and their picture names (for the caller to remove)."""
         with self.Session.begin() as s:
             old = s.scalars(select(Vehicle).where(Vehicle.id.in_(ids))).all()
-            paths = [v.crop_path for v in old if v.crop_path]
+            deleted, paths = [v.id for v in old], [v.crop_path for v in old if v.crop_path]
+            if deleted:
+                s.execute(delete(VehicleZoneEvent).where(VehicleZoneEvent.vehicle_id.in_(deleted)))
             for v in old:
                 s.delete(v)
-        return paths
+        return deleted, paths
 
     def update_track(self, track_id: int, **fields) -> None:
         with self.Session.begin() as s:
@@ -1082,12 +1132,17 @@ class Database:
         stats: dict[tuple[str, str], dict] = {}
         with self.Session() as s:
             for e in s.scalars(q):
-                st = stats.setdefault((e.camera, e.zone_name), {"camera": e.camera, "zone": e.zone_name,
-                                                               "enter": 0, "exit": 0, "in": 0, "out": 0,
-                                                               "_dwell": []})
+                st = stats.setdefault((e.camera, e.zone_name), _zone_stats(e.camera, e.zone_name))
                 st[e.kind] += 1
                 if e.kind == "exit" and e.dwell_s is not None:
                     st["_dwell"].append(e.dwell_s)
+            # Vehicles crossing the same lines and areas, counted apart from people.
+            vq = select(VehicleZoneEvent).where(VehicleZoneEvent.at >= start, VehicleZoneEvent.at < end)
+            if camera:
+                vq = vq.where(VehicleZoneEvent.camera == camera)
+            for e in s.scalars(vq):
+                st = stats.setdefault((e.camera, e.zone_name), _zone_stats(e.camera, e.zone_name))
+                st["vehicles_" + e.kind] += 1
         out = []
         for key in sorted(stats):
             st = stats[key]
@@ -1432,6 +1487,8 @@ class Database:
                     gone = s.scalars(select(Vehicle).where(Vehicle.camera_id == cam.id,
                                                            Vehicle.started_at < now - timedelta(days=days))).all()
                     paths += [v.crop_path for v in gone if v.crop_path]
+                    if gone:
+                        s.execute(delete(VehicleZoneEvent).where(VehicleZoneEvent.vehicle_id.in_([v.id for v in gone])))
                     for v in gone:
                         s.delete(v)
         if old:

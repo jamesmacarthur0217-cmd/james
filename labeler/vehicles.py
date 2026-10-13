@@ -1,6 +1,7 @@
 """Vehicles: cars, motorbikes, bicycles, buses and lorries, from a second detector (YOLO11s, COCO classes).
 
-One record per vehicle visit (table `vehicles`). A vehicle that stays where it is for `parked_after_s` is
+One record per vehicle visit (table `vehicles`; picture vehicle_<id>.jpg next to people's, with a copy for viewers in
+which the faces of people in that frame are blurred, like people's pictures). A vehicle that stays where it is for `parked_after_s` is
 "parked": it stays one record however long it stands there, also when someone walking past hides it for a while
 (the tracker then loses it; a vehicle found again where a parked one was, within `parked_memory_s`, continues that
 record), and it is marked "left" when it drives off. Without this a car parked all day would become a new record
@@ -51,8 +52,11 @@ class VehicleState:
     left: bool = False
     best_area: float = 0.0
     best_crop: np.ndarray | None = None
+    best_heads: list = field(default_factory=list)   # heads of people in the best picture (crop coordinates)
     picture_area: float = 0.0          # area of the picture stored so far
     described: bool = False            # sent to be described (color, make/model) once
+    zones: object = None               # zones.PersonZones: where it is relative to the camera's zones
+    zone_log: list = field(default_factory=list)   # zone events not stored yet (no record yet)
 
     @property
     def kind(self) -> str:
@@ -77,12 +81,15 @@ class VehicleWatch:
         self.describe_after_s = float(cfg.get("describe_after_s", 5.0))
         self.still_memory_s = float(cfg.get("still_memory_s", 120.0))
         self.tracks: dict[int, VehicleState] = {}
+        self.zone_counter = None   # zones.ZoneCounter of the camera (set by the pipeline): counting lines count vehicles
         self.parked_lost: dict[int, tuple[VehicleState, float]] = {}   # db id -> (state, lost at): standing ones
 
     # --- per frame ---------------------------------------------------------------------------------------
 
-    def update(self, t: float, wall: datetime, frame: np.ndarray | None, dets: list[tuple]) -> None:
-        """dets: [(tracker id, box, COCO class, confidence)] for this frame."""
+    def update(self, t: float, wall: datetime, frame: np.ndarray | None, dets: list[tuple],
+               heads: list | None = None) -> None:
+        """dets: [(tracker id, box, COCO class, confidence)] for this frame; heads: people's head boxes in it (their
+        faces are blurred in the viewers' copy of a vehicle's picture)."""
         h, w = (frame.shape[:2] if frame is not None else (0, 0))
         for key, box, cls, conf in dets:
             if KINDS.get(cls) not in self.kinds:
@@ -96,10 +103,18 @@ class VehicleWatch:
             st.box, st.last_t, st.last_wall = box, t, wall
             self._movement(st, t, wall)
             if frame is not None:
-                self._keep_picture(st, frame, box, conf, w, h)
+                self._keep_picture(st, frame, box, conf, w, h, heads or [])
+            if self.zone_counter is not None and self.zone_counter.zones and w:
+                from .zones import PersonZones
+                st.zones = st.zones or PersonZones()
+                # Where the wheels touch the ground: the bottom middle of the box.
+                st.zone_log += self.zone_counter.update(st.zones, ((box[0] + box[2]) / 2 / w, box[3] / h), wall)
             if st.db_id is None and st.n >= self.min_frames:
                 st.db_id = self.store.create(st.kind, st.first_wall, key)
                 self._store_picture(st)
+            if st.db_id is not None and st.zone_log:
+                self.store.zone_events(st.db_id, st.zone_log)
+                st.zone_log = []
             if st.db_id is not None and not st.described and (st.parked or t - st.first_t >= self.describe_after_s):
                 self._describe(st)
         for key, st in list(self.tracks.items()):
@@ -159,16 +174,21 @@ class VehicleWatch:
             st.parked = True
             self.store.update(st.db_id, parked=True, parked_at=wall)
 
-    def _keep_picture(self, st: VehicleState, frame: np.ndarray, box: tuple, conf: float, w: int, h: int) -> None:
+    def _keep_picture(self, st: VehicleState, frame: np.ndarray, box: tuple, conf: float, w: int, h: int,
+                      heads: list) -> None:
         x1, y1, x2, y2 = box
         if conf < 0.5 or x1 <= EDGE * w or y1 <= EDGE * h or x2 >= (1 - EDGE) * w or y2 >= (1 - EDGE) * h:
             return   # unsure, or cut off by the picture's border
         area = (x2 - x1) * (y2 - y1)
         if area > st.best_area * 1.15:   # clearly bigger: closer to the camera
             pad_x, pad_y = 0.05 * (x2 - x1), 0.05 * (y2 - y1)
-            crop = frame[max(0, int(y1 - pad_y)):min(h, int(y2 + pad_y)), max(0, int(x1 - pad_x)):min(w, int(x2 + pad_x))]
+            ox, oy = max(0, int(x1 - pad_x)), max(0, int(y1 - pad_y))
+            crop = frame[oy:min(h, int(y2 + pad_y)), ox:min(w, int(x2 + pad_x))]
             if crop.size:
                 st.best_area, st.best_crop = area, crop.copy()
+                st.best_heads = [(hx1 - ox, hy1 - oy, hx2 - ox, hy2 - oy) for hx1, hy1, hx2, hy2 in
+                                 (tuple(b[:4]) for b in heads if b is not None)
+                                 if hx2 > ox and hy2 > oy and hx1 < ox + crop.shape[1] and hy1 < oy + crop.shape[0]]
 
     def _describe(self, st: VehicleState) -> None:
         """Once per vehicle, with its best picture: after describe_after_s in view, when parked, or when it leaves."""
@@ -180,7 +200,7 @@ class VehicleWatch:
 
     def _store_picture(self, st: VehicleState) -> None:
         if st.db_id is not None and st.best_crop is not None and st.best_area > st.picture_area:
-            self.store.picture(st.db_id, st.best_crop)
+            self.store.picture(st.db_id, st.best_crop, st.best_heads)
             st.picture_area = st.best_area
 
     def _finish(self, key: int) -> None:
@@ -199,10 +219,11 @@ class VehicleWatch:
 class VehicleStore:
     """VehicleWatch's storage: the `vehicles` table and pictures in <crop_dir>/vehicles/."""
 
-    def __init__(self, db, camera_id: int, crop_dir, describe=None):
-        self.db, self.camera_id, self.crop_dir = db, camera_id, crop_dir
+    def __init__(self, db, camera_id: int, crop_dir, describe=None, blur_all: bool = False, camera: str = ""):
+        self.db, self.camera_id, self.crop_dir, self.camera = db, camera_id, crop_dir, camera
         self._describe = describe   # (vehicle id, picture) -> None: color now, the vision model's answer later
-        (crop_dir / "vehicles").mkdir(parents=True, exist_ok=True)
+        self.blur_all = blur_all    # storage.blur_faces: faces blurred in the stored picture too
+        (crop_dir / "blurred").mkdir(parents=True, exist_ok=True)
 
     def create(self, kind: str, started_at: datetime, tracker_id: int) -> int:
         return self.db.create_vehicle(self.camera_id, tracker_id, kind, started_at)
@@ -210,11 +231,17 @@ class VehicleStore:
     def update(self, vehicle_id: int, **fields) -> None:
         self.db.update_vehicle(vehicle_id, **fields)
 
-    def picture(self, vehicle_id: int, crop: np.ndarray) -> None:
+    def picture(self, vehicle_id: int, crop: np.ndarray, heads: list | None = None) -> None:
         import cv2
-        name = f"vehicles/{vehicle_id}.jpg"
-        cv2.imwrite(str(self.crop_dir / name), crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        from . import privacy
+        name = f"vehicle_{vehicle_id}.jpg"
+        blurred = privacy.blur_boxes(crop, heads or [])
+        cv2.imwrite(str(self.crop_dir / name), blurred if self.blur_all else crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        cv2.imwrite(str(privacy.blurred_path(self.crop_dir, name)), blurred, [cv2.IMWRITE_JPEG_QUALITY, 90])
         self.db.update_vehicle(vehicle_id, crop_path=name)
+
+    def zone_events(self, vehicle_id: int, events: list[dict]) -> None:
+        self.db.add_vehicle_zone_events(vehicle_id, self.camera, events)
 
     def describe(self, vehicle_id: int, crop: np.ndarray) -> None:
         if self._describe is not None:

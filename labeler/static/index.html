@@ -74,6 +74,23 @@
     </div>
     <div class="people" id="people"><div class="empty">No one yet.</div></div>
   </section>
+  <section class="panel" id="vehicles-panel" hidden>
+    <h2>Vehicles seen</h2>
+    <div class="search">
+      <select id="v-kind" title="Kind"><option value="">All kinds</option><option value="car">cars (with SUVs, vans, pickups)</option>
+        <option value="SUV">SUVs</option><option value="van">vans</option><option value="pickup">pickups</option>
+        <option value="lorry">lorries</option><option value="bus">buses</option><option value="motorbike">motorbikes</option>
+        <option value="bicycle">bicycles</option></select>
+      <select id="v-color" title="Color"><option value="">Any color</option></select>
+      <input type="date" id="v-day" title="Day">
+      <button id="v-clear">Clear</button>
+    </div>
+    <div class="banner" id="v-banner" hidden></div>
+    <div class="select-bar admin-only">
+      <button id="v-del" class="danger" disabled>Delete selected</button>
+    </div>
+    <div class="people" id="vehicles"><div class="empty">No vehicles yet.</div></div>
+  </section>
   </div>
 </main>
 <div id="player" class="player" hidden>
@@ -222,6 +239,14 @@ async function fetchTracks() {
                                         body: JSON.stringify({ question: view.q, limit: 30 }) });
     if (r.ok) {
       const res = await r.json();
+      if (res.vehicles) {   // a question about vehicles: the answer is in the Vehicles list
+        vehicleView = { kind: "ask", items: res.vehicles, explanation: `${res.explanation} · ${res.total} found` };
+        drawVehicles();
+        $("vehicles-panel").hidden = false;
+        $("vehicles-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+        view.explanation = `${res.explanation} · ${res.total} found: see Vehicles seen below`;
+        return [];
+      }
       view.explanation = `${res.explanation} · ${res.total} found`;
       return res.people;
     }
@@ -607,6 +632,77 @@ async function loadCameras() {
   const wanted = new URLSearchParams(location.search).get("camera");
   if (wanted && cameraNames.includes(wanted)) $("f-camera").value = wanted;
 }
+
+// --- Vehicles (security cameras; labeler/vehicles.py) ---------------------------------------------------------
+let vehicleView = { kind: "recent" }, vehicleHtml = "", anyVehicleCamera = false;
+const vSelected = new Set();
+const KIND_LABEL = { lorry: "lorry/pickup" };
+for (const c of ["white", "black", "silver", "gray", "red", "blue", "green", "yellow", "orange", "brown", "beige", "purple", "pink"])
+  $("v-color").add(new Option(c, c));
+
+function vehicleCard(v) {
+  const when = new Date(v.started_at).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  const state = v.parked ? (v.left_at ? "parked, then left" : (v.ended_at ? "parked" : "parked here now"))
+                         : (v.ended_at ? "passed" : "in view");
+  const name = [v.make, v.model].filter(Boolean).join(" ");
+  const kindColor = [v.color, KIND_LABEL[v.kind] || v.kind].filter(Boolean).join(" ");
+  const chips = (kindColor ? `<span class="chip">${esc(kindColor)}</span>` : "")
+    + (name ? `<span class="chip" title="Make and model are the vision model's guess">${esc(name)} <small>(guess)</small></span>` : "");
+  return `<div class="person">
+    <input type="checkbox" class="admin-only" data-vselect="${v.id}" ${vSelected.has(v.id) ? "checked" : ""} aria-label="Select vehicle ${v.id}">
+    ${v.crop ? `<img src="/crops/${encodeURIComponent(v.crop)}?v=${encodeURIComponent(v.ended_at || "")}" alt="">` : "<img alt=\"\">"}
+    <div><div class="meta">#${v.id}${cameraNames.length > 1 ? ` · ${esc(v.camera)}` : ""} · ${when} · ${state}</div>
+    <div class="chips">${chips || '<span class="chip">describing…</span>'}</div>
+    <a class="link" href="/recordings?camera=${encodeURIComponent(v.camera)}&amp;at=${encodeURIComponent(v.started_at)}">▶ Recording</a></div></div>`;
+}
+
+function drawVehicles(items) {
+  const list = vehicleView.kind === "ask" ? vehicleView.items : items || [];
+  $("v-banner").hidden = vehicleView.kind !== "ask";
+  if (vehicleView.kind === "ask") $("v-banner").innerHTML = esc(vehicleView.explanation)
+    + ' <button class="link" id="v-back">Show all</button>';
+  const html = list.length ? list.map(vehicleCard).join("") : '<div class="empty">No matching vehicles.</div>';
+  if (html !== vehicleHtml) { $("vehicles").innerHTML = html; vehicleHtml = html; }
+  $("v-del").disabled = !vSelected.size;
+}
+
+async function loadVehicles() {
+  if (vehicleView.kind === "ask") return;
+  const q = { limit: 40 };
+  if ($("v-kind").value) q.kind = $("v-kind").value;
+  if ($("v-color").value) q.color = $("v-color").value;
+  if ($("v-day").value) q.day = $("v-day").value;
+  if ($("f-camera").value) q.camera = $("f-camera").value;
+  try {
+    const r = await fetch("/api/vehicles?" + new URLSearchParams(q));
+    if (!r.ok) return;
+    const items = await r.json();
+    $("vehicles-panel").hidden = !anyVehicleCamera && !items.length && !Object.keys(q).some(k => k !== "limit");
+    drawVehicles(items);
+  } catch {}
+}
+
+for (const id of ["v-kind", "v-color", "v-day"]) $(id).addEventListener("change", () => { vehicleView = { kind: "recent" }; loadVehicles(); });
+$("v-clear").onclick = () => { $("v-kind").value = $("v-color").value = $("v-day").value = ""; vehicleView = { kind: "recent" }; loadVehicles(); };
+$("vehicles-panel").addEventListener("click", (e) => {
+  if (e.target.id === "v-back") { vehicleView = { kind: "recent" }; loadVehicles(); }
+});
+$("vehicles").addEventListener("change", (e) => {
+  const id = Number(e.target.dataset.vselect);
+  if (!id) return;
+  e.target.checked ? vSelected.add(id) : vSelected.delete(id);
+  $("v-del").disabled = !vSelected.size;
+});
+$("v-del").onclick = async () => {
+  if (!vSelected.size || !confirm(`Delete ${vSelected.size} vehicle(s) with their pictures?`)) return;
+  await fetch("/api/vehicles/delete", { method: "POST", headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ ids: [...vSelected] }) });
+  vSelected.clear();
+  if (vehicleView.kind === "ask") vehicleView = { kind: "recent" };
+  loadVehicles();
+};
+fetch("/api/cameras").then(r => r.json()).then(cams => { anyVehicleCamera = cams.some(c => c.vehicles); loadVehicles(); });
+setInterval(loadVehicles, 5000);
 
 // Alert pop-ups (falls with a sound) are shown on every page by session.js.
 

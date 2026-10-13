@@ -179,8 +179,10 @@ class Pipeline:
             self.vehicle_model = YOLO(vcfg["model"])
             vt = resolve(vcfg["tracker"])
             self.vehicle_tracker = str(vt) if vt.exists() else "bytetrack.yaml"
-            self.vehicles = VehicleWatch(vcfg, VehicleStore(db, self.camera_id, self.crop_dir, self._describe_vehicle),
+            self.vehicles = VehicleWatch(vcfg, VehicleStore(db, self.camera_id, self.crop_dir, self._describe_vehicle,
+                                                            cfg["storage"].get("blur_faces", False), self.name),
                                          vcfg["kinds"])
+            self.vehicles.zone_counter = self.zone_counter
         self.tracks: dict[int, TrackState] = {}
         self.by_db_id: dict[int, TrackState] = {}
         # People who recently left the view, kept briefly so a returning person continues
@@ -456,7 +458,7 @@ class Pipeline:
                 dets.append((tid, tuple(box), cls, conf))
                 if self.idle and conf >= self.wake_conf:
                     self.last_person_at = now   # a vehicle arriving wakes idle mode, like a person
-        self.vehicles.update(now, self.clock.wall(), frame, dets)
+        self.vehicles.update(now, self.clock.wall(), frame, dets, self._head_boxes())
 
     def _describe_vehicle(self, vehicle_id: int, crop: np.ndarray) -> None:
         """A first color from the color estimator now; type, color, make and model from the vision model when it is

@@ -26,11 +26,14 @@ class FakeStore:
     def update(self, vehicle_id, **fields):
         self.rows[vehicle_id].update(fields)
 
-    def picture(self, vehicle_id, crop):
+    def picture(self, vehicle_id, crop, heads=None):
         self.pictures[vehicle_id] = crop.shape
 
     def describe(self, vehicle_id, crop):
         self.rows[vehicle_id]["described"] = self.rows[vehicle_id].get("described", 0) + 1
+
+    def zone_events(self, vehicle_id, events):
+        self.rows[vehicle_id].setdefault("zones", []).extend(e["kind"] for e in events)
 
 
 def run(watch, frames, t0=0.0, fps=5):
@@ -134,12 +137,12 @@ def test_vehicles_table_store_list_delete_and_retention(db, camera, tmp_path):
     store.picture(new, np.zeros((40, 60, 3), np.uint8))
     store.update(new, parked=True, color="red")
     rows = db.list_vehicles()
-    assert [r["id"] for r in rows] == [new, old] and rows[0]["parked"] and rows[0]["crop"] == f"vehicles/{new}.jpg"
-    assert (tmp_path / "vehicles" / f"{new}.jpg").is_file()
+    assert [r["id"] for r in rows] == [new, old] and rows[0]["parked"] and rows[0]["crop"] == f"vehicle_{new}.jpg"
+    assert (tmp_path / f"vehicle_{new}.jpg").is_file() and (tmp_path / "blurred" / f"vehicle_{new}.jpg").is_file()
     assert db.list_vehicles(kind="car")[0]["id"] == old
     db.cleanup(30)
     assert [r["id"] for r in db.list_vehicles()] == [new]
-    assert db.delete_vehicles([new]) == [f"vehicles/{new}.jpg"] and db.list_vehicles() == []
+    assert db.delete_vehicles([new]) == ([new], [f"vehicle_{new}.jpg"]) and db.list_vehicles() == []
 
 
 def test_only_security_cameras_look_for_vehicles_by_default(db, monkeypatch, tmp_path):
@@ -232,3 +235,104 @@ def test_pipeline_sends_vehicles_to_the_vision_model_and_routes_the_answer(db, c
     assert db.list_vehicles()[0]["color"] == "blue"
     p.on_vlm_result(-vid, [{"type": "car", "color": "blue", "make": "Proton", "model": "Saga"}])
     assert db.list_vehicles()[0]["make"] == "Proton"
+
+
+# --- step 3: lists, the Ask box, Reports, counting lines ---
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from labeler import accounts, reports  # noqa: E402
+from labeler.agent import QueryAgent, vehicle_query  # noqa: E402
+from labeler.alerts import AlertEngine  # noqa: E402
+from labeler.web import create_app  # noqa: E402
+from labeler.zones import ZoneCounter  # noqa: E402
+
+
+def _vehicles(db, camera, tmp_path):
+    store = VehicleStore(db, camera, tmp_path)
+    ids = {}
+    for name, kind, color, make, ago in [("suv", "SUV", "silver", "Toyota", 1), ("myvi", "car", "red", "Perodua", 2),
+                                          ("bike", "motorbike", "black", None, 3), ("old", "car", "red", None, 50)]:
+        i = store.create(kind, datetime(2026, 10, 13, 12) - timedelta(hours=ago), 1)
+        db.update_vehicle(i, color=color, make=make)
+        ids[name] = i
+    return ids
+
+
+def _app(db, tmp_path, address="127.0.0.1"):
+    cfg = copy.deepcopy(DEFAULTS)
+    cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
+    return TestClient(create_app(cfg, db, None, None, AlertEngine(db)), client=(address, 5000))
+
+
+def test_vehicles_api_filters_and_delete(db, camera, tmp_path):
+    ids = _vehicles(db, camera, tmp_path)
+    client = _app(db, tmp_path)
+    got = lambda **q: [v["id"] for v in client.get("/api/vehicles", params=q).json()]   # noqa: E731
+    assert got(kind="car") == [ids["suv"], ids["myvi"], ids["old"]]      # "car" also finds the SUV
+    assert got(kind="SUV") == [ids["suv"]]
+    assert got(color="gray") == [ids["suv"]]                             # silver counts as gray, and back
+    assert got(day="2026-10-13") == [ids["suv"], ids["myvi"], ids["bike"]]
+    assert client.get("/api/vehicles", params={"day": "13/10"}).status_code == 400
+    r = client.post("/api/vehicles/delete", json={"ids": [ids["bike"], 999]})
+    assert r.json()["deleted"] == 1 and ids["bike"] not in got()
+    assert "1 vehicles" in client.get("/api/audit").json()["entries"][0]["detail"]
+
+
+def test_viewers_can_list_but_not_delete_vehicles(db, camera, tmp_path):
+    _vehicles(db, camera, tmp_path)
+    db.add_user("vic", accounts.hash_password("correct horse battery"), "viewer")
+    viewer = _app(db, tmp_path, address="192.168.1.20")
+    viewer.post("/api/login", json={"username": "vic", "password": "correct horse battery"})
+    assert viewer.get("/api/vehicles").status_code == 200
+    assert viewer.post("/api/vehicles/delete", json={"ids": [1]}).status_code == 403
+
+
+def test_ask_box_knows_vehicle_questions():
+    q = vehicle_query("any red cars yesterday evening?")
+    assert q["kinds"] == ["SUV", "car", "pickup", "van"] and q["colors"] == ["red"]
+    assert vehicle_query("a bike at the gate")["kinds"] == ["bicycle", "motorbike"]
+    assert vehicle_query("the grey lorry")["colors"] == ["gray", "silver"]
+    assert vehicle_query("was the Perodua here?")["make"] == "perodua"
+    assert vehicle_query("the Myvi", models={"Myvi"})["model"] == "myvi"
+    assert vehicle_query("a man in a red shirt") is None
+    assert vehicle_query("who carried a bag") is None
+
+
+def test_ask_box_answers_with_vehicles(db, camera, tmp_path, monkeypatch):
+    ids = _vehicles(db, camera, tmp_path)
+    agent = QueryAgent({"vlm": {"host": "http://x", "model": "m"}}, db, None, ["test-cam"])
+    monkeypatch.setattr(agent, "_ask_llm", lambda q, now: {"start": "2026-10-13T00:00", "end": "2026-10-13T23:59",
+                                                          "camera": "", "conditions": [], "appearance": ""})
+    res = agent.run("red cars today", now=datetime(2026, 10, 13, 18))
+    assert [v["id"] for v in res["vehicles"]] == [ids["myvi"]] and res["people"] == []
+    assert "red" in res["explanation"] and "car" in res["explanation"]
+    res = agent.run("any toyota today", now=datetime(2026, 10, 13, 18))
+    assert [v["id"] for v in res["vehicles"]] == [ids["suv"]]
+
+
+def test_reports_count_vehicles_per_hour_and_kind(db, camera, tmp_path):
+    _vehicles(db, camera, tmp_path)
+    s, e = datetime(2026, 10, 13), datetime(2026, 10, 14)
+    out = reports.summarize_vehicles(db.vehicle_rows(s, e), s, e)
+    assert out["total"] == 3 and out["unit"] == "hour"
+    assert {k["value"]: k["count"] for k in out["kinds"]} == {"SUV": 1, "car": 1, "motorbike": 1}
+    assert sum(r["count"] for r in out["timeline"]) == 3
+    summary = _app(db, tmp_path).get("/api/reports/summary", params={"start": "2026-10-13", "end": "2026-10-13"}).json()
+    assert summary["vehicles"]["total"] == 3
+
+
+def test_counting_lines_count_vehicles_apart_from_people(db, camera, tmp_path):
+    store = VehicleStore(db, camera, tmp_path, camera="test-cam")
+    watch = VehicleWatch(CFG, store)
+    gate = {"id": 1, "name": "gate", "kind": "line", "points": [(0.5, 0.0), (0.5, 1.0)]}   # a vertical line
+    watch.zone_counter = ZoneCounter([gate], 3)
+    end = run(watch, passing(n=40))          # drives left to right across the middle
+    run(watch, [[]] * 30, t0=end)
+    day = T0.replace(hour=0)
+    counts = db.zone_counts(day, day + timedelta(days=1))
+    assert len(counts) == 1 and counts[0]["vehicles_in"] + counts[0]["vehicles_out"] == 1
+    assert counts[0]["in"] + counts[0]["out"] == 0                    # people untouched
+    vid = db.list_vehicles()[0]["id"]
+    db.delete_vehicles([vid])
+    assert db.zone_counts(day, day + timedelta(days=1)) == []

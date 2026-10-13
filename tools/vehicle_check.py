@@ -145,7 +145,13 @@ class _Store:
     def update(self, vehicle_id, **fields):
         self.rows[vehicle_id].update(fields)
 
-    def picture(self, vehicle_id, crop):
+    def picture(self, vehicle_id, crop, heads=None):
+        pass
+
+    def describe(self, vehicle_id, crop):
+        pass
+
+    def zone_events(self, vehicle_id, events):
         pass
 
 

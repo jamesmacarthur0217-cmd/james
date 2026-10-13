@@ -83,6 +83,18 @@ def engagement(people: list[dict], looked_s: float = 3.0) -> dict:
     }
 
 
+def summarize_vehicles(rows: list[tuple[datetime, str]], start: datetime, end: datetime) -> dict:
+    """Vehicles per hour (or day) and per kind. rows: (arrived, kind)."""
+    unit, slots = buckets(start, end)
+    counts = Counter()
+    for t, _ in rows:
+        counts[t.replace(minute=0, second=0, microsecond=0) if unit == "hour" else
+               t.replace(hour=0, minute=0, second=0, microsecond=0)] += 1
+    return {"total": len(rows), "unit": unit,
+            "timeline": [{"t": s.isoformat(timespec="minutes"), "count": counts.get(s, 0)} for s in slots],
+            "kinds": [{"value": k, "count": n} for k, n in Counter(k for _, k in rows).most_common()]}
+
+
 def summarize(people: list[dict], start: datetime, end: datetime, looked_s: float = 3.0) -> dict:
     unit, slots = buckets(start, end)
     counts = Counter()

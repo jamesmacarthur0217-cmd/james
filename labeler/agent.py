@@ -204,7 +204,18 @@ class QueryAgent:
 
     def run(self, question: str, limit: int = 30, now: datetime | None = None) -> dict:
         now = now or datetime.now()
+        makes, models = self.db.vehicle_names()
+        vq = vehicle_query(question, makes, models)
         plan = self.plan(question, now)
+        if vq is not None:   # about vehicles: the model's plan gives the time and camera, the words the rest
+            start, end = plan["start"], plan["end"]
+            vehicles = self.db.list_vehicles(limit, camera=plan["camera"] or None, kinds=vq["kinds"] or None,
+                                             colors=vq["colors"] or None, make=vq["make"], model=vq["model"],
+                                             start=start, end=end)
+            return {"question": question, "explanation": explain_vehicles(vq, plan),
+                    "plan": {**plan, "start": start and start.isoformat(timespec="minutes"),
+                             "end": end and end.isoformat(timespec="minutes"), "vehicles": vq},
+                    "total": len(vehicles), "people": [], "vehicles": vehicles}
         start, end = plan["start"] or EARLIEST, plan["end"] or now + timedelta(minutes=1)
         candidates = self.db.people_between(start, end, plan["camera"] or None, limit=5000, newest_first=True)
         people = [p for p in candidates if _matches(plan["conditions"], p["attributes"])]
@@ -232,6 +243,64 @@ class QueryAgent:
                 "plan": {**plan, "start": plan["start"] and plan["start"].isoformat(timespec="minutes"),
                          "end": plan["end"] and plan["end"].isoformat(timespec="minutes")},
                 "total": total, "people": people[:limit]}
+
+
+# --- vehicles (labeler/vehicles.py) ---------------------------------------------------------------------------
+# A word for a kind finds these stored kinds. People say "car" for SUVs, vans and pickups too; in Malaysia "bike"
+# is often a motorbike, so it finds both.
+VEHICLE_WORDS = {
+    "car": {"car", "SUV", "van", "pickup"}, "cars": {"car", "SUV", "van", "pickup"}, "sedan": {"car"},
+    "hatchback": {"car"}, "suv": {"SUV"}, "suvs": {"SUV"}, "4x4": {"SUV", "pickup"}, "jeep": {"SUV"},
+    "van": {"van"}, "vans": {"van"}, "mpv": {"van"}, "minivan": {"van"},
+    "pickup": {"pickup"}, "pickups": {"pickup"}, "pick-up": {"pickup"},
+    "lorry": {"lorry"}, "lorries": {"lorry"}, "truck": {"lorry", "pickup"}, "trucks": {"lorry", "pickup"},
+    "bus": {"bus"}, "buses": {"bus"},
+    "motorbike": {"motorbike"}, "motorbikes": {"motorbike"}, "motorcycle": {"motorbike"},
+    "motorcycles": {"motorbike"}, "scooter": {"motorbike"}, "scooters": {"motorbike"}, "moped": {"motorbike"},
+    "bicycle": {"bicycle"}, "bicycles": {"bicycle"}, "cycle": {"bicycle"},
+    "bike": {"motorbike", "bicycle"}, "bikes": {"motorbike", "bicycle"},
+    "vehicle": set(), "vehicles": set(),   # any kind
+}
+VEHICLE_COLOR_WORDS = {**{c: {c} for c in schema.COLORS if c != "unknown"}, "grey": {"gray", "silver"},
+                       "gray": {"gray", "silver"}, "silver": {"silver", "gray"}}
+COMMON_MAKES = {"perodua", "proton", "toyota", "honda", "nissan", "mazda", "mitsubishi", "hyundai", "kia", "ford",
+                "bmw", "mercedes", "volkswagen", "volvo", "lexus", "tesla", "byd", "chery", "suzuki", "isuzu",
+                "subaru", "audi", "porsche", "yamaha", "kawasaki", "ducati", "modenas", "hino", "scania"}
+
+
+def vehicle_query(question: str, makes: set[str] | None = None, models: set[str] | None = None) -> dict | None:
+    """What a question asks about vehicles, or None if it is not about vehicles: kinds, colors, make, model.
+    A make or model counts when it is a common make or one the vision model has answered before."""
+    text = question.lower()
+    words = _words(question)
+    kinds: set[str] = set()
+    found = False
+    for w, k in VEHICLE_WORDS.items():
+        if w in words:
+            found = True
+            kinds |= k
+    known_makes = COMMON_MAKES | {m.lower() for m in makes or ()}
+    make = next((m for m in sorted(known_makes, key=len, reverse=True) if re.search(rf"\b{re.escape(m)}\b", text)), None)
+    model = next((m for m in sorted({m.lower() for m in models or ()}, key=len, reverse=True)
+                  if len(m) > 1 and re.search(rf"\b{re.escape(m)}\b", text)), None)
+    if not (found or make or model):
+        return None
+    colors = set().union(*(c for w, c in VEHICLE_COLOR_WORDS.items() if w in words)) if words else set()
+    return {"kinds": sorted(kinds), "colors": sorted(colors), "make": make, "model": model}
+
+
+def explain_vehicles(vq: dict, plan: dict) -> str:
+    what = " ".join(filter(None, [" or ".join(vq["colors"]) if vq["colors"] else "",
+                                  (vq["make"] or "").title(), (vq["model"] or "").title(),
+                                  " / ".join(vq["kinds"]) if vq["kinds"] else "vehicles"]))
+    parts = [f"Looked for: {what}"]
+    if plan.get("start") or plan.get("end"):
+        s, e = plan.get("start"), plan.get("end")
+        parts.append(f"from {s:%a %d %b %H:%M}" if s else "")
+        parts.append(f"until {e:%a %d %b %H:%M}" if e else "")
+    if plan.get("camera"):
+        parts.append(f"on camera {plan['camera']}")
+    return " ".join(p for p in parts if p) + "."
 
 
 def _matches(conditions: list[list[str]], attrs: dict) -> bool:

@@ -553,7 +553,8 @@ videos' color picture is only 320×240; each clip's last picture is held 15 s, a
 Security cameras also see **cars, motorbikes, bicycles, buses and lorries** (a second detector, YOLO11s, 19 MB,
 downloaded with the user's OK, AGPL-3.0 like the pose model; `labeler/vehicles.py`; `vehicles:` in config.yaml; per
 camera `vehicles: true/false`, default on for security cameras and off for kiosk ones). Each vehicle's visit is one
-record (table `vehicles`, picture in `data\crops\vehicles`), drawn in purple on the live picture. A vehicle that
+record (table `vehicles`, picture `data\crops\vehicle_<id>.jpg`; viewers get a copy with the faces of people in
+that frame blurred), drawn in purple on the live picture. A vehicle that
 stands still for 60 s is **parked**: it stays one record however long it stands there, also when people walking past
 hide it for a while, and is marked "left" when it drives off. Vehicles are kept as long as the camera's people
 (retention), a moving vehicle starts a recording and wakes idle mode, a parked one does neither, and ignore zones
@@ -595,6 +596,19 @@ brought it to 0, and a sentence telling the model what an SUV is made it call 72
 COCO pictures of people, 57 were answered "no vehicle" (the other 3 may show one behind them); the lit shop sign on
 MOT16-04 was still called a motorbike (an ignore zone there is the fix); its white car was named Nissan Skyline (it
 looks like a Toyota Crown).
+
+**Seeing and finding them**: the Live page lists **Vehicles seen** under the people (picture, color and type, make and
+model marked "(guess)", time, passed / in view / parked / parked then left, ▶ Recording), filtered by kind, color and
+day ("cars" also lists SUVs, vans and pickups; "gray" and "silver" find each other); admins delete selected ones;
+viewers see the list (`/api/vehicles`). The **Ask box** answers questions about vehicles ("red car yesterday
+evening", "motorbikes after 10 pm", "any Perodua today"): words for kinds, colors, makes (common ones and any the
+vision model has named) pick the vehicles, the model's reading of the question the time and camera; the answer
+appears in the Vehicles list. "Bike" finds motorbikes and bicycles (in Malaysia it often means a motorbike).
+**Reports** show vehicles per hour (or day) and per kind; **counting lines and areas** count vehicles too, apart from
+people (a vehicle's place is the bottom middle of its box, where the wheels touch the ground), in the zones table.
+Checked on a test copy with MOT16-04: the list with pictures, "white car" in the Ask box found the parked white car,
+Reports showed 8 vehicles by kind; no vehicle crossed the two lines drawn there (the clip's moving bicycles stay at
+its edges), so line counting is checked by the tests only.
 
 ## Detection: how far can a camera see?
 

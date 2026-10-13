@@ -75,6 +75,13 @@ made the model call ordinary cars SUVs. The shop sign is not caught (ignore zone
 - Reports: vehicles per hour by type; zones and counting lines count vehicles separately from people (a gate line:
   cars in and out).
 
+**Step 3 results (2026-10-13)**: done (README "Vehicles", Seeing and finding them). `/api/vehicles` (kind, color, day; viewers
+too), `/api/vehicles/delete` (admins, audited), cameras say `vehicles`; Live page "Vehicles seen"; `agent.vehicle_query`
++ `QueryAgent.run` answers with `vehicles`; `reports.summarize_vehicles` + Reports panel; table
+`vehicle_zone_events` (vehicles in the zones table); pictures `vehicle_<id>.jpg` with a face-blurred copy for viewers
+(`VehicleStore.picture`, heads from the frame). Checked in the browser pane on MOT16-04; no vehicle crossed the lines
+there (tests only for line counting).
+
 ## Step 4: alerts
 
 - Alert rules can ask for a vehicle (type, color, entered zone; e.g. *motorbike entered zone gate after 11 pm*):
