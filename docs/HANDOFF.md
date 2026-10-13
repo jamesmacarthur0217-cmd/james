@@ -203,6 +203,9 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
 21. **Tune on one half, report on the other**, and say so when the rules changed after seeing the second half.
 22. **Heredocs again** (pitfall 1) turned `\v` in a README path into a control character (2026-10-13): edits with
    backslashes go in a script file written with the Write tool; a scan for control characters before committing helps.
+23. **Tests must not need git-ignored files** (models like `yolo11s.pt`, datasets): GitHub has none of them. One test
+   did, and the GitHub run failed for 23 pushes (2026-10-13/14) unnoticed. Check `gh run list --limit 3` after pushing
+   (gh is signed in on this PC); to test like GitHub, rename the file for one run.
 
 ## 7. Conventions
 
