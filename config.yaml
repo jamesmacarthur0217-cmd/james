@@ -16,6 +16,7 @@ cameras:
     # mode: kiosk             # optional: overrides the global mode below for this camera
     # retention_days: 7       # optional: keep this camera's people this many days (else storage.retention_days)
     # imgsz: 1280             # optional: detector picture size for this camera (else detector.imgsz)
+    # fall_alert: false       # optional: no fall alerts on this camera (it never sees the floor)
   # A second camera, e.g. an IP camera at the entrance:
   # - name: entrance
   #   source: rtsp://user:password@192.168.1.50:554/stream1
@@ -133,6 +134,14 @@ vlm:
   history_frames: 4           # labels are a vote over this many recent answers per person
   timeout_s: 90
   max_queue: 32
+
+# Fall alerts: someone upright is down a moment later and stays down. Needs a camera that sees the room from the
+# side (not from the ceiling); mark beds and sofas on the Live page (Zones: "Lying is normal here").
+falls:
+  enabled: true
+  after_s: 10                 # seconds down before it counts as a fall
+  drop_s: 1.0                 # from upright to down within this many seconds (slower = lying down, not falling)
+  min_drop: 0.4               # the head comes down at least this share of the person's standing height
 
 labels:
   mobility_aids: true         # wheelchair, walking stick, crutches, walker (health-related: false = never stored)

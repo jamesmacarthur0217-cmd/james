@@ -63,7 +63,11 @@ DEFAULTS: dict = {
         "timeout_s": 90,
         "max_queue": 32,
     },
-    "labels": {"mobility_aids": True},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored
+    "labels": {"mobility_aids": True},
+    # Fall alerts (labeler/falls.py): upright -> lying within drop_s, the head down min_drop of standing height,
+    # then down for after_s. Per camera: cameras[].fall_alert (default on). Measured: tools/fall_check.py.
+    "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,
+              "low_ratio": 0.5, "lost_s": 0.5, "min_width": 1.25},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored
     "embeddings": {"enabled": True, "model": "google/siglip2-base-patch16-224", "device": "cuda"},
     "reid": {"weights": "data/models/reid/osnet_ain_x1_0.pt", "device": "cuda"},   # tools/relink_check.py --reid
     "age_model": {"enabled": True, "model": "dima806/fairface_age_image_detection"},

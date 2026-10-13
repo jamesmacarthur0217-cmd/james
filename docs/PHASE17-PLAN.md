@@ -62,6 +62,18 @@ picture makes the second request look ~25% faster (it reuses its work on the pic
 - Per camera `fall_alert` (default on; off for cameras that never see the floor), Settings page.
 - Live picture: the person's box turns red with "FALL?" while it lasts.
 
+**Step 2 results (2026-10-13)**: done (README "Fall alerts"), together with the measuring of step 4 (the rules
+needed the videos). URFD downloaded with OK (100 MP4, 116 MB: the color picture is the right half, 320x240; plus
+the per-frame lying marks). `labeler/falls.py` (FallWatch: update per person, tick per frame), pipeline hook
+(`_on_fall`, red box "FALL?"/"FALL"), zones `lying_ok` ("Lying is normal here" on the Live page), `falls:` config,
+`cameras[].fall_alert`. Side camera: first half 15/15 falls, 0/20 false alarms; second half 13/15, 1/20 (the rules
+were changed after seeing it: README says so); MOT16 walking 0/7; ceiling camera 0/30 (not supported). Found on the
+way: the tracker renumbers a falling person (sometimes in the same frame, or reusing an old number), loses people
+lying half cut off at the bottom edge, and can give one fallen person two boxes; a person walking out of the bottom
+of a high street view looked like "fell out of sight" until only body points decide at the edge; kneeling under a
+bed looked like lying until the box had to be wider than tall. Lesson: a real app run found 3 of these that the
+measuring tool did not (two alerts for one fall, no alert in a video's second loop, the zone ignored out of sight).
+
 ## Step 3: fall alerts everywhere
 
 - AlertEngine: computed condition `fallen = yes` (like `zone`); a built-in **"Fall"** rule made at first start

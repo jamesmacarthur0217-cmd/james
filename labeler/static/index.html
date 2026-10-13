@@ -37,6 +37,8 @@
           <option value="line">Counting line: click 2 points</option>
         </select>
         <input id="zone-name" placeholder="Name, e.g. door" maxlength="100">
+        <label id="zone-lying-label" title="A bed or sofa: someone lying here is not a fall"><input type="checkbox"
+          id="zone-lying"> Lying is normal here</label>
         <button id="zone-undo">Undo point</button>
         <button id="zone-save" class="primary" disabled>Save</button>
         <span class="muted" id="zone-msg"></span>
@@ -459,6 +461,7 @@ function drawZonePreview() {
   const enough = kind === "area" ? zoneDraw.points.length >= 3 : zoneDraw.points.length === 2;
   $("zone-save").disabled = !enough || !$("zone-name").value.trim();
   $("zone-hint").textContent = ZONE_HINT[kind];
+  $("zone-lying-label").hidden = kind !== "area";
 }
 
 $("zone-draw").addEventListener("click", (e) => {
@@ -481,7 +484,7 @@ async function loadZoneList() {
   const zones = await (await fetch("/api/zones?camera=" + encodeURIComponent(zoneCamera()))).json();
   $("zone-list").innerHTML = zones.length
     ? zones.map(z => `<div class="zone-item"><span><b>${esc(z.name)}</b> <span class="muted">${z.kind === "line"
-        ? "counting line" : "area"}</span></span><button class="danger-quiet" data-id="${z.id}"
+        ? "counting line" : z.lying_ok ? "area, lying is normal here" : "area"}</span></span><button class="danger-quiet" data-id="${z.id}"
         data-name="${esc(z.name)}">Delete</button></div>`).join("")
     : '<div class="muted">No zones on this camera yet.</div>';
 }
@@ -496,12 +499,14 @@ $("zone-list").onclick = async (e) => {
 $("zone-save").onclick = async () => {
   const r = await fetch("/api/zones", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ camera: zoneCamera(), name: $("zone-name").value.trim(),
-                           kind: $("zone-kind").value, points: zoneDraw.points }) });
+                           kind: $("zone-kind").value, points: zoneDraw.points,
+                           lying_ok: $("zone-kind").value === "area" && $("zone-lying").checked }) });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) { $("zone-msg").textContent = data.detail || "Could not save."; return; }
   $("zone-msg").textContent = `Saved "${data.name}".`;
   zoneDraw.points = [];
   $("zone-name").value = "";
+  $("zone-lying").checked = false;
   drawZonePreview();
   loadZoneList();
 };

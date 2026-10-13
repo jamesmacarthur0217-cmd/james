@@ -496,6 +496,44 @@ Measured 2026-10-13 (`tools/mobility_check.py`; answers checked by eye):
 - People counted as "no aid" when no aid box touched them and the model said none; people too cut-off or
   blurry to tell were left out (69 of 793).
 
+## Fall alerts
+
+A camera that sees a room from the side notices **a fall**: someone upright is down a moment later (within 1 s),
+their head having come down at least 40% of their standing height, and they stay down for **10 seconds**
+(`falls:` in config.yaml). The person's box turns red on the live picture ("FALL?" while waiting, "FALL" once
+confirmed) and the app's log says `FALL [camera] person #N has been down for 10 s`. Lying down slowly (going to
+bed) is not a fall, and neither is kneeling or crouching on the floor (the box must be clearly wider than tall).
+Getting up within the 10 s cancels it. On the Live page, **Zones → Area → "Lying is normal here"** marks a bed or a
+sofa: no fall starts there. Per camera, `fall_alert: false` turns it off (a camera that never sees the floor).
+Built on the body points the detector already finds (`labeler/falls.py`): no extra model; about 0.02 ms per person
+per frame (measured on 13,197 person-frames), against tens of milliseconds for the detector.
+
+**Not a medical device.** Only falls in view are seen; a camera looking straight down from the ceiling does not
+work (from above, standing and lying look alike: 0 of 30 on such a camera); the user's desk webcam probably does
+not see the floor. Pop-ups with a sound on every page follow (Phase 17 step 3).
+
+Measured 2026-10-13 on the **UR Fall Detection** videos (University of Rzeszow; 30 falls, 40 everyday activities;
+CC BY-NC-SA 4.0, downloaded with the user's OK, 116 MB in `data\datasets\urfd`; `tools/fall_check.py`). The
+videos' color picture is only 320×240; each clip's last picture is held 15 s, as if the person stays down:
+
+| | falls caught | false alarms |
+|---|---|---|
+| Side camera, first half (falls 1-15, activities 1-20) | 15 of 15 | 0 of 20 |
+| Side camera, second half (falls 16-30, activities 21-40) | **13 of 15** | **1 of 20** |
+| 7 MOT16 street and mall videos (people walking) | - | 0 of 7 |
+| Ceiling camera (falls 1-30) | 0 of 30 | - |
+
+- A fall is confirmed **0.8 s after it began + the 10 s wait** (median).
+- **Honest note**: the rules were first set on the first half, but the first look at the second half showed
+  failures absent from the first half (people crouching at the camera's edge, the tracker's number changes), and
+  the rules were changed after it. So the second half is no longer an untouched test; the walking videos and the
+  ceiling camera were never tuned on. Rules found this way: the tracker gives a falling person a new number (the
+  history moves along), loses people lying half cut off at the bottom edge ("fell out of sight" counts unless they
+  were still upright), and can see one fallen person as two boxes (one alert).
+- Missed: two people who ended up curled up or facing the camera (their box is not wider than tall). False alarm:
+  someone kneeling right at the bottom edge until the clip ends.
+- Settings near the chosen ones give similar results (head drop 30-50%, collapsed below 40-60% of standing height).
+
 ## Detection: how far can a camera see?
 
 Each frame is shrunk to `detector.imgsz` (640) pixels on its long side before people are looked for. What
@@ -794,10 +832,11 @@ Changes are tracked with git.
 | `labeler/importer.py` | the Import page: recorded videos with real times |
 | `labeler/recorder.py`, `labeler/recordings_web.py` | recording while people are in view; the Recordings page |
 | `labeler/receiver.py` | receiving cameras sent from a phone or another PC (MediaMTX) |
+| `labeler/falls.py` | fall detection from body points |
 | `remote-camera/` | for another PC: send its webcam here through Tailscale (setup-camera.bat, remove-camera.bat) |
 | `run.py`, `start.bat`, `stop.bat` | starting and stopping |
 | `install.bat` / `install.ps1`, `tools/models.py`, `tools/pack_offline.ps1` | installing on a new PC, offline package |
-| `tools/` | benchmarks, evaluation, training, backups, long-run check (`soak.py`), restore drill, FFmpeg setup, mobility-aid check (`mobility_check.py`, `get_aid_photos.py`) |
+| `tools/` | benchmarks, evaluation, training, backups, long-run check (`soak.py`), restore drill, FFmpeg setup, mobility-aid check (`mobility_check.py`, `get_aid_photos.py`), fall check (`fall_check.py`) |
 | `tests/` | automated tests |
 | `data/` | person pictures, backups, log files, datasets (not in git) |
 
@@ -821,5 +860,6 @@ MOT16 (MOTChallenge, imported as the recorded camera `mot16` and used by the ret
 Import page and retrain (or delete `data\models\attributes.joblib` to go back to the shipped classifiers).
 Open Images photos with wheelchairs and crutches (`data\datasets\openimages_aids`, measuring only): CC BY 2.0
 (each photo's author), boxes CC BY 4.0.
+UR Fall Detection videos (`data\datasets\urfd`, measuring only): CC BY-NC-SA 4.0, non-commercial.
 OSNet-AIN re-identification weights (`data\models\reid`, measuring tool only, not used by the app): MIT, trained on
 MSMT17, DukeMTMC-reID and CUHK03 (research use; DukeMTMC was withdrawn by its authors in 2019).

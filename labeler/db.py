@@ -195,6 +195,7 @@ class Zone(Base):
     kind: Mapped[str] = mapped_column(String(10))       # area | line
     points: Mapped[str] = mapped_column(Text)           # JSON [[x, y], ...], fractions of the frame
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    lying_ok: Mapped[bool | None] = mapped_column(Boolean, default=False)   # a bed or sofa: no fall alerts here
 
 
 class ZoneEvent(Base):
@@ -314,7 +315,8 @@ def resolve(attrs: list[Attribute]) -> dict[str, dict]:
 # existing ones, so these are added at startup when missing (FLOAT works on SQLite and PostgreSQL).
 NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT", "video_paths": "TEXT", "source_file": "TEXT",
                           "source_offset_s": "FLOAT"},
-               "cameras": {"retention_days": "INTEGER"}}
+               "cameras": {"retention_days": "INTEGER"},
+               "zones": {"lying_ok": "BOOLEAN"}}
 
 
 def _videos(value: str | None) -> list[str]:
@@ -923,7 +925,7 @@ class Database:
     @staticmethod
     def _zone_dict(z: Zone) -> dict:
         return {"id": z.id, "camera": z.camera, "name": z.name, "kind": z.kind,
-                "points": [tuple(p) for p in json.loads(z.points)]}
+                "points": [tuple(p) for p in json.loads(z.points)], "lying_ok": bool(z.lying_ok)}
 
     def list_zones(self, camera: str | None = None) -> list[dict]:
         q = select(Zone).order_by(Zone.camera, Zone.name)
@@ -932,7 +934,7 @@ class Database:
         with self.Session() as s:
             return [self._zone_dict(z) for z in s.scalars(q)]
 
-    def add_zone(self, camera: str, name: str, kind: str, points: list) -> dict:
+    def add_zone(self, camera: str, name: str, kind: str, points: list, lying_ok: bool = False) -> dict:
         from .zones import check_points
         pts = check_points(kind, points)
         name = name.strip()[:100]
@@ -941,7 +943,8 @@ class Database:
         with self.Session.begin() as s:
             if s.scalars(select(Zone).where(Zone.camera == camera, Zone.name == name)).first():
                 raise ValueError(f"camera {camera} already has a zone named {name!r}")
-            z = Zone(camera=camera, name=name, kind=kind, points=json.dumps([list(p) for p in pts]))
+            z = Zone(camera=camera, name=name, kind=kind, points=json.dumps([list(p) for p in pts]),
+                     lying_ok=bool(lying_ok) and kind == "area")
             s.add(z)
             s.flush()
             return self._zone_dict(z)

@@ -43,6 +43,11 @@ def inside(pt: tuple[float, float], polygon: list) -> bool:
     return hit
 
 
+def lying_ok(zones: list[dict], pt: tuple[float, float]) -> bool:
+    """True inside an area marked "lying is normal here" (a bed, a sofa): no fall alerts start there."""
+    return any(z["kind"] == AREA and z.get("lying_ok") and inside(pt, z["points"]) for z in zones)
+
+
 def side(pt: tuple[float, float], a: tuple, b: tuple) -> int:
     """+1 on the "in" side of line a -> b, -1 on the "out" side, 0 when beside the line's ends."""
     dx, dy = b[0] - a[0], b[1] - a[1]

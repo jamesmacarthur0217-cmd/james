@@ -20,6 +20,7 @@ from .clips import ClipRecorder, person_video_name
 from .config import mask_password, resolve
 from .db import Database
 from .embed import Embedder
+from .falls import FallWatch
 from .sources import FrameSource, is_blank
 from .student import Student
 from .vlm import VLMWorker
@@ -158,6 +159,10 @@ class Pipeline:
         self.camera_id = db.get_or_create_camera(cam["name"], str(cam["source"]), self.mode)
         self.owned_ids: set[int] = set()   # records created by this camera, for routing VLM results
         self.zone_counter = zones_mod.ZoneCounter(db.list_zones(self.name), cfg["zones"]["min_frames"])
+        # Fall alerts (labeler/falls.py): per camera, off for cameras that never see the floor.
+        fcfg = cfg.get("falls") or {}
+        self.falls = FallWatch(fcfg) if fcfg.get("enabled") and self.cam.get("fall_alert", True) else None
+        self._fall_db: dict[int, int] = {}   # tracker number -> person, kept after the track ends (falls out of sight)
         pv = cfg.get("person_videos") or {}
         self.clips = (ClipRecorder(self.crop_dir, cfg["clips"], pv)
                       if cfg["clips"]["enabled"] or pv.get("enabled") else None)
@@ -385,10 +390,22 @@ class Pipeline:
                     st.zone_log += self.zone_counter.update(
                         st.zones, zones_mod.anchor(st.box, frame.shape, self.mode), self.clock.wall())
                     self._flush_zone_events(st)
+                if self.falls is not None:
+                    ok = zones_mod.lying_ok(self.zone_counter.zones, zones_mod.anchor(st.box, frame.shape, self.mode))
+                    if self.falls.update(tid, now, st.box, kpts, ok, frame.shape[0]):
+                        self._on_fall(tid)
+
+        if self.falls is not None:
+            for tid, _ in self.falls.tick(now):   # falls confirmed although the person is no longer seen
+                self._on_fall(tid)
 
         for tid, st in list(self.tracks.items()):
             if tid not in seen and now - st.last_seen > tcfg["lost_after_s"]:
+                if self.falls is not None and st.db_id is not None:
+                    self._fall_db[tid] = st.db_id
                 self._finish(tid, lost_at=st.last_seen)
+        if self._fall_db and self.frames % 100 == 0:
+            self._fall_db = {k: v for k, v in self._fall_db.items() if k in self.falls.tracks}
         if self.recently_lost:
             window = self.relink_cfg["window_s"]
             self.recently_lost = {k: v for k, v in self.recently_lost.items() if now - v[1] <= window}
@@ -404,6 +421,14 @@ class Pipeline:
             blurred = self._draw(privacy.blur_boxes(frame, heads), seen, low_color, now)
         self._publish(self._draw(frame, seen, low_color, now), blurred)
         self._publish_live(seen, now)
+
+    def _on_fall(self, tid: int) -> None:
+        """A fall is confirmed: the person was down for falls.after_s (labeler/falls.py)."""
+        st = self.tracks.get(tid)
+        if st is not None:
+            self._ensure_db(st)
+        db_id = st.db_id if st is not None else self._fall_db.get(tid)
+        log.warning("FALL [%s] person #%s has been down for %d s", self.name, db_id, self.falls.after_s)
 
     def _should_ignore(self, box: tuple, shape: tuple) -> bool:
         """Skip detections that cannot be a person we care about: inside an ignore zone (a monitor,
@@ -851,6 +876,9 @@ class Pipeline:
             st = self.tracks[tid]
             x1, y1, x2, y2 = (int(v) for v in st.box)
             color = (80, 200, 120) if st.labels else (0, 180, 255)
+            fall = self.falls.state(tid) if self.falls is not None else None
+            if fall:
+                color = (0, 0, 255)   # red: down after a fall (confirmed or waiting for falls.after_s)
             if st.kpts is not None:
                 for a, b in SKELETON:
                     if st.kpts[a, 2] > 0.5 and st.kpts[b, 2] > 0.5:
@@ -858,7 +886,10 @@ class Pipeline:
                                  (int(st.kpts[b, 0]), int(st.kpts[b, 1])), (255, 200, 80), 2, cv2.LINE_AA)
             cv2.rectangle(out, (x1, y1), (x2, y2), color, 2)
             y = max(y1, 20)
-            for line in self._label_lines(st, now):
+            lines = self._label_lines(st, now)
+            if fall:
+                lines = ["FALL" if fall == "fallen" else "FALL?"] + lines
+            for line in lines:
                 (tw, th), _ = cv2.getTextSize(line, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
                 cv2.rectangle(out, (x1, y - th - 6), (x1 + tw + 6, y + 2), color, -1)
                 cv2.putText(out, line, (x1 + 3, y - 3), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 1, cv2.LINE_AA)

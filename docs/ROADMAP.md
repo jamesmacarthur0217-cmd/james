@@ -9,7 +9,7 @@ import, first kept retraining) are done (2026-10-12). Phase 12 step 1 (a re-iden
 on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. Phase 13 (recording
 while people are in view), Phase 14 (a camera at another site, through Tailscale) and Phase 15 (that camera sent
 from a phone or PC, so it works through company firewalls) are done (2026-10-12). Phase 17 (mobility aids and fall
-alerts) step 1 is done (2026-10-13). 518 tests pass.
+alerts) steps 1-2 are done (2026-10-13). 543 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -223,7 +223,10 @@ a pop-up with sound on every page; measured on public fall videos). The Phase 15
 for now by the user (2026-10-13).
 1. **Done 2026-10-13**: mobility-aid label (wheelchair 211 of 218 on held-out Open Images photos, 0 false alarms in
    1,532 COCO people, +0.13 s per person).
-2-5. Fall detection, fall alerts everywhere, measuring on UR Fall videos, Settings and docs: next.
+2. **Done 2026-10-13** (with step 4's measuring): fall detection from body points; side camera 13/15 falls and 1/20
+   false alarms on the second half of UR Fall (15/15, 0/20 on the first), 0/7 on walking videos; ceiling cameras not
+   supported.
+3, 5. Fall alerts everywhere (pop-up with sound), Settings and docs: next.
 
 ## Critical files
 

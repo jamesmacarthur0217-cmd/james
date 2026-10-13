@@ -56,6 +56,7 @@ class ZoneIn(BaseModel):
     name: str
     kind: str                     # area | line
     points: list[list[float]]
+    lying_ok: bool = False        # an area where lying is normal (a bed, a sofa): no fall alerts there
 
 
 class AnswerIn(BaseModel):
@@ -446,12 +447,13 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         if pipelines and body.camera not in by_name:
             raise HTTPException(404, f"no camera named {body.camera!r}")
         try:
-            zone = db.add_zone(body.camera, body.name, body.kind, body.points)
+            zone = db.add_zone(body.camera, body.name, body.kind, body.points, body.lying_ok)
         except ValueError as e:
             raise HTTPException(400, str(e))
         if body.camera in by_name:
             by_name[body.camera].reload_zones()
-        audit(request, "zone added", f"{zone['kind']} {zone['name']!r} on camera {zone['camera']}")
+        audit(request, "zone added", f"{zone['kind']} {zone['name']!r} on camera {zone['camera']}"
+                                     + (" (lying is normal here)" if zone["lying_ok"] else ""))
         return zone
 
     @app.delete("/api/zones/{zone_id}")
