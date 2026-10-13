@@ -553,7 +553,7 @@ videos' color picture is only 320×240; each clip's last picture is held 15 s, a
 Security cameras also see **cars, motorbikes, bicycles, buses and lorries** (a second detector, YOLO11s, 19 MB,
 downloaded with the user's OK, AGPL-3.0 like the pose model; `labeler/vehicles.py`; `vehicles:` in config.yaml; per
 camera `vehicles: true/false`, default on for security cameras and off for kiosk ones). Each vehicle's visit is one
-record (table `vehicles`, picture in `data\cropsehicles`), drawn in purple on the live picture. A vehicle that
+record (table `vehicles`, picture in `data\crops\vehicles`), drawn in purple on the live picture. A vehicle that
 stands still for 60 s is **parked**: it stays one record however long it stands there, also when people walking past
 hide it for a while, and is marked "left" when it drives off. Vehicles are kept as long as the camera's people
 (retention), a moving vehicle starts a recording and wakes idle mode, a parked one does neither, and ignore zones
