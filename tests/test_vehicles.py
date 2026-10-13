@@ -159,6 +159,9 @@ def test_only_security_cameras_look_for_vehicles_by_default(db, monkeypatch, tmp
     cfg = copy.deepcopy(DEFAULTS)
     cfg["storage"]["crop_dir"] = str(tmp_path)
     cfg["clips"]["enabled"] = False
+    model = tmp_path / "yolo11s.pt"   # a stand-in: the real file is git-ignored, so CI has none (vehicles would be off)
+    model.write_bytes(b"")
+    cfg["vehicles"]["model"] = str(model)
     gate = Pipeline(cfg, db, None, camera={"name": "gate", "source": "rtsp://x", "mode": "security"})
     desk = Pipeline(cfg, db, None, camera={"name": "desk", "source": 0, "mode": "kiosk"})
     yard = Pipeline(cfg, db, None, camera={"name": "yard", "source": 1, "mode": "kiosk", "vehicles": True})
