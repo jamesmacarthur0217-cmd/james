@@ -113,11 +113,11 @@ or another app (Teams, Discord) holding the camera.
 | **People seen** (on Live) | Everyone recorded. **Ask** box for questions or descriptions; filter by attribute; look-alikes; tick people and **Delete selected** or **Delete all…** |
 | **Review queue** | Disagreements between models first, then least confident; your answer settles every source |
 | **Reports** | People per hour/day, attribute breakdowns, date range and camera filters, **Download CSV** |
-| **Alerts** | Rules like "red top + backpack" or "anyone" (per camera); each fires once per person |
+| **Alerts** | Rules like "red top + backpack" or "anyone" (per camera, time of day, only when Away); each fires once per person |
 | **Recordings** | Video of each camera while people are in view: a bar per day, play from any moment (viewers: faces blurred) |
 | **Answer key** | Label recorded people yourself, blind, and see how accurate the system is on this camera |
 | **Import** (admin) | Add recorded videos with their real times (see Importing recorded videos) |
-| **Settings** (admin) | Cameras, how long data is kept, backups, face blurring, HTTPS, weekly retraining; **Restart now** |
+| **Settings** (admin) | Cameras, how long data is kept, backups, face blurring, HTTPS, weekly retraining, the Home / Away schedule; **Restart now** |
 | **Health** | Whether the database, Ollama, cameras, disk, backups and storage are fine (see Reliability) |
 
 ### Settings page
@@ -383,6 +383,24 @@ it on your own camera. People recorded before this version have no times.
 
 After updating the app, press Ctrl+F5 once on each device so the browser loads the new pages; from this
 version on, pages are always checked for updates.
+
+## Home / Away
+
+A switch at the top of every page says whether the house is empty: **🏠 Home** or **🔒 Away**. Alert rules can use
+it: on the Alerts page add the condition **Home / Away → only when Away** (or only when Home), for people and
+vehicles, e.g. *anyone, only when Away* or *any vehicle, 22:00-06:00, only when Away*. Rules without it work all the
+time; the built-in **Fall** rule always works.
+
+- **Who**: admins and viewers (family on their phones) may switch it; a tap asks "Switch to Away?" first. Every
+  switch is in the Audit log ("home/away").
+- **Weekly schedule** (Settings page, "Away every week"; or `arming.schedule` in config.yaml): one line per time
+  the house is empty, e.g. `mon-fri 08:00-18:00`, `sat,sun 10:00-12:00`, `daily 23:00-06:00` (into the next
+  morning). A button press holds until the schedule next changes: Home pressed at 07:00 is overruled at 08:00.
+  A change due while the app was off is applied at the next start, logged with the time it was due.
+- **Where to see it**: the button (hover: since when, by whom, the next change), a tile on the Live page, and a line
+  on the Health page. A person already in view when it switches to Away is alerted at their next re-labeling
+  (within about 15 s).
+- Without a schedule and before the first press it is Home.
 
 ## Alert clips
 

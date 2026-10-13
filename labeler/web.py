@@ -628,7 +628,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         messages too; viewers and a monitoring tool (?token=, web.health_token) only what is wrong."""
         role = (getattr(request.state, "user", None) or {}).get("role")
         detail = {"admin": "full", "monitor": "status"}.get(role, "viewer")
-        result = healthcheck.run_checks(cfg, db, pipelines, health, app.state.started_at, detail)
+        result = healthcheck.run_checks(cfg, db, pipelines, health, app.state.started_at, detail, arming)
         return JSONResponse(result, status_code=200 if result["ok"] else 503, headers={"Cache-Control": "no-store"})
 
     @app.get("/stream")

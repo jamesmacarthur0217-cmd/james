@@ -32,7 +32,9 @@
       <p class="hint">Get notified on every open page when someone matching these conditions appears.
         With no conditions, the rule matches anyone (e.g. a camera that should see nobody at night).
         "fell" is a fall: the built-in rule "Fall" pops up with a sound on every page until OK is clicked;
-        turn it off below to stop fall alerts (deleted, it comes back at the next start).</p>
+        turn it off below to stop fall alerts (deleted, it comes back at the next start).
+        "Home / Away" = only when the switch at the top of every page says Away (or Home); its weekly schedule is
+        on the <a href="/settings">Settings</a> page.</p>
       <div class="row"><label for="name">Name</label><input id="name" placeholder="e.g. Red top with backpack" style="flex:1"></div>
       <div class="row"><label for="camera">Camera</label><select id="camera"><option value="">Any camera</option></select></div>
       <div id="conds"></div>
@@ -64,12 +66,12 @@ function condRow() {
   div.className = "cond";
   const names = Object.keys(fields);
   const NICE = { zone: "entered zone", fallen: "fell", vehicle: "vehicle (a rule about vehicles)", vehicle_color: "vehicle color",
-                 hours: "time of day" };
+                 hours: "time of day", armed: "Home / Away" };
   div.innerHTML = `<select class="c-name">${names.map(n => `<option value="${n}">${NICE[n] || n.replace(/_/g, " ")}</option>`).join("")}</select>
     <select class="c-value"></select><button class="c-del" title="Remove">✕</button>`;
   const fill = () => {
     const vals = fields[div.querySelector(".c-name").value].filter(v => v !== "unknown");
-    const show = (n, v) => n === "hours" ? `${v.split("-")[0].padStart(2, "0")}:00 to ${(+v.split("-")[1] % 24 + "").padStart(2, "0")}:00`
+    const show = (n, v) => n === "armed" ? `only when ${v === "away" ? "Away" : "Home"}` : n === "hours" ? `${v.split("-")[0].padStart(2, "0")}:00 to ${(+v.split("-")[1] % 24 + "").padStart(2, "0")}:00`
                                          : n === "vehicle" && v === "any" ? "any vehicle" : n === "vehicle" && v === "car" ? "car (with SUVs, vans, pickups)" : v;
     const n = div.querySelector(".c-name").value;
     div.querySelector(".c-value").innerHTML = vals.map(v => `<option value="${esc(v)}">${esc(show(n, v))}</option>`).join("");
@@ -82,6 +84,7 @@ function condRow() {
 
 function describe(conds) {
   return conds.length ? conds.map(([n, v]) => n === "zone" ? `in zone ${v}` : n === "fallen" ? "fell"
+                                              : n === "armed" ? `only when ${v === "away" ? "Away" : "Home"}`
                                               : n === "vehicle" ? (v === "any" ? "any vehicle" : `vehicle = ${v}`)
                                               : n === "hours" ? `between ${v.split("-")[0].padStart(2, "0")}:00 and ${(+v.split("-")[1] % 24 + "").padStart(2, "0")}:00`
                                               : `${n.replace(/_/g, " ")} = ${v}`).join(", ")
@@ -164,7 +167,8 @@ async function init() {
   // Vehicles (labeler/vehicles.py) and the time of day (people and vehicles).
   fields = { ...fields, vehicle: ["any", "car", "SUV", "van", "pickup", "lorry", "bus", "motorbike", "bicycle"],
              vehicle_color: ["white", "black", "silver", "gray", "red", "blue", "green", "yellow", "orange", "brown", "beige", "purple", "pink"],
-             hours: ["22-06", "20-06", "00-06", "18-24", "06-18", "08-18", "09-17"] };
+             hours: ["22-06", "20-06", "00-06", "18-24", "06-18", "08-18", "09-17"],
+             armed: ["away", "home"] };   // the Home / Away switch (labeler/arming.py)
   for (const c of await (await fetch("/api/cameras")).json()) $("camera").add(new Option(c.name, c.name));
   loadRules();
   loadEvents();

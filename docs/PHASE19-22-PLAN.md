@@ -25,7 +25,7 @@ Ask at the start: may viewers (family) switch it, or admins only; a weekly sched
    the next schedule change). API GET/POST `/api/arming` (audited).
 2. **Done 2026-10-14.** Rules: condition `armed = away / home` (attrs["armed"] in `AlertEngine.check`, `check_vehicle`); rules without it
    work as now. The built-in "Fall" rule stays always on.
-3. Pages: a Home/Away switch in the header of every page (session.js, big enough for a phone), shown on the Live
+3. **Done 2026-10-14** (a tap asks first, the user's choice). Pages: a Home/Away switch in the header of every page (session.js, big enough for a phone), shown on the Live
    page's "Today" tiles and the Health page; Alerts page "only when Away/Home".
 4. Tests (schedule edges, override until the next change, rule matching), real run, docs.
 

@@ -120,6 +120,69 @@
     } catch {}
   }
 
+  // --- Home / Away switch in the header of every page (labeler/arming.py) -----------------------------
+  // Admins and viewers may switch it; a confirm box first, so a stray tap on a phone does not. Other scripts
+  // read window.VL.arming and listen for the "vl-arming" event (the Live page's tile); VL.switchArming() asks too.
+  const hhmm = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+  const dayTime = (iso) => {
+    const d = new Date(iso), today = new Date().toDateString() === d.toDateString();
+    return today ? hhmm(iso) : d.toLocaleDateString([], { weekday: "short" }) + " " + hhmm(iso);
+  };
+  const Nice = (m) => m === "away" ? "Away" : "Home";
+  window.VL = window.VL || {};
+  window.VL.armingText = (s) => {
+    if (!s) return "";
+    let text = s.since ? `${Nice(s.mode)} since ${dayTime(s.since)} (${s.why === "schedule" ? "schedule" : s.by})` : `${Nice(s.mode)}`;
+    if (s.next) text += ` · schedule: ${Nice(s.next.mode)} at ${dayTime(s.next.at)}`;
+    return text;
+  };
+
+  function drawArming(s) {
+    window.VL.arming = s;
+    const b = document.getElementById("arming");
+    if (b) {
+      b.className = "arming " + s.mode;
+      b.innerHTML = s.mode === "away" ? "<span aria-hidden=\"true\">🔒</span> Away" : "<span aria-hidden=\"true\">🏠</span> Home";
+      b.title = window.VL.armingText(s) + " · click to switch";
+      b.setAttribute("aria-label", `${Nice(s.mode)}. Switch to ${s.mode === "away" ? "Home" : "Away"}`);
+    }
+    document.dispatchEvent(new CustomEvent("vl-arming", { detail: s }));
+  }
+
+  async function loadArming() {
+    try {
+      const r = await plainFetch("/api/arming");
+      if (r.ok) drawArming(await r.json());
+    } catch {}
+  }
+
+  window.VL.switchArming = async () => {
+    const s = window.VL.arming;
+    if (!s) return;
+    const to = s.mode === "away" ? "home" : "away";
+    const why = to === "away" ? "Alert rules marked \"only when Away\" will work." : "Alert rules marked \"only when Away\" will stop.";
+    if (!confirm(`Switch to ${Nice(to)}?\n${why}`)) return;
+    try {
+      const r = await plainFetch("/api/arming", { method: "POST", headers: { "Content-Type": "application/json" },
+                                                   body: JSON.stringify({ mode: to }) });
+      if (r.ok) drawArming(await r.json()); else alert("Could not switch: " + ((await r.json()).detail || r.status));
+    } catch { alert("Could not switch: no answer from the app."); }
+  };
+
+  function addArmingButton() {
+    const header = document.querySelector("header");
+    if (!header || document.getElementById("arming")) return;
+    const b = document.createElement("button");
+    b.id = "arming";
+    b.className = "arming";
+    b.textContent = "…";
+    b.addEventListener("click", window.VL.switchArming);
+    const nav = header.querySelector("nav");
+    if (nav) nav.after(b); else header.append(b);
+    loadArming();
+    setInterval(loadArming, 30000);   // the schedule may switch it, or someone on another device
+  }
+
   async function start() {
     let me = null;
     try {
@@ -128,6 +191,7 @@
     } catch {}
     if (!me) return;
     const admin = me.role === "admin";
+    addArmingButton();
     pollAlerts(admin);
     setInterval(() => pollAlerts(admin), 3000);
   }

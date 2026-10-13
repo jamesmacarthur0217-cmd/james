@@ -162,7 +162,10 @@ class Arming:
             now = self.clock()
             self._follow_schedule(now)
             last = self._last
+            mode = last["mode"] if last else HOME
             nxt = next_change(self.windows, now)
+            if nxt and nxt[1] == mode:   # e.g. Away by the button before the schedule's Away: show its next Home
+                nxt = next_change(self.windows, nxt[0])
         return {"mode": last["mode"] if last else HOME,
                 "since": last["at"].isoformat(timespec="seconds") if last else None,
                 "by": last["by"] if last else None, "why": last["why"] if last else None,

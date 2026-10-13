@@ -121,6 +121,8 @@ def test_button_holds_until_the_next_scheduled_change(db):
     state = arming.state()
     assert state["why"] == "schedule" and state["since"] == "2026-10-13T18:00:00"
     assert state["next"] == {"mode": AWAY, "at": "2026-10-14T08:00:00"}
+    arming.set(AWAY, "james")                  # Away before the schedule's Away: the next real change is Home
+    assert arming.state()["next"] == {"mode": HOME, "at": "2026-10-14T18:00:00"}
 
 
 def test_state_survives_a_restart(db):
@@ -245,3 +247,50 @@ def test_rule_api_checks_armed(db, tmp_path):
     assert add([["vehicle", "any"], ["armed", "away"], ["hours", "22-06"]]) == 200
     assert add([["fallen", "yes"], ["armed", "home"]]) == 200
     assert add([["armed", "holiday"]]) == 400
+
+
+# --- pages: Settings box, Health line (step 3) ---
+
+def test_schedule_is_saved_on_the_settings_page(db, tmp_path):
+    import yaml
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(f"cameras:\n  - name: cam1\n    source: samples/bus.jpg\n"
+                        f"settings_file: {(tmp_path / 'settings.yaml').as_posix()}\n", encoding="utf-8")
+    cfg = load_config(cfg_file)
+    client = TestClient(create_app(cfg, db, None), client=("127.0.0.1", 5000))
+    form = client.get("/api/settings").json()["values"]
+    assert form["away_schedule"] == []
+    form["away_schedule"] = ["  mon-fri 08:00-18:00 ", "", "daily 23:00-06:00"]
+    r = client.post("/api/settings", json=form)
+    assert r.status_code == 200, r.json()
+    saved = yaml.safe_load((tmp_path / "settings.yaml").read_text(encoding="utf-8"))
+    assert saved == {"arming": {"schedule": ["mon-fri 08:00-18:00", "daily 23:00-06:00"]}}
+    assert load_config(cfg_file)["arming"]["schedule"] == ["mon-fri 08:00-18:00", "daily 23:00-06:00"]
+    assert "away_schedule" in db.list_audit(10)[0]["detail"]
+
+
+def test_health_line(db, tmp_path):
+    from labeler.healthcheck import check_arming
+    arming, clock = _arming(db, [], at(MON, 12))
+    assert check_arming(arming) == {"name": "Home / Away", "level": "ok",
+                                    "detail": "Home; no weekly schedule (Settings page)"}
+    arming, clock = _arming(db, ["mon-fri 08:00-18:00"], at(MON, 12))
+    line = check_arming(arming)["detail"]
+    assert line == ("Away since 2026-10-12 08:00 (schedule); schedule: mon-fri 08:00-18:00, "
+                    "next Home at 2026-10-12 18:00")
+    arming.set(HOME, "tixuan")
+    assert check_arming(arming)["detail"].startswith("Home since 2026-10-12 12:00 (tixuan)")
+    cfg = copy.deepcopy(DEFAULTS)
+    cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
+    client = TestClient(create_app(cfg, db, None, arming=arming), client=("127.0.0.1", 5000))
+    names = [c["name"] for c in client.get("/api/health").json()["checks"]]
+    assert "Home / Away" in names
+
+
+def test_pages_have_the_switch():
+    static = Path(__file__).resolve().parent.parent / "labeler" / "static"
+    js = (static / "session.js").read_text(encoding="utf-8")
+    assert "/api/arming" in js and "confirm(" in js          # every page, asks before switching
+    assert 'id="arming-slot"' in (static / "index.html").read_text(encoding="utf-8")
+    assert 'armed: ["away", "home"]' in (static / "alerts.html").read_text(encoding="utf-8")
+    assert 'id="away_schedule"' in (static / "settings.html").read_text(encoding="utf-8")

@@ -292,6 +292,19 @@ def check_vehicles(cfg: dict, db, pipelines: list) -> dict | None:
                                     + ("" if vcfg.get("describe", True) else "; not described (vehicles.describe off)"))
 
 
+def check_arming(arming) -> dict:
+    """Home / Away (labeler/arming.py): never a problem, but good to see from another device."""
+    s = arming.state()
+    nice = {"home": "Home", "away": "Away"}
+    detail = nice[s["mode"]]
+    if s["since"]:
+        detail += f" since {s['since'].replace('T', ' ')[:16]} ({'schedule' if s['why'] == 'schedule' else s['by']})"
+    detail += (f"; schedule: {', '.join(s['schedule'])}, next {nice[s['next']['mode']]} at "
+               f"{s['next']['at'].replace('T', ' ')[:16]}" if s["next"] else
+               f"; schedule: {', '.join(s['schedule'])}" if s["schedule"] else "; no weekly schedule (Settings page)")
+    return _check("Home / Away", "ok", detail)
+
+
 def check_errors(now: float) -> tuple[dict, list[dict]]:
     errors = logs.recent_errors.recent(now)
     latest = [{"at": datetime.fromtimestamp(t).isoformat(timespec="seconds"), "message": mask_password(m)[:300]}
@@ -303,7 +316,7 @@ def check_errors(now: float) -> tuple[dict, list[dict]]:
 
 
 def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: float | None = None,
-               detail: str = "full") -> dict:
+               detail: str = "full", arming=None) -> dict:
     """detail: "full" (admins), "viewer" (no log messages) or "status" (monitoring token: problems only)."""
     now_mono, now = time.monotonic(), time.time()
     errors_check, latest_errors = check_errors(now)
@@ -330,6 +343,11 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
         checks.insert(-1, check_recording(cfg, db, pipelines))
     except Exception as e:
         checks.insert(-1, _check("recording", "warning", f"could not be checked ({e.__class__.__name__})"))
+    if arming is not None:
+        try:
+            checks.insert(-1, check_arming(arming))
+        except Exception as e:
+            checks.insert(-1, _check("Home / Away", "warning", f"could not be checked ({e.__class__.__name__})"))
     try:   # access from other devices and Tailscale (labeler/remote.py); never breaks the health check
         from . import remote
         checks[-1:-1] = remote.checks(cfg, db)   # before "errors in the log"

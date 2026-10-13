@@ -152,6 +152,9 @@ def test_masked_password_is_kept_and_never_logged(paths, db):
     ({"vehicle_kinds": ["car", "spaceship"]}, "vehicle kinds are some of"),
     ({"vehicle_parked_after_s": 5}, "vehicle_parked_after_s"),
     ({"fall_after_s": 1000}, "fall_after_s"),
+    ({"away_schedule": ["weekdays 08:00-18:00"]}, "unknown day 'weekdays'"),
+    ({"away_schedule": ["mon-fri 8-18"]}, "write days and times like mon-fri 08:00-18:00"),
+    ({"away_schedule": ["mon 09:00-09:00"]}, "the same time"),
 ])
 def test_bad_values_are_refused(paths, db, change, message):
     app, _ = _app(paths, db)

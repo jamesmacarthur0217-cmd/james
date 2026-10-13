@@ -6,7 +6,7 @@ to go back to config.yaml. Changes apply after a restart (the page has a Restart
 
 Only the common settings are editable here, each validated: cameras (add, remove, source, mode, retention,
 detector size), how long people and the audit log are kept, face blurring, HTTPS, weekly retraining, the
-daily database backup and its second copy, idle mode, recording. Zones and
+daily database backup and its second copy, idle mode, recording, the weekly Home / Away schedule. Zones and
 alert rules have their own pages; accounts are managed with tools/users.py.
 
 A camera keeps its name for good (zones, alert rules and recorded people refer to it); removing a camera keeps
@@ -99,6 +99,15 @@ class SettingsIn(BaseModel):
     recording_keep_days: float = Field(gt=0, le=365)
     recording_max_gb: float = Field(ge=1, le=100000)
     backup_copy_to: str = Field(default="", max_length=260)
+    away_schedule: list[str] = Field(default=[], max_length=20)   # Home / Away (labeler/arming.py)
+
+    @field_validator("away_schedule")
+    @classmethod
+    def _schedule(cls, v: list[str]) -> list[str]:
+        from .arming import parse_schedule
+        v = [line.strip() for line in v if line.strip()]
+        parse_schedule(v)   # a ValueError says which line and why
+        return v
 
     @field_validator("recording_when")
     @classmethod
@@ -140,6 +149,7 @@ SIMPLE = {
     "recording_when": ("recording", "when"),
     "recording_keep_days": ("recording", "keep_days"),
     "recording_max_gb": ("recording", "max_gb"),
+    "away_schedule": ("arming", "schedule"),
 }
 CAMERA_FIELDS = ("name", "source", "mode", "retention_days", "imgsz", "fall_alert", "vehicles")
 

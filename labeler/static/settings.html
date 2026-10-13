@@ -136,6 +136,19 @@
   </section>
 
   <section class="panel">
+    <h2>Home / Away</h2>
+    <div class="grid">
+      <label for="away_schedule">Away every week</label>
+      <div><textarea id="away_schedule" rows="3" style="width:min(100%,420px);display:block;margin-bottom:4px" spellcheck="false"
+        placeholder="e.g.&#10;mon-fri 08:00-18:00&#10;daily 23:00-06:00"></textarea>
+        <span class="hint">One line per time the house is empty: days (mon, tue, wed, thu, fri, sat, sun, a range like
+        mon-fri, or daily) and times; 23:00-06:00 runs into the next morning. Empty = only the Home / Away button at
+        the top of every page. A button press holds until the schedule next changes. Alert rules use it with
+        "Home / Away" on the <a href="/alerts">Alerts</a> page.</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
     <h2>Vehicles</h2>
     <div class="grid">
       <label for="vehicles_enabled">Vehicles</label>
@@ -256,6 +269,7 @@ function readForm() {
              vehicles: tr.querySelector(".veh").checked };
   });
   v.vehicle_kinds = [...document.querySelectorAll("#vehicle_kinds input:checked")].map(b => b.value);
+  v.away_schedule = $("away_schedule").value.split("\n").map(l => l.trim()).filter(Boolean);
   return v;
 }
 
@@ -266,6 +280,7 @@ function fill(values) {
   }
   $("cams").replaceChildren(...values.cameras.map(c => camRow(c, false)));
   document.querySelectorAll("#vehicle_kinds input").forEach(b => { b.checked = (values.vehicle_kinds || []).includes(b.value); });
+  $("away_schedule").value = (values.away_schedule || []).join("\n");
 }
 
 function changed() {

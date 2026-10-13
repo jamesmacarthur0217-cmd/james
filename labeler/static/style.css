@@ -27,7 +27,7 @@ main { padding: 16px 20px; }
 .panel h2 { font-size: 14px; margin: 0 0 10px; }
 #live { width: 100%; border-radius: 6px; background: #000; display: block; min-height: 200px; }
 .search { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-select, input, button { font: inherit; padding: 6px 10px; border-radius: 6px;
+select, input, button, textarea { font: inherit; padding: 6px 10px; border-radius: 6px;
   border: 1px solid var(--border); background: var(--panel); color: var(--text); }
 button { cursor: pointer; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -99,6 +99,12 @@ button.danger-quiet { margin-left: auto; color: #c9372c; border-color: transpare
 /* Accounts: admin controls are hidden until the page knows the user is an admin (static/session.js). */
 body:not(.is-admin) .admin-only { display: none !important; }
 .who { color: var(--muted); display: flex; align-items: center; gap: 8px; }
+/* Home / Away switch (static/session.js): big enough to tap on a phone; Away stands out. */
+.arming { min-height: 36px; min-width: 92px; font-weight: 600; border-radius: 18px; padding: 6px 14px; }
+.arming.away { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); }
+.arming.home { color: var(--ok); border-color: var(--ok); }
+.today-tile.away b { color: var(--warn); }
+.today button.today-tile { font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .login { display: flex; justify-content: center; padding-top: 12vh; }
 .login form { display: flex; flex-direction: column; gap: 12px; width: min(340px, 100%); }
 .login h1 { font-size: 18px; margin: 0 0 4px; }

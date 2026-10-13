@@ -163,7 +163,7 @@ async function loadToday() {
   const usual = d.usual_by_now == null ? "no earlier weeks to compare yet"
     : `usually ${d.usual_by_now} by now (${d.usual_day} a whole day; ${d.usual_from_days} earlier ${d.usual_from_days === 1 ? "week" : "weeks"})`;
   const h = d.busiest_hour;
-  let html = tile(d.people, `people today · ${usual}`)
+  let html = '<span id="arming-slot"></span>' + tile(d.people, `people today · ${usual}`)
     + tile(h ? `${String(h.hour).padStart(2, "0")}:00` : "–", h ? `busiest hour (${h.people} people)` : "busiest hour");
   if (d.alerts !== undefined) {
     html += `<a href="/alerts">${tile(d.alerts, d.alerts === 1 ? "alert today" : "alerts today", d.alerts ? "warn" : "")}</a>`;
@@ -177,7 +177,19 @@ async function loadToday() {
   }
   $("today").innerHTML = html;
   $("today").hidden = false;
+  drawArmingTile();
 }
+
+// Home / Away (static/session.js keeps it up to date): a tile first in the strip; clicking it switches (asks first).
+function drawArmingTile() {
+  const slot = $("arming-slot"), s = window.VL && window.VL.arming;
+  if (!slot || !s) return;
+  slot.innerHTML = `<button class="today-tile ${s.mode}" title="Click to switch"><b>${s.mode === "away" ? "Away" : "Home"}</b>
+    <span>${(window.VL.armingText(s).split(" · ")[0].replace(/^(Home|Away) ?/, "") || "Home / Away")
+            + (s.next ? ` · next: ${s.next.mode === "away" ? "Away" : "Home"} ${new Date(s.next.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "")}</span></button>`;
+  slot.querySelector("button").addEventListener("click", () => window.VL.switchArming());
+}
+document.addEventListener("vl-arming", drawArmingTile);
 
 // Search by photo: the picture is sent as it is and not stored; the server finds the person in it.
 $("photo-btn").addEventListener("click", () => $("photo-file").click());
