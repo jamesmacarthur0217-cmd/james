@@ -41,8 +41,8 @@ household use is generally outside the Act; their filled-in camera sign and data
   2026-10-12 as the recorded camera `mot16` (dated March 2016; CC BY-NC-SA 3.0, non-commercial). With them the
   weekly retraining ran and was kept for the first time (`data/models/attributes.joblib`, 61.8% → 62.1%).
 - BitLocker is on for drive C: (the user turned it on 2026-10-08).
-- **Docker was not running** at the end of the session (the database is in Docker): `start.bat` starts it;
-  tools like `tools/users.py` need it running first (they hang otherwise).
+- Docker and the database container were running at the end of 2026-10-13 (healthy); VisionLabeler itself was not
+  running. `start.bat` starts Docker if needed; tools like `tools/users.py` need it running first (they hang otherwise).
 - Proposal card in the user's session list: "Import recorded videos (fast, with real times)" (not started).
 
 ## 3. Architecture
@@ -95,6 +95,8 @@ labeler/today.py     Today at a glance (/api/today): same weekday, last 4 weeks,
 labeler/photo.py     search by photo: own YOLO copy (lazy), person in the middle else largest, Embedder,
                      db.nearest; raw request body (no python-multipart); POST /api/search/photo (viewers too)
 labeler/remote.py    Health checks for other devices / Tailscale / firewall (netsh, read-only, cached 5 min)
+labeler/vehicles.py  vehicles: second detector (yolo11s.pt) + tracker, VehicleWatch (records, parked, zones, pictures
+                     vehicle_<id>.jpg + blurred copy), VehicleStore (db), apply_description (vision model's answer)
 labeler/falls.py     fall detection from body points (FallWatch.update per person, tick per frame); Pipeline._on_fall
                      -> AlertEngine.check(fallen=True) (rule "Fall", alerts.FALLEN); pop-ups for every page in
                      static/session.js (falls: red, beep until OK); zones.lying_ok; tools/fall_check.py measures it
@@ -180,6 +182,13 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
    keep logs and settings in tmp folders; `load_config` uses `data/settings.yaml` only for the real config.yaml.
 18. **"now" twice in a test** can fall on both sides of midnight: make people at noon of a chosen day and ask
    for that day (fixed 2026-10-10 in test_alerts_reports and test_zones; it failed once at 00:00).
+19. **The measuring tools missed bugs a real run on a test copy found** (Phase 17-18): two alerts for one fall, no alert
+   after a video loops, a zone ignored out of sight, an alert before the vehicle's picture. Always do the real run.
+20. **Ollama reuses its work on a picture**: asking twice in a row about the same picture makes the second request
+   ~25% faster; time whole passes, not alternating requests (tools/mobility_check.py speed).
+21. **Tune on one half, report on the other**, and say so when the rules changed after seeing the second half.
+22. **Heredocs again** (pitfall 1) turned `\v` in a README path into a control character (2026-10-13): edits with
+   backslashes go in a script file written with the Write tool; a scan for control characters before committing helps.
 
 ## 7. Conventions
 
@@ -281,32 +290,40 @@ the zip is not in git); Ti Xuan's company PC only if their company allows it. Th
 "cameras from other devices" and that people are found and recorded. Note: the user's real app has never run the
 Phase 13-15 code yet (recording, receiver) until they restart it.
 
-**Phase 17 (mobility aids and fall alerts), step 1 done (2026-10-13, [PHASE17-PLAN.md](PHASE17-PLAN.md))**: the user
-skipped the Phase 15 phone test and Phase 16 for now ("skip both"; don't push them again unless asked). New label
-`mobility_aid` (wheelchair, walking stick, crutches, walker), asked as one choice with look-alike answers stored as
-"none" (`schema.DECOYS`), switch `labels.mobility_aids` (Settings; off = not asked, not stored; `schema.mode_fields`
-is the list of fields to use, not `MODE_FIELDS`). Measured with `tools/mobility_check.py` on COCO and on 166 Open
-Images photos (`tools/get_aid_photos.py`, `data/datasets/openimages_aids`, truth checked by eye in
-`mobility_truth.json`). The user's own app labels aids from its next restart.
-Step 2 (fall detection) done: `labeler/falls.py`, measured with `tools/fall_check.py` on UR Fall Detection
-(`data/datasets/urfd`, 100 MP4s, detections cached in `cache/`); see the plan's step 2 results for what the
-tracker does around a fall. The pipeline only logs `FALL [...]` and draws a red box so far; alerts are step 3.
+**Phase 17 (mobility aids and fall alerts) is done** (2026-10-13, [PHASE17-PLAN.md](PHASE17-PLAN.md); numbers in README
+"Mobility aids" and "Fall alerts"). The user skipped the Phase 15 phone test and Phase 16 ("skip both"; don't push them
+again unless asked). Commits: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · `3b7ffd5`
+Settings.
+- Mobility aids: label `mobility_aid`, asked as one choice with look-alike answers stored as "none" (`schema.DECOYS`);
+  `labels.mobility_aids` (Settings) turns it off; use `schema.mode_fields(mode, cfg["labels"])`, not `MODE_FIELDS`.
+  Measured with `tools/mobility_check.py` (COCO; Open Images photos in `data/datasets/openimages_aids`, truth by eye).
+- Falls: `labeler/falls.py` (FallWatch.update per person, tick per frame; side cameras only), alert rule "Fall"
+  (`alerts.FALLEN`, made at start), pop-ups for every page in `static/session.js` (falls red with a beep until OK:
+  the user heard it), zones `lying_ok`. Measured with `tools/fall_check.py` on UR Fall (`data/datasets/urfd`).
 
-Step 3 done: fall alerts ("Fall" rule, pop-ups in `session.js` on every page, `db.DROPPED_UNIQUE`).
-Step 5 done (Settings). **Phase 17 is done.**
+**Phase 18 (vehicles) is done** (2026-10-13, [PHASE18-PLAN.md](PHASE18-PLAN.md); README "Vehicles"). User's choices: cars,
+motorbikes, bicycles, buses, lorries; no number plates; make/model by the vision model. Commits: `2790822` detect/track
+· `91d90e4` describe · `8374fad` list/Ask/Reports/lines · `0d87bc0` alerts · `9a03ef4` Settings/Health.
+- `labeler/vehicles.py` (VehicleWatch + VehicleStore), `yolo11s.pt` (git-ignored), second tracker
+  `trackers/vehicles.yaml`, every 2nd frame, security cameras by default (`cameras[].vehicles`). Parked vehicles stay
+  one record (still 60 s; a vehicle still 5 s is remembered 2 min when lost). Tables `vehicles`, `vehicle_zone_events`.
+- The vision model describes each vehicle once (`vlm.PROMPT_VEHICLE`; jobs with negative ids routed by
+  `Pipeline.on_vlm_result`). Stanford Cars (unseen 300): make 88%, model 57%, type 93%.
+- Vehicle alert rules: a rule with a `vehicle` condition (+ `vehicle_color`, `zone`, `hours`; `hours` also for people);
+  `alert_events.vehicle_id`, `track_id` nullable (`db.NULLABLE_NOW`).
+- Measured with `tools/vehicle_check.py` (coco, speed, count on MOT16, makes on `data/datasets/stanford_cars`).
 
-**Phase 18 (vehicles, [PHASE18-PLAN.md](PHASE18-PLAN.md)) step 1 done (2026-10-13)**: `labeler/vehicles.py`, table
-`vehicles`, `yolo11s.pt` (downloaded with OK, git-ignored like the pose model), measured with `tools/vehicle_check.py`
-(COCO, speed, MOT16 counting). Step 2 done: the vision model describes each vehicle once (`vlm.PROMPT_VEHICLE`,
-negative job ids), Stanford Cars in `data/datasets/stanford_cars` (`tools/vehicle_check.py makes --seed 1` = the
-unseen sample). Step 3 done: Vehicles list, Ask box (`agent.vehicle_query`), Reports, `vehicle_zone_events`. Next:
-Step 4 done (vehicle alert rules; `db.NULLABLE_NOW` relaxes alert_events.track_id on PostgreSQL at start). Step 5 done
-(Settings, Health, `tools/models.py`). **Phase 18 is done.** The user's own app gets all of Phases 17-18 (and the
-PostgreSQL changes: zones.lying_ok, the dropped alert unique rule, alert_events.vehicle_id, track_id nullable, new
-tables vehicles and vehicle_zone_events) at its next restart. Next: ask the user (offer a short list of proposals); ask the user before each step. Phase 16
-([PHASE16-PLAN.md](PHASE16-PLAN.md), search recordings by words) stays approved but not started. Later, with the user: a long-run check with recording on and the webcam measurement (lens cover). The rest of
-Phase 12 (more cameras, per-camera tuning, re-measuring re-identification and the short-gap re-link rule on
-outdoor footage) when the user adds cameras.
+**The user's own app has not run Phases 13-18 yet**: at its next restart it gets them and changes the PostgreSQL
+database by itself (zones.lying_ok; the alert "one per rule and person" constraint dropped; alert_events.vehicle_id and
+track_id nullable; new tables vehicles, vehicle_zone_events). Each change was checked on a scratch database on the same
+server (scripts in the session scratchpad, not kept: create a database, recreate the old layout, start `Database(url)`,
+check, drop it). Ask the user to restart (stop.bat, start.bat) and look at the Health page.
+
+Waiting for the user: a camera that sees a room from the side (falls) and one that sees the gate or street in security
+mode (vehicles), then real numbers (makes like Perodua and Proton are not measured); marking beds/sofas "Lying is
+normal here". Phase 16 ([PHASE16-PLAN.md](PHASE16-PLAN.md), search recordings by words) stays approved, not started.
+Later, with the user: a long-run check with recording on, the webcam measurement (lens cover), the rest of Phase 12
+when cameras are added.
 
 Open items (also in that plan):
 - Pictures and person videos are not in the backups (restore drill, 2026-10-12). The user chose to leave it so
@@ -320,12 +337,13 @@ Open items (also in that plan):
 - More cameras than ~4: batching or one process per camera (README "How many cameras?").
 - The user keeps labeling on the Answer key page (aim 50-100 webcam people; the retraining check is noise with
   26). Measure their seconds per person with the keyboard page (before: about 34 s).
-- Before any commercial use: remove the `mot16` camera's people and retrain (MOT16 is non-commercial).
+- Before any commercial use: remove the `mot16` camera's people and retrain (MOT16 is non-commercial). The
+  measuring sets UR Fall (CC BY-NC-SA 4.0), Open Images (CC BY 2.0) and Stanford Cars (research use) are only used by
+  the tools in `tools/`, never by the app; they can be deleted (`data/datasets/urfd`, `openimages_aids`, `stanford_cars`).
 - Vocabulary refinements (coat, polo, tank top) need answer-key values to be measurable.
 
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then help me finish the Phase 15 test
-> (a camera sent from my phone), and continue with the newest plan in docs/ (ask me before each phase starts,
-> and do it step by step).
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with the newest plan in docs/
+> (PHASE19-PLAN.md if it is there; ask me before each phase and each step starts, and do it step by step).
