@@ -9,7 +9,7 @@ import, first kept retraining) are done (2026-10-12). Phase 12 step 1 (a re-iden
 on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. Phase 13 (recording
 while people are in view), Phase 14 (a camera at another site, through Tailscale) and Phase 15 (that camera sent
 from a phone or PC, so it works through company firewalls) are done (2026-10-12). Phase 17 (mobility aids and fall
-alerts) is done (2026-10-13). Phase 18 (vehicles) step 1 is done. 568 tests pass.
+alerts) is done (2026-10-13). Phase 18 (vehicles) steps 1-2 are done. 573 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -235,7 +235,8 @@ for now by the user (2026-10-13).
 **Plan: [PHASE18-PLAN.md](PHASE18-PLAN.md)** (user's choices: cars, motorbikes, bicycles, buses and lorries; no number
 plates; type, color and make/model).
 1. **Done 2026-10-13**: detect, track and store vehicles; parked vehicles one record (MOT16-04); COCO cars 79% found.
-2-5. Describe (color, make/model), see and find, alerts, Settings/Health/docs: next.
+2. **Done 2026-10-13**: type, color, make and model by the vision model (Stanford Cars: make 88%, model 57%, type 93%).
+3-5. See and find, alerts, Settings/Health/docs: next.
 
 ## Critical files
 

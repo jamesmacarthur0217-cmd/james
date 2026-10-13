@@ -52,6 +52,7 @@ class VehicleState:
     best_area: float = 0.0
     best_crop: np.ndarray | None = None
     picture_area: float = 0.0          # area of the picture stored so far
+    described: bool = False            # sent to be described (color, make/model) once
 
     @property
     def kind(self) -> str:
@@ -73,6 +74,7 @@ class VehicleWatch:
         self.parked_memory_s = float(cfg["parked_memory_s"])
         self.move_ratio = float(cfg["move_ratio"])       # moved = the centre went this share of its size away
         self.still_s = float(cfg.get("still_s", 5.0))
+        self.describe_after_s = float(cfg.get("describe_after_s", 5.0))
         self.still_memory_s = float(cfg.get("still_memory_s", 120.0))
         self.tracks: dict[int, VehicleState] = {}
         self.parked_lost: dict[int, tuple[VehicleState, float]] = {}   # db id -> (state, lost at): standing ones
@@ -98,6 +100,8 @@ class VehicleWatch:
             if st.db_id is None and st.n >= self.min_frames:
                 st.db_id = self.store.create(st.kind, st.first_wall, key)
                 self._store_picture(st)
+            if st.db_id is not None and not st.described and (st.parked or t - st.first_t >= self.describe_after_s):
+                self._describe(st)
         for key, st in list(self.tracks.items()):
             if t - st.last_t > self.lost_after_s:
                 self._finish(key)
@@ -166,6 +170,14 @@ class VehicleWatch:
             if crop.size:
                 st.best_area, st.best_crop = area, crop.copy()
 
+    def _describe(self, st: VehicleState) -> None:
+        """Once per vehicle, with its best picture: after describe_after_s in view, when parked, or when it leaves."""
+        if st.best_crop is not None:
+            st.described = True
+            self._store_picture(st)
+            self.store.update(st.db_id, kind=st.kind)   # the detector's vote so far; the vision model may refine it
+            self.store.describe(st.db_id, st.best_crop)
+
     def _store_picture(self, st: VehicleState) -> None:
         if st.db_id is not None and st.best_crop is not None and st.best_area > st.picture_area:
             self.store.picture(st.db_id, st.best_crop)
@@ -175,8 +187,10 @@ class VehicleWatch:
         st = self.tracks.pop(key)
         if st.db_id is None:
             return   # seen too briefly to count
+        if not st.described:
+            self._describe(st)
         self._store_picture(st)
-        self.store.update(st.db_id, ended_at=st.last_wall, kind=st.kind, n_frames=st.n)
+        self.store.update(st.db_id, ended_at=st.last_wall, n_frames=st.n)
         standing = not st.left and st.last_t - st.still_since >= self.still_s
         if (st.parked and not st.left) or standing:
             self.parked_lost[st.db_id] = (st, st.last_t)   # hidden or gone: found again here = the same vehicle
@@ -185,8 +199,9 @@ class VehicleWatch:
 class VehicleStore:
     """VehicleWatch's storage: the `vehicles` table and pictures in <crop_dir>/vehicles/."""
 
-    def __init__(self, db, camera_id: int, crop_dir):
+    def __init__(self, db, camera_id: int, crop_dir, describe=None):
         self.db, self.camera_id, self.crop_dir = db, camera_id, crop_dir
+        self._describe = describe   # (vehicle id, picture) -> None: color now, the vision model's answer later
         (crop_dir / "vehicles").mkdir(parents=True, exist_ok=True)
 
     def create(self, kind: str, started_at: datetime, tracker_id: int) -> int:
@@ -200,3 +215,31 @@ class VehicleStore:
         name = f"vehicles/{vehicle_id}.jpg"
         cv2.imwrite(str(self.crop_dir / name), crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
         self.db.update_vehicle(vehicle_id, crop_path=name)
+
+    def describe(self, vehicle_id: int, crop: np.ndarray) -> None:
+        if self._describe is not None:
+            self._describe(vehicle_id, crop)
+
+
+def body_color(crop: np.ndarray) -> str | None:
+    """A first color from the color estimator: the middle of the vehicle (not wheels, windows at the top, road)."""
+    from . import colors
+    h, w = crop.shape[:2]
+    if colors.is_low_color(crop):
+        return None   # black and white (infrared at night): no color
+    hit = colors.dominant(colors.color_histogram(crop[int(0.35 * h):int(0.75 * h), int(0.15 * w):int(0.85 * w)]))
+    return hit[0] if hit else None
+
+
+def apply_description(db, vehicle_id: int, answer: dict[str, str], night: bool = False) -> None:
+    """Store the vision model's answer. "not a vehicle" hides the record (kept for checking, never listed)."""
+    if answer.get("type") == "not a vehicle":
+        db.update_vehicle(vehicle_id, not_vehicle=True)
+        return
+    fields = {k: answer[k] for k in ("make", "model") if answer.get(k, "unknown") != "unknown"}
+    if answer.get("type") in ("car", "SUV", "van", "pickup", "lorry", "bus", "motorbike", "bicycle"):
+        fields["kind"] = answer["type"]   # finer than the detector's (van, pickup)
+    if answer.get("color", "unknown") != "unknown" and not night:
+        fields["color"] = answer["color"]
+    if fields:
+        db.update_vehicle(vehicle_id, **fields)

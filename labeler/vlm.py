@@ -53,6 +53,47 @@ luggage"; a person who stands behind, pushes or stands next to a wheelchair that
 standing next to a wheelchair". Answer "none" when the person uses nothing."""
 
 
+# Vehicles (labeler/vehicles.py): one picture, type, color, make and model. "not a vehicle" lets the model reject
+# what the detector mistook for one (a lit shop sign was a "car" on MOT16-04).
+# Measured on Stanford Cars (2026-10-13): with "not a vehicle" as one of the types, 8% of clear car photos (SUVs,
+# minivans, pickups) were answered so (18% after adding "SUV" and a stricter sentence); a separate yes/no question
+# first ("vehicle_in_picture") is asked instead.
+VEHICLE_TYPES = ["car", "SUV", "van", "pickup", "lorry", "bus", "motorbike", "bicycle", "unknown"]
+VEHICLE_COLORS = [c for c in schema.COLORS if c != "unknown"] + ["silver", "unknown"]
+PROMPT_VEHICLE = """You are describing a vehicle seen by a security camera. The picture is cut out around it.
+vehicle_in_picture: "yes" if a car, van, lorry, bus, motorbike or bicycle is in the picture; "no" only for a sign,
+a poster, a building or a person without one.
+type: what the vehicle is. A minivan or MPV is a "van".
+color: the main color of its body (not windows, wheels or the road); "silver" for a metallic light gray.
+make: the brand (for example Perodua, Proton, Toyota, Honda, Yamaha), only if the badge, logo or shape makes it
+clear; otherwise "unknown". model: the model name (for example Myvi, Saga, Vios, City), only if clear; otherwise
+"unknown". Do not guess from the color alone."""
+
+
+def vehicle_schema() -> dict:
+    props = {"vehicle_in_picture": {"type": "string", "enum": ["yes", "no"]},
+             "type": {"type": "string", "enum": VEHICLE_TYPES},
+             "color": {"type": "string", "enum": VEHICLE_COLORS},
+             "make": {"type": "string"}, "model": {"type": "string"}}
+    return {"type": "object", "properties": props, "required": list(props)}
+
+
+def clean_vehicle(raw: dict) -> dict[str, str]:
+    """Off-list answers become "unknown"; make and model are short names (a sentence is not a name)."""
+    out = {"type": "unknown"}
+    if str(raw.get("vehicle_in_picture", "yes")).strip().lower() == "no":
+        return {"type": "not a vehicle", "color": "unknown", "make": "unknown", "model": "unknown"}
+    for name, allowed in (("type", VEHICLE_TYPES), ("color", VEHICLE_COLORS)):
+        v = str(raw.get(name, "unknown")).strip()
+        v = {a.lower(): a for a in allowed}.get(v.lower(), "unknown")
+        out[name] = v
+    for name in ("make", "model"):
+        v = " ".join(str(raw.get(name, "")).split())[:40]
+        bad = not v or v.lower() in ("unknown", "none", "n/a", "unclear") or len(v.split()) > 3 or not any(c.isalpha() for c in v)
+        out[name] = "unknown" if bad else v
+    return out
+
+
 def _b64(image: np.ndarray, max_side: int) -> str:
     h, w = image.shape[:2]
     scale = max_side / max(h, w)
@@ -93,9 +134,15 @@ class VLMClient:
         return True, "ok"
 
     def label(self, person: np.ndarray, face: np.ndarray | None, mode: str | None = None) -> dict[str, str]:
-        """Label one person. Retries once if Ollama fails (it occasionally restarts its model process)."""
+        """Label one person (or, with mode "vehicle", one vehicle). Retries once if Ollama fails (it occasionally
+        restarts its model process)."""
+        if mode == "vehicle":
+            return self._retry(lambda: self._label_vehicle(person))
+        return self._retry(lambda: self._label(person, face, mode or self.mode))
+
+    def _retry(self, call):
         try:
-            return self._label(person, face, mode or self.mode)
+            return call()
         except (requests.ConnectionError, requests.Timeout) as e:
             log.warning("VLM request failed (%s); retrying once", e.__class__.__name__)
         except requests.HTTPError as e:
@@ -103,7 +150,23 @@ class VLMClient:
                 raise
             log.warning("Ollama returned %s; retrying once", e.response.status_code)
         time.sleep(2)
-        return self._label(person, face, mode or self.mode)
+        return call()
+
+    def _chat(self, prompt: str, images: list[str], fmt: dict) -> dict:
+        body = {"model": self.model, "messages": [{"role": "user", "content": prompt, "images": images}],
+                "format": fmt, "stream": False, "options": {"temperature": 0, "num_predict": 200}, "keep_alive": "30m"}
+        if self._send_think:
+            body["think"] = False
+        r = requests.post(f"{self.host}/api/chat", json=body, timeout=self.timeout)
+        if r.status_code == 400 and "think" in r.text and self._send_think:
+            self._send_think = False
+            body.pop("think")
+            r = requests.post(f"{self.host}/api/chat", json=body, timeout=self.timeout)
+        r.raise_for_status()
+        return json.loads(r.json()["message"]["content"])
+
+    def _label_vehicle(self, picture: np.ndarray) -> dict[str, str]:
+        return clean_vehicle(self._chat(PROMPT_VEHICLE, [_b64(picture, 512)], vehicle_schema()))
 
     def _label(self, person: np.ndarray, face: np.ndarray | None, mode: str) -> dict[str, str]:
         images = [_b64(person, 512)]

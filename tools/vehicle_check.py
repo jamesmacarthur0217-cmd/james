@@ -220,6 +220,77 @@ def count(args) -> None:
               f"{sum(1 for g in ids if seen_gt[g] >= 0.8 * n / every)}")
 
 
+STANFORD = ROOT / "data" / "datasets" / "stanford_cars"
+MULTI_WORD_MAKES = ("AM General", "Aston Martin", "Land Rover")
+MAKE_NAMES = {"mercedes": "mercedesbenz", "benz": "mercedesbenz", "vw": "volkswagen", "chevy": "chevrolet",
+              "rollsroyce": "rollsroyce", "hummer": "amgeneral", "landrover": "landrover", "mini": "mini"}
+
+
+def _norm(s: str) -> str:
+    return "".join(c for c in s.lower() if c.isalnum())
+
+
+def _stanford_make(name: str) -> str:
+    return next((m for m in MULTI_WORD_MAKES if name.startswith(m)), name.split()[0])
+
+
+def makes(args) -> None:
+    """Make and model by the vision model on Stanford Cars test photos (196 US models, 2012 and older)."""
+    import hashlib
+    import json
+    import random
+    import re
+    import pyarrow.parquet as pq
+    from labeler.config import load_config
+    from labeler.vlm import PROMPT_VEHICLE, VLMClient, vehicle_schema
+    names = dict(re.findall(r"'(\d+)': (.+)", (STANFORD / "README.md").read_text(encoding="utf-8")))
+    table = pq.read_table(STANFORD / "test-00000-of-00002.parquet")
+    labels = table.column("label").to_pylist()
+    picks = random.Random(args.seed).sample(range(len(labels)), args.n)
+    asked = PROMPT_VEHICLE + json.dumps(vehicle_schema(), sort_keys=True)
+    cache = STANFORD / f"answers-{hashlib.sha1(asked.encode()).hexdigest()[:6]}.jsonl"
+    done = {}
+    if cache.exists():
+        done = {r["i"]: r for r in map(json.loads, cache.read_text("utf-8").splitlines())}
+    client = VLMClient(load_config()["vlm"], "kiosk")
+    images = table.column("image")
+    with open(cache, "a", encoding="utf-8") as f:
+        for i in picks:
+            if i in done:
+                continue
+            data = images[i].as_py()["bytes"]
+            img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+            t = time.perf_counter()
+            answer = client.label(img, None, "vehicle")
+            done[i] = {"i": i, "truth": names[str(labels[i])].strip(), "answer": answer, "s": time.perf_counter() - t}
+            f.write(json.dumps(done[i]) + "\n")
+    rows = [done[i] for i in picks]
+    made = [r for r in rows if r["answer"]["make"] != "unknown"]
+    right_make = [r for r in made if MAKE_NAMES.get(_norm(r["answer"]["make"]), _norm(r["answer"]["make"]))
+                  == MAKE_NAMES.get(_norm(_stanford_make(r["truth"])), _norm(_stanford_make(r["truth"])))]
+    modeled = [r for r in rows if r["answer"]["model"] != "unknown"]
+    right_model = [r for r in modeled if _norm(r["answer"]["model"]) and _norm(r["answer"]["model"]) in _norm(r["truth"])]
+    types = Counter(r["answer"]["type"] for r in rows)
+
+    def body(name: str) -> str:   # the body type in Stanford's class name
+        words = name.split()
+        return ("SUV" if "SUV" in words else "van" if {"Minivan", "Van"} & set(words)
+                else "pickup" if "Cab" in words else "car")
+    by_body = Counter((body(r["truth"]), r["answer"]["type"]) for r in rows)
+    right_type = sum(k for (b, a), k in by_body.items() if a == b or (b == "pickup" and a == "lorry"))
+    n = len(rows)
+    print(f"Stanford Cars test, {n} photos, median {statistics.median(r['s'] for r in rows):.2f} s each")
+    print(f"  type: {dict(types.most_common())}; matches the body type in the name {right_type}/{n} ({right_type / n:.0%})")
+    print("   ", ", ".join(f"{b}->{a} {k}" for (b, a), k in by_body.most_common() if a != b))
+    print(f"  make answered {len(made)}/{n} ({len(made) / n:.0%}), right {len(right_make)}/{len(made)} "
+          f"({len(right_make) / max(len(made), 1):.0%}) -> right of all {len(right_make) / n:.0%}")
+    print(f"  model answered {len(modeled)}/{n} ({len(modeled) / n:.0%}), right {len(right_model)}/{len(modeled)} "
+          f"({len(right_model) / max(len(modeled), 1):.0%}) -> right of all {len(right_model) / n:.0%}")
+    wrong = [r for r in made if r not in right_make][:8]
+    for r in wrong:
+        print(f"    wrong make: said {r['answer']['make']} {r['answer']['model']!r}, is {r['truth']}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -232,8 +303,11 @@ def main() -> None:
     p.add_argument("--every", type=int, default=0, help="vehicle detector on every n-th frame (default: config)")
     p.add_argument("--parked", type=float, default=0, help="parked after this many seconds (the clips are short)")
     p.add_argument("--move", type=float, default=0, help="moved = the centre went this share of its size away")
+    p = sub.add_parser("makes", help="make/model by the vision model on Stanford Cars")
+    p.add_argument("--n", type=int, default=300)
+    p.add_argument("--seed", type=int, default=0, help="which photos (seed 0 was used to tune the prompt)")
     args = ap.parse_args()
-    {"coco": coco, "speed": speed, "count": count}[args.cmd](args)
+    {"coco": coco, "speed": speed, "count": count, "makes": makes}[args.cmd](args)
 
 
 if __name__ == "__main__":

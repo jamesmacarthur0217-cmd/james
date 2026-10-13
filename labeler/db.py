@@ -122,6 +122,7 @@ class Vehicle(Base):
     parked: Mapped[bool] = mapped_column(Boolean, default=False)
     parked_at: Mapped[datetime | None] = mapped_column(DateTime)
     left_at: Mapped[datetime | None] = mapped_column(DateTime)
+    not_vehicle: Mapped[bool] = mapped_column(Boolean, default=False)   # the vision model saw no vehicle: hidden
 
 
 class Attribute(Base):
@@ -525,7 +526,7 @@ class Database:
     # --- vehicles (labeler/vehicles.py) ---------------------------------------------------------------------
 
     VEHICLE_FIELDS = {"kind", "ended_at", "n_frames", "crop_path", "color", "make", "model", "parked", "parked_at",
-                      "left_at"}
+                      "left_at", "not_vehicle"}
 
     def create_vehicle(self, camera_id: int, tracker_id: int, kind: str, started_at: datetime) -> int:
         with self.Session.begin() as s:
@@ -555,7 +556,8 @@ class Database:
     def list_vehicles(self, limit: int = 50, camera: str | None = None, kind: str | None = None,
                       start: datetime | None = None, end: datetime | None = None) -> list[dict]:
         """Newest first."""
-        q = select(Vehicle, Camera.name).join(Camera, Camera.id == Vehicle.camera_id)
+        q = select(Vehicle, Camera.name).join(Camera, Camera.id == Vehicle.camera_id).where(
+            Vehicle.not_vehicle.is_not(True))
         if camera:
             q = q.where(Camera.name == camera)
         if kind:

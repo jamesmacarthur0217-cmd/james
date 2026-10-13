@@ -577,6 +577,25 @@ Measured 2026-10-13 (`tools/vehicle_check.py`):
   matching a marked vehicle. A fixed gate camera has no camera motion; there is no fixed street footage with marked
   vehicles here, so the user's own gate camera is the real test.
 
+**Description**: once per vehicle (after 5 s in view, when it parks, or when it leaves, with its best picture) the
+vision model answers whether a vehicle is in the picture, its type (car, SUV, van, pickup, lorry, bus, motorbike,
+bicycle), color (the people's color list plus silver) and make and model, "unknown" when not clear. It waits behind
+people in the same queue (vehicle jobs have negative numbers). The color estimator gives a first color at once (none
+from black-and-white night pictures). A vehicle the model says is not in the picture is hidden from every list (kept
+for checking). `vehicles.describe: false` turns the vision model off for vehicles.
+
+Measured 2026-10-13 on **Stanford Cars** (196 US-market models from 2012 and earlier; one 513 MB file downloaded with
+the user's OK, research use; `tools/vehicle_check.py makes`), 300 photos not used for tuning: **make right 88%** of
+all (answered 98%, of those 90% right; many "wrong" ones are twins with another badge, e.g. GMC Savana / Chevrolet
+Express), **model right 57%** (answered 90%, of those 63%: a guess), **type matches the body type 93%** (pickups
+called lorry most often), 0.84 s per vehicle. Malaysian makes (Perodua, Proton) are not in that set: not measured.
+Found while tuning on another 300 photos: with "not a vehicle" as one of the types, 8% of clear car photos (SUVs,
+minivans, pickups) were answered so, 18% after adding "SUV" and a stricter sentence; a separate yes/no question first
+brought it to 0, and a sentence telling the model what an SUV is made it call 72 ordinary cars SUVs (removed). On 60
+COCO pictures of people, 57 were answered "no vehicle" (the other 3 may show one behind them); the lit shop sign on
+MOT16-04 was still called a motorbike (an ignore zone there is the fix); its white car was named Nissan Skyline (it
+looks like a Toyota Crown).
+
 ## Detection: how far can a camera see?
 
 Each frame is shrunk to `detector.imgsz` (640) pixels on its long side before people are looked for. What

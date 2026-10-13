@@ -58,6 +58,14 @@ Health for the new model (step 5); delete from the page (step 3).
   how often the make is answered and right, and by eye on Malaysian-looking cars in COCO/MOT16 (Perodua, Proton are
   not in Stanford Cars: said honestly). If make/model is mostly wrong, only type and color are kept (asked first).
 
+**Step 2 results (2026-10-13)**: done (README "Vehicles", Description). Stanford Cars test file downloaded with OK (513
+MB). `vlm.PROMPT_VEHICLE` / `vehicle_schema` / `clean_vehicle` (a yes/no "vehicle_in_picture" first; types incl. SUV
+and van; colors + silver; make/model free text cleaned), `VLMClient.label(..., "vehicle")`; `vehicles.body_color`
+(first color), `apply_description` ("not a vehicle" hides: `vehicles.not_vehicle`); pipeline `_describe_vehicle`
+(negative job ids routed back by `on_vlm_result`). Unseen 300 photos: make 88%, model 57%, type 93%, 0.84 s. Found:
+"not a vehicle" as a type rejected 8-18% of clear cars; the separate question fixed it; an SUV definition sentence
+made the model call ordinary cars SUVs. The shop sign is not caught (ignore zone).
+
 ## Step 3: see and find them
 
 - Live page: a **Vehicles** list next to People (picture, type, color, make/model, arrived/left/parked, time,

@@ -21,7 +21,7 @@ from .config import mask_password, resolve
 from .db import Database
 from .embed import Embedder
 from .falls import FallWatch
-from .vehicles import KINDS as VEHICLE_KINDS, VehicleStore, VehicleWatch
+from .vehicles import KINDS as VEHICLE_KINDS, VehicleStore, VehicleWatch, apply_description, body_color
 from .sources import FrameSource, is_blank
 from .student import Student
 from .vlm import VLMWorker
@@ -179,7 +179,8 @@ class Pipeline:
             self.vehicle_model = YOLO(vcfg["model"])
             vt = resolve(vcfg["tracker"])
             self.vehicle_tracker = str(vt) if vt.exists() else "bytetrack.yaml"
-            self.vehicles = VehicleWatch(vcfg, VehicleStore(db, self.camera_id, self.crop_dir), vcfg["kinds"])
+            self.vehicles = VehicleWatch(vcfg, VehicleStore(db, self.camera_id, self.crop_dir, self._describe_vehicle),
+                                         vcfg["kinds"])
         self.tracks: dict[int, TrackState] = {}
         self.by_db_id: dict[int, TrackState] = {}
         # People who recently left the view, kept briefly so a returning person continues
@@ -456,6 +457,17 @@ class Pipeline:
                 if self.idle and conf >= self.wake_conf:
                     self.last_person_at = now   # a vehicle arriving wakes idle mode, like a person
         self.vehicles.update(now, self.clock.wall(), frame, dets)
+
+    def _describe_vehicle(self, vehicle_id: int, crop: np.ndarray) -> None:
+        """A first color from the color estimator now; type, color, make and model from the vision model when it is
+        free (people first: vehicle jobs wait in the same queue). Vehicle jobs use negative numbers (-id), so they
+        never mix with people's."""
+        color = body_color(crop)
+        if color:
+            self.db.update_vehicle(vehicle_id, color=color)
+        if self.vlm is not None and self.vehicle_cfg.get("describe", True):
+            self.owned_ids.add(-vehicle_id)
+            self.vlm.submit(-vehicle_id, [(crop, None)], "vehicle")
 
     def _on_fall(self, tid: int) -> None:
         """A fall is confirmed: the person was down for falls.after_s (labeler/falls.py)."""
@@ -793,6 +805,10 @@ class Pipeline:
     def on_vlm_result(self, db_id: int, results: list[dict[str, str]]) -> None:
         """Called on the VLM thread. Labels are a majority vote over the person's most recent
         answers, so they follow real changes without flickering on a single odd frame."""
+        if db_id < 0:   # a vehicle (see _describe_vehicle)
+            if results:
+                apply_description(self.db, -db_id, results[0])
+            return
         if db_id in self.deleted_ids:
             return
         st = self.by_db_id.get(db_id)

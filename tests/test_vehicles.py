@@ -29,6 +29,9 @@ class FakeStore:
     def picture(self, vehicle_id, crop):
         self.pictures[vehicle_id] = crop.shape
 
+    def describe(self, vehicle_id, crop):
+        self.rows[vehicle_id]["described"] = self.rows[vehicle_id].get("described", 0) + 1
+
 
 def run(watch, frames, t0=0.0, fps=5):
     """frames: list of detection lists, one per frame, at fps."""
@@ -159,3 +162,73 @@ def test_standing_vehicle_lost_now_and_then_becomes_parked_as_one_record():
         t = run(watch, standing(key=10 + k, cls=BICYCLE, n=5 * 20), t0=t)
         t = run(watch, [[]] * 30, t0=t)
     assert list(store.rows) == [1] and store.rows[1]["parked"] is True
+
+
+# --- step 2: describing vehicles ---
+
+from labeler.vehicles import apply_description, body_color  # noqa: E402
+from labeler.vlm import VEHICLE_TYPES, clean_vehicle, vehicle_schema  # noqa: E402
+
+
+def test_each_vehicle_is_described_once():
+    store = FakeStore()
+    watch = VehicleWatch(CFG, store)
+    end = run(watch, passing(n=40))                     # 8 s in view: described after 5 s
+    run(watch, [[]] * 30, t0=end)
+    end = run(watch, passing(key=2, n=10), t0=end + 10)  # 2 s in view: described when it leaves
+    run(watch, [[]] * 30, t0=end)
+    assert [r["described"] for r in store.rows.values()] == [1, 1]
+
+
+def test_vehicle_answers_are_cleaned():
+    assert set(vehicle_schema()["properties"]["type"]["enum"]) == set(VEHICLE_TYPES)
+    assert clean_vehicle({"vehicle_in_picture": "no", "type": "car"})["type"] == "not a vehicle"
+    out = clean_vehicle({"type": "Car", "color": "silver", "make": "Perodua", "model": "Myvi"})
+    assert out == {"type": "car", "color": "silver", "make": "Perodua", "model": "Myvi"}
+    out = clean_vehicle({"type": "spaceship", "color": "chrome", "make": "it looks like a small Japanese car",
+                         "model": "N/A"})
+    assert out == {"type": "unknown", "color": "unknown", "make": "unknown", "model": "unknown"}
+
+
+def test_description_is_stored_and_not_a_vehicle_is_hidden(db, camera, tmp_path):
+    store = VehicleStore(db, camera, tmp_path)
+    car = store.create("lorry", datetime.now(), 1)
+    sign = store.create("car", datetime.now(), 2)
+    apply_description(db, car, {"type": "pickup", "color": "white", "make": "Toyota", "model": "Hilux"})
+    apply_description(db, sign, {"type": "not a vehicle", "color": "red", "make": "unknown", "model": "unknown"})
+    rows = db.list_vehicles()
+    assert [r["id"] for r in rows] == [car]
+    assert {k: rows[0][k] for k in ("kind", "color", "make", "model")} == {
+        "kind": "pickup", "color": "white", "make": "Toyota", "model": "Hilux"}
+    apply_description(db, car, {"type": "unknown", "color": "unknown", "make": "unknown", "model": "unknown"})
+    assert db.list_vehicles()[0]["make"] == "Toyota"   # "unknown" never overwrites an answer
+
+
+def test_first_color_from_the_middle_of_the_body():
+    crop = np.zeros((100, 200, 3), np.uint8)
+    crop[:, :] = (40, 40, 200)                    # red body (BGR)
+    crop[:30, :] = (20, 20, 20)                   # dark windows on top
+    assert body_color(crop) == "red"
+    assert body_color(np.full((100, 200, 3), 128, np.uint8)) is None   # gray picture: no color (night)
+
+
+def test_pipeline_sends_vehicles_to_the_vision_model_and_routes_the_answer(db, camera, tmp_path):
+    from test_pipeline_logic import make_pipeline
+    p = make_pipeline(db)
+    p.owned_ids, p.vehicle_cfg = set(), dict(DEFAULTS["vehicles"])
+    sent = []
+
+    class VLM:
+        def submit(self, job_id, frames, mode):
+            sent.append((job_id, mode))
+            return True
+
+    p.vlm = VLM()
+    vid = VehicleStore(db, camera, tmp_path).create("car", datetime.now(), 1)
+    crop = np.zeros((60, 100, 3), np.uint8)
+    crop[:, :] = (200, 60, 30)                    # blue
+    p._describe_vehicle(vid, crop)
+    assert sent == [(-vid, "vehicle")] and -vid in p.owned_ids
+    assert db.list_vehicles()[0]["color"] == "blue"
+    p.on_vlm_result(-vid, [{"type": "car", "color": "blue", "make": "Proton", "model": "Saga"}])
+    assert db.list_vehicles()[0]["make"] == "Proton"
