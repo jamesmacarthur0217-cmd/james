@@ -277,6 +277,9 @@ Phase 21 started 2026-10-14 (user's choices: dogs, cats and birds; security came
 3. **Done 2026-10-14**: alert rules `animal = any/dog/cat/bird` with zone, hours, Away and stayed
    (`AlertEngine.check_animal`, `alerts.rule_kind`); `alert_events.animal_id` (NEW_COLUMNS, checked on PostgreSQL);
    pop-ups, clips, Alerts list; deleting an animal deletes its alerts.
+4. **Done 2026-10-14**: `tools/animal_check.py`: COCO dogs 75%, cats 83%, birds 68% (medium/large, at 0.5; 0.4 not
+   worth it); false alarms 0 on MOT16, 3 on UR Fall (a person crawling = "dog"). Tried, not kept: ignoring animal boxes
+   that are a found person (lost real animals). README "Animals".
 
 ## Critical files
 

@@ -680,6 +680,38 @@ look for them and how many came today, or a warning when `yolo11s.pt` is missing
 at start (an offline PC would fail) but turns vehicles off for those cameras; `install.bat`, the offline package and
 `python tools/models.py check/download/pack/unpack` include it.
 
+## Animals
+
+Dogs, cats and birds (`animals.kinds`; horses, sheep and cows can be added; monkeys and monitor lizards are not
+something the detector knows) are found by the vehicle detector in the same pass, so they cost nothing extra. On
+security cameras by default (`cameras[].animals`). Each visit is one record with a picture (people's faces blurred in
+the viewers' copy) and a rough color; an animal lying still for a minute is **resting** and stays one record. They are
+drawn in orange on the live picture and listed under **Animals seen** on the Live page (kind, color, day; admins can
+delete). The Ask box understands dog, puppy, cat, kitten, bird, crow, pigeon, pet, animal ("black cat yesterday");
+Reports shows animals per hour and per kind. Alert rules: **animal** = any / dog / cat / bird, with an area, the time
+of day, Home / Away and "stayed in area", e.g. *dog, 22:00-06:00, only when Away*. Animals do not wake idle mode or
+start recording (birds would keep the camera busy all day). Deleting an animal deletes its alerts and clips.
+
+**Measured** (2026-10-14, `tools/animal_check.py`):
+
+| COCO val2017 (5,000 photos) | Found, medium and large | Found, small (far) | Wrong boxes |
+|---|---|---|---|
+| Dogs | 156 of 207 (75%) | 5 of 11 | 17 |
+| Cats | 166 of 200 (83%) | 0 of 2 | 17 |
+| Birds | 131 of 193 (68%) | 33 of 234 (14%) | 22 |
+
+That is at confidence 0.5, which the tracker needs to start following something. At 0.4 it would find 1-5% more but
+with about 25-100% more wrong boxes (birds 22 → 43), so 0.5 stays. A photo is one chance; on a camera an animal gets many
+frames, but must be found in most of them for a few seconds. Far-away birds are mostly missed.
+
+False alarms on videos without animals: MOT16 street videos (7, 3.6 minutes, busy streets) **0**; UR Fall indoor
+videos (100, 8.3 minutes, color half) **3**: each a person crawling on all fours towards the camera, taken for a dog.
+Tried and not kept: leaving out an "animal" box that is the same box as a person the person detector found. It lost real
+animals (boxes overlapping 50%: dogs 156 → 147, cats 166 → 159, birds 131 → 123; the person detector sometimes "sees a
+person" on a close-up animal), and when nearly identical (70%: dogs 150, cats 160, birds 123) it removed only 1 of the 3
+false dogs. Not measured: the user's own camera, night (infrared) pictures, and animals common in Malaysia
+(stray cats and dogs should be like COCO's; monitor lizards and monkeys are not found at all).
+
 ## Detection: how far can a camera see?
 
 Each frame is shrunk to `detector.imgsz` (640) pixels on its long side before people are looked for. What

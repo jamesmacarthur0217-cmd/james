@@ -118,6 +118,7 @@ labeler/settings.py  Settings page: data/settings.yaml merged over config.yaml i
 start.bat / stop.bat daily start/stop (wait for Docker + Ollama; stop waits for app exit, backs up DB)
 install.bat/.ps1     new PC: winget Python/Docker/Ollama, .venv, .env, DB, models, admin, autostart,
                      health; -CheckOnly, -Offline <pkg>; PowerShell 5.1 + ASCII only (tests check)
+tools/animal_check.py animals on COCO (per confidence) and false alarms on MOT16 / UR Fall (color half only!)
 tools/loiter_check.py loitering alerts against MOT16 true markings (found, false, late; --min-visibility)
 tools/relink_check.py counting check against MOTChallenge gt.txt (true identities); per-join right/wrong
 tools/models.py      check / download / pack / unpack models (HF cache, Ollama manifest+blobs, YOLO)
