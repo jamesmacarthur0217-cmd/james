@@ -9,7 +9,7 @@ import, first kept retraining) are done (2026-10-12). Phase 12 step 1 (a re-iden
 on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. Phase 13 (recording
 while people are in view), Phase 14 (a camera at another site, through Tailscale) and Phase 15 (that camera sent
 from a phone or PC, so it works through company firewalls) are done (2026-10-12). Phase 17 (mobility aids and fall
-alerts) steps 1-3 are done (2026-10-13). 550 tests pass.
+alerts) is done (2026-10-13). 553 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -216,7 +216,7 @@ PC's Tailscale connected again, the firewall rule for 8554/1935, then a phone or
 **Approved plan: [PHASE16-PLAN.md](PHASE16-PLAN.md)**: type a description, get video moments from all cameras to
 play (built on the Ask box, the recordings table and the Recordings page). Start after the Phase 15 phone test.
 
-## Phase 17: Mobility aids and fall alerts (approved 2026-10-13; step 1 done)
+## Phase 17: Mobility aids and fall alerts (done 2026-10-13)
 
 **Plan: [PHASE17-PLAN.md](PHASE17-PLAN.md)** (user's choices: mobility aids on by default with a switch; fall alerts as
 a pop-up with sound on every page; measured on public fall videos). The Phase 15 phone test and Phase 16 were skipped
@@ -228,7 +228,7 @@ for now by the user (2026-10-13).
    supported.
 3. **Done 2026-10-13**: the built-in "Fall" rule, a red pop-up with a beep on every page until OK, clips that show
    the fall; a person can be alerted for a second fall.
-5. Settings (fall alerts per camera) and docs: next.
+5. **Done 2026-10-13**: Settings (fall alerts on/off, seconds, per camera) and docs. **Phase 17 is done.**
 
 ## Critical files
 

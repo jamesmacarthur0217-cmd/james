@@ -110,6 +110,12 @@ Settings page (mobility aids on/off; fall alert per camera; seconds), README sec
 alerts", with the measured numbers and the limits), data-protection template line, HANDOFF/ROADMAP. One commit per
 step, tests, full suite green.
 
+**Step 5 results (2026-10-13)**: Settings page "Fall alerts" (on/off, "Down for (seconds)" 3-300) and a "Fall
+alerts" column per camera (`fall_alert: false` is written only when off); checked in the browser pane (saved and
+audited); README, data-protection template, HANDOFF. **Phase 17 is done.** The user heard the beep (2026-10-13).
+Waiting for the user: their app gets the new code (mobility aids, falls, the PostgreSQL changes) at its next restart;
+a camera that sees a room from the side for real fall alerts (the desk webcam probably does not see the floor).
+
 ## Critical files
 
 `labeler/schema.py`, `labeler/vlm.py`, `labeler/agent.py`, `labeler/student.py` / `labeler/training.py` (ignore

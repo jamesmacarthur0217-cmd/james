@@ -62,7 +62,8 @@
       general values below.</p>
     <div class="cams">
       <table>
-        <thead><tr><th>Name</th><th>Source</th><th>Mode</th><th>Keep days</th><th>Detector size</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Source</th><th>Mode</th><th>Keep days</th><th>Detector size</th>
+          <th title="Off for a camera that never sees the floor">Fall alerts</th><th></th></tr></thead>
         <tbody id="cams"></tbody>
       </table>
     </div>
@@ -114,6 +115,22 @@
       <label for="https">HTTPS for other devices</label>
       <div><input type="checkbox" id="https"> <span class="hint">Other devices use https://&lt;this PC&gt;:8443
         (encrypted); plain http then works on this PC only.</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Fall alerts</h2>
+    <div class="grid">
+      <label for="falls_enabled">Fall alerts</label>
+      <div><input type="checkbox" id="falls_enabled"> <span class="hint">When someone standing is down a moment later
+        and stays down, every open page shows a red pop-up with a sound until OK is clicked (the alert rule "Fall" on
+        the <a href="/alerts">Alerts</a> page). Needs a camera that sees the room from the side, not from the ceiling;
+        turn it off per camera above for cameras that never see the floor. Mark beds and sofas on the Live page
+        (Zones: "Lying is normal here").</span></div>
+      <label for="fall_after_s">Down for (seconds)</label>
+      <div><input type="number" id="fall_after_s" min="3" max="300" step="1"> <span class="hint">Before it counts as
+        a fall. Shorter tells you sooner but also when someone just lies down on the floor for a moment; 10 was
+        measured (README "Fall alerts").</span></div>
     </div>
   </section>
 
@@ -174,7 +191,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const SIMPLE = ["retention_days", "audit_retention_days", "blur_faces", "blur_faces_for_viewers", "https", "retrain_enabled",
-                "backup_enabled", "backup_copy_to", "person_videos", "mobility_aids", "idle_enabled", "idle_after_s",
+                "backup_enabled", "backup_copy_to", "person_videos", "mobility_aids", "falls_enabled", "fall_after_s", "idle_enabled", "idle_after_s",
                 "recording_enabled", "recording_when", "recording_keep_days", "recording_max_gb"];
 let loaded = null;        // values as saved (what the next start uses)
 let push = null;          // this PC's address and the receiver's ports (cameras sent from other devices)
@@ -191,6 +208,7 @@ function camRow(c, isNew) {
     <td><select class="mode">${opt("kiosk", "kiosk", c.mode)}${opt("security", "security", c.mode)}</select></td>
     <td><input type="number" class="days" min="0" max="3650" value="${c.retention_days ?? ""}" placeholder="general"></td>
     <td><select class="imgsz">${opt("", "general", c.imgsz)}${opt(640, "640", c.imgsz)}${opt(960, "960", c.imgsz)}${opt(1280, "1280", c.imgsz)}</select></td>
+    <td><input type="checkbox" class="fall"${c.fall_alert === false ? "" : " checked"} title="Fall alerts on this camera"></td>
     <td><button class="danger-quiet remove">Remove</button></td>`;
   tr.querySelector(".remove").addEventListener("click", () => {
     if ($("cams").children.length <= 1) { showMsg("At least one camera is needed.", false); return; }
@@ -214,7 +232,7 @@ function readForm() {
     const source = tr.querySelector(".source").value.trim();
     return { name: tr.querySelector(".name").value.trim(), source: /^\d+$/.test(source) ? Number(source) : source,
              mode: tr.querySelector(".mode").value, retention_days: days === "" ? null : Number(days),
-             imgsz: size === "" ? null : Number(size) };
+             imgsz: size === "" ? null : Number(size), fall_alert: tr.querySelector(".fall").checked };
   });
   return v;
 }

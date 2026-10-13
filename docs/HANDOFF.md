@@ -16,10 +16,10 @@ Roadmap Phase 1 (licenses) is deferred until they say otherwise. Under Malaysia'
 household use is generally outside the Act; their filled-in camera sign and data-protection summary are in
 `data/privacy/` (git-ignored, contains their email); the blank templates are in `docs/`.
 
-## 2. Current state (2026-10-12, end of the session)
+## 2. Current state (2026-10-13, end of the session)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
-  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phase 13 (recording) done; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15 and 17 done (17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
   `2429790`/`bc23363` soak tool · `0449255` idle mode · `23273b1` restore drill. Phase 9 (small
   fixes): `8675c46` list redraw · `81dbcb2` backup.dir · `482bdd4` CI v7 · `0296435` relink_check help. Phase 8
   commits, newest first: `3794de3` today at a glance · `e3a6179` photo search · `ea97937` original excerpts ·
@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **550 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **553 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -95,6 +95,9 @@ labeler/today.py     Today at a glance (/api/today): same weekday, last 4 weeks,
 labeler/photo.py     search by photo: own YOLO copy (lazy), person in the middle else largest, Embedder,
                      db.nearest; raw request body (no python-multipart); POST /api/search/photo (viewers too)
 labeler/remote.py    Health checks for other devices / Tailscale / firewall (netsh, read-only, cached 5 min)
+labeler/falls.py     fall detection from body points (FallWatch.update per person, tick per frame); Pipeline._on_fall
+                     -> AlertEngine.check(fallen=True) (rule "Fall", alerts.FALLEN); pop-ups for every page in
+                     static/session.js (falls: red, beep until OK); zones.lying_ok; tools/fall_check.py measures it
 labeler/settings.py  Settings page: data/settings.yaml merged over config.yaml in load_config (only the
                      project's config.yaml, or a config naming settings_file:); validated; masked passwords;
                      POST /api/restart → exit 4 → supervisor restarts at once (VL_SUPERVISED=1 from it)
@@ -290,7 +293,7 @@ Step 2 (fall detection) done: `labeler/falls.py`, measured with `tools/fall_chec
 tracker does around a fall. The pipeline only logs `FALL [...]` and draws a red box so far; alerts are step 3.
 
 Step 3 done: fall alerts ("Fall" rule, pop-ups in `session.js` on every page, `db.DROPPED_UNIQUE`).
-**Next: Phase 17 step 5 (Settings: fall alerts per camera and the wait; docs)**; ask the user before each step. Phase 16
+Step 5 done (Settings). **Phase 17 is done.** Next: ask the user what to do (propose a plan, as on 2026-10-13); ask the user before each step. Phase 16
 ([PHASE16-PLAN.md](PHASE16-PLAN.md), search recordings by words) stays approved but not started. Later, with the user: a long-run check with recording on and the webcam measurement (lens cover). The rest of
 Phase 12 (more cameras, per-camera tuning, re-measuring re-identification and the short-gap re-link rule on
 outdoor footage) when the user adds cameras.

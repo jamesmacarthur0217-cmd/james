@@ -123,8 +123,9 @@ or another app (Teams, Discord) holding the camera.
 ### Settings page
 
 The common settings can be changed on the **Settings** page instead of editing `config.yaml`: cameras (add,
-remove, source, mode, own retention, detector size), how long people and the audit log are kept, face blurring
-(for viewers, and in saved pictures), HTTPS, the weekly retraining, idle mode, and recording. Every value is checked before it is
+remove, source, mode, own retention, detector size, fall alerts), how long people and the audit log are kept, face
+blurring (for viewers, and in saved pictures), mobility-aid labels, fall alerts (on/off, seconds down: 3-300), HTTPS,
+the weekly retraining, idle mode, and recording. Every value is checked before it is
 saved (a webcam number 0-9, a file that exists, or a camera address with a host; detector size 640/960/1280;
 0-3650 days), and every change is in the Audit log. Only the changed values are saved, in `data\settings.yaml`
 (config.yaml keeps its comments and stays the list of defaults; delete the file to go back to it).
@@ -501,7 +502,7 @@ Measured 2026-10-13 (`tools/mobility_check.py`; answers checked by eye):
 
 A camera that sees a room from the side notices **a fall**: someone upright is down a moment later (within 1 s),
 their head having come down at least 40% of their standing height, and they stay down for **10 seconds**
-(`falls:` in config.yaml). The person's box turns red on the live picture ("FALL?" while waiting, "FALL" once
+(Settings page: "Fall alerts", "Down for (seconds)", and per camera; `falls:` in config.yaml). The person's box turns red on the live picture ("FALL?" while waiting, "FALL" once
 confirmed) and the app's log says `FALL [camera] person #N has been down for 10 s`. Lying down slowly (going to
 bed) is not a fall, and neither is kneeling or crouching on the floor (the box must be clearly wider than tall).
 Getting up within the 10 s cancels it. On the Live page, **Zones → Area → "Lying is normal here"** marks a bed or a

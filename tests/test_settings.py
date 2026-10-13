@@ -44,6 +44,7 @@ def _form(**changes):
             "retention_days": 30, "audit_retention_days": 365, "blur_faces": False,
             "blur_faces_for_viewers": True, "https": False, "retrain_enabled": True,
             "backup_enabled": True, "backup_copy_to": "", "person_videos": True, "mobility_aids": True,
+            "falls_enabled": True, "fall_after_s": 10,
             "idle_enabled": True, "idle_after_s": 60, "recording_enabled": False, "recording_when": "people",
             "recording_keep_days": 3, "recording_max_gb": 100}
     form.update(changes)
@@ -145,6 +146,8 @@ def test_masked_password_is_kept_and_never_logged(paths, db):
     ({"idle_after_s": 5}, "idle_after_s"),
     ({"recording_when": "sometimes"}, "people are in view, or always"),
     ({"recording_keep_days": 0}, "recording_keep_days"),
+    ({"fall_after_s": 1}, "fall_after_s"),
+    ({"fall_after_s": 1000}, "fall_after_s"),
 ])
 def test_bad_values_are_refused(paths, db, change, message):
     app, _ = _app(paths, db)
@@ -258,3 +261,20 @@ def test_a_camera_sent_from_another_device(paths, db):
     client.post("/api/settings", json=form)
     saved = yaml.safe_load(paths[1].read_text(encoding="utf-8"))
     assert "push_password" not in next(c for c in saved["cameras"] if c["name"] == "phone")
+
+
+def test_fall_alert_settings_are_saved(paths, db):
+    app, _ = _app(paths, db)
+    client = TestClient(app, client=("127.0.0.1", 5000))
+    form = _form(fall_after_s=20)
+    form["cameras"][1]["fall_alert"] = False                   # the door camera never sees the floor
+    r = client.post("/api/settings", json=form)
+    assert r.status_code == 200, r.json()
+    saved = yaml.safe_load(paths[1].read_text(encoding="utf-8"))
+    assert saved["falls"] == {"after_s": 20}
+    cams = {c["name"]: c for c in saved["cameras"]}
+    assert cams["door"]["fall_alert"] is False and "fall_alert" not in cams["cam1"]   # on = default, not written
+    shown = client.get("/api/settings").json()
+    page = shown.get("values", shown)
+    assert page["fall_after_s"] == 20 and [c["fall_alert"] for c in page["cameras"]] == [True, False]
+    assert "camera door fall_alert: True → False" in db.list_audit(10)[0]["detail"]
