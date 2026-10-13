@@ -162,3 +162,38 @@ def test_alerts_page_offers_stayed():
     from pathlib import Path
     page = (Path(__file__).resolve().parent.parent / "labeler" / "static" / "alerts.html").read_text(encoding="utf-8")
     assert 'z.kind === "area"' in page and "STAYS.map" in page and 'n === "stayed"' in page
+
+
+def test_time_inside_shown_only_for_areas_with_a_rule(db, camera):
+    p = _pipeline(db, AlertEngine(db))
+    z = zones.PersonZones()
+    z.inside = {1: ("gate", T0), 2: ("yard", T0 + timedelta(seconds=30))}
+    now = T0 + timedelta(seconds=125)
+    assert p._stay_text(z, frozenset(), now) == ""                          # no loitering rules: nothing shown
+    assert p._stay_text(z, frozenset({"gate"}), now) == "gate 2:05"
+    assert p._stay_text(z, frozenset({"gate", "yard"}), now) == "gate 2:05 yard 1:35"
+    assert p._stay_text(z, frozenset({"gate"}), T0 + timedelta(hours=1, seconds=7)) == "gate 1:00:07"
+    assert p._stay_text(None, frozenset({"gate"}), now) == ""
+
+
+def test_check_stays_remembers_which_areas_to_show(db, camera):
+    engine = AlertEngine(db)
+    db.add_rule("loitering", [["stayed", "gate:120"]])
+    db.add_rule("car", [["vehicle", "any"], ["stayed", "drive:600"]])
+    p = _pipeline(db, engine)
+
+    class Watch:
+        tracks = {}
+    p.vehicles = Watch()
+    p._check_stays()
+    assert p._stay_areas == {"gate"} and p._stay_areas_v == {"drive"}
+
+
+def test_vehicle_label_gets_the_time(tmp_path, db, camera):
+    from labeler.config import DEFAULTS as D
+    from labeler.vehicles import VehicleWatch
+    watch = VehicleWatch(D["vehicles"], VehicleStore(db, camera, tmp_path))
+    for i in range(6):
+        watch.update(i * 0.1, T0, None, [(1, (10, 10, 60, 40), 2, 0.9)])
+    assert watch.shown(0.5, lambda v: "gate 0:42")[0][1].endswith("car gate 0:42")
+    assert watch.shown(0.5)[0][1].endswith("car")

@@ -37,7 +37,7 @@ Ask at the start: may viewers (family) switch it, or admins only; a weekly sched
    people inside areas once a second (not every frame) with `AlertEngine.check(..., attrs with stayed seconds)`;
    once per rule and person as now. Vehicles the same in `VehicleWatch` (a car standing at the gate 10 minutes).
 2. **Done 2026-10-14** (with the Alerts page picker). Combines with `hours` and `armed` (e.g. *stayed at gate 2 min, 22:00-06:00, only when Away*).
-3. Live picture: seconds inside an area next to the person (only for areas with such a rule).
+3. **Done 2026-10-14.** Live picture: seconds inside an area next to the person (only for areas with such a rule).
 4. Measure: MOT16 (people waiting at a crossing) and the user's own footage when there is some; tests; docs.
 
 ## Phase 21: Animals

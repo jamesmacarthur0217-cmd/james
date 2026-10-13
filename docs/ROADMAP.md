@@ -260,6 +260,8 @@ Phase 20 started 2026-10-14.
    (`Pipeline._check_stays`, `AlertEngine.stay_limits`); real run: 4 people and a bus alerted 21 s into a 20 s rule.
 2. **Done 2026-10-14**: Alerts page "stayed in area (loitering)" (area x 30 s ... 1 h); with hours and Away: none at
    Home, all 4 people within 3 s of switching to Away; README "Loitering".
+3. **Done 2026-10-14**: the live picture shows the time inside areas that have a loitering rule ("street 1:03" above a
+   person's label, "#2 bus parked street 1:02" on a vehicle).
 
 ## Critical files
 

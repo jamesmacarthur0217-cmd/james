@@ -130,13 +130,15 @@ class VehicleWatch:
         """A vehicle in view that is not parked (for recording and idle mode)."""
         return any(not st.parked and t - st.last_t < 1.0 and st.n >= self.min_frames for st in self.tracks.values())
 
-    def shown(self, t: float) -> list[tuple[tuple, str]]:
-        """(box, label) of the vehicles in view now, for the live picture."""
+    def shown(self, t: float, extra=None) -> list[tuple[tuple, str]]:
+        """(box, label) of the vehicles in view now, for the live picture; extra(state) adds to the label (the time
+        inside an area with a loitering rule)."""
         out = []
         for st in self.tracks.values():
             if t - st.last_t < 0.5 and st.n >= self.min_frames:
                 label = st.kind if st.kind != "lorry" else "lorry/pickup"
-                out.append((st.box, f"#{st.db_id} {label}" + (" parked" if st.parked else "")))
+                more = extra(st) if extra is not None else ""
+                out.append((st.box, f"#{st.db_id} {label}" + (" parked" if st.parked else "") + (f" {more}" if more else "")))
         return out
 
     def close(self) -> None:

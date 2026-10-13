@@ -194,6 +194,9 @@ class Pipeline:
         self.tracks: dict[int, TrackState] = {}
         self.by_db_id: dict[int, TrackState] = {}
         self._stay_checked = 0.0   # when people and vehicles inside areas were last checked for loitering rules
+        # Areas with a loitering rule (people, vehicles): the live picture shows how long someone is in them.
+        self._stay_areas: frozenset[str] = frozenset()
+        self._stay_areas_v: frozenset[str] = frozenset()
         # People who recently left the view, kept briefly so a returning person continues
         # the same record instead of becoming a new one: db_id -> (state, time lost).
         self.recently_lost: dict[int, tuple[TrackState, float]] = {}
@@ -488,12 +491,14 @@ class Pipeline:
 
         try:
             limits = self.alerts.stay_limits(self.name)
+            self._stay_areas = frozenset(limits)
             if limits:
                 for st in list(self.tracks.values()):
                     s = stays(st.zones)
                     if st.db_id is not None and due(s, limits):
                         self._check_alerts(st.db_id, stayed=s)
             limits = self.alerts.stay_limits(self.name, vehicles=True) if self.vehicles is not None else {}
+            self._stay_areas_v = frozenset(limits)
             if limits:
                 for v in list(self.vehicles.tracks.values()):
                     s = stays(v.zones)
@@ -501,6 +506,18 @@ class Pipeline:
                         self._check_vehicle_alerts(v.db_id, stayed=s)
         except Exception:
             log.exception("checking loitering rules failed")
+
+    def _stay_text(self, z, areas: frozenset, wall: datetime) -> str:
+        """"gate 2:05" for each area with a loitering rule this person or vehicle is in (the live picture)."""
+        if not areas or z is None:
+            return ""
+        parts = []
+        for name, since in sorted(z.inside.values(), key=lambda v: v[1]):
+            if name in areas:
+                s = max(0, int((wall - since).total_seconds()))
+                parts.append(f"{name} {s // 3600}:{s // 60 % 60:02d}:{s % 60:02d}" if s >= 3600
+                             else f"{name} {s // 60}:{s % 60:02d}")
+        return " ".join(parts)
 
     def _check_vehicle_alerts(self, vehicle_id: int, stayed: dict | None = None) -> None:
         if self.alerts is None:
@@ -973,6 +990,7 @@ class Pipeline:
     def _draw(self, frame: np.ndarray, seen: set[int], low_color: bool, now: float) -> np.ndarray:
         out = frame.copy()
         h, w = out.shape[:2]
+        wall = self.clock.wall()
         if self.zone_counter.zones:
             self.zone_counter.draw(out, [self.tracks[t].zones for t in seen])
         for zx1, zy1, zx2, zy2 in self.ignore_zones:
@@ -996,6 +1014,9 @@ class Pipeline:
             cv2.rectangle(out, (x1, y1), (x2, y2), color, 2)
             y = max(y1, 20)
             lines = self._label_lines(st, now)
+            stay = self._stay_text(st.zones, self._stay_areas, wall)
+            if stay:
+                lines = [stay] + lines
             if fall:
                 lines = ["FALL" if fall == "fallen" else "FALL?"] + lines
             for line in lines:
@@ -1004,7 +1025,8 @@ class Pipeline:
                 cv2.putText(out, line, (x1 + 3, y - 3), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 1, cv2.LINE_AA)
                 y += th + 8
         if self.vehicles is not None:
-            for (x1, y1, x2, y2), label in self.vehicles.shown(now):
+            for (x1, y1, x2, y2), label in self.vehicles.shown(
+                    now, lambda v: self._stay_text(v.zones, self._stay_areas_v, wall)):
                 cv2.rectangle(out, (int(x1), int(y1)), (int(x2), int(y2)), (200, 90, 200), 2)   # purple: a vehicle
                 (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
                 cv2.rectangle(out, (int(x1), int(y1) - th - 8), (int(x1) + tw + 6, int(y1)), (200, 90, 200), -1)

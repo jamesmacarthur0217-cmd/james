@@ -393,7 +393,8 @@ condition **stayed in area (loitering)** and pick the area and the time (30 s, 1
 person (or vehicle), with a pop-up and a clip like other alerts. Time is measured from when the person's point (the
 middle of the person on kiosk cameras, the feet on security cameras) was inside the area for `zones.min_frames` frames.
 A person out of sight for more than `tracking.lost_after_s` (4 s) counts as having left, so their time starts again;
-a parked vehicle hidden for a moment keeps its time.
+a parked vehicle hidden for a moment keeps its time. On the live picture, people and vehicles inside an area that has
+such a rule show the time they have been in it, e.g. "gate 1:03" above a person's labels.
 
 ## Home / Away
 
