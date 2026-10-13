@@ -51,6 +51,10 @@ class RuleUpdate(BaseModel):
     enabled: bool
 
 
+class ArmingIn(BaseModel):
+    mode: str
+
+
 class ZoneIn(BaseModel):
     camera: str
     name: str
@@ -141,8 +145,12 @@ def ensure_first_admin(db: Database, web: dict) -> None:
 
 
 def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | None, embedder=None,
-               alerts=None, agent=None, health=None, retrainer=None, importer=None, photo=None) -> FastAPI:
+               alerts=None, agent=None, health=None, retrainer=None, importer=None, photo=None,
+               arming=None) -> FastAPI:
     app = FastAPI(title="VisionLabeler")
+    if arming is None:
+        from .arming import Arming
+        arming = Arming(db, cfg)
     app.state.stopping = threading.Event()
     app.state.started_at = time.time()
     health_token = str(cfg["web"].get("health_token") or "")
@@ -432,6 +440,22 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         _rules_changed()
         audit(request, "alert rule deleted", f"rule #{rule_id}")
         return {"ok": True}
+
+    # --- Home / Away (labeler/arming.py): admins and viewers ------------------------------
+
+    @app.get("/api/arming")
+    def arming_state():
+        return arming.state()
+
+    @app.post("/api/arming")
+    def arming_set(body: ArmingIn, request: Request):
+        try:
+            changed = arming.set(body.mode, who(request))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        if changed:
+            audit(request, "home/away", f"set to {body.mode.capitalize()}")
+        return arming.state()
 
     @app.get("/api/alerts/events")
     def alert_events(since_id: int = 0, limit: int = 50):

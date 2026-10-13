@@ -26,6 +26,8 @@ DEFAULTS: dict = {
     "clips": {"enabled": True, "before_s": 5, "after_s": 5, "fps": 10, "max_width": 960},
     "person_videos": {"enabled": True, "max_s": 20, "fps": 5, "max_width": 480, "before_s": 1, "after_s": 1},
     "idle": {"enabled": True, "after_s": 60, "fps": 3},
+    # Home / Away (labeler/arming.py): Away times each week, e.g. "mon-fri 08:00-18:00"; the pages' button too.
+    "arming": {"schedule": []},
     # Cameras sent from other devices (labeler/receiver.py): MediaMTX runs only when a camera has `source: push`.
     "receiver": {"exe": "data/mediamtx/mediamtx.exe", "dir": "data/mediamtx", "rtsp_port": 8554, "rtmp_port": 1935,
                  "publish_from": ["100.64.0.0/10"]},   # who may send: Tailscale addresses
@@ -167,6 +169,11 @@ def load_config(path: str | Path | None = None, use_settings: bool = True) -> di
     cfg["cameras"] = normalize_cameras(cfg)
     if cfg["mode"] not in ("kiosk", "security"):
         raise ValueError(f"mode must be 'kiosk' or 'security', got {cfg['mode']!r}")
+    from .arming import parse_schedule
+    try:
+        parse_schedule(cfg["arming"]["schedule"])
+    except ValueError as e:
+        raise ValueError(f"arming.schedule: {e}") from None
     return cfg
 
 

@@ -149,6 +149,8 @@ def main() -> int:
             log.warning("age model unavailable (%s); age comes from the VLM", e)
 
     from labeler.alerts import AlertEngine
+    from labeler.arming import Arming
+    arming = Arming(db, cfg)
     alerts = AlertEngine(db)
     if cfg["falls"]["enabled"]:
         alerts.ensure_fall_rule()
@@ -197,7 +199,7 @@ def main() -> int:
     from labeler.importer import Importer
     importer = Importer(cfg, db, worker, embedder, student, age_model, register=imports.append,
                         unregister=lambda p: imports.remove(p) if p in imports else None)
-    app = create_app(cfg, db, pipelines, embedder, alerts, agent, health, retrainer, importer)
+    app = create_app(cfg, db, pipelines, embedder, alerts, agent, health, retrainer, importer, arming=arming)
     server = _web_servers(app, web)
 
     def request_shutdown() -> None:

@@ -304,6 +304,16 @@ class Recording(Base):
     encoder: Mapped[str] = mapped_column(String(30), default="")
 
 
+class ArmingChange(Base):
+    """Home / Away switched (labeler/arming.py); the newest row is the current state."""
+    __tablename__ = "arming"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mode: Mapped[str] = mapped_column(String(10))            # home | away
+    at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    changed_by: Mapped[str] = mapped_column(String(100))     # user name, or "schedule"
+    why: Mapped[str] = mapped_column(String(20))             # button | schedule
+
+
 class AuditEntry(Base):
     """Who did what in the web pages: logins, viewing, searches, exports, deletes, rule changes, reviews.
     Frequent background requests (the Live page's polling) are not logged."""
@@ -1371,6 +1381,30 @@ class Database:
             n, size, oldest = s.execute(select(func.count(Recording.id), func.coalesce(func.sum(Recording.size_bytes), 0),
                                                func.min(Recording.started_at))).one()
         return {"files": n, "bytes": int(size), "oldest": oldest.isoformat(timespec="seconds") if oldest else None}
+
+    # --- Home / Away (labeler/arming.py) -----------------------------------------------
+
+    @staticmethod
+    def _arming_dict(a: ArmingChange) -> dict:
+        return {"mode": a.mode, "at": a.at, "by": a.changed_by, "why": a.why}
+
+    def add_arming(self, mode: str, at: datetime, by: str, why: str) -> dict:
+        with self.Session.begin() as s:
+            a = ArmingChange(mode=mode, at=at, changed_by=by[:100], why=why)
+            s.add(a)
+            s.flush()
+            return self._arming_dict(a)
+
+    def latest_arming(self) -> dict | None:
+        with self.Session() as s:
+            a = s.scalars(select(ArmingChange).order_by(ArmingChange.at.desc(), ArmingChange.id.desc()).limit(1)).first()
+            return self._arming_dict(a) if a else None
+
+    def arming_history(self, limit: int = 20) -> list[dict]:
+        """Newest first."""
+        with self.Session() as s:
+            return [{**self._arming_dict(a), "at": a.at.isoformat(timespec="seconds")} for a in s.scalars(
+                select(ArmingChange).order_by(ArmingChange.at.desc(), ArmingChange.id.desc()).limit(limit))]
 
     # --- audit log ----------------------------------------------------------------------
 

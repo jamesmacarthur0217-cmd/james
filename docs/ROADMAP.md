@@ -247,6 +247,9 @@ plates; type, color and make/model).
 vehicle detector), 22 scene questions (the vision model answers yes/no questions about a camera every few minutes).
 Ask the user before each phase and each step.
 
+Phase 19 started 2026-10-14 (user's choices: admins **and viewers** may switch; a weekly schedule).
+1. **Done 2026-10-14**: Home/Away state (`labeler/arming.py`, table `arming`), weekly schedule, `/api/arming`.
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),

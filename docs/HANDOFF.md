@@ -100,6 +100,9 @@ labeler/vehicles.py  vehicles: second detector (yolo11s.pt) + tracker, VehicleWa
 labeler/falls.py     fall detection from body points (FallWatch.update per person, tick per frame); Pipeline._on_fall
                      -> AlertEngine.check(fallen=True) (rule "Fall", alerts.FALLEN); pop-ups for every page in
                      static/session.js (falls: red, beep until OK); zones.lying_ok; tools/fall_check.py measures it
+labeler/arming.py    Home / Away (Phase 19): table `arming` (each change; newest = now), weekly Away schedule
+                     (`arming.schedule`, "mon-fri 08:00-18:00"), a button press holds until the schedule's next
+                     change; GET/POST /api/arming (viewers too, audited); one Arming made in run.py
 labeler/settings.py  Settings page: data/settings.yaml merged over config.yaml in load_config (only the
                      project's config.yaml, or a config naming settings_file:); validated; masked passwords;
                      POST /api/restart → exit 4 → supervisor restarts at once (VL_SUPERVISED=1 from it)

@@ -19,7 +19,8 @@ Health lines (`labeler/healthcheck.py`).
 ## Phase 19: Home / Away arming
 
 Ask at the start: may viewers (family) switch it, or admins only; a weekly schedule yes/no.
-1. State: table `arming` (mode home/away, since, by whom, why: button or schedule); `labeler/arming.py`
+**Answers (2026-10-14): admins and viewers may switch; yes, a weekly schedule.**
+1. **Done 2026-10-14.** State: table `arming` (mode home/away, since, by whom, why: button or schedule); `labeler/arming.py`
    (`current()`, `set(mode, by)`, schedule from Settings: e.g. weekdays 08:00-18:00 Away; a button press holds until
    the next schedule change). API GET/POST `/api/arming` (audited).
 2. Rules: condition `armed = away / home` (attrs["armed"] in `AlertEngine.check`, `check_vehicle`); rules without it

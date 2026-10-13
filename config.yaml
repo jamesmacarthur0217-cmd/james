@@ -64,6 +64,11 @@ timeline:
   min_similarity: 0.8         # how alike (0..1, mostly clothing); not measured across different cameras yet
   window_h: 24                # only sightings within this many hours of the person
 
+# Home / Away: alert rules can work only when Away (or only at Home). Switched by the button on the pages (admins
+# and viewers) and by this weekly schedule of Away times; a button press holds until the schedule next changes.
+arming:
+  schedule: []                # e.g. ["mon-fri 08:00-18:00", "daily 23:00-06:00"] (days: mon..sun, mon-fri, daily)
+
 # A short video around each alert (Alerts page, admins). Deleted with the person (retention, Delete).
 clips:
   enabled: true
