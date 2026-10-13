@@ -43,8 +43,8 @@ Ask at the start: may viewers (family) switch it, or admins only; a weekly sched
 ## Phase 21: Animals
 
 Ask at the start: which animals (COCO has bird, cat, dog, horse, sheep, cow; monkeys and monitor lizards are not in it:
-said honestly).
-1. One detector call for vehicles and animals (the classes added to the vehicle detector's list: no extra cost);
+said honestly). **Answers (2026-10-14): dogs, cats and birds; security cameras only.**
+1. **Done 2026-10-14.** One detector call for vehicles and animals (the classes added to the vehicle detector's list: no extra cost);
    generalize `VehicleWatch` (kinds map + store) and add table `animals` (+ zone events) with an AnimalStore; animals
    resting stay one record like parked vehicles; on all cameras or security only (asked).
 2. Live page "Animals seen", Ask box words (dog, cat, bird...), Reports counts, alert rules `animal = dog`

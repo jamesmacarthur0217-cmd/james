@@ -125,6 +125,23 @@ class Vehicle(Base):
     not_vehicle: Mapped[bool] = mapped_column(Boolean, default=False)   # the vision model saw no vehicle: hidden
 
 
+class Animal(Base):
+    """One animal's visit to one camera (labeler/animals.py): like a vehicle's; one resting there stays one record."""
+    __tablename__ = "animals"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    camera_id: Mapped[int] = mapped_column(ForeignKey("cameras.id"), index=True)
+    tracker_id: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(20), index=True)          # dog, cat, bird (horse, sheep, cow)
+    started_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime)
+    n_frames: Mapped[int] = mapped_column(Integer, default=0)
+    crop_path: Mapped[str | None] = mapped_column(String(300))
+    color: Mapped[str | None] = mapped_column(String(20))
+    resting: Mapped[bool] = mapped_column(Boolean, default=False)
+    resting_at: Mapped[datetime | None] = mapped_column(DateTime)
+    left_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
 class Attribute(Base):
     """One label for a track from one source (color estimator, VLM, ...)."""
     __tablename__ = "attributes"
@@ -246,6 +263,18 @@ class VehicleZoneEvent(Base):
     __tablename__ = "vehicle_zone_events"
     id: Mapped[int] = mapped_column(primary_key=True)
     vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id", ondelete="CASCADE"), index=True)
+    camera: Mapped[str] = mapped_column(String(100))
+    zone_id: Mapped[int] = mapped_column(Integer)
+    zone_name: Mapped[str] = mapped_column(String(100), index=True)
+    kind: Mapped[str] = mapped_column(String(10))       # enter | exit (areas), in | out (lines)
+    at: Mapped[datetime] = mapped_column(DateTime, index=True)
+
+
+class AnimalZoneEvent(Base):
+    """An animal entering/exiting an area or crossing a line (counted apart from people and vehicles)."""
+    __tablename__ = "animal_zone_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    animal_id: Mapped[int] = mapped_column(ForeignKey("animals.id", ondelete="CASCADE"), index=True)
     camera: Mapped[str] = mapped_column(String(100))
     zone_id: Mapped[int] = mapped_column(Integer)
     zone_name: Mapped[str] = mapped_column(String(100), index=True)
@@ -658,6 +687,66 @@ class Database:
                 s.execute(delete(AlertEvent).where(AlertEvent.vehicle_id.in_(deleted)))
             for v in old:
                 s.delete(v)
+        return deleted, paths
+
+    # --- animals (labeler/animals.py) -----------------------------------------------------------------------
+
+    ANIMAL_FIELDS = {"kind", "ended_at", "n_frames", "crop_path", "color", "resting", "resting_at", "left_at"}
+
+    def create_animal(self, camera_id: int, tracker_id: int, kind: str, started_at: datetime) -> int:
+        with self.Session.begin() as s:
+            a = Animal(camera_id=camera_id, tracker_id=tracker_id, kind=kind, started_at=started_at)
+            s.add(a)
+            s.flush()
+            return a.id
+
+    def update_animal(self, animal_id: int, **fields) -> None:
+        unknown = set(fields) - self.ANIMAL_FIELDS
+        if unknown:
+            raise ValueError(f"not animal fields: {sorted(unknown)}")
+        with self.Session.begin() as s:
+            a = s.get(Animal, animal_id)
+            if a is not None:   # deleted meanwhile
+                for k, value in fields.items():
+                    setattr(a, k, value)
+
+    def list_animals(self, limit: int = 50, camera: str | None = None, kinds: list[str] | None = None,
+                     start: datetime | None = None, end: datetime | None = None,
+                     colors: list[str] | None = None) -> list[dict]:
+        """Newest first."""
+        iso = lambda d: d.isoformat(timespec="seconds") if d else None   # noqa: E731
+        q = select(Animal, Camera.name).join(Camera, Camera.id == Animal.camera_id)
+        if camera:
+            q = q.where(Camera.name == camera)
+        if kinds:
+            q = q.where(Animal.kind.in_(kinds))
+        if colors:
+            q = q.where(Animal.color.in_(colors))
+        if start:
+            q = q.where(Animal.started_at >= start)
+        if end:
+            q = q.where(Animal.started_at < end)
+        with self.Session() as s:
+            return [{"id": a.id, "camera": cam, "kind": a.kind, "started_at": iso(a.started_at),
+                     "ended_at": iso(a.ended_at), "crop": a.crop_path, "color": a.color, "resting": bool(a.resting),
+                     "resting_at": iso(a.resting_at), "left_at": iso(a.left_at), "n_frames": a.n_frames}
+                    for a, cam in s.execute(q.order_by(Animal.started_at.desc(), Animal.id.desc()).limit(limit)).all()]
+
+    def add_animal_zone_events(self, animal_id: int, camera: str, events: list[dict]) -> None:
+        with self.Session.begin() as s:
+            if s.get(Animal, animal_id) is not None:
+                s.add_all(AnimalZoneEvent(animal_id=animal_id, camera=camera, zone_id=e["zone_id"],
+                                          zone_name=e["zone_name"], kind=e["kind"], at=e["at"]) for e in events)
+
+    def delete_animals(self, ids: list[int]) -> tuple[list[int], list[str]]:
+        """Delete animals; returns the ids deleted and their picture names (for the caller to remove)."""
+        with self.Session.begin() as s:
+            old = s.scalars(select(Animal).where(Animal.id.in_(ids))).all()
+            deleted, paths = [a.id for a in old], [a.crop_path for a in old if a.crop_path]
+            if deleted:
+                s.execute(delete(AnimalZoneEvent).where(AnimalZoneEvent.animal_id.in_(deleted)))
+            for a in old:
+                s.delete(a)
         return deleted, paths
 
     def update_track(self, track_id: int, **fields) -> None:
@@ -1557,6 +1646,14 @@ class Database:
                         s.execute(delete(AlertEvent).where(AlertEvent.vehicle_id.in_(gone_ids)))
                     for v in gone:
                         s.delete(v)
+                    # Animals: the same.
+                    gone = s.scalars(select(Animal).where(Animal.camera_id == cam.id,
+                                                          Animal.started_at < now - timedelta(days=days))).all()
+                    paths += [a.crop_path for a in gone if a.crop_path]
+                    if gone:
+                        s.execute(delete(AnimalZoneEvent).where(AnimalZoneEvent.animal_id.in_([a.id for a in gone])))
+                    for a in gone:
+                        s.delete(a)
         if old:
             with self._vec_lock:
                 self._vectors = None

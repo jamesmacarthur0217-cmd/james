@@ -38,7 +38,7 @@ def make_pipeline(db, embedder=None):
     p.deleted_ids = set()
     p.alerts = None
     p.name = "test-cam"
-    p.falls = p.vehicles = None
+    p.falls = p.vehicles = p.animals = None
     p.age = None
     p.age_ids = set()
     p.clips = None

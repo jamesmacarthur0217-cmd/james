@@ -10,6 +10,7 @@ for `still_memory_s`: the tracker loses standing bicycles behind passing people 
 (MOT16-04), and each return was a new record whose "still" clock started again, so they never became parked.
 
 The watcher only decides; storing goes through a `store` (VehicleStore for the database, a fake one in tests).
+Animals (labeler/animals.py) use the same watcher with their own names (`names`) and store; "parked" is "resting".
 Measured with tools/vehicle_check.py (README "Vehicles").
 """
 from __future__ import annotations
@@ -59,10 +60,11 @@ class VehicleState:
     described: bool = False            # sent to be described (color, make/model) once
     zones: object = None               # zones.PersonZones: where it is relative to the camera's zones
     zone_log: list = field(default_factory=list)   # zone events not stored yet (no record yet)
+    names: dict = field(default_factory=lambda: KINDS)   # COCO class -> our name (animals: labeler/animals.py)
 
     @property
     def kind(self) -> str:
-        return KINDS[self.kinds.most_common(1)[0][0]] if self.kinds else "car"
+        return self.names[self.kinds.most_common(1)[0][0]] if self.kinds else next(iter(self.names.values()))
 
     def size(self) -> float:
         return max(self.box[2] - self.box[0], self.box[3] - self.box[1], 1.0)
@@ -71,9 +73,12 @@ class VehicleState:
 class VehicleWatch:
     """Vehicles on one camera. Call update() with each frame's vehicle detections (tracked)."""
 
-    def __init__(self, cfg: dict, store, kinds: list[str] | None = None):
+    def __init__(self, cfg: dict, store, kinds: list[str] | None = None, names: dict[int, str] | None = None,
+                 still_word: str = "parked"):
         self.store = store
-        self.kinds = set(kinds or KINDS.values())
+        self.names = names or KINDS            # COCO class -> our name
+        self.still_word = still_word           # shown on the live picture: "parked" (animals: "resting")
+        self.kinds = set(kinds or self.names.values())
         self.min_frames = int(cfg["min_frames"])
         self.lost_after_s = float(cfg["lost_after_s"])
         self.parked_after_s = float(cfg["parked_after_s"])
@@ -94,12 +99,13 @@ class VehicleWatch:
         faces are blurred in the viewers' copy of a vehicle's picture)."""
         h, w = (frame.shape[:2] if frame is not None else (0, 0))
         for key, box, cls, conf in dets:
-            if KINDS.get(cls) not in self.kinds:
+            if self.names.get(cls) not in self.kinds:
                 continue
             box = tuple(float(v) for v in box[:4])
             st = self.tracks.get(key)
             if st is None:
-                st = self.tracks[key] = self._found_again(key, t, wall, box, cls) or VehicleState(key, t, wall)
+                st = self.tracks[key] = (self._found_again(key, t, wall, box, cls)
+                                         or VehicleState(key, t, wall, names=self.names))
             st.kinds[cls] += conf
             st.n += 1
             st.box, st.last_t, st.last_wall = box, t, wall
@@ -138,7 +144,8 @@ class VehicleWatch:
             if t - st.last_t < 0.5 and st.n >= self.min_frames:
                 label = st.kind if st.kind != "lorry" else "lorry/pickup"
                 more = extra(st) if extra is not None else ""
-                out.append((st.box, f"#{st.db_id} {label}" + (" parked" if st.parked else "") + (f" {more}" if more else "")))
+                out.append((st.box, f"#{st.db_id} {label}" + (f" {self.still_word}" if st.parked else "")
+                            + (f" {more}" if more else "")))
         return out
 
     def close(self) -> None:

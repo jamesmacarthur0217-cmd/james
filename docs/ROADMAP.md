@@ -266,6 +266,12 @@ Phase 20 started 2026-10-14.
    51/93, 6 false of 75 alerts; 15 s found 13/47 (tracks break). Tried, not kept: carrying the time over a re-link
    (same found, 2 more false). **Phase 20 is done.** Next: Phase 21 (animals); ask the user first.
 
+Phase 21 started 2026-10-14 (user's choices: dogs, cats and birds; security cameras only, like vehicles).
+1. **Done 2026-10-14**: one detector pass for vehicles and animals; `labeler/animals.py` (AnimalStore; the vehicle
+   watcher with animal names, "resting"), tables `animals`, `animal_zone_events` (checked on PostgreSQL), retention,
+   orange boxes on the live picture. Seen on a COCO photo: the husky (0.40-0.45) is below the tracker's 0.5 start
+   threshold: to be measured in step 3.
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),

@@ -21,6 +21,7 @@ from .config import mask_password, resolve
 from .db import Database
 from .embed import Embedder
 from .falls import FallWatch
+from .animals import AnimalStore, kinds_map as animal_kinds
 from .vehicles import KINDS as VEHICLE_KINDS, VehicleStore, VehicleWatch, apply_description, body_color
 from .sources import FrameSource, is_blank
 from .student import Student
@@ -171,26 +172,36 @@ class Pipeline:
                       if cfg["clips"]["enabled"] or pv.get("enabled") else None)
         if self.falls is not None and self.clips is not None:
             self.clips.keep_at_least(self.fall_clip_s)
-        # Vehicles (labeler/vehicles.py): a second detector with its own tracker; security cameras by default.
+        # Vehicles (labeler/vehicles.py) and animals (labeler/animals.py): a second detector with its own tracker,
+        # one pass for both; security cameras by default.
         vcfg = cfg.get("vehicles") or {}
-        self.vehicles = None
+        acfg = cfg.get("animals") or {}
+        self.vehicle_cfg = vcfg
+        self.vehicles = self.animals = None
         self.vehicles_missing = None   # the vehicle detector file, when it should be used but is not there
-        if vcfg.get("enabled") and cam.get("vehicles", self.mode == "security") and not resolve(vcfg["model"]).is_file():
+        want_vehicles = bool(vcfg.get("enabled")) and cam.get("vehicles", self.mode == "security")
+        want_animals = bool(acfg.get("enabled")) and cam.get("animals", self.mode == "security")
+        if (want_vehicles or want_animals) and not resolve(vcfg["model"]).is_file():
             # Not downloaded at start (Ultralytics would try, and an offline PC would fail): install.bat or
             # `python tools/models.py download` gets it; the Health page says so meanwhile.
             self.vehicles_missing = str(resolve(vcfg["model"]))
-            log.warning("[%s] vehicles are off: the vehicle detector %s is missing (python tools/models.py download)",
-                        self.name, self.vehicles_missing)
-        elif vcfg.get("enabled") and cam.get("vehicles", self.mode == "security"):
-            self.vehicle_cfg = vcfg
+            log.warning("[%s] vehicles and animals are off: the vehicle detector %s is missing "
+                        "(python tools/models.py download)", self.name, self.vehicles_missing)
+        elif want_vehicles or want_animals:
             self.vehicle_model = YOLO(vcfg["model"])
             vt = resolve(vcfg["tracker"])
             self.vehicle_tracker = str(vt) if vt.exists() else "bytetrack.yaml"
-            self.vehicles = VehicleWatch(vcfg, VehicleStore(db, self.camera_id, self.crop_dir, self._describe_vehicle,
-                                                            cfg["storage"].get("blur_faces", False), self.name,
-                                                            self._check_vehicle_alerts),
-                                         vcfg["kinds"])
-            self.vehicles.zone_counter = self.zone_counter
+            blur_all = cfg["storage"].get("blur_faces", False)
+            if want_vehicles:
+                self.vehicles = VehicleWatch(vcfg, VehicleStore(db, self.camera_id, self.crop_dir,
+                                                                self._describe_vehicle, blur_all, self.name,
+                                                                self._check_vehicle_alerts), vcfg["kinds"])
+                self.vehicles.zone_counter = self.zone_counter
+            if want_animals:
+                self.animal_kinds = animal_kinds(acfg["kinds"])
+                self.animals = VehicleWatch(acfg, AnimalStore(db, self.camera_id, self.crop_dir, blur_all, self.name),
+                                            acfg["kinds"], names=self.animal_kinds, still_word="resting")
+                self.animals.zone_counter = self.zone_counter
         self.tracks: dict[int, TrackState] = {}
         self.by_db_id: dict[int, TrackState] = {}
         self._stay_checked = 0.0   # when people and vehicles inside areas were last checked for loitering rules
@@ -327,6 +338,8 @@ class Pipeline:
                 self._finish(tid)
             if self.vehicles is not None:
                 self.vehicles.close()
+            if self.animals is not None:
+                self.animals.close()
             if self.clips is not None:
                 self.clips.close()   # alerts that fired just before stopping get a shorter clip
             log.info("pipeline stopped after %d frames", self.frames)
@@ -429,7 +442,8 @@ class Pipeline:
         if self.falls is not None:
             for tid, _ in self.falls.tick(now):   # falls confirmed although the person is no longer seen
                 self._on_fall(tid)
-        if self.vehicles is not None and self.frames % max(1, int(self.vehicle_cfg["every_n_frames"])) == 0:
+        if ((self.vehicles is not None or self.animals is not None)
+                and self.frames % max(1, int(self.vehicle_cfg["every_n_frames"])) == 0):
             self._update_vehicles(frame, now)
         if self.alerts is not None and self.zone_counter.zones and now - self._stay_checked >= 1.0:
             self._stay_checked = now
@@ -458,10 +472,17 @@ class Pipeline:
         self._publish(self._draw(frame, seen, low_color, now), blurred)
         self._publish_live(seen, now)
 
+    def _object_classes(self) -> list[int]:
+        """The COCO classes the second detector looks for on this camera: vehicles and/or animals."""
+        return ((list(VEHICLE_KINDS) if self.vehicles is not None else [])
+                + (list(self.animal_kinds) if self.animals is not None else []))
+
     def _update_vehicles(self, frame: np.ndarray, now: float) -> None:
+        """Vehicles and animals: one pass of the second detector, then each watcher gets its own kinds."""
         r = self.vehicle_model.track(
-            frame, persist=True, tracker=self.vehicle_tracker, classes=list(VEHICLE_KINDS), conf=self.det_cfg["conf"],
-            imgsz=int(self.vehicle_cfg["imgsz"]), device=self.det_cfg["device"], verbose=False)[0]
+            frame, persist=True, tracker=self.vehicle_tracker, classes=self._object_classes(),
+            conf=self.det_cfg["conf"], imgsz=int(self.vehicle_cfg["imgsz"]), device=self.det_cfg["device"],
+            verbose=False)[0]
         dets = []
         if r.boxes is not None and r.boxes.id is not None:
             h, w = frame.shape[:2]
@@ -471,9 +492,13 @@ class Pipeline:
                 if any(zx1 <= cx <= zx2 and zy1 <= cy <= zy2 for zx1, zy1, zx2, zy2 in self.ignore_zones):
                     continue   # a poster or a screen showing a car
                 dets.append((tid, tuple(box), cls, conf))
-                if self.idle and conf >= self.wake_conf:
-                    self.last_person_at = now   # a vehicle arriving wakes idle mode, like a person
-        self.vehicles.update(now, self.clock.wall(), frame, dets, self._head_boxes())
+                if self.idle and conf >= self.wake_conf and cls in VEHICLE_KINDS:
+                    self.last_person_at = now   # a vehicle arriving wakes idle mode, like a person (animals do not)
+        heads = self._head_boxes()
+        if self.vehicles is not None:
+            self.vehicles.update(now, self.clock.wall(), frame, [d for d in dets if d[2] in VEHICLE_KINDS], heads)
+        if self.animals is not None:
+            self.animals.update(now, self.clock.wall(), frame, [d for d in dets if d[2] in self.animal_kinds], heads)
 
     def _check_stays(self) -> None:
         """Loitering rules ("stayed = gate:120"): people and vehicles inside areas long enough are checked against
@@ -1024,6 +1049,13 @@ class Pipeline:
                 cv2.rectangle(out, (x1, y - th - 6), (x1 + tw + 6, y + 2), color, -1)
                 cv2.putText(out, line, (x1 + 3, y - 3), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 1, cv2.LINE_AA)
                 y += th + 8
+        if self.animals is not None:
+            for (x1, y1, x2, y2), label in self.animals.shown(now):
+                cv2.rectangle(out, (int(x1), int(y1)), (int(x2), int(y2)), (40, 160, 255), 2)   # orange: an animal
+                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+                cv2.rectangle(out, (int(x1), int(y1) - th - 8), (int(x1) + tw + 6, int(y1)), (40, 160, 255), -1)
+                cv2.putText(out, label, (int(x1) + 3, int(y1) - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 1,
+                            cv2.LINE_AA)
         if self.vehicles is not None:
             for (x1, y1, x2, y2), label in self.vehicles.shown(
                     now, lambda v: self._stay_text(v.zones, self._stay_areas_v, wall)):

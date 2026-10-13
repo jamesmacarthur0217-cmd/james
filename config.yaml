@@ -18,6 +18,7 @@ cameras:
     # imgsz: 1280             # optional: detector picture size for this camera (else detector.imgsz)
     # fall_alert: false       # optional: no fall alerts on this camera (it never sees the floor)
     # vehicles: true          # optional: look for vehicles (default: on for security cameras, off for kiosk)
+    # animals: true           # optional: look for animals (default: on for security cameras, off for kiosk)
   # A second camera, e.g. an IP camera at the entrance:
   # - name: entrance
   #   source: rtsp://user:password@192.168.1.50:554/stream1
@@ -154,6 +155,12 @@ vehicles:
   enabled: true
   every_n_frames: 2           # the vehicle detector looks at every 2nd frame (it about doubles the detector time)
   parked_after_s: 60          # standing still this long = parked (one record, however long it stays)
+
+# Animals: dogs, cats and birds, found by the vehicle detector in the same pass (no extra cost), on security cameras
+# (per camera: animals: true/false). An animal lying still for parked_after_s is "resting": one record.
+animals:
+  enabled: true
+  kinds: [dog, cat, bird]     # also possible: horse, sheep, cow
 
 labels:
   mobility_aids: true         # wheelchair, walking stick, crutches, walker (health-related: false = never stored)
