@@ -1,4 +1,4 @@
-# Phases 23-25 (+16) plan: small fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phases 23-24 done, 25 started)
+# Phases 23-25 (+16) plan: small fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phases 23-25 done, 16 next)
 
 ## Context
 
@@ -52,7 +52,7 @@ The answer key measures people's labels; nothing measures the newer detections o
    per camera and the pictures; links to the Recordings page at each moment.
 3. **Done 2026-10-14.** When someone switches Away -> Home, the button offers "What happened while you were away?" (a link, never
    automatic); the Live page's Today tiles link to it too.
-4. Tests (periods over midnight, Away periods from the `arming` table, viewer view), real run, docs.
+4. **Done 2026-10-14** (README "What happened (Summary)"). **Phase 25 is done.** Tests (periods over midnight, Away periods from the `arming` table, viewer view), real run, docs.
 
 ## Phase 16: Search recordings by words
 

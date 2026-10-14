@@ -297,7 +297,7 @@ Phase 22 started 2026-10-14 (user's choices: every 5 minutes by default; alert a
 5. **Done 2026-10-14**: Settings (on/off, answers in a row), Health line (last answers, overdue warning), docs.
    **Phase 22 is done; the Phases 19-22 plan is finished.** Next: propose the next round to the user.
 
-## Phases 23-25 and 16: fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phases 23-24 done, 25 started)
+## Phases 23-25 and 16: fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phases 23-25 done, 16 next)
 
 **Plan: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)**: the user chose, in this order: 23 small fixes (Settings unsaved
 mark, non-English text in the console, old SQLite alert tables), 24 "was this right?" checks on their own cameras
@@ -321,6 +321,8 @@ search recordings by words. Not chosen: phone alerts (keep alerts on the pages).
    a "Summary" link in every page's menu, viewers too).
 10. **Done 2026-10-14**: Phase 25 step 3, a "welcome back" note after switching Away -> Home (counts and a link; only
     for whoever switched; never opens anything) and a Summary tile on the Live page.
+11. **Done 2026-10-14**: Phase 25 step 4, README "What happened (Summary)". **Phase 25 is done.** Next: Phase 16
+    (search recordings by words), the last of this plan; ask the user first.
 
 ## Critical files
 

@@ -19,7 +19,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 ## 2. Current state (2026-10-14)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
-  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15 and 17-24 done (24: `f4f1a1d` · `be64dd8` · `cbaea65`; 23: `02c7cf9` · `2989afc`; 22: `722118c` · `cba3db4` · `14f8c19` · `938f2c3` · Settings; 21: `98be1cd` · `5bc87d8` · `7215d4c` · `8f694b4` · Settings; 20: `98f436a` rule · `89af3de` page · `3141852` live picture · tool; 19: `46daf57` Home/Away state · `1843a06` rules · `b41530b` pages; 17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings; 18: vehicles `2790822` · `91d90e4` · `8374fad` · `0d87bc0` · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15 and 17-25 done (25: `21d51cf` · `3f20e28` · `483f048`; 24: `f4f1a1d` · `be64dd8` · `cbaea65`; 23: `02c7cf9` · `2989afc`; 22: `722118c` · `cba3db4` · `14f8c19` · `938f2c3` · Settings; 21: `98be1cd` · `5bc87d8` · `7215d4c` · `8f694b4` · Settings; 20: `98f436a` rule · `89af3de` page · `3141852` live picture · tool; 19: `46daf57` Home/Away state · `1843a06` rules · `b41530b` pages; 17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings; 18: vehicles `2790822` · `91d90e4` · `8374fad` · `0d87bc0` · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
   `2429790`/`bc23363` soak tool · `0449255` idle mode · `23273b1` restore drill. Phase 9 (small
   fixes): `8675c46` list redraw · `81dbcb2` backup.dir · `482bdd4` CI v7 · `0296435` relink_check help. Phase 8
   commits, newest first: `3794de3` today at a glance · `e3a6179` photo search · `ea97937` original excerpts ·
@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **702 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **713 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -344,7 +344,7 @@ motorbikes, bicycles, buses, lorries; no number plates; make/model by the vision
   `alert_events.vehicle_id`, `track_id` nullable (`db.NULLABLE_NOW`).
 - Measured with `tools/vehicle_check.py` (coco, speed, count on MOT16, makes on `data/datasets/stanford_cars`).
 
-**The user's own app has not run Phases 13-24 yet**: at its next restart it gets them and changes the PostgreSQL
+**The user's own app has not run Phases 13-25 yet**: at its next restart it gets them and changes the PostgreSQL
 database by itself (zones.lying_ok; the alert "one per rule and person" constraint dropped; alert_events.vehicle_id and
 track_id nullable; new tables vehicles, vehicle_zone_events; Phases 19-22: new tables arming, animals,
 animal_zone_events, scene_questions, scene_answers, checks; alert_events.animal_id, .scene_id, .picture; alert_events.rule_id
@@ -405,9 +405,10 @@ fine, the plan's assumption was wrong); old SQLite alert tables rebuilt at start
 they restart their app). Step 3: checks.flags, /api/check/flags, notes (Check page, table checks; results: checks.results/summary_line, Health
 "checked by you", Reports "checks").
 
-**Phase 25 started 2026-10-14**: steps 1-3 done (step 3: session.js welcomeBack) (summary data and API; the Summary page `static/summary.html`, `?period=`).
+**Phase 25 ("while you were away") is done** (2026-10-14; README "What happened (Summary)"): `21d51cf` summary ·
+`3f20e28` page · `483f048` welcome-back note · docs (step 3: session.js welcomeBack) (summary data and API; the Summary page `static/summary.html`, `?period=`).
 
-**Next: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)**, the rest of Phase 25 "while you were away" (approved 2026-10-14): 23 small fixes, 24 "was this right?"
+**Next: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)**, Phase 16 search recordings by words ([PHASE16-PLAN.md](PHASE16-PLAN.md); approved): 23 small fixes, 24 "was this right?"
 on the user's cameras, 25 "while you were away" summary, then 16 search recordings by words. Not chosen: phone alerts
 (don't offer again unless asked). Ask before each phase and each step. Before Phase 24 the user restarts their app. Its opening questions are
 already answered (2026-10-14): every 5 minutes by default, alert after two "yes" in a row. Ask the user before starting
@@ -437,4 +438,4 @@ Open items (also in that plan):
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with the newest plan in docs/
-> (docs/PHASE23-25-PLAN.md, Phase 25 next; ask me before each phase and each step starts, and do it step by step).
+> (docs/PHASE23-25-PLAN.md, Phase 16 next; ask me before each phase and each step starts, and do it step by step).

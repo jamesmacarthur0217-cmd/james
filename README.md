@@ -114,6 +114,7 @@ or another app (Teams, Discord) holding the camera.
 | **Review queue** | Disagreements between models first, then least confident; your answer settles every source |
 | **Reports** | People per hour/day, attribute breakdowns, date range and camera filters, **Download CSV** |
 | **Alerts** | Rules like "red top + backpack", "anyone" or "stayed at the gate 2 min" (per camera, time of day, only when Away); each fires once per person |
+| **Summary** | What happened while you were away, last night, today or any period: counts, people, one timeline |
 | **Recordings** | Video of each camera while people are in view: a bar per day, play from any moment (viewers: faces blurred) |
 | **Answer key** | Label recorded people yourself, blind, and see how accurate the system is on this camera |
 | **Check** (admin) | "Was this right?" about vehicles, animals, alerts and scene answers on your cameras: real accuracy here |
@@ -473,6 +474,23 @@ page before relying on it.
 **Settings and Health**: the Settings page has a **Scene questions** section (on/off, answers in a row before an alert,
 1-5). The Health page has a "scene questions" line with the last answers, and a warning when a question has not been
 answered for twice its interval (the vision model busy all the time, or the camera or the vision model down).
+
+## What happened (Summary)
+
+The **Summary** page (in every page's menu; admins and viewers) shows what happened in a period, from what is
+already stored (nothing new is recorded for it):
+
+- **While you were away**: from the last switch to Away until the switch back to Home (or until now, still Away);
+  **Last night**: 18:00 yesterday until 08:00 today; **Today**; or **Choose…** any start and end (up to 31 days).
+- Tiles: people, vehicles, animals, alerts, scene answers that changed ("Is the gate open?: no → yes"), camera problems.
+- The first people with their pictures and a short description ("man, red t-shirt"), and people per camera.
+- One timeline by day: time, kind, picture, text, "▶ Recording" at that moment, and the clip of an alert (admins);
+  buttons show only one kind (only alerts, only people, ...).
+
+After switching **Away → Home** with the button, a note under the menu says what happened meanwhile ("While you were
+away: 3 people, 1 alert") with a link to the summary; it never opens anything by itself and ✕ closes it. The Live
+page's Today tiles have a **Summary** tile too. Viewers (family) see the same, with faces blurred, without clips and
+camera problems (as elsewhere). It takes about 30 ms for a busy day on this PC.
 
 ## Home / Away
 
