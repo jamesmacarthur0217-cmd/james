@@ -352,8 +352,8 @@ column `changed_by`, not the reserved word `by`), rule condition `armed = away/h
 tile, Health line, Settings box `away_schedule` (-> `arming.schedule`, applies after a restart like every setting).
 The new table was checked on a scratch PostgreSQL database (script in the session scratchpad, not kept). The user's own
 app gets it at its next restart (new table only, no change to old ones). Docker Desktop was started for that check
-(2026-10-14) and left running. Small thing noticed, not fixed: on the Settings page the "unsaved changes" mark reacts
-only to the cameras table, not to the other fields (saving works).
+(2026-10-14) and left running. The Settings page's "unsaved changes" mark that reacted only to the cameras
+table was fixed in Phase 23 step 1.
 
 **Phase 20 (loitering) is done** (2026-10-14; README "Loitering"): condition `stayed = <area>:<seconds>` (people and
 vehicles; `alerts.parse_stayed`, `AlertEngine.stay_limits`), `Pipeline._check_stays` once a second, the Alerts page

@@ -297,12 +297,13 @@ Phase 22 started 2026-10-14 (user's choices: every 5 minutes by default; alert a
 5. **Done 2026-10-14**: Settings (on/off, answers in a row), Health line (last answers, overdue warning), docs.
    **Phase 22 is done; the Phases 19-22 plan is finished.** Next: propose the next round to the user.
 
-## Phases 23-25 and 16: fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14, not started)
+## Phases 23-25 and 16: fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phase 23 started)
 
 **Plan: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)**: the user chose, in this order: 23 small fixes (Settings unsaved
 mark, non-English text in the console, old SQLite alert tables), 24 "was this right?" checks on their own cameras
 (real accuracy for vehicles, animals, falls, loitering, scene answers), 25 a "while you were away" summary, then 16
 search recordings by words. Not chosen: phone alerts (keep alerts on the pages). Ask before each phase and each step.
+1. **Done 2026-10-14**: Phase 23 step 1, the Settings page marks every changed field as unsaved.
 
 ## Critical files
 

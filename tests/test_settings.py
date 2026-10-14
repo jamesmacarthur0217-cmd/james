@@ -308,3 +308,10 @@ def test_vehicle_settings_are_saved(paths, db):
     shown = client.get("/api/settings").json()
     page = shown.get("values", shown)
     assert [c["vehicles"] for c in page["cameras"]] == [True, True]
+
+
+def test_every_field_marks_unsaved_changes():
+    """Not only the cameras table: one listener on the whole form (checked in the browser on a test copy)."""
+    from pathlib import Path
+    page = (Path(__file__).resolve().parent.parent / "labeler" / "static" / "settings.html").read_text(encoding="utf-8")
+    assert 'document.querySelector("main").addEventListener(kind, () => { if (loaded) changed(); })' in page

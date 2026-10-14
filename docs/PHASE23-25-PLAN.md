@@ -1,4 +1,4 @@
-# Phases 23-25 (+16) plan: small fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14, not started)
+# Phases 23-25 (+16) plan: small fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phase 23 started)
 
 ## Context
 
@@ -17,7 +17,7 @@ Before Phase 24 the user restarts their own app (stop.bat, start.bat) so it runs
 
 ## Phase 23: Small fixes
 
-1. Settings page: the "unsaved changes" mark reacts to every field (today only the cameras table calls `changed()`);
+1. **Done 2026-10-14.** Settings page: the "unsaved changes" mark reacts to every field (today only the cameras table calls `changed()`);
    one input/change listener on the form. Test in `tests/test_pages.py` style plus a browser check.
 2. Non-English text in the console: the console handler (`labeler/logs.py`) writes with the Windows code page, so a
    scene question or camera name in Chinese gives "--- Logging error ---" there (the log file is UTF-8 already).
