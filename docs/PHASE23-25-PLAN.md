@@ -1,4 +1,4 @@
-# Phases 23-25 (+16) plan: small fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phase 23 done, Phase 24 started)
+# Phases 23-25 (+16) plan: small fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phases 23-24 done)
 
 ## Context
 
@@ -41,7 +41,7 @@ The answer key measures people's labels; nothing measures the newer detections o
    optional correction); shown on the Check page, a Health line ("checked: ... right"), and in Reports.
 3. **Done 2026-10-14** (notes only: 10+ answered and under 70% right). Use the answers where measured gains are possible, only if measured: e.g. a scene question that is often wrong is
    flagged on the Alerts page; an animal kind often wrong on one camera can be turned off there. No automatic retuning.
-4. Docs; with the user: a week of checks gives the first real numbers for README sections 17-22.
+4. **Done 2026-10-14** (README "Checking on your own cameras"). **Phase 24 is done.** Docs; with the user: a week of checks gives the first real numbers for README sections 17-22.
 
 ## Phase 25: "While you were away" summary
 

@@ -116,6 +116,7 @@ or another app (Teams, Discord) holding the camera.
 | **Alerts** | Rules like "red top + backpack", "anyone" or "stayed at the gate 2 min" (per camera, time of day, only when Away); each fires once per person |
 | **Recordings** | Video of each camera while people are in view: a bar per day, play from any moment (viewers: faces blurred) |
 | **Answer key** | Label recorded people yourself, blind, and see how accurate the system is on this camera |
+| **Check** (admin) | "Was this right?" about vehicles, animals, alerts and scene answers on your cameras: real accuracy here |
 | **Import** (admin) | Add recorded videos with their real times (see Importing recorded videos) |
 | **Settings** (admin) | Cameras, how long data is kept, backups, face blurring, HTTPS, weekly retraining, the Home / Away schedule, vehicles, animals, scene questions; **Restart now** |
 | **Health** | Whether the database, Ollama, cameras, disk, backups and storage are fine (see Reliability) |
@@ -172,6 +173,28 @@ because people centre what they photograph). The first search loads a detector c
 Tick people in **People seen** (or **Select all shown**) and press **Delete selected**, or use
 **Delete all…** (asks you to type DELETE ALL). Their pictures, labels, review history, embeddings and alerts
 are removed. A deleted person still in view is shown as a gray "deleted" box and not recorded again.
+
+## Checking on your own cameras
+
+The numbers in this README come from public videos and photos. The **Check** page (admins) measures how often the
+system is right **on your own cameras**: it shows one thing at a time from the last 30 days, with its picture (an
+alert with its clip), and you answer with a key:
+
+- **Y** right, **N** wrong, **U** not sure, **S** skip. After "wrong" for a vehicle or an animal, **1-9** says what it
+  really was ("cat", "not an animal"), or **Enter** goes on without.
+- What it asks: vehicles ("Is this a white car?"), animals ("Is this a dog?"), alerts of every kind (falls, loitering,
+  scene questions, vehicle, animal and person rules: "Was this alert right?") and each scene question's latest answer.
+  The kinds take turns (the one with the fewest checks first), newest first; checking again replaces the old answer.
+
+**Results**: the page's table shows right N of M per kind and per camera ("Not sure" counts neither way), with the
+common mistakes ("dog → cat: 3"); under 10 answers it says "few checks yet". The same numbers are a Health page line
+("checked by you") and a Reports panel (checks made on the chosen days). Once something has at least 10 answers and
+under 70% right, it gets a note: an alert rule or a scene question on the Alerts page ("often wrong: 4 of 12 right"),
+a vehicle or animal kind on a camera on the Check page, with what to try (other words for a question; turning animals
+or vehicles off for a camera that never sees real ones). Nothing changes by itself.
+
+A few minutes a day for a week gives the first real numbers for your cameras. Checks are kept when the thing checked is
+deleted later (they are the measurement).
 
 ## Accuracy (measured)
 
