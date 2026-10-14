@@ -350,6 +350,8 @@ cameras (when added). The user picks which to keep and the order at the start. A
    torch 2.11 (`torch.jit.script`, not used). The user chose to upgrade: PyTorch 2.14.1 + torchvision 0.29.1 (CUDA 13.0
    index `cu130`, driver 580+, the installer checks it), setuptools 84; pip-audit clean. Same outputs before/after
    (detector boxes, body points, SigLIP vectors, age, falls, counting), speed same or slightly faster.
+6. **Done 2026-10-15**: Phase 28 step 4, `remote-camera.zip` made again from the current `remote-camera/` folder (the
+   user's choice) and git-ignored. Left in Phase 28: step 1, the GitHub runs after 2026-10-19 (Ubuntu 26 runner).
 
 ## Critical files
 

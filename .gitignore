@@ -4,3 +4,5 @@ __pycache__/
 data/
 *.pt
 .env
+# the remote-camera folder zipped to give to another PC (made from the folder, not kept in git)
+remote-camera.zip

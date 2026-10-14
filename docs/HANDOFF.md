@@ -316,8 +316,7 @@ the firewall rule "VisionLabeler cameras (Tailscale)" for 8554/1935 is in place;
 **Still to do with the user (they have not done it yet):** (1) Settings → "Add camera sent from a phone or PC" →
 Save → copy the two send addresses (password shown once) → Restart now; (2) send from a device: their phone
 (Tailscale app + Larix Broadcaster, the phone/RTMP address) is the easiest test; another PC gets the NEW
-`remote-camera` folder (the `remote-camera.zip` in the project folder is the OLD serving version: zip it again;
-the zip is not in git); Ti Xuan's company PC only if their company allows it. Then check the Health page line
+`remote-camera` folder (`remote-camera.zip` in the project folder was made again from it on 2026-10-15; git-ignored); Ti Xuan's company PC only if their company allows it. Then check the Health page line
 "cameras from other devices" and that people are found and recorded. Note: the user's real app has never run the
 Phase 13-15 code yet (recording, receiver) until they restart it.
 
@@ -424,7 +423,8 @@ test install, so Starlette's test client no longer warns. Step 3 done: PyTorch 2
 pack_offline.ps1 use the cu130 index and the installer requires NVIDIA driver 580+. Compared on the same inputs with a
 scratchpad script (not kept): identical boxes/points/vectors/age, fall_check and relink_check unchanged. Roll back if
 ever needed: `pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu128`.
-Next: step 4 (old `remote-camera.zip`: ask), step 1 (GitHub runner, after 2026-10-19).
+Step 4 done: `remote-camera.zip` made again from the current (sending) folder, user's choice; git-ignored. Left:
+step 1 (check the GitHub runs after 2026-10-19, when `ubuntu-latest` becomes Ubuntu 26; fix if anything breaks).
 
 **Earlier plan: Phase 16** search recordings by words ([PHASE16-PLAN.md](PHASE16-PLAN.md); approved, skipped for now), **then
 [PHASE26-29-PLAN.md](PHASE26-29-PLAN.md)** (approved 2026-10-14): 26 real-camera week with the user, 27 scene question
