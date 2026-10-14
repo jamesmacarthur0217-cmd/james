@@ -67,7 +67,7 @@ alert after two "yes" in a row.** Ask the user before starting the phase and bef
    Job ids in their own range (vehicles use negative ids), routed back like vehicles.
 3. **Done 2026-10-14.** Alerts: `alert_events` with neither a person nor a vehicle (allowed since Phase 18) plus a picture
    (`alert_events.picture`, NEW_COLUMNS); pop-up, Alerts list, clip as now; "▶ Recording".
-4. Measure reliability with questions whose answers are known: "Is someone lying on the floor?" on UR Fall frames
+4. **Done 2026-10-14** (`tools/scene_check.py`, README "Scene questions"). Measure reliability with questions whose answers are known: "Is someone lying on the floor?" on UR Fall frames
    (frame marks), "Is there a car?" on MOT16-04/13 frames (marked cars); speed per question. No smoke/fire footage
    here: said honestly, and the user tests it with their own camera.
 5. Settings (on/off, default interval), Health line (questions, last answers, overdue), docs.

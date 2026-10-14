@@ -292,6 +292,8 @@ Phase 22 started 2026-10-14 (user's choices: every 5 minutes by default; alert a
 3. **Done 2026-10-14**: real alerts: `alert_events.scene_id`, `.picture` (own copy scene_<id>_<time>.jpg), `rule_id`
    optional (NEW_COLUMNS / NULLABLE_NOW, checked on PostgreSQL); pop-up, Alerts list, clip; deleted with the question
    and by retention. Old SQLite databases cannot store them (rule_id stays required there; a warning is logged).
+4. **Done 2026-10-14**: `tools/scene_check.py`: lying on the floor 64/64 yes, 513/523 no (10 wrong: kneeling);
+   a car 116/116, no car 135/135; 0.6 s per answer. README "Scene questions".
 
 ## Critical files
 

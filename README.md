@@ -415,6 +415,38 @@ quiet gate or door this matters much less, but it is **not measured on minutes-l
 here). Tried and not kept: carrying the time over when a lost person is re-linked to their record (same found, 2 more
 false alarms: most broken tracks are not re-linked on security cameras).
 
+## Scene questions
+
+A yes/no question about a camera's whole picture, which the vision model answers every few minutes: "Is the gate
+open?", "Is there a car in the driveway?", "Are the lights on?". Admins write them on the Alerts page (**Scene
+questions**: camera, question, every 1 minute to 1 hour, 5 minutes by default; alert when the answer is yes, or no for
+a question like "Is the gate closed?"). A question is asked only when the vision model has nothing else to do (people
+and vehicles first), one at a time, with the camera's latest picture without boxes or labels. Each answer is stored
+with its picture (faces blurred for viewers) and shown next to the question.
+
+An alert comes after **two matching answers in a row** (`scene.answers_in_a_row`), so one wrong answer does not alert;
+with a question every 5 minutes it comes 5-10 minutes after the change. It does not come again until a different
+answer has come in between. It pops up on every page with the picture, is listed on the Alerts page with a clip, and
+keeps its own copy of the picture. Deleting a question deletes its answers and alerts. A database kept in an old
+SQLite file cannot store these alerts (a warning is logged); PostgreSQL databases are updated at start.
+
+**Measured** (2026-10-14, `tools/scene_check.py`, the app's own prompt and model, one picture every half second of
+video):
+
+| Question | Pictures | Right | Wrong | Wrong twice in a row |
+|---|---|---|---|---|
+| "Is someone lying on the floor?": after a fall (UR Fall) | 64 | 64 | 0 | 0 of 36 pairs |
+| the same, people standing, sitting, bending (UR Fall) | 523 | 513 | 10 "yes" | 5 of 453 pairs |
+| "Is there a car in the picture?": MOT16 04 and 13, a car clearly in view | 116 | 116 | 0 | 0 |
+| the same, MOT16 02, 09, 11 (no cars) | 135 | 135 | 0 | 0 |
+
+No "unsure" answers; 0.6 s per answer (median). The 10 wrong "yes" were all someone kneeling or on hands and knees
+close to the floor. Someone lying down on purpose (on a bed or the floor; the marks do not say which) was answered
+"yes" 63 of 94 times. "Twice in a row" is measured on pictures half a second apart; the app asks minutes apart, so
+this overstates how often two wrong answers come together. Not measured (no such footage here): smoke or fire, an
+open gate, lights, night pictures, your own cameras: try a question for a day and look at its answers on the Alerts
+page before relying on it.
+
 ## Home / Away
 
 A switch at the top of every page says whether the house is empty: **🏠 Home** or **🔒 Away**. Alert rules can use
