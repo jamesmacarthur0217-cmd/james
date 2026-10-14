@@ -1095,6 +1095,12 @@ vision model, which the classifiers only stand in for until it answers. A larger
 
 ## Tests
 
+The tests need `pytest` and `httpx2` (Starlette's test client; with only the older `httpx` it warns):
+
+```bash
+.venv\Scripts\python.exe -m pip install pytest httpx2
+```
+
 ```bash
 .venv\Scripts\python.exe -m pytest -q
 ```

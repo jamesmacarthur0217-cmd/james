@@ -343,6 +343,10 @@ cameras (when added). The user picks which to keep and the order at the start. A
    **Phase 27 is done.** Next: the user picks among 16 (search recordings), 26 (real-camera week, needs their app
    restarted), 28 (maintenance; the runner check after 2026-10-19), 29 (more cameras, when added).
 
+2026-10-15: the user chose Phase 28 (the parts that can be done now).
+4. **Done 2026-10-15**: Phase 28 step 2, `httpx2` installed (with OK) for Starlette's test client; GitHub installs it too;
+   the test warning is gone.
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),

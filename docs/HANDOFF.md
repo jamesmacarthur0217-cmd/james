@@ -148,7 +148,7 @@ Key decisions (keep unless there is a measured reason; numbers in README):
 
 | Thing | Where / how |
 |---|---|
-| Python | `C:\VisionLabeler\.venv` (Python 3.13, torch 2.11 cu128); `cryptography` added for HTTPS |
+| Python | `C:\VisionLabeler\.venv` (Python 3.13, torch 2.11 cu128); `cryptography` added for HTTPS; `httpx2` for tests |
 | Database | Docker Desktop container `visionlabeler-db` (pgvector/pgvector:pg17), 127.0.0.1:5432, URL in `.env` |
 | Docker CLI | may be missing from PATH: `C:\Users\JAMES\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe`; start: Docker Desktop, then `docker compose up -d --wait` in the project (what start.bat does) |
 | Ollama | `%LOCALAPPDATA%\Programs\Ollama\ollama.exe`, starts with Windows; `qwen3-vl:4b-instruct` used |
@@ -417,6 +417,10 @@ whole 66.5%. Step 2 done: limits "only when Away" (`only_away`) and `hours` per 
 (2026-10-15): Alerts page box "Look at", "Ask" (hours), "only when Away", also in each row. **Phase 27 is done.**
 Next: ask the user which of 16 (search recordings), 26 (real-camera week: their app must be restarted first), 28
 (maintenance; GitHub runner check after 2026-10-19), 29 (more cameras) comes next.
+
+**Phase 28 started 2026-10-15** (user's choice): step 2 done, `httpx2` 2.13.1 in `.venv` (with OK) and in the GitHub
+test install, so Starlette's test client no longer warns. Next: step 3 (pip-audit), step 4 (old `remote-camera.zip`:
+ask), step 1 (GitHub runner, after 2026-10-19).
 
 **Earlier plan: Phase 16** search recordings by words ([PHASE16-PLAN.md](PHASE16-PLAN.md); approved, skipped for now), **then
 [PHASE26-29-PLAN.md](PHASE26-29-PLAN.md)** (approved 2026-10-14): 26 real-camera week with the user, 27 scene question
