@@ -367,7 +367,11 @@ at 0.5 (0.4 not worth it); 0 false on MOT16, 3 on UR Fall (a person crawling). P
 (left) next to the color picture (right): use the right half. Tried, not kept: ignoring animal boxes that are a found
 person. All new tables/columns checked on scratch PostgreSQL databases. Not measured: the user's camera, night pictures.
 
-**Next: Phase 22 (scene questions)** in [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md), not started. Its opening questions are
+**Phase 22 (scene questions) started 2026-10-15**: step 1 done (tables `scene_questions`/`scene_answers`, `/api/scene`
+(admins, audited), Alerts page box). Docker was off at the start of 2026-10-15 (PC restarted): a database check hung
+until it was started (pitfall 11).
+
+**Next: the rest of Phase 22 (scene questions)** in [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md). Its opening questions are
 already answered (2026-10-14): every 5 minutes by default, alert after two "yes" in a row. Ask the user before starting
 the phase, then before each step. State at the end of 2026-10-14: Docker Desktop was started for the PostgreSQL checks
 and left running; the user's own app has not run Phases 13-21 yet (ask them to restart it: stop.bat, start.bat).

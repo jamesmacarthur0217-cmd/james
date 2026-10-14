@@ -321,6 +321,7 @@ def _apply_retention(db: Database, cfg: dict, crop_dir) -> None:
     if old_audit:
         log.info("retention: deleted %d old audit log entries", old_audit)
     db.cleanup_camera_events(cfg["storage"]["audit_retention_days"])   # camera problems: kept as long
+    db.cleanup_scene_answers(cfg["storage"]["audit_retention_days"])   # scene answers too
     from labeler import recorder
     recorder.prune(db, cfg)   # recordings: keep_days and max_gb
 

@@ -55,6 +55,18 @@ class ArmingIn(BaseModel):
     mode: str
 
 
+class SceneIn(BaseModel):
+    camera: str
+    question: str
+    every_min: int = 5
+    alert_on: str = "yes"
+
+
+class SceneUpdate(BaseModel):
+    enabled: bool | None = None
+    every_min: int | None = None
+
+
 class ZoneIn(BaseModel):
     camera: str
     name: str
@@ -458,6 +470,55 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             privacy.remove_picture(crop_dir, name)
         _rules_changed()
         audit(request, "alert rule deleted", f"rule #{rule_id}")
+        return {"ok": True}
+
+    # --- scene questions (labeler/scene.py): admins --------------------------------------
+
+    def _scene_every(minutes: int) -> int:
+        if not 1 <= minutes <= 60:
+            raise HTTPException(400, "ask every 1 to 60 minutes")
+        return minutes * 60
+
+    @app.get("/api/scene")
+    def scene_list():
+        return db.list_scene_questions()
+
+    @app.post("/api/scene")
+    def scene_add(body: SceneIn, request: Request):
+        cams = [c["name"] for c in cfg["cameras"]]
+        text = " ".join(body.question.split())
+        if body.camera not in cams:
+            raise HTTPException(400, f"no camera {body.camera!r}")
+        if not 5 <= len(text) <= 200:
+            raise HTTPException(400, "the question needs 5 to 200 characters, e.g. Is the gate open?")
+        if body.alert_on not in ("yes", "no"):
+            raise HTTPException(400, "alert when the answer is yes or no")
+        q = db.add_scene_question(body.camera, text, _scene_every(body.every_min), body.alert_on)
+        audit(request, "scene question added", f"{body.camera}: {text} (every {body.every_min} min, "
+                                               f"alert on {body.alert_on})")
+        return q
+
+    @app.patch("/api/scene/{question_id}")
+    def scene_update(question_id: int, body: SceneUpdate, request: Request):
+        fields = {}
+        if body.enabled is not None:
+            fields["enabled"] = body.enabled
+        if body.every_min is not None:
+            fields["every_s"] = _scene_every(body.every_min)
+        q = db.update_scene_question(question_id, **fields)
+        if q is None:
+            raise HTTPException(404, "question not found")
+        audit(request, "scene question changed", f"#{question_id}: " + ", ".join(f"{k} = {v}" for k, v in fields.items()))
+        return q
+
+    @app.delete("/api/scene/{question_id}")
+    def scene_delete(question_id: int, request: Request):
+        q = db.delete_scene_question(question_id)
+        if q is None:
+            raise HTTPException(404, "question not found")
+        if q["last_picture"]:
+            privacy.remove_picture(crop_dir, q["last_picture"])
+        audit(request, "scene question deleted", f"#{question_id} {q['camera']}: {q['question']}")
         return {"ok": True}
 
     # --- Home / Away (labeler/arming.py): admins and viewers ------------------------------

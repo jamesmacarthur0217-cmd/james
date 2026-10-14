@@ -48,6 +48,22 @@
       <div id="rules"><div class="empty">No rules yet.</div></div>
     </section>
     <section class="panel" style="margin-top:16px">
+      <h2>Scene questions</h2>
+      <p class="hint">A yes/no question about a camera's whole picture, asked to the vision model every few minutes,
+        e.g. "Is the gate open?", "Is there a car in the driveway?", "Are the lights on?". An alert comes after two
+        answers in a row that match (one wrong answer does not alert). People and vehicles are labeled first.</p>
+      <div class="row"><label for="sq-camera">Camera</label><select id="sq-camera"></select></div>
+      <div class="row"><label for="sq-text">Question</label><input id="sq-text" maxlength="200" style="flex:1"
+        placeholder="e.g. Is the gate open?"></div>
+      <div class="row"><label for="sq-every">Ask every</label><select id="sq-every">
+          <option value="1">1 min</option><option value="5" selected>5 min</option><option value="10">10 min</option>
+          <option value="15">15 min</option><option value="30">30 min</option><option value="60">1 hour</option></select>
+        <label for="sq-alert" style="min-width:0">alert when</label><select id="sq-alert">
+          <option value="yes">the answer is yes</option><option value="no">the answer is no</option></select></div>
+      <div class="row"><button class="primary" id="sq-add">Add question</button><span class="muted" id="sq-msg"></span></div>
+      <div id="scene"><div class="empty">No questions yet.</div></div>
+    </section>
+    <section class="panel" style="margin-top:16px">
       <h2>Camera problems</h2>
       <p class="hint">No picture, a blank picture, or running slowly; also shown on the Live page while it lasts.</p>
       <div id="camera-events"><div class="empty">No camera problems.</div></div>
@@ -141,6 +157,41 @@ $("save").onclick = async () => {
   loadRules();
 };
 
+// --- Scene questions (labeler/scene.py) ---
+const EVERY = { 60: "1 min", 300: "5 min", 600: "10 min", 900: "15 min", 1800: "30 min", 3600: "1 hour" };
+async function loadScene() {
+  const r = await fetch("/api/scene");
+  if (!r.ok) return;
+  const qs = await r.json();
+  $("scene").innerHTML = qs.length ? qs.map(q => {
+    const last = q.last_answer ? `last answer: ${esc(q.last_answer)} · ${esc(q.last_at.replace("T", " ").slice(0, 16))}` : "not asked yet";
+    return `<div class="rule" data-id="${q.id}">
+      <input type="checkbox" class="sq-on" ${q.enabled ? "checked" : ""} title="Enabled">
+      <div class="what"><b>${esc(q.question)}</b><small>${esc(q.camera)} · every ${EVERY[q.every_s] || Math.round(q.every_s / 60) + " min"}
+        · alert on ${esc(q.alert_on)} · ${last}</small></div>
+      <button class="sq-del danger-quiet">Delete</button></div>`;
+  }).join("") : '<div class="empty">No questions yet.</div>';
+}
+$("scene").addEventListener("change", async (e) => {
+  if (!e.target.matches(".sq-on")) return;
+  await fetch(`/api/scene/${e.target.closest(".rule").dataset.id}`, { method: "PATCH",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: e.target.checked }) });
+});
+$("scene").addEventListener("click", async (e) => {
+  if (!e.target.matches(".sq-del") || !confirm("Delete this question and its answers?")) return;
+  await fetch(`/api/scene/${e.target.closest(".rule").dataset.id}`, { method: "DELETE" });
+  loadScene();
+});
+$("sq-add").onclick = async () => {
+  const r = await fetch("/api/scene", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ camera: $("sq-camera").value, question: $("sq-text").value,
+                           every_min: Number($("sq-every").value), alert_on: $("sq-alert").value }) });
+  if (!r.ok) { $("sq-msg").textContent = (await r.json()).detail || "Could not add"; return; }
+  $("sq-msg").textContent = "Added.";
+  $("sq-text").value = "";
+  loadScene();
+};
+
 async function loadEvents() {
   const data = await (await fetch("/api/alerts/events?limit=50")).json();
   // Keep an open clip playing: only redraw when the list changed.
@@ -188,11 +239,16 @@ async function init() {
              hours: ["22-06", "20-06", "00-06", "18-24", "06-18", "08-18", "09-17"],
              armed: ["away", "home"],     // the Home / Away switch (labeler/arming.py)
              animal: ["any", "dog", "cat", "bird"] };   // animals (labeler/animals.py)
-  for (const c of await (await fetch("/api/cameras")).json()) $("camera").add(new Option(c.name, c.name));
+  for (const c of await (await fetch("/api/cameras")).json()) {
+    $("camera").add(new Option(c.name, c.name));
+    if (c.live) $("sq-camera").add(new Option(c.name, c.name));
+  }
   loadRules();
+  loadScene();
   loadEvents();
   loadCameraEvents();
   setInterval(() => { loadEvents(); loadCameraEvents(); }, 5000);
+  setInterval(loadScene, 30000);
 }
 init();
 </script>

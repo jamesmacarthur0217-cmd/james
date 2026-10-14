@@ -344,6 +344,32 @@ class ArmingChange(Base):
     why: Mapped[str] = mapped_column(String(20))             # button | schedule
 
 
+class SceneQuestion(Base):
+    """A yes/no question the vision model answers about a camera's whole picture every few minutes (labeler/scene.py),
+    e.g. "Is the gate open?"; an alert when the answer becomes `alert_on` (two answers in a row)."""
+    __tablename__ = "scene_questions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    camera: Mapped[str] = mapped_column(String(100), index=True)
+    question: Mapped[str] = mapped_column(String(200))
+    every_s: Mapped[int] = mapped_column(Integer, default=300)
+    alert_on: Mapped[str] = mapped_column(String(3), default="yes")     # yes | no
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    last_answer: Mapped[str | None] = mapped_column(String(10))         # yes | no | unsure
+    last_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_picture: Mapped[str | None] = mapped_column(String(300))
+
+
+class SceneAnswer(Base):
+    """One answer to a scene question (history; kept as long as the audit log)."""
+    __tablename__ = "scene_answers"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    question_id: Mapped[int] = mapped_column(ForeignKey("scene_questions.id", ondelete="CASCADE"), index=True)
+    at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    answer: Mapped[str] = mapped_column(String(10))
+    seconds: Mapped[float | None] = mapped_column(Float)                # how long the vision model took
+
+
 class AuditEntry(Base):
     """Who did what in the web pages: logins, viewing, searches, exports, deletes, rule changes, reviews.
     Frequent background requests (the Live page's polling) are not logged."""
@@ -1524,6 +1550,71 @@ class Database:
         with self.Session() as s:
             return [{**self._arming_dict(a), "at": a.at.isoformat(timespec="seconds")} for a in s.scalars(
                 select(ArmingChange).order_by(ArmingChange.at.desc(), ArmingChange.id.desc()).limit(limit))]
+
+    # --- scene questions (labeler/scene.py) -----------------------------------------------
+
+    @staticmethod
+    def _scene_dict(q: SceneQuestion) -> dict:
+        iso = lambda d: d.isoformat(timespec="seconds") if d else None   # noqa: E731
+        return {"id": q.id, "camera": q.camera, "question": q.question, "every_s": q.every_s,
+                "alert_on": q.alert_on, "enabled": q.enabled, "created_at": iso(q.created_at),
+                "last_answer": q.last_answer, "last_at": iso(q.last_at), "last_picture": q.last_picture}
+
+    def add_scene_question(self, camera: str, question: str, every_s: int = 300, alert_on: str = "yes") -> dict:
+        with self.Session.begin() as s:
+            q = SceneQuestion(camera=camera, question=question, every_s=every_s, alert_on=alert_on)
+            s.add(q)
+            s.flush()
+            return self._scene_dict(q)
+
+    def list_scene_questions(self, camera: str | None = None) -> list[dict]:
+        q = select(SceneQuestion).order_by(SceneQuestion.id)
+        if camera:
+            q = q.where(SceneQuestion.camera == camera)
+        with self.Session() as s:
+            return [self._scene_dict(x) for x in s.scalars(q)]
+
+    def update_scene_question(self, question_id: int, **fields) -> dict | None:
+        allowed = {"enabled", "every_s", "last_answer", "last_at", "last_picture"}
+        if set(fields) - allowed:
+            raise ValueError(f"not scene question fields: {sorted(set(fields) - allowed)}")
+        with self.Session.begin() as s:
+            q = s.get(SceneQuestion, question_id)
+            if q is None:
+                return None
+            for k, v in fields.items():
+                setattr(q, k, v)
+            return self._scene_dict(q)
+
+    def delete_scene_question(self, question_id: int) -> dict | None:
+        """Deletes it with its answers; returns it (for the caller to remove its picture), or None."""
+        with self.Session.begin() as s:
+            q = s.get(SceneQuestion, question_id)
+            if q is None:
+                return None
+            out = self._scene_dict(q)
+            s.execute(delete(SceneAnswer).where(SceneAnswer.question_id == question_id))
+            s.delete(q)
+            return out
+
+    def add_scene_answer(self, question_id: int, answer: str, at: datetime, seconds: float | None = None) -> None:
+        with self.Session.begin() as s:
+            if s.get(SceneQuestion, question_id) is not None:
+                s.add(SceneAnswer(question_id=question_id, answer=answer, at=at, seconds=seconds))
+
+    def scene_answers(self, question_id: int, limit: int = 20) -> list[dict]:
+        """Newest first."""
+        with self.Session() as s:
+            return [{"answer": a.answer, "at": a.at.isoformat(timespec="seconds"), "seconds": a.seconds}
+                    for a in s.scalars(select(SceneAnswer).where(SceneAnswer.question_id == question_id)
+                                       .order_by(SceneAnswer.at.desc(), SceneAnswer.id.desc()).limit(limit))]
+
+    def cleanup_scene_answers(self, retention_days: int) -> int:
+        if retention_days <= 0:
+            return 0
+        with self.Session.begin() as s:
+            return s.execute(delete(SceneAnswer).where(
+                SceneAnswer.at < datetime.now() - timedelta(days=retention_days))).rowcount
 
     # --- audit log ----------------------------------------------------------------------
 
