@@ -109,3 +109,18 @@ def test_api_periods_and_viewers(db, camera, tmp_path):
     viewer.post("/api/login", json={"username": "vic", "password": "correct horse battery"})
     got = viewer.get("/api/summary", params={"start": "2026-10-13T18:00", "end": "2026-10-14T08:00"}).json()
     assert got["counts"]["people"] == 1 and got["camera_problems"] == [] and got["alerts"][0]["clip"] is None
+
+
+# --- step 2: the page ---
+
+def test_summary_page_for_admins_and_viewers(db, tmp_path):
+    from pathlib import Path
+    assert "What happened" in _app(db, tmp_path).get("/summary").text
+    db.add_user("vic", accounts.hash_password("correct horse battery"), "viewer")
+    viewer = _app(db, tmp_path, address="192.168.1.20")
+    viewer.post("/api/login", json={"username": "vic", "password": "correct horse battery"})
+    assert viewer.get("/summary", follow_redirects=False).status_code == 200
+    static = Path(__file__).resolve().parent.parent / "labeler" / "static"
+    for page in static.glob("*.html"):
+        if page.name != "login.html":
+            assert 'href="/summary"' in page.read_text(encoding="utf-8"), page.name   # in every page's menu

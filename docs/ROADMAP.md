@@ -317,6 +317,8 @@ search recordings by words. Not chosen: phone alerts (keep alerts on the pages).
    week of checks on their cameras. Next: Phase 25 ("while you were away").
 8. **Done 2026-10-14**: Phase 25 step 1, `labeler/summary.py` and `/api/summary` (away / night / today / start-end;
    viewers too, without clips and camera problems).
+9. **Done 2026-10-14**: Phase 25 step 2, the Summary page (periods, tiles, people, timeline with filters; phone width;
+   a "Summary" link in every page's menu, viewers too).
 
 ## Critical files
 

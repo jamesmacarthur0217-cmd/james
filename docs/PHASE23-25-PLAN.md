@@ -48,7 +48,7 @@ The answer key measures people's labels; nothing measures the newer detections o
 1. **Done 2026-10-14.** `labeler/summary.py`: for a period (from the last switch to Away until now, or "last night", "today", a chosen
    range): people (count, pictures of the first few), vehicles, animals, alerts (all kinds), scene answers that
    changed, camera problems; from the existing tables, no new data.
-2. A **Summary** page (admins; viewers get the people-free parts and blurred pictures, as elsewhere) with a timeline
+2. **Done 2026-10-14** (also for viewers, as the API). A **Summary** page (admins; viewers get the people-free parts and blurred pictures, as elsewhere) with a timeline
    per camera and the pictures; links to the Recordings page at each moment.
 3. When someone switches Away -> Home, the button offers "What happened while you were away?" (a link, never
    automatic); the Live page's Today tiles link to it too.

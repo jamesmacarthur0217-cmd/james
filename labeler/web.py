@@ -802,6 +802,10 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         stop()
         return {"ok": True}
 
+    @app.get("/summary")
+    def summary_page():
+        return FileResponse(STATIC / "summary.html")
+
     @app.get("/api/summary")
     def summary_api(request: Request, period: str | None = None, start: str | None = None, end: str | None = None):
         """What happened: period away / night / today, or start and end (2026-10-14T18:00). Viewers: no clips and

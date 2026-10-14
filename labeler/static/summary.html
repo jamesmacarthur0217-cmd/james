@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Summary</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/session.js"></script>
+<style>
+  .periods { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .periods button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .custom { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  .custom[hidden] { display: none; }
+  .tiles { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; }
+  .tile { background: var(--chip); border-radius: 10px; padding: 8px 14px; min-width: 96px; }
+  .tile b { font-size: 20px; display: block; font-variant-numeric: tabular-nums; }
+  .tile span { color: var(--muted); font-size: 12px; }
+  .tile.warn b { color: var(--warn); }
+  .faces { display: flex; flex-wrap: wrap; gap: 10px; }
+  .face { width: 108px; font-size: 12px; color: inherit; text-decoration: none; }
+  .face span { color: var(--muted); }
+  .face img { width: 108px; height: 140px; object-fit: cover; border-radius: 8px; background: var(--chip); display: block; }
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .filters button { font-size: 12px; padding: 3px 10px; border-radius: 12px; }
+  .filters button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .line { display: grid; grid-template-columns: 66px 26px 52px minmax(0, 1fr); gap: 8px; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .line .t { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+  .line .icon { font-size: 18px; text-align: center; }
+  .line img { width: 52px; height: 52px; object-fit: cover; border-radius: 6px; background: var(--chip); }
+  .line .pic-none { width: 52px; height: 52px; }
+  .line small { color: var(--muted); }
+  .line.t-alert .what { color: var(--warn); }
+  .day { font-weight: 600; margin: 12px 0 2px; font-size: 13px; }
+  @media (max-width: 520px) { .line { grid-template-columns: 62px 22px 44px minmax(0, 1fr); }
+    .line img, .line .pic-none { width: 44px; height: 44px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>VisionLabeler</h1>
+  <nav><a href="/">Live</a><a href="/recordings">Recordings</a><a href="/summary" class="active">Summary</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/check" class="admin-only">Check</a><a href="/audit" class="admin-only">Audit log</a><a href="/import" class="admin-only">Import</a><a href="/settings" class="admin-only">Settings</a><a href="/health">Health</a></nav>
+</header>
+<main>
+  <section class="panel">
+    <h2>What happened</h2>
+    <div class="periods" id="periods">
+      <button data-p="away">While you were away</button><button data-p="night">Last night</button>
+      <button data-p="today">Today</button><button data-p="custom">Choose…</button>
+    </div>
+    <div class="custom" id="custom" hidden>
+      <label>From <input type="datetime-local" id="from"></label> <label>until <input type="datetime-local" id="until"></label>
+      <button class="primary" id="go">Show</button>
+    </div>
+    <p class="muted" id="when"></p>
+    <div class="tiles" id="tiles"></div>
+  </section>
+  <section class="panel" id="people-panel" style="margin-top:16px" hidden>
+    <h2 id="people-title">People</h2>
+    <div class="faces" id="faces"></div>
+  </section>
+  <section class="panel" style="margin-top:16px">
+    <h2>Timeline</h2>
+    <div class="filters" id="filters"></div>
+    <div id="timeline"><div class="empty">Loading…</div></div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+const ICON = { person: "🚶", vehicle: "🚗", animal: "🐾", alert: "⚠️", scene: "❓", camera: "📷" };
+const NAMES = { person: "people", vehicle: "vehicles", animal: "animals", alert: "alerts", scene: "scene answers", camera: "camera problems" };
+let data = null, only = null;
+const hhmm = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const dayOf = (iso) => new Date(iso).toLocaleDateString([], { weekday: "long", day: "numeric", month: "short" });
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+async function load(period, start, end) {
+  document.querySelectorAll("#periods button").forEach(b => b.classList.toggle("on", b.dataset.p === period));
+  $("custom").hidden = period !== "custom";
+  if (period === "custom" && !(start && end)) return;
+  const q = period === "custom" ? { start, end } : { period };
+  try { localStorage.setItem("summaryPeriod", period); } catch {}
+  $("timeline").innerHTML = '<div class="empty">Loading…</div>';
+  const r = await fetch("/api/summary?" + new URLSearchParams(q));
+  data = await r.json();
+  if (!r.ok) { $("when").textContent = data.detail || "Could not load."; return; }
+  if (data.none) {
+    $("when").textContent = "Home / Away has never been switched to Away yet: pick another period.";
+    $("tiles").innerHTML = ""; $("people-panel").hidden = true; $("filters").innerHTML = "";
+    $("timeline").innerHTML = '<div class="empty">Nothing to show.</div>';
+    return;
+  }
+  const s = new Date(data.start), e = new Date(data.end);
+  const fmt = (d) => d.toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  $("when").textContent = `${fmt(s)} → ${fmt(e)}`;
+  draw();
+}
+
+function draw() {
+  const c = data.counts;
+  const tile = (n, label, warn) => `<div class="tile${warn && n ? " warn" : ""}"><b>${n}</b><span>${label}</span></div>`;
+  const perCam = Object.entries(data.people_per_camera);
+  $("tiles").innerHTML = tile(c.people, c.people === 1 ? "person" : "people")
+    + tile(c.vehicles, c.vehicles === 1 ? "vehicle" : "vehicles") + tile(c.animals, c.animals === 1 ? "animal" : "animals")
+    + tile(c.alerts, c.alerts === 1 ? "alert" : "alerts", true)
+    + (c.scene_changes ? tile(c.scene_changes, c.scene_changes === 1 ? "scene answer changed" : "scene answers changed", true) : "")
+    + (c.camera_problems ? tile(c.camera_problems, "camera problems", true) : "");
+  $("people-panel").hidden = !data.people.length;
+  $("people-title").textContent = c.people > data.people.length ? `People (the first ${data.people.length} of ${c.people})`
+    : "People" + (perCam.length > 1 ? " · " + perCam.map(([k, n]) => `${k}: ${n}`).join(", ") : "");
+  $("faces").innerHTML = data.people.map(p => `<a class="face" href="/recordings?camera=${encodeURIComponent(p.camera)}&amp;at=${encodeURIComponent(p.at)}">
+      ${p.picture ? `<img src="/crops/${encodeURIComponent(p.picture)}" alt="" loading="lazy">` : '<img alt="">'}
+      <span>${esc(hhmm(p.at))} · ${esc(p.text)}</span></a>`).join("");
+  const kinds = [...new Set(data.timeline.map(x => x.type))];
+  $("filters").innerHTML = kinds.length > 1 ? `<button data-f="" class="${only ? "" : "on"}">everything</button>`
+    + kinds.map(k => `<button data-f="${k}" class="${only === k ? "on" : ""}">${ICON[k]} ${NAMES[k]}</button>`).join("") : "";
+  const rows = data.timeline.filter(x => !only || x.type === only);
+  let day = "";
+  $("timeline").innerHTML = rows.length ? (data.timeline_cut ? `<p class="hint">The ${data.timeline_cut} oldest are left out: choose a shorter period.</p>` : "")
+    + rows.map(x => {
+      const d = dayOf(x.at), head = d !== day ? `<div class="day">${esc(d)}</div>` : "";
+      day = d;
+      return head + `<div class="line t-${x.type}"><span class="t">${esc(hhmm(x.at))}</span><span class="icon" title="${NAMES[x.type]}">${ICON[x.type]}</span>
+        ${x.picture ? `<img src="/crops/${encodeURIComponent(x.picture)}" alt="" loading="lazy">` : '<span class="pic-none"></span>'}
+        <div><span class="what">${esc(x.text)}</span><br><small>${esc(x.camera || "")}
+          · <a class="link" href="/recordings?camera=${encodeURIComponent(x.camera || "")}&amp;at=${encodeURIComponent(x.at)}">▶ Recording</a>
+          ${x.clip ? ` · <a class="link" href="/clips/${encodeURIComponent(x.clip)}" target="_blank">clip</a>` : ""}</small></div></div>`;
+    }).join("") : '<div class="empty">Nothing happened in this period.</div>';
+}
+
+$("periods").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (b) load(b.dataset.p);
+});
+$("filters").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  only = b.dataset.f || null;
+  draw();
+});
+$("go").onclick = () => load("custom", $("from").value, $("until").value);
+
+const asked = new URLSearchParams(location.search).get("period");
+let saved = null;
+try { saved = localStorage.getItem("summaryPeriod"); } catch {}
+const first = ["away", "night", "today"].includes(asked) ? asked : (["away", "night", "today"].includes(saved) ? saved : "away");
+const now = new Date(), pad = (n) => String(n).padStart(2, "0");
+const local = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+$("until").value = local(now);
+$("from").value = local(new Date(now - 24 * 3600 * 1000));
+load(first);
+</script>
+</body>
+</html>
