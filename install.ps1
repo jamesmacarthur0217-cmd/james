@@ -18,7 +18,7 @@ $ErrorActionPreference = "Continue"
 $Root = $PSScriptRoot
 Set-Location $Root
 $VenvPy = Join-Path $Root ".venv\Scripts\python.exe"
-$TorchIndex = "https://download.pytorch.org/whl/cu128"
+$TorchIndex = "https://download.pytorch.org/whl/cu130"   # CUDA 13.0 builds: NVIDIA driver 580 or newer
 $Image = "pgvector/pgvector:pg17"
 $script:Missing = @()
 $script:Stopped = $false
@@ -140,7 +140,10 @@ else { Miss "Windows" "$($os.Caption): Windows 10 or 11, 64-bit, is needed" }
 $smi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
 if ($smi) {
   $gpu = & nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader 2>$null | Select-Object -First 1
-  Ok "NVIDIA GPU" "$gpu"
+  $driver = ("$gpu" -split ",")[-1].Trim()
+  if ($driver -match "^(\d+)" -and [int]$Matches[1] -lt 580) {
+    Miss "NVIDIA GPU" "$gpu`: driver $driver is too old for PyTorch's CUDA 13.0 build; install driver 580 or newer from nvidia.com"
+  } else { Ok "NVIDIA GPU" "$gpu" }
 } else {
   Miss "NVIDIA GPU" "no NVIDIA driver found (nvidia-smi). The app needs an NVIDIA GPU with 8 GB or more; install its driver from nvidia.com"
 }

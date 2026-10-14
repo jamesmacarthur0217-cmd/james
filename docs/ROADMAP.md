@@ -346,6 +346,10 @@ cameras (when added). The user picks which to keep and the order at the start. A
 2026-10-15: the user chose Phase 28 (the parts that can be done now).
 4. **Done 2026-10-15**: Phase 28 step 2, `httpx2` installed (with OK) for Starlette's test client; GitHub installs it too;
    the test warning is gone.
+5. **Done 2026-10-15**: Phase 28 step 3, pip-audit: setuptools 81 (a Mac-only packaging issue) and, by version,
+   torch 2.11 (`torch.jit.script`, not used). The user chose to upgrade: PyTorch 2.14.1 + torchvision 0.29.1 (CUDA 13.0
+   index `cu130`, driver 580+, the installer checks it), setuptools 84; pip-audit clean. Same outputs before/after
+   (detector boxes, body points, SigLIP vectors, age, falls, counting), speed same or slightly faster.
 
 ## Critical files
 

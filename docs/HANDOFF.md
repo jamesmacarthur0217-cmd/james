@@ -132,7 +132,7 @@ tools/animal_check.py animals on COCO (per confidence) and false alarms on MOT16
 tools/loiter_check.py loitering alerts against MOT16 true markings (found, false, late; --min-visibility)
 tools/relink_check.py counting check against MOTChallenge gt.txt (true identities); per-join right/wrong
 tools/models.py      check / download / pack / unpack models (HF cache, Ollama manifest+blobs, YOLO)
-tools/pack_offline.ps1 offline package: pip freeze wheels (cu128 index), models, docker save
+tools/pack_offline.ps1 offline package: pip freeze wheels (cu130 index), models, docker save
 tools/               evaluate.py (COCO answer key), bench_vlm.py, bench_age.py, teacher_label.py,
                      train_attributes.py, extract_people.py, backup_db.py, users.py, make_test_config.py
 ```
@@ -148,7 +148,7 @@ Key decisions (keep unless there is a measured reason; numbers in README):
 
 | Thing | Where / how |
 |---|---|
-| Python | `C:\VisionLabeler\.venv` (Python 3.13, torch 2.11 cu128); `cryptography` added for HTTPS; `httpx2` for tests |
+| Python | `C:\VisionLabeler\.venv` (Python 3.13, torch 2.14.1 cu130 since 2026-10-15); `cryptography` added for HTTPS; `httpx2` for tests |
 | Database | Docker Desktop container `visionlabeler-db` (pgvector/pgvector:pg17), 127.0.0.1:5432, URL in `.env` |
 | Docker CLI | may be missing from PATH: `C:\Users\JAMES\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe`; start: Docker Desktop, then `docker compose up -d --wait` in the project (what start.bat does) |
 | Ollama | `%LOCALAPPDATA%\Programs\Ollama\ollama.exe`, starts with Windows; `qwen3-vl:4b-instruct` used |
@@ -419,8 +419,12 @@ Next: ask the user which of 16 (search recordings), 26 (real-camera week: their 
 (maintenance; GitHub runner check after 2026-10-19), 29 (more cameras) comes next.
 
 **Phase 28 started 2026-10-15** (user's choice): step 2 done, `httpx2` 2.13.1 in `.venv` (with OK) and in the GitHub
-test install, so Starlette's test client no longer warns. Next: step 3 (pip-audit), step 4 (old `remote-camera.zip`:
-ask), step 1 (GitHub runner, after 2026-10-19).
+test install, so Starlette's test client no longer warns. Step 3 done: PyTorch 2.11 cu128 -> **2.14.1 cu130**
+(torchvision 0.29.1; the cu128 index has nothing newer than 2.11), setuptools 81 -> 84, pip-audit clean; install.ps1 and
+pack_offline.ps1 use the cu130 index and the installer requires NVIDIA driver 580+. Compared on the same inputs with a
+scratchpad script (not kept): identical boxes/points/vectors/age, fall_check and relink_check unchanged. Roll back if
+ever needed: `pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu128`.
+Next: step 4 (old `remote-camera.zip`: ask), step 1 (GitHub runner, after 2026-10-19).
 
 **Earlier plan: Phase 16** search recordings by words ([PHASE16-PLAN.md](PHASE16-PLAN.md); approved, skipped for now), **then
 [PHASE26-29-PLAN.md](PHASE26-29-PLAN.md)** (approved 2026-10-14): 26 real-camera week with the user, 27 scene question

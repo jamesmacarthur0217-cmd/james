@@ -38,9 +38,9 @@ if (-not $SkipWheels) {
   $lines = & $VenvPy -m pip freeze --exclude-editable | Where-Object { $_ -and $_ -notmatch " @ " }
   [IO.File]::WriteAllLines($frozen, [string[]]$lines, (New-Object Text.UTF8Encoding $false))
   Say ("  {0} packages listed in requirements-frozen.txt" -f $lines.Count)
-  # torch +cu128 builds are on the PyTorch index; everything else on PyPI.
+  # torch +cu130 builds are on the PyTorch index; everything else on PyPI.
   & $VenvPy -m pip download -r $frozen -d $wheels --only-binary=:all: `
-      --index-url https://download.pytorch.org/whl/cu128 --extra-index-url https://pypi.org/simple | Out-Host
+      --index-url https://download.pytorch.org/whl/cu130 --extra-index-url https://pypi.org/simple | Out-Host
   if ($LASTEXITCODE -ne 0) { $failed += "Python packages" }
 }
 

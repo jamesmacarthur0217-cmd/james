@@ -41,7 +41,7 @@ Copy the `VisionLabeler` folder to the new PC (Windows 10/11, NVIDIA GPU with 8 
 1. checks Windows and the GPU driver (`nvidia-smi`);
 2. installs Python 3.13, Ollama and Docker Desktop with `winget` if they are missing (after Docker Desktop is
    installed, Windows may need a restart and Docker Desktop must be opened once; then run `install.bat` again);
-3. makes `.venv` with CUDA PyTorch and `requirements.txt` (about 4 GB);
+3. makes `.venv` with CUDA PyTorch (CUDA 13.0: NVIDIA driver 580 or newer) and `requirements.txt` (about 4 GB);
 4. writes `.env` with a new random database password (an existing `.env` is never overwritten);
 5. starts the database (`docker compose up`);
 6. downloads the models: detector, SigLIP 2, age model (`tools\models.py download`) and the vision model
@@ -889,9 +889,13 @@ are drawn as gray "ignored" boxes.
   blocks shutdown.
 - **Ollama errors**: each request is retried once.
 - **Security updates**: `.venv\Scripts\python.exe -m pip_audit` lists installed packages with known security
-  problems (checked 2026-10-10: only setuptools, an install tool, moved to 81.0, the newest PyTorch 2.11 accepts;
-  its remaining issue concerns building packages on a Mac. PyTorch's CUDA build is not checked by pip-audit; by
-  version, 2.11 has an advisory for `torch.jit.script`, which needs local access and is not used by the app).
+  problems. Checked 2026-10-15: **none**, after moving PyTorch 2.11 (CUDA 12.8) to **2.14.1 (CUDA 13.0)** and
+  setuptools 81 to 84 (PyTorch 2.11 held it below 82). PyTorch's CUDA build is not checked by pip-audit; 2.14.1 has
+  no advisory by version. The CUDA 13.0 build needs NVIDIA driver 580 or newer (the installer checks it). Measured
+  before and after on the same inputs: the same people boxes (451 of 451 on 300 COCO photos, body points within
+  0.2 px), the same appearance vectors (cosine 1.00000) and age answers (300 of 300), the same fall results
+  (`tools/fall_check.py`, run fresh) and the same counting on MOT16-09 (`tools/relink_check.py`); speed the same or
+  slightly faster (detector 11.9 -> 11.0 ms a frame, age model 9.4 -> 6.7 ms a face).
   GitHub's Dependabot (`.github/dependabot.yml`) opens a pull request when a package in requirements.txt gets a
   security fix; turn on "Dependabot alerts" and "security updates" once in the repository's Settings.
 - **HTTPS certificate**: the Health page shows its end date (825 days after it was made) and warns 30 days before.
