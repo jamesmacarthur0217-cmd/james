@@ -143,3 +143,43 @@ def test_results_on_the_page_health_and_reports(db, camera, tmp_path):
     other_day = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d")
     assert client.get("/api/reports/summary", params={"start": other_day, "end": other_day}).json()["checks"] == []
     assert client.get("/api/reports/summary", params={"start": today, "end": today, "camera": "other"}).json()["checks"] == []
+
+
+# --- step 3: "often wrong" notes ---
+
+def _many(db, kind, item_ids, what, camera, answers, correction=None):
+    for i, a in zip(item_ids, answers):
+        db.save_check(kind, i, what, camera, a, correction if a == "no" else None, "james")
+
+
+def test_often_wrong_rules_questions_and_kinds(db, camera):
+    rule = db.add_rule("anyone", [])["id"]
+    good = db.add_rule("red top", [["upper_color", "red"]])["id"]
+    people = [db.create_track(camera, i, datetime.now()) for i in range(12)]
+    bad_alerts = [db.record_alert(rule, p, "test-cam", "anyone")["id"] for p in people]
+    good_alerts = [db.record_alert(good, p, "test-cam", "red top")["id"] for p in people]
+    _many(db, "alert", bad_alerts, "person", "test-cam", ["yes"] * 4 + ["no"] * 8)      # 4 of 12: often wrong
+    _many(db, "alert", good_alerts, "person", "test-cam", ["yes"] * 11 + ["no"])        # 11 of 12: fine
+    q = db.add_scene_question("test-cam", "Is the gate open?")
+    for i in range(10):
+        db.add_scene_answer(q["id"], "yes", datetime.now() - timedelta(minutes=i))
+    from labeler.db import SceneAnswer
+    with db.Session() as s:
+        answer_ids = [a.id for a in s.query(SceneAnswer).all()]                           # all 10 answers
+    _many(db, "scene", answer_ids, "yes", "test-cam", ["no"] * 6 + ["yes"] * 4)
+    _many(db, "animal", range(100, 112), "dog", "gate", ["no"] * 9 + ["yes"] * 3, "not an animal")
+    _many(db, "animal", range(200, 205), "cat", "gate", ["no"] * 5, "dog")                 # only 5: too few to say
+    f = checks.flags(db)
+    assert f["rules"] == {rule: "often wrong: 4 of 12 right (Check page)"}
+    assert f["scene"] == {q["id"]: "often wrong: 4 of 10 right (Check page)"}
+    assert [k["text"] for k in f["kinds"]] == [
+        "“dog” on gate: 3 of 12 right, mostly not an animal; if gate never sees real animals, turn animals off for it "
+        "(Settings page, the Animals column)"]
+
+
+def test_flags_api_and_alerts_page(db, tmp_path):
+    client = _app(db, tmp_path)
+    assert client.get("/api/check/flags").json() == {"rules": {}, "scene": {}, "kinds": []}
+    from pathlib import Path
+    page = (Path(__file__).resolve().parent.parent / "labeler" / "static" / "alerts.html").read_text(encoding="utf-8")
+    assert "flags.rules[r.id]" in page and "flags.scene[q.id]" in page

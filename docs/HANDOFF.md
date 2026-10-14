@@ -397,7 +397,7 @@ night, the user's cameras.
 **Phase 23 (small fixes) is done** (2026-10-14): `02c7cf9` Settings unsaved mark; step 2 not needed (console text is
 fine, the plan's assumption was wrong); old SQLite alert tables rebuilt at start (`Database._rebuild_sqlite`).
 
-**Phase 24 started 2026-10-14**: steps 1-2 done (Check page, table checks; results: checks.results/summary_line, Health
+**Phase 24 started 2026-10-14**: steps 1-3 done (step 3: checks.flags, /api/check/flags, notes) (Check page, table checks; results: checks.results/summary_line, Health
 "checked by you", Reports "checks").
 
 **Next: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)**, the rest of Phase 24 (approved 2026-10-14): 23 small fixes, 24 "was this right?"

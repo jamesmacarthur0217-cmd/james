@@ -39,7 +39,7 @@ The answer key measures people's labels; nothing measures the newer detections o
    keyboard Y / N / S like the Answer key page; mixed so every kind gets checked; items already checked skipped.
 2. **Done 2026-10-14.** Results: per kind and camera, "right N of M" (and for vehicles/animals the kind: "it was a cat, not a dog" as an
    optional correction); shown on the Check page, a Health line ("checked: ... right"), and in Reports.
-3. Use the answers where measured gains are possible, only if measured: e.g. a scene question that is often wrong is
+3. **Done 2026-10-14** (notes only: 10+ answered and under 70% right). Use the answers where measured gains are possible, only if measured: e.g. a scene question that is often wrong is
    flagged on the Alerts page; an animal kind often wrong on one camera can be turned off there. No automatic retuning.
 4. Docs; with the user: a week of checks gives the first real numbers for README sections 17-22.
 

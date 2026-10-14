@@ -124,6 +124,62 @@ def summary_line(rows: list[dict]) -> str | None:
     return "; ".join(parts) or None
 
 
+# --- "often wrong" (step 3): notes and suggestions, never automatic changes ---------------------------------------
+
+OFTEN_MIN = 10      # at least this many answered right or wrong ...
+OFTEN_SHARE = 0.7   # ... and fewer than this share right: worth a note
+
+
+def _often(right: int, wrong: int) -> bool:
+    return right + wrong >= OFTEN_MIN and right / (right + wrong) < OFTEN_SHARE
+
+
+def flags(db) -> dict:
+    """{"rules": {rule id: note}, "scene": {question id: note}, "kinds": [suggestion, ...]}: things often wrong."""
+    from collections import Counter, defaultdict
+    rows = db.list_checks()
+    sources = db.alert_sources([c["item_id"] for c in rows if c["kind"] == "alert"])
+    questions = db.scene_answer_questions([c["item_id"] for c in rows if c["kind"] == "scene"])
+    per_rule, per_question = defaultdict(Counter), defaultdict(Counter)
+    for c in rows:
+        if c["right"] == "unsure":
+            continue
+        if c["kind"] == "alert" and c["item_id"] in sources:
+            src = sources[c["item_id"]]
+            if src["rule_id"] is not None:
+                per_rule[src["rule_id"]][c["right"]] += 1
+            if src["scene_id"] is not None:
+                per_question[src["scene_id"]][c["right"]] += 1
+        elif c["kind"] == "scene" and c["item_id"] in questions:
+            per_question[questions[c["item_id"]]][c["right"]] += 1
+
+    def note(counts: Counter) -> str:
+        return f"often wrong: {counts['yes']} of {counts['yes'] + counts['no']} right (Check page)"
+
+    out = {"rules": {rid: note(n) for rid, n in per_rule.items() if _often(n["yes"], n["no"])},
+           "scene": {qid: note(n) for qid, n in per_question.items() if _often(n["yes"], n["no"])}, "kinds": []}
+    groups = defaultdict(list)
+    for c in rows:
+        if c["kind"] in ("vehicle", "animal") and c["right"] != "unsure":
+            groups[(c["kind"], c["camera"], c["what"])].append(c)
+    for (kind, camera, what), cs in sorted(groups.items()):
+        right = sum(c["right"] == "yes" for c in cs)
+        wrong = len(cs) - right
+        if not _often(right, wrong):
+            continue
+        fixes = Counter(c["correction"] for c in cs if c["right"] == "no" and c["correction"])
+        text = f"“{what}” on {camera}: {right} of {right + wrong} right"
+        if fixes:
+            top, n = fixes.most_common(1)[0]
+            if n * 2 >= wrong:
+                text += f", mostly {top}"
+                if top.startswith("not a"):
+                    text += (f"; if {camera} never sees real {kind}s, turn {kind}s off for it (Settings page, the "
+                             f"{'Vehicles' if kind == 'vehicle' else 'Animals'} column)")
+        out["kinds"].append({"kind": kind, "camera": camera, "what": what, "text": text})
+    return out
+
+
 def next_item(db, skip: set[tuple[str, int]] | None = None, now: datetime | None = None, clip_for=None) -> dict | None:
     """The kind with the fewest checks first (among kinds with something to check), its newest unchecked item."""
     skip = skip or set()

@@ -311,6 +311,8 @@ search recordings by words. Not chosen: phone alerts (keep alerts on the pages).
    `checks` (checked on PostgreSQL), `labeler/checks.py` (kinds take turns, newest first, 30 days).
 5. **Done 2026-10-14**: Phase 24 step 2, results (right N of M per thing and camera, common mistakes, "few checks
    yet" under 10) on the Check page, a Health line "checked by you" and a Reports panel.
+6. **Done 2026-10-14**: Phase 24 step 3, "often wrong" notes (10+ answered, under 70% right): alert rules and scene
+   questions on the Alerts page, vehicle/animal kinds per camera on the Check page; nothing changes by itself.
 
 ## Critical files
 

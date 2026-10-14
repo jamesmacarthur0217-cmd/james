@@ -1758,6 +1758,21 @@ class Database:
                      "correction": c.correction, "at": c.created_at.isoformat(timespec="seconds")}
                     for c in s.scalars(q)]
 
+    def alert_sources(self, ids: list[int]) -> dict[int, dict]:
+        """alert event id -> {"rule_id", "scene_id"} for the alerts that still exist."""
+        if not ids:
+            return {}
+        with self.Session() as s:
+            return {i: {"rule_id": r, "scene_id": q} for i, r, q in s.execute(
+                select(AlertEvent.id, AlertEvent.rule_id, AlertEvent.scene_id).where(AlertEvent.id.in_(ids))).all()}
+
+    def scene_answer_questions(self, ids: list[int]) -> dict[int, int]:
+        """scene answer id -> its question id."""
+        if not ids:
+            return {}
+        with self.Session() as s:
+            return dict(s.execute(select(SceneAnswer.id, SceneAnswer.question_id).where(SceneAnswer.id.in_(ids))).all())
+
     def latest_scene_answers(self) -> list[dict]:
         """Each scene question's newest answer (its picture is the question's last picture), newest first."""
         out = []

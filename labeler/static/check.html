@@ -47,6 +47,7 @@
     <p class="hint">From your answers above. "Not sure" counts neither way; with only a few checks the share can change
       a lot, so it is marked.</p>
     <div id="results"><div class="empty">No checks yet.</div></div>
+    <div id="suggest"></div>
   </section>
 </main>
 <script>
@@ -124,7 +125,11 @@ document.addEventListener("keydown", (e) => {
 async function loadResults() {
   const r = await fetch("/api/check/results");
   if (!r.ok) return;
-  const rows = (await r.json()).rows;
+  const data = await r.json();
+  const rows = data.rows;
+  const kinds = data.flags.kinds;
+  $("suggest").innerHTML = kinds.length ? '<h3 style="font-size:14px;margin:14px 0 6px">Often wrong</h3><ul class="hint">'
+    + kinds.map(k => `<li>${esc(k.text)}</li>`).join("") + "</ul>" : "";
   if (!rows.length) { $("results").innerHTML = '<div class="empty">No checks yet.</div>'; return; }
   const cams = new Set(rows.filter(x => x.camera).map(x => x.camera));
   const shown = rows.filter(x => x.camera === null || cams.size > 1);   // one camera: its rows equal the totals

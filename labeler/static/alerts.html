@@ -15,6 +15,7 @@
   .rule { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
   .rule .what { flex: 1; }
   .rule .what small { color: var(--muted); display: block; }
+  .rule .what small.often { color: var(--warn); }
   .event { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
   .event img { width: 48px; height: 64px; object-fit: cover; border-radius: 6px; background: var(--chip); flex: none; }
   .event small { color: var(--muted); }
@@ -121,12 +122,20 @@ function describe(conds) {
                       : "anyone";
 }
 
+// Notes from the Check page (labeler/checks.py): rules and questions whose alerts or answers were often wrong.
+async function checkFlags() {
+  try { const r = await fetch("/api/check/flags"); return r.ok ? await r.json() : { rules: {}, scene: {} }; }
+  catch { return { rules: {}, scene: {} }; }
+}
+
 async function loadRules() {
   const rules = await (await fetch("/api/alerts/rules")).json();
+  const flags = await checkFlags();
   $("rules").innerHTML = rules.length ? rules.map(r => `
     <div class="rule" data-id="${r.id}">
       <input type="checkbox" class="r-on" ${r.enabled ? "checked" : ""} title="Enabled">
-      <div class="what"><b>${esc(r.name)}</b><small>${esc(describe(r.conditions))} · ${esc(r.camera || "any camera")}</small></div>
+      <div class="what"><b>${esc(r.name)}</b><small>${esc(describe(r.conditions))} · ${esc(r.camera || "any camera")}</small>
+        ${flags.rules[r.id] ? `<small class="often">${esc(flags.rules[r.id])}</small>` : ""}</div>
       <button class="r-del danger-quiet">Delete</button>
     </div>`).join("") : '<div class="empty">No rules yet.</div>';
 }
@@ -163,12 +172,14 @@ async function loadScene() {
   const r = await fetch("/api/scene");
   if (!r.ok) return;
   const qs = await r.json();
+  const flags = await checkFlags();
   $("scene").innerHTML = qs.length ? qs.map(q => {
     const last = q.last_answer ? `last answer: ${esc(q.last_answer)} · ${esc(q.last_at.replace("T", " ").slice(0, 16))}` : "not asked yet";
     return `<div class="rule" data-id="${q.id}">
       <input type="checkbox" class="sq-on" ${q.enabled ? "checked" : ""} title="Enabled">
       <div class="what"><b>${esc(q.question)}</b><small>${esc(q.camera)} · every ${EVERY[q.every_s] || Math.round(q.every_s / 60) + " min"}
-        · alert on ${esc(q.alert_on)} · ${last}</small></div>
+        · alert on ${esc(q.alert_on)} · ${last}</small>
+        ${flags.scene[q.id] ? `<small class="often">${esc(flags.scene[q.id])}: try other words, or check that the camera sees the place well</small>` : ""}</div>
       <button class="sq-del danger-quiet">Delete</button></div>`;
   }).join("") : '<div class="empty">No questions yet.</div>';
 }

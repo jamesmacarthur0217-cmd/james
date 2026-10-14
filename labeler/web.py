@@ -509,7 +509,13 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     @app.get("/api/check/results")
     def check_results():
         from . import checks
-        return {"rows": checks.results(db.list_checks()), "few": checks.FEW}
+        return {"rows": checks.results(db.list_checks()), "few": checks.FEW, "flags": checks.flags(db)}
+
+    @app.get("/api/check/flags")
+    def check_flags():
+        """Rules, scene questions and vehicle/animal kinds often wrong by the checks (notes; nothing changes)."""
+        from . import checks
+        return checks.flags(db)
 
     @app.post("/api/check")
     def check_save(body: CheckIn, request: Request):
