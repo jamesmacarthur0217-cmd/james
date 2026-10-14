@@ -1746,11 +1746,17 @@ class Database:
         with self.Session() as s:
             return dict(s.execute(select(Check.kind, func.count(Check.id)).group_by(Check.kind)).all())
 
-    def list_checks(self) -> list[dict]:
+    def list_checks(self, start: datetime | None = None, end: datetime | None = None) -> list[dict]:
+        """Checks made in [start, end) (all without them), oldest first."""
+        q = select(Check).order_by(Check.id)
+        if start:
+            q = q.where(Check.created_at >= start)
+        if end:
+            q = q.where(Check.created_at < end)
         with self.Session() as s:
             return [{"kind": c.kind, "item_id": c.item_id, "what": c.what, "camera": c.camera, "right": c.verdict,
                      "correction": c.correction, "at": c.created_at.isoformat(timespec="seconds")}
-                    for c in s.scalars(select(Check).order_by(Check.id))]
+                    for c in s.scalars(q)]
 
     def latest_scene_answers(self) -> list[dict]:
         """Each scene question's newest answer (its picture is the question's last picture), newest first."""

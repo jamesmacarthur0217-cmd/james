@@ -94,6 +94,11 @@
     <div class="hbars" id="ani-kinds" style="margin-top:10px"></div>
     <details><summary>Show as a table</summary><div id="ani-table"></div></details>
   </section>
+  <section class="panel" id="checks-panel" style="margin-top:14px" hidden>
+    <h2>Checked by you (Check page)</h2>
+    <p class="hint">Your answers made on these days: how often what the system found was right on your cameras.</p>
+    <div id="checks"></div>
+  </section>
   <section class="panel" id="zones-panel" style="margin-top:14px" hidden>
     <h2>Zones and counting lines</h2>
     <div id="zones"></div>
@@ -286,6 +291,15 @@ function drawAnimals(data) {
       `<tr><td>${esc(label(r.t, v.unit))}</td><td>${r.count}</td></tr>`).join("") + "</table>";
 }
 
+// Checks (labeler/checks.py): right N of M per thing, from the Check page.
+function drawChecks(data) {
+  const rows = data.checks || [];
+  $("checks-panel").hidden = !rows.length;
+  $("checks").innerHTML = '<table class="data"><tr><th></th><th>Right</th><th>Wrong</th><th>Not sure</th></tr>'
+    + rows.map(r => `<tr><td>${esc(r.what)}</td><td>${r.share === null ? "–" : `${r.right} of ${r.right + r.wrong} (${Math.round(r.share * 100)}%)${r.few ? " · few checks yet" : ""}`}</td>
+      <td>${r.wrong}</td><td>${r.unsure}</td></tr>`).join("") + "</table>";
+}
+
 // Areas count entries and the average stay; lines count crossings each way.
 function drawZones(data) {
   const rows = data.zones || [];
@@ -342,6 +356,7 @@ async function load() {
   drawZones(data);
   drawVehicles(data);
   drawAnimals(data);
+  drawChecks(data);
   drawBreakdowns(data);
 }
 

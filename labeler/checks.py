@@ -77,6 +77,53 @@ def candidates(db, kind: str, now: datetime | None = None, clip_for=None) -> lis
     return out
 
 
+# --- results -----------------------------------------------------------------------------------------------------
+
+FEW = 10   # fewer right + wrong answers than this: shown, but marked "few checks yet"
+ALERT_LABELS = {"fall": "fall alerts", "loitering": "loitering alerts", "scene": "scene alerts",
+                "vehicle": "vehicle alerts", "animal": "animal alerts", "person": "person alerts"}
+ORDER = ["vehicles", "animals", "scene answers", *ALERT_LABELS.values()]
+
+
+def label(check: dict) -> str:
+    """What a check measures, in words: "vehicles", "animals", "scene answers", "fall alerts", ..."""
+    if check["kind"] == "alert":
+        return ALERT_LABELS.get(check["what"], "alerts")
+    return {"vehicle": "vehicles", "animal": "animals", "scene": "scene answers"}[check["kind"]]
+
+
+def results(rows: list[dict]) -> list[dict]:
+    """Per measured thing, all cameras first ("camera": None), then each camera: right, wrong, not sure, the share
+    right of those answered right or wrong, and the most common mistakes ("dog -> cat": 3)."""
+    from collections import Counter, defaultdict
+    groups: dict[tuple, list[dict]] = defaultdict(list)
+    for c in rows:
+        groups[(label(c), None)].append(c)
+        groups[(label(c), c["camera"])].append(c)
+    out = []
+    for (what, camera), cs in groups.items():
+        right = sum(c["right"] == "yes" for c in cs)
+        wrong = sum(c["right"] == "no" for c in cs)
+        mistakes = Counter(f"{c['what']} → {c['correction']}" for c in cs if c["right"] == "no" and c["correction"])
+        out.append({"what": what, "camera": camera, "right": right, "wrong": wrong,
+                    "unsure": sum(c["right"] == "unsure" for c in cs),
+                    "share": round(right / (right + wrong), 3) if right + wrong else None, "few": right + wrong < FEW,
+                    "mistakes": [{"what": k, "n": n} for k, n in mistakes.most_common(3)]})
+    rank = {w: i for i, w in enumerate(ORDER)}
+    return sorted(out, key=lambda r: (rank.get(r["what"], 99), r["camera"] is not None, r["camera"] or ""))
+
+
+def summary_line(rows: list[dict]) -> str | None:
+    """One line for the Health page: every thing checked, all cameras together."""
+    parts = []
+    for r in results(rows):
+        if r["camera"] is None and r["right"] + r["wrong"]:
+            n = r["right"] + r["wrong"]
+            parts.append(f"{r['what']} {r['right']} of {n} right" + (" (few checks yet)" if r["few"]
+                                                                     else f" ({r['share']:.0%})"))
+    return "; ".join(parts) or None
+
+
 def next_item(db, skip: set[tuple[str, int]] | None = None, now: datetime | None = None, clip_for=None) -> dict | None:
     """The kind with the fewest checks first (among kinds with something to check), its newest unchecked item."""
     skip = skip or set()

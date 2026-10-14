@@ -340,6 +340,13 @@ def check_scene(cfg: dict, db, now: datetime | None = None) -> dict | None:
     return _check("scene questions", "ok", detail)
 
 
+def check_checks(db) -> dict | None:
+    """Phase 24: what the admins' checks on the Check page say (no line before the first check)."""
+    from . import checks
+    line = checks.summary_line(db.list_checks())
+    return _check("checked by you", "ok", line + " (Check page)") if line else None
+
+
 def check_arming(arming) -> dict:
     """Home / Away (labeler/arming.py): never a problem, but good to see from another device."""
     s = arming.state()
@@ -387,6 +394,12 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
             checks.insert(-1, line)
     except Exception as e:
         checks.insert(-1, _check("vehicles", "warning", f"could not be checked ({e.__class__.__name__})"))
+    try:
+        line = check_checks(db)
+        if line is not None:
+            checks.insert(-1, line)
+    except Exception as e:
+        checks.insert(-1, _check("checked by you", "warning", f"could not be read ({e.__class__.__name__})"))
     try:
         line = check_scene(cfg, db)
         if line is not None:

@@ -309,6 +309,8 @@ search recordings by words. Not chosen: phone alerts (keep alerts on the pages).
    **Phase 23 is done.** Next: Phase 24 ("was this right?"); the user restarts their app first.
 4. **Done 2026-10-14**: Phase 24 step 1, the Check page (Y / N / U / S keys, a correction after "wrong"), table
    `checks` (checked on PostgreSQL), `labeler/checks.py` (kinds take turns, newest first, 30 days).
+5. **Done 2026-10-14**: Phase 24 step 2, results (right N of M per thing and camera, common mistakes, "few checks
+   yet" under 10) on the Check page, a Health line "checked by you" and a Reports panel.
 
 ## Critical files
 

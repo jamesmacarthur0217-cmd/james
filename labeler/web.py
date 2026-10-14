@@ -381,6 +381,12 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
 
     # --- reports -------------------------------------------------------------------------
 
+    def _checked(s, e, camera):
+        """Checks made on these days (the Check page): right N of M per thing; one camera's, or all cameras'."""
+        from . import checks
+        rows = [c for c in db.list_checks(s, e) if not camera or c["camera"] == camera]
+        return [r for r in checks.results(rows) if r["camera"] is None]
+
     @app.get("/api/reports/summary")
     def report_summary(request: Request, start: str | None = None, end: str | None = None,
                        camera: str | None = None):
@@ -390,7 +396,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return {**reports.summarize(db.people_between(s, e, camera), s, e, cfg["engagement"]["looked_s"]),
                 "zones": db.zone_counts(s, e, camera),
                 "vehicles": reports.summarize_vehicles(db.vehicle_rows(s, e, camera), s, e),
-                "animals": reports.summarize_vehicles(db.animal_rows(s, e, camera), s, e)}
+                "animals": reports.summarize_vehicles(db.animal_rows(s, e, camera), s, e),
+                "checks": _checked(s, e, camera)}
 
     @app.get("/api/reports/export.csv")
     def report_csv(request: Request, start: str | None = None, end: str | None = None, camera: str | None = None):
@@ -498,6 +505,11 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             if n.isdigit():
                 skipped.add((kind, int(n)))
         return {"item": checks.next_item(db, skipped, clip_for=_clip_for), "counts": db.check_counts()}
+
+    @app.get("/api/check/results")
+    def check_results():
+        from . import checks
+        return {"rows": checks.results(db.list_checks()), "few": checks.FEW}
 
     @app.post("/api/check")
     def check_save(body: CheckIn, request: Request):

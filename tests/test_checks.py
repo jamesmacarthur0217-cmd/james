@@ -96,3 +96,50 @@ def test_only_admins_check(db, camera, tmp_path):
     viewer.post("/api/login", json={"username": "vic", "password": "correct horse battery"})
     assert viewer.get("/api/check/next").status_code == 403
     assert viewer.get("/check", follow_redirects=False).status_code == 303
+
+
+# --- step 2: results ---
+
+def _c(kind, what, camera, right, correction=None):
+    return {"kind": kind, "what": what, "camera": camera, "right": right, "correction": correction}
+
+
+def test_results_per_thing_and_camera_with_mistakes():
+    rows = [_c("vehicle", "car", "gate", "yes")] * 9 + [_c("vehicle", "car", "gate", "no", "SUV"),
+                                                         _c("vehicle", "bus", "yard", "yes"), _c("vehicle", "car", "gate", "unsure")]
+    rows += [_c("animal", "dog", "gate", "no", "cat"), _c("animal", "dog", "gate", "no", "cat"), _c("animal", "cat", "gate", "yes")]
+    rows += [_c("alert", "fall", "room", "yes"), _c("scene", "no", "gate", "no")]
+    res = {(r["what"], r["camera"]): r for r in checks.results(rows)}
+    v = res[("vehicles", None)]
+    assert (v["right"], v["wrong"], v["unsure"], v["share"], v["few"]) == (10, 1, 1, 0.909, False)
+    assert v["mistakes"] == [{"what": "car → SUV", "n": 1}]
+    assert res[("vehicles", "yard")]["right"] == 1 and res[("vehicles", "yard")]["few"]
+    a = res[("animals", None)]
+    assert (a["right"], a["wrong"], a["mistakes"]) == (1, 2, [{"what": "dog → cat", "n": 2}])
+    assert res[("fall alerts", None)]["share"] == 1.0 and res[("scene answers", None)]["share"] == 0.0
+    order = [r["what"] for r in checks.results(rows) if r["camera"] is None]
+    assert order == ["vehicles", "animals", "scene answers", "fall alerts"]
+    assert checks.summary_line(rows) == ("vehicles 10 of 11 right (91%); animals 1 of 3 right (few checks yet); "
+                                         "scene answers 0 of 1 right (few checks yet); fall alerts 1 of 1 right (few checks yet)")
+    assert checks.summary_line([_c("animal", "dog", "gate", "unsure")]) is None   # only "not sure": nothing to say
+    assert checks.results([]) == []
+
+
+def test_results_on_the_page_health_and_reports(db, camera, tmp_path):
+    from labeler.healthcheck import check_checks
+    ids = _things(db, camera)
+    client = _app(db, tmp_path)
+    assert client.get("/api/check/results").json()["rows"] == [] and check_checks(db) is None
+    client.post("/api/check", json={"kind": "vehicle", "item_id": ids["car"], "right": "yes"})
+    client.post("/api/check", json={"kind": "animal", "item_id": ids["dog"], "right": "no", "correction": "cat"})
+    rows = client.get("/api/check/results").json()["rows"]
+    assert [(r["what"], r["camera"], r["right"], r["wrong"]) for r in rows if r["camera"] is None] == \
+        [("vehicles", None, 1, 0), ("animals", None, 0, 1)]
+    assert check_checks(db)["detail"] == ("vehicles 1 of 1 right (few checks yet); animals 0 of 1 right "
+                                          "(few checks yet) (Check page)")
+    today = datetime.now().strftime("%Y-%m-%d")
+    report = client.get("/api/reports/summary", params={"start": today, "end": today}).json()
+    assert [(r["what"], r["right"]) for r in report["checks"]] == [("vehicles", 1), ("animals", 0)]
+    other_day = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d")
+    assert client.get("/api/reports/summary", params={"start": other_day, "end": other_day}).json()["checks"] == []
+    assert client.get("/api/reports/summary", params={"start": today, "end": today, "camera": "other"}).json()["checks"] == []

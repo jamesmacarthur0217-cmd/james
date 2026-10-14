@@ -37,7 +37,7 @@ The answer key measures people's labels; nothing measures the newer detections o
 1. **Done 2026-10-14** (column `verdict`, not the SQL word `right`). Table `checks` (what: vehicle / animal / fall / loitering alert / scene answer, its id, right yes/no/not sure, by,
    when) and an admin **Check** page: recent items one at a time with their picture (and clip when there is one),
    keyboard Y / N / S like the Answer key page; mixed so every kind gets checked; items already checked skipped.
-2. Results: per kind and camera, "right N of M" (and for vehicles/animals the kind: "it was a cat, not a dog" as an
+2. **Done 2026-10-14.** Results: per kind and camera, "right N of M" (and for vehicles/animals the kind: "it was a cat, not a dog" as an
    optional correction); shown on the Check page, a Health line ("checked: ... right"), and in Reports.
 3. Use the answers where measured gains are possible, only if measured: e.g. a scene question that is often wrong is
    flagged on the Alerts page; an animal kind often wrong on one camera can be turned off there. No automatic retuning.

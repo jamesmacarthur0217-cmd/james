@@ -19,6 +19,10 @@
   .no { border-color: var(--bad); color: var(--bad); }
   .fix { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   .fix button { font-size: 13px; padding: 4px 10px; }
+  table.res { border-collapse: collapse; font-size: 13px; width: 100%; }
+  table.res td, table.res th { border-bottom: 1px solid var(--border); padding: 5px 8px; text-align: left; }
+  table.res td.num, table.res th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.res tr.cam td:first-child { padding-left: 22px; color: var(--muted); }
   .keys kbd { font: 11px ui-monospace, Consolas, monospace; background: var(--chip); padding: 0 4px; border-radius: 4px; }
 </style>
 </head>
@@ -37,6 +41,12 @@
       after "wrong", <kbd>1</kbd>-<kbd>9</kbd> say what it really was (or <kbd>Enter</kbd> to go on without).</p>
     <div id="checker"><div class="empty">Loading…</div></div>
     <p class="muted" id="msg"></p>
+  </section>
+  <section class="panel" style="margin-top:16px">
+    <h2>How often it was right</h2>
+    <p class="hint">From your answers above. "Not sure" counts neither way; with only a few checks the share can change
+      a lot, so it is marked.</p>
+    <div id="results"><div class="empty">No checks yet.</div></div>
   </section>
 </main>
 <script>
@@ -92,6 +102,7 @@ async function save(right, correction) {
     if (!r.ok) { $("msg").textContent = "Could not save: " + ((await r.json().catch(() => ({}))).detail || r.status); return; }
     done++;
     $("msg").textContent = `${done} checked now.`;
+    loadResults();
     await load();
   } finally { busy = false; }
 }
@@ -110,7 +121,25 @@ document.addEventListener("keydown", (e) => {
   if (a) answer(a);
 });
 
+async function loadResults() {
+  const r = await fetch("/api/check/results");
+  if (!r.ok) return;
+  const rows = (await r.json()).rows;
+  if (!rows.length) { $("results").innerHTML = '<div class="empty">No checks yet.</div>'; return; }
+  const cams = new Set(rows.filter(x => x.camera).map(x => x.camera));
+  const shown = rows.filter(x => x.camera === null || cams.size > 1);   // one camera: its rows equal the totals
+  $("results").innerHTML = `<table class="res"><tr><th></th><th class="num">Right</th><th class="num">Wrong</th>
+      <th class="num">Not sure</th><th>Common mistakes</th></tr>` + shown.map(x => {
+    const n = x.right + x.wrong;
+    const share = x.share === null ? "–" : `${x.right} of ${n} (${Math.round(x.share * 100)}%)${x.few ? ' <small class="muted">few checks yet</small>' : ""}`;
+    return `<tr class="${x.camera ? "cam" : ""}"><td>${esc(x.camera || x.what)}</td><td class="num">${share}</td>
+      <td class="num">${x.wrong}</td><td class="num">${x.unsure}</td>
+      <td>${x.mistakes.map(m => `${esc(m.what)}: ${m.n}`).join(", ")}</td></tr>`;
+  }).join("") + "</table>";
+}
+
 load();
+loadResults();
 </script>
 </body>
 </html>
