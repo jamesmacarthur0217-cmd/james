@@ -190,6 +190,7 @@ async function loadToday() {
         "since the last backup", age == null || age > 48 ? "warn" : "")}</a>`;
     }
   }
+  html += `<a href="/summary?period=today">${tile("Summary", "what happened today, last night, while away")}</a>`;
   $("today").innerHTML = html;
   $("today").hidden = false;
   drawArmingTile();

@@ -319,6 +319,8 @@ search recordings by words. Not chosen: phone alerts (keep alerts on the pages).
    viewers too, without clips and camera problems).
 9. **Done 2026-10-14**: Phase 25 step 2, the Summary page (periods, tiles, people, timeline with filters; phone width;
    a "Summary" link in every page's menu, viewers too).
+10. **Done 2026-10-14**: Phase 25 step 3, a "welcome back" note after switching Away -> Home (counts and a link; only
+    for whoever switched; never opens anything) and a Summary tile on the Live page.
 
 ## Critical files
 

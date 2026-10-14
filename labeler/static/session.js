@@ -165,9 +165,37 @@
     try {
       const r = await plainFetch("/api/arming", { method: "POST", headers: { "Content-Type": "application/json" },
                                                    body: JSON.stringify({ mode: to }) });
-      if (r.ok) drawArming(await r.json()); else alert("Could not switch: " + ((await r.json()).detail || r.status));
+      if (r.ok) {
+        drawArming(await r.json());
+        if (to === "home") welcomeBack();
+      } else alert("Could not switch: " + ((await r.json()).detail || r.status));
     } catch { alert("Could not switch: no answer from the app."); }
   };
+
+  // After switching Away -> Home: a note under the header with what happened meanwhile and a link to the Summary
+  // page (labeler/summary.py). Only for whoever switched; it never opens anything by itself; ✕ closes it.
+  async function welcomeBack() {
+    let s = null;
+    try {
+      const r = await plainFetch("/api/summary?period=away");
+      if (r.ok) s = await r.json();
+    } catch {}
+    if (!s || s.none || !s.counts) return;
+    const c = s.counts, parts = [];
+    const add = (n, one, many) => { if (n) parts.push(`${n} ${n === 1 ? one : many}`); };
+    add(c.people, "person", "people"); add(c.vehicles, "vehicle", "vehicles"); add(c.animals, "animal", "animals");
+    add(c.alerts, "alert", "alerts"); add(c.scene_changes, "scene answer changed", "scene answers changed");
+    document.getElementById("welcome")?.remove();
+    const box = document.createElement("div");
+    box.id = "welcome";
+    box.className = "welcome";
+    box.setAttribute("role", "status");
+    box.innerHTML = `<span>Welcome back. ${parts.length ? "While you were away: " + parts.join(", ") + "." : "Nothing happened while you were away."}</span>
+      <a href="/summary?period=away">What happened while you were away?</a><button aria-label="Close">✕</button>`;
+    box.querySelector("button").addEventListener("click", () => box.remove());
+    document.querySelector("header")?.after(box);
+  }
+  window.VL.welcomeBack = welcomeBack;
 
   function addArmingButton() {
     const header = document.querySelector("header");

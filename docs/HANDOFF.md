@@ -405,7 +405,7 @@ fine, the plan's assumption was wrong); old SQLite alert tables rebuilt at start
 they restart their app). Step 3: checks.flags, /api/check/flags, notes (Check page, table checks; results: checks.results/summary_line, Health
 "checked by you", Reports "checks").
 
-**Phase 25 started 2026-10-14**: steps 1-2 done (summary data and API; the Summary page `static/summary.html`, `?period=`).
+**Phase 25 started 2026-10-14**: steps 1-3 done (step 3: session.js welcomeBack) (summary data and API; the Summary page `static/summary.html`, `?period=`).
 
 **Next: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)**, the rest of Phase 25 "while you were away" (approved 2026-10-14): 23 small fixes, 24 "was this right?"
 on the user's cameras, 25 "while you were away" summary, then 16 search recordings by words. Not chosen: phone alerts

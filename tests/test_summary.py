@@ -124,3 +124,14 @@ def test_summary_page_for_admins_and_viewers(db, tmp_path):
     for page in static.glob("*.html"):
         if page.name != "login.html":
             assert 'href="/summary"' in page.read_text(encoding="utf-8"), page.name   # in every page's menu
+
+
+# --- step 3: getting there ---
+
+def test_welcome_back_note_and_live_link():
+    from pathlib import Path
+    static = Path(__file__).resolve().parent.parent / "labeler" / "static"
+    js = (static / "session.js").read_text(encoding="utf-8")
+    assert 'if (to === "home") welcomeBack();' in js                       # only after switching to Home
+    assert '/api/summary?period=away' in js and 'href="/summary?period=away"' in js
+    assert 'href="/summary?period=today"' in (static / "index.html").read_text(encoding="utf-8")

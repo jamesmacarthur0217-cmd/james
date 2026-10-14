@@ -50,7 +50,7 @@ The answer key measures people's labels; nothing measures the newer detections o
    changed, camera problems; from the existing tables, no new data.
 2. **Done 2026-10-14** (also for viewers, as the API). A **Summary** page (admins; viewers get the people-free parts and blurred pictures, as elsewhere) with a timeline
    per camera and the pictures; links to the Recordings page at each moment.
-3. When someone switches Away -> Home, the button offers "What happened while you were away?" (a link, never
+3. **Done 2026-10-14.** When someone switches Away -> Home, the button offers "What happened while you were away?" (a link, never
    automatic); the Live page's Today tiles link to it too.
 4. Tests (periods over midnight, Away periods from the `arming` table, viewer view), real run, docs.
 
