@@ -335,6 +335,9 @@ cameras (when added). The user picks which to keep and the order at the start. A
 1. **Done 2026-10-14**: Phase 27 step 1, a scene question can be about one drawn area (`scene_questions.zone_id`,
    checked on PostgreSQL; `scene.area_picture`, `AREA_WAY = "part"`). `tools/scene_area_check.py` (784 pictures): area
    cut out 94.4% right, outlined in red 90.2% (not kept), whole picture 66.5%. README "Scene questions".
+2. **Done 2026-10-14**: Phase 27 step 2, a scene question can be limited to "only when Away" and/or hours
+   (`scene_questions.only_away`, `.hours`, checked on PostgreSQL; `scene.asked_now`, `limits_since`): not asked outside
+   them, asked at once when they start, answers in a row start afresh; Health does not call it late meanwhile.
 
 ## Critical files
 

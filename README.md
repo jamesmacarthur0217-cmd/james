@@ -494,6 +494,14 @@ Measured (2026-10-14, `tools/scene_area_check.py`, 784 pictures with a known ans
 something is outside the outline (the wall: 37 of 37 wrong). Most cut-out mistakes on COCO are road photos with a piece
 of a car at the cut-out's edge or cars too small to be marked; a few are plain wrong (sky, signs).
 
+**Only when Away, only at some hours.** Like an alert rule, a question can be limited to when the house is set to Away
+(see Home / Away) and/or to some hours ("22-06" = 22:00 until 06:00): "Is the gate open?" at night only, so the family
+going in and out by day gives no alerts. Outside its limits a question is not asked at all (the vision model stays free);
+when its hours start or the house goes Away it is asked at once, and its answers in a row start afresh, so a gate left
+open all day alerts again when the night starts. The Health page does not count the time outside the limits as late.
+Choosing the limits on the Alerts page comes with Phase 27 step 3; until then through `/api/scene` (`only_away`,
+`hours`).
+
 **Settings and Health**: the Settings page has a **Scene questions** section (on/off, answers in a row before an alert,
 1-5). The Health page has a "scene questions" line with the last answers, and a warning when a question has not been
 answered for twice its interval (the vision model busy all the time, or the camera or the vision model down).

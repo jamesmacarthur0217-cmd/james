@@ -243,7 +243,7 @@ def main() -> int:
     threading.Thread(target=backups.loop, args=(cfg, db, app.state.stopping), name="backup", daemon=True).start()
     if worker is not None and cfg["scene"]["enabled"]:
         from labeler.scene import SceneRunner
-        scene_box.append(SceneRunner(db, pipelines, worker, crop_dir, cfg))
+        scene_box.append(SceneRunner(db, pipelines, worker, crop_dir, cfg, arming=arming))
         threading.Thread(target=scene_box[0].loop, args=(app.state.stopping,), name="scene", daemon=True).start()
     if health is not None:
         from labeler.health import health_loop

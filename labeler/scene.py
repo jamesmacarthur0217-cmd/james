@@ -13,6 +13,10 @@ until a different answer has come in between. A failed request is tried again af
 (alert_events with scene_id, no rule) keeps its own copy of the picture (scene_<id>_<time>.jpg: the question's picture
 is replaced at every answer), pops up on every page and gets a clip from the camera, like other alerts.
 
+A question can be limited like an alert rule (Phase 27): only when the house is set to Away, and/or only at some hours
+("22-06"). Outside its limits it is not asked at all, and its answers in a row start again: each night or each Away
+period alerts by itself (the gate left open all day alerts again when the night starts).
+
 Vision model jobs for questions use their own numbers (-(SCENE_BASE + question id)): people's are positive, vehicles'
 are minus the vehicle's number, so they never mix (run.py routes answers by number).
 """
@@ -34,6 +38,28 @@ def job_id(question_id: int) -> int:
 
 def question_of(job: int) -> int | None:
     return -job - SCENE_BASE if job <= -SCENE_BASE else None
+
+
+def asked_now(q: dict, now: datetime, mode: str) -> bool:
+    """Whether a question's limits allow asking it now (mode: Home / Away, labeler/arming.py)."""
+    from .alerts import in_hours
+    from .arming import AWAY
+    if q.get("only_away") and mode != AWAY:
+        return False
+    return not q.get("hours") or in_hours(q["hours"], now.hour)
+
+
+def limits_since(q: dict, now: datetime, away_since: datetime | None) -> datetime | None:
+    """When a question that may be asked now last began to be allowed (its hours started, the house went Away), so it
+    is asked at once then and the Health page does not call it late for the time it was not asked; None without limits."""
+    from datetime import timedelta
+    starts = []
+    if q.get("hours"):
+        start = now.replace(hour=int(q["hours"].split("-")[0]) % 24, minute=0, second=0, microsecond=0)
+        starts.append(start if start <= now else start - timedelta(days=1))
+    if q.get("only_away") and away_since is not None:
+        starts.append(away_since)
+    return max(starts) if starts else None
 
 
 def picture_name(question_id: int) -> str:
@@ -76,8 +102,9 @@ def area_picture(frame, points: list, way: str = "part", margin: float = AREA_MA
 
 class SceneRunner:
     def __init__(self, db, pipelines: list, worker, crop_dir, cfg: dict, clock=datetime.now, mono=time.monotonic,
-                 on_alert=None):
+                 on_alert=None, arming=None):
         self.db, self.pipelines, self.worker, self.crop_dir = db, pipelines, worker, crop_dir
+        self.arming = arming                 # Home / Away (labeler/arming.py), for questions asked only when Away
         self.scfg = cfg["scene"]
         self.cfg_clips = bool(cfg["clips"]["enabled"])
         self.clock, self.mono = clock, mono
@@ -107,14 +134,24 @@ class SceneRunner:
 
     def due(self) -> list[dict]:
         """Enabled questions whose interval has passed since their last answer, oldest answer first."""
+        from .arming import AWAY, HOME
         now, mono = self.clock(), self.mono()
+        state = self.arming.state() if self.arming is not None else {"mode": HOME, "since": None}
+        away_since = datetime.fromisoformat(state["since"]) if state["mode"] == AWAY and state["since"] else None
         out = []
         for q in self.db.list_scene_questions():
             if not q["enabled"] or q["id"] in self.pending:
                 continue
+            if not asked_now(q, now, state["mode"]):
+                self.runs.pop(q["id"], None)       # outside its limits: the next window starts afresh
+                self.alerted.discard(q["id"])
+                continue
             if mono - self.failed_at.get(q["id"], -1e18) < float(self.scfg["retry_after_s"]):
                 continue
             last = datetime.fromisoformat(q["last_at"]) if q["last_at"] else None
+            since = limits_since(q, now, away_since)
+            if last is not None and since is not None and last < since:
+                last = None                        # a new night or Away period: the first answer comes at once
             if last is None or (now - last).total_seconds() >= q["every_s"]:
                 out.append(q)
         return sorted(out, key=lambda q: q["last_at"] or "")

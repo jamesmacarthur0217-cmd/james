@@ -364,6 +364,8 @@ class SceneQuestion(Base):
     last_at: Mapped[datetime | None] = mapped_column(DateTime)
     last_picture: Mapped[str | None] = mapped_column(String(300))
     zone_id: Mapped[int | None] = mapped_column(Integer)                # only this area of the picture (Phase 27)
+    only_away: Mapped[bool | None] = mapped_column(Boolean, default=False)   # asked only when the house is Away
+    hours: Mapped[str | None] = mapped_column(String(5))                # asked only then, e.g. "22-06"
 
 
 class SceneAnswer(Base):
@@ -446,7 +448,7 @@ NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT", "video_path
                           "source_offset_s": "FLOAT"},
                "cameras": {"retention_days": "INTEGER"},
                "zones": {"lying_ok": "BOOLEAN"},
-               "scene_questions": {"zone_id": "INTEGER"},
+               "scene_questions": {"zone_id": "INTEGER", "only_away": "BOOLEAN", "hours": "VARCHAR(5)"},
                "alert_events": {"vehicle_id": "INTEGER", "animal_id": "INTEGER", "scene_id": "INTEGER",
                                 "picture": "TEXT"}}
 # Columns that may be empty now (table, column): an alert can be about a vehicle instead of a person.
@@ -1668,12 +1670,13 @@ class Database:
         return {"id": q.id, "camera": q.camera, "question": q.question, "every_s": q.every_s,
                 "alert_on": q.alert_on, "enabled": q.enabled, "created_at": iso(q.created_at),
                 "last_answer": q.last_answer, "last_at": iso(q.last_at), "last_picture": q.last_picture,
-                "zone_id": q.zone_id}
+                "zone_id": q.zone_id, "only_away": bool(q.only_away), "hours": q.hours or None}
 
     def add_scene_question(self, camera: str, question: str, every_s: int = 300, alert_on: str = "yes",
-                           zone_id: int | None = None) -> dict:
+                           zone_id: int | None = None, only_away: bool = False, hours: str | None = None) -> dict:
         with self.Session.begin() as s:
-            q = SceneQuestion(camera=camera, question=question, every_s=every_s, alert_on=alert_on, zone_id=zone_id)
+            q = SceneQuestion(camera=camera, question=question, every_s=every_s, alert_on=alert_on, zone_id=zone_id,
+                              only_away=only_away, hours=hours or None)
             s.add(q)
             s.flush()
             return self._scene_dict(q)
@@ -1686,7 +1689,7 @@ class Database:
             return [self._scene_dict(x) for x in s.scalars(q)]
 
     def update_scene_question(self, question_id: int, **fields) -> dict | None:
-        allowed = {"enabled", "every_s", "last_answer", "last_at", "last_picture", "zone_id"}
+        allowed = {"enabled", "every_s", "last_answer", "last_at", "last_picture", "zone_id", "only_away", "hours"}
         if set(fields) - allowed:
             raise ValueError(f"not scene question fields: {sorted(set(fields) - allowed)}")
         with self.Session.begin() as s:

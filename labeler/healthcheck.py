@@ -312,9 +312,10 @@ def check_animals(cfg: dict, db, pipelines: list) -> dict | None:
                                    f"({', '.join(acfg.get('kinds') or [])})")
 
 
-def check_scene(cfg: dict, db, now: datetime | None = None) -> dict | None:
+def check_scene(cfg: dict, db, now: datetime | None = None, arming=None) -> dict | None:
     """Scene questions (labeler/scene.py): how many, their last answers, and any that are overdue (not answered in
-    twice their interval: the vision model busy all the time, the camera off, or the vision model down)."""
+    twice their interval: the vision model busy all the time, the camera off, or the vision model down). A question
+    outside its limits (only when Away, hours) is never late: it is not asked then."""
     scfg = cfg.get("scene") or {}
     questions = [q for q in db.list_scene_questions() if q["enabled"]]
     if not scfg.get("enabled"):
@@ -324,13 +325,23 @@ def check_scene(cfg: dict, db, now: datetime | None = None) -> dict | None:
     if not cfg["vlm"].get("enabled"):
         return _check("scene questions", "warning", f"{len(questions)} questions, but the vision model is turned off "
                                                     "(vlm.enabled): none are asked")
+    from .arming import AWAY, HOME
+    from .scene import asked_now, limits_since
     now = now or datetime.now()
+    state = arming.state() if arming is not None else {"mode": HOME, "since": None}
+    away_since = datetime.fromisoformat(state["since"]) if state["mode"] == AWAY and state["since"] else None
 
     def ago(q) -> float:
-        start = q["last_at"] or q["created_at"]
-        return (now - datetime.fromisoformat(start)).total_seconds()
+        return (now - datetime.fromisoformat(q["last_at"] or q["created_at"])).total_seconds()
 
-    late = [q for q in questions if ago(q) > 2 * q["every_s"] + 60]
+    def is_late(q) -> bool:
+        if not asked_now(q, now, state["mode"]):
+            return False
+        start = max(filter(None, [datetime.fromisoformat(q["last_at"] or q["created_at"]),
+                                  limits_since(q, now, away_since)]))
+        return (now - start).total_seconds() > 2 * q["every_s"] + 60
+
+    late = [q for q in questions if is_late(q)]
     answers = "; ".join(f"{q['question']} {q['last_answer'] or 'not asked yet'}"
                         + (f" ({int(ago(q) // 60)} min ago)" if q["last_at"] else "") for q in questions[:3])
     detail = f"{len(questions)} {'question' if len(questions) == 1 else 'questions'}: {answers}"
@@ -401,7 +412,7 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
     except Exception as e:
         checks.insert(-1, _check("checked by you", "warning", f"could not be read ({e.__class__.__name__})"))
     try:
-        line = check_scene(cfg, db)
+        line = check_scene(cfg, db, arming=arming)
         if line is not None:
             checks.insert(-1, line)
     except Exception as e:

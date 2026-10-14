@@ -373,3 +373,97 @@ def test_api_chooses_the_area(db, tmp_path):
     entries = client.get("/api/audit").json()["entries"]
     assert entries[0]["action"] == "zone deleted" and "Is the gate open?" in entries[0]["detail"]
     assert any(e["action"] == "scene question added" and "area gate" in e["detail"] for e in entries)
+
+
+# --- Phase 27 step 2: only when Away, only at some hours ---
+
+from labeler.arming import Arming  # noqa: E402
+from labeler.scene import asked_now, limits_since  # noqa: E402
+
+
+def test_limits_say_when_a_question_is_asked():
+    at = lambda h, m=0: T0.replace(hour=h, minute=m)                           # noqa: E731
+    night = {"hours": "22-06", "only_away": False}
+    assert [asked_now(night, at(h), "home") for h in (21, 22, 3, 6)] == [False, True, True, False]
+    away = {"hours": None, "only_away": True}
+    assert (asked_now(away, at(12), "home"), asked_now(away, at(12), "away")) == (False, True)
+    assert asked_now({"hours": None, "only_away": False}, at(12), "home")
+    assert limits_since(night, at(23, 30), None) == at(22) and limits_since(night, at(3), None) == at(22) - timedelta(days=1)
+    assert limits_since(away, at(12), at(9)) == at(9) and limits_since({"hours": None, "only_away": False}, at(9), None) is None
+    both = {"hours": "08-18", "only_away": True}
+    assert limits_since(both, at(12), at(10)) == at(10) and limits_since(both, at(12), at(7)) == at(8)
+
+
+def test_only_when_away(db, tmp_path):
+    clock = Clock()
+    runner, worker, cam = _runner(db, tmp_path, clock)
+    runner.arming = Arming(db, copy.deepcopy(DEFAULTS), clock=clock)
+    q = db.add_scene_question("gate", "Is the gate open?", 300, only_away=True)
+    assert db.list_scene_questions()[0]["only_away"] is True
+    assert runner.tick() is None and worker.jobs == []                         # Home: not asked
+    runner.arming.set("away", "test")
+    assert runner.tick() == q["id"]
+
+
+def test_hours_and_a_fresh_start_each_night(db, tmp_path):
+    clock = Clock()                                                             # 12:00
+    alerts = []
+    runner, worker, cam = _runner(db, tmp_path, clock, alerts)
+    q = db.add_scene_question("gate", "Is the gate open?", 3600, hours="22-06")
+
+    def ask(answer):
+        cam.scene_frame = (cam.scene_frame[0], clock.now, [])
+        assert runner.tick() == q["id"]
+        runner.on_result(job_id(q["id"]), [{"answer": answer, "seconds": "1"}])
+
+    assert runner.tick() is None                                                # midday: not asked
+    clock.step(10 * 3600)                                                       # 22:00
+    ask("yes")
+    clock.step(3600)
+    ask("yes")
+    assert len(alerts) == 1                                                     # two in a row: the alert
+    clock.step(7 * 3600 - 600)                                                  # 05:50
+    ask("yes")
+    assert len(alerts) == 1                                                     # still open: no new alert
+    clock.step(600)                                                             # 06:00: outside the hours
+    cam.scene_frame = (cam.scene_frame[0], clock.now, [])
+    assert runner.tick() is None
+    clock.step(16 * 3600)                                                       # 22:00 the next night
+    ask("yes")                                                                  # at once, though the last was 16 h ago ...
+    assert len(alerts) == 1
+    clock.step(3600)
+    ask("yes")
+    assert len(alerts) == 2                                                     # ... and a new night alerts again
+
+
+def test_api_sets_the_limits(db, tmp_path):
+    client = _app(db, tmp_path)
+    base = {"camera": "gate", "question": "Is the gate open?"}
+    assert client.post("/api/scene", json={**base, "hours": "25-06"}).status_code == 400
+    assert client.post("/api/scene", json={**base, "hours": "8-8"}).status_code == 400
+    r = client.post("/api/scene", json={**base, "hours": "22 - 06", "only_away": True})
+    assert r.status_code == 200 and (r.json()["hours"], r.json()["only_away"]) == ("22-06", True)
+    qid = r.json()["id"]
+    r = client.patch(f"/api/scene/{qid}", json={"hours": "", "only_away": False})
+    assert (r.json()["hours"], r.json()["only_away"]) == (None, False)
+    assert client.patch(f"/api/scene/{qid}", json={"hours": "x"}).status_code == 400
+    entries = client.get("/api/audit").json()["entries"]
+    assert any("only when Away, hours 22-06" in e["detail"] for e in entries if e["action"] == "scene question added")
+
+
+def test_health_does_not_call_a_resting_question_late(db):
+    from labeler.healthcheck import check_scene
+    cfg = copy.deepcopy(DEFAULTS)
+    now = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    q = db.add_scene_question("gate", "Is the gate open?", 300, hours="22-06")
+    db.update_scene_question(q["id"], last_answer="no", last_at=now - timedelta(hours=6))   # 06:00
+    assert check_scene(cfg, db, now)["level"] == "ok"                          # midday: not asked, not late
+    assert check_scene(cfg, db, now.replace(hour=22, minute=5))["level"] == "ok"   # the night just started
+    assert check_scene(cfg, db, now.replace(hour=22, minute=20))["level"] == "warning"
+    db.update_scene_question(q["id"], hours=None, only_away=True)
+    clock = lambda: now                                                        # noqa: E731
+    arming = Arming(db, cfg, clock=clock)
+    assert check_scene(cfg, db, now, arming)["level"] == "ok"                  # Home: not asked
+    arming.set("away", "test")
+    assert check_scene(cfg, db, now + timedelta(minutes=5), arming)["level"] == "ok"
+    assert check_scene(cfg, db, now + timedelta(minutes=20), arming)["level"] == "warning"
