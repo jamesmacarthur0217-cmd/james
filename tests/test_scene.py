@@ -300,3 +300,76 @@ def test_health_line(db):
     assert "vision model is turned off" in check_scene(cfg, db, now)["detail"]
     cfg["scene"]["enabled"] = False
     assert check_scene(cfg, db, now)["level"] == "off"
+
+
+# --- Phase 27 step 1: one area of the picture ---
+
+from labeler.scene import AREA_WAY, area_picture  # noqa: E402
+from labeler.vlm import PROMPT_SCENE_PART  # noqa: E402
+
+SQUARE = [[0.25, 0.25], [0.75, 0.25], [0.75, 0.75], [0.25, 0.75]]
+
+
+def test_area_picture_cuts_out_the_area_with_a_margin():
+    frame = np.full((100, 200, 3), 200, np.uint8)
+    part = area_picture(frame, SQUARE, "part")
+    assert part.shape == (64, 124, 3)                         # 100x50 area + 10% margin + 2 px each side
+    triangle = area_picture(frame, [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75]], "part")
+    assert triangle[2, 2].tolist() == [200] * 3               # inside (with the margin): as it was
+    assert triangle[-1, -1].tolist() == [70] * 3              # outside the triangle: darkened
+    outline = area_picture(frame, SQUARE, "outline")
+    assert outline.shape == frame.shape and outline[25, 100].tolist() == [0, 0, 255] and outline[50, 100].tolist() == [200] * 3
+    assert frame[25, 100].tolist() == [200] * 3               # the camera's own frame is not drawn on
+
+
+def test_client_asks_about_the_area(monkeypatch):
+    client = VLMClient.__new__(VLMClient)
+    asked = {}
+    monkeypatch.setattr(client, "_chat", lambda prompt, images, fmt: asked.update(prompt=prompt) or {"answer": "no"},
+                        raising=False)
+    assert client.label(np.zeros((50, 80, 3), np.uint8), None, ("scene", "Is the gate open?", "part"))["answer"] == "no"
+    assert asked["prompt"] == PROMPT_SCENE_PART.format(question="Is the gate open?")
+
+
+def test_runner_sends_only_the_area_and_keeps_that_picture(db, tmp_path):
+    clock = Clock()
+    runner, worker, cam = _runner(db, tmp_path, clock)
+    cam.scene_frame = (np.full((100, 200, 3), 90, np.uint8), clock.now, [(60, 30, 80, 50)])
+    z = db.add_zone("gate", "gate", "area", SQUARE)
+    q = db.add_scene_question("gate", "Is the gate open?", 300, zone_id=z["id"])
+    assert db.list_scene_questions()[0]["zone_id"] == z["id"]
+    assert runner.tick() == q["id"]
+    job, frames, mode = worker.jobs[0]
+    assert mode == ("scene", "Is the gate open?", AREA_WAY) and frames[0][0].shape == area_picture(cam.scene_frame[0], SQUARE, AREA_WAY).shape
+    runner.on_result(job, [{"answer": "yes", "seconds": "1"}])
+    import cv2
+    for path in (tmp_path / "scene_1.jpg", tmp_path / "blurred" / "scene_1.jpg"):
+        assert cv2.imread(str(path)).shape == frames[0][0].shape   # the Check page shows what the model saw
+    db.delete_zone(z["id"])                                         # the area is gone: the whole picture again
+    clock.step(300)
+    cam.scene_frame = (cam.scene_frame[0], clock.now, [])
+    assert db.list_scene_questions()[0]["zone_id"] is None
+    assert runner.tick() == q["id"] and worker.jobs[1][2] == ("scene", "Is the gate open?")
+    assert worker.jobs[1][1][0][0].shape == (100, 200, 3)
+
+
+def test_api_chooses_the_area(db, tmp_path):
+    client = _app(db, tmp_path)
+    area = db.add_zone("gate", "gate", "area", SQUARE)
+    line = db.add_zone("gate", "door line", "line", [[0.1, 0.5], [0.9, 0.5]])
+    other = db.add_zone("door", "porch", "area", SQUARE)
+    base = {"camera": "gate", "question": "Is the gate open?"}
+    assert [client.post("/api/scene", json={**base, "zone_id": z["id"]}).status_code
+            for z in (line, other)] == [400, 400]                      # a line, another camera's area
+    r = client.post("/api/scene", json={**base, "zone_id": area["id"]})
+    assert r.status_code == 200 and r.json()["zone_id"] == area["id"]
+    qid = r.json()["id"]
+    assert client.patch(f"/api/scene/{qid}", json={"zone_id": 0}).json()["zone_id"] is None
+    assert client.patch(f"/api/scene/{qid}", json={"zone_id": area["id"]}).json()["zone_id"] == area["id"]
+    assert client.patch(f"/api/scene/{qid}", json={"zone_id": line["id"]}).status_code == 400
+    assert client.patch("/api/scene/999", json={"zone_id": 0}).status_code == 404
+    assert client.delete(f"/api/zones/{area['id']}").status_code == 200
+    assert client.get("/api/scene").json()[0]["zone_id"] is None
+    entries = client.get("/api/audit").json()["entries"]
+    assert entries[0]["action"] == "zone deleted" and "Is the gate open?" in entries[0]["detail"]
+    assert any(e["action"] == "scene question added" and "area gate" in e["detail"] for e in entries)

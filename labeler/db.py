@@ -363,6 +363,7 @@ class SceneQuestion(Base):
     last_answer: Mapped[str | None] = mapped_column(String(10))         # yes | no | unsure
     last_at: Mapped[datetime | None] = mapped_column(DateTime)
     last_picture: Mapped[str | None] = mapped_column(String(300))
+    zone_id: Mapped[int | None] = mapped_column(Integer)                # only this area of the picture (Phase 27)
 
 
 class SceneAnswer(Base):
@@ -445,6 +446,7 @@ NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT", "video_path
                           "source_offset_s": "FLOAT"},
                "cameras": {"retention_days": "INTEGER"},
                "zones": {"lying_ok": "BOOLEAN"},
+               "scene_questions": {"zone_id": "INTEGER"},
                "alert_events": {"vehicle_id": "INTEGER", "animal_id": "INTEGER", "scene_id": "INTEGER",
                                 "picture": "TEXT"}}
 # Columns that may be empty now (table, column): an alert can be about a vehicle instead of a person.
@@ -1381,12 +1383,17 @@ class Database:
             return self._zone_dict(z)
 
     def delete_zone(self, zone_id: int) -> dict | None:
-        """Delete a zone (its counted events stay, under its name). Returns the deleted zone."""
+        """Delete a zone (its counted events stay, under its name). Returns the deleted zone, with "questions": the
+        scene questions that were about it, which now look at the whole picture."""
         with self.Session.begin() as s:
             z = s.get(Zone, zone_id)
             if z is None:
                 return None
             out = self._zone_dict(z)
+            asked = list(s.scalars(select(SceneQuestion).where(SceneQuestion.zone_id == zone_id)))
+            for q in asked:
+                q.zone_id = None
+            out["questions"] = [q.question for q in asked]
             s.delete(z)
             return out
 
@@ -1660,11 +1667,13 @@ class Database:
         iso = lambda d: d.isoformat(timespec="seconds") if d else None   # noqa: E731
         return {"id": q.id, "camera": q.camera, "question": q.question, "every_s": q.every_s,
                 "alert_on": q.alert_on, "enabled": q.enabled, "created_at": iso(q.created_at),
-                "last_answer": q.last_answer, "last_at": iso(q.last_at), "last_picture": q.last_picture}
+                "last_answer": q.last_answer, "last_at": iso(q.last_at), "last_picture": q.last_picture,
+                "zone_id": q.zone_id}
 
-    def add_scene_question(self, camera: str, question: str, every_s: int = 300, alert_on: str = "yes") -> dict:
+    def add_scene_question(self, camera: str, question: str, every_s: int = 300, alert_on: str = "yes",
+                           zone_id: int | None = None) -> dict:
         with self.Session.begin() as s:
-            q = SceneQuestion(camera=camera, question=question, every_s=every_s, alert_on=alert_on)
+            q = SceneQuestion(camera=camera, question=question, every_s=every_s, alert_on=alert_on, zone_id=zone_id)
             s.add(q)
             s.flush()
             return self._scene_dict(q)
@@ -1677,7 +1686,7 @@ class Database:
             return [self._scene_dict(x) for x in s.scalars(q)]
 
     def update_scene_question(self, question_id: int, **fields) -> dict | None:
-        allowed = {"enabled", "every_s", "last_answer", "last_at", "last_picture"}
+        allowed = {"enabled", "every_s", "last_answer", "last_at", "last_picture", "zone_id"}
         if set(fields) - allowed:
             raise ValueError(f"not scene question fields: {sorted(set(fields) - allowed)}")
         with self.Session.begin() as s:

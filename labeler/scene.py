@@ -1,10 +1,10 @@
-"""Scene questions: yes/no questions the vision model answers about a camera's whole picture every few minutes.
+"""Scene questions: yes/no questions the vision model answers about a camera's picture every few minutes.
 
 An admin writes them on the Alerts page ("Is the gate open?", "Is there a car in the driveway?"; table
 scene_questions). Every `scene.check_every_s` the runner looks for a question that is due (its interval, 5 minutes by
 default, since the last answer) and sends the camera's latest clean picture (no boxes or labels; Pipeline.scene_frame)
-to the vision model, but only while it has nothing else to do: people and vehicles always go first, and only one
-question is out at a time. The answer is "yes", "no" or "unsure"; it is stored (scene_answers) with the time it took,
+to the vision model (or only one area of it, drawn on the Live page: area_picture), but only while it has nothing
+else to do: people and vehicles always go first, and only one question is out at a time. The answer is "yes", "no" or "unsure"; it is stored (scene_answers) with the time it took,
 and the picture is kept as scene_<id>.jpg (with a copy for viewers in which people's faces are blurred).
 
 An alert comes when `answers_in_a_row` answers in a row (2, the user's choice) are the one the question alerts on
@@ -40,6 +40,40 @@ def picture_name(question_id: int) -> str:
     return f"scene_{question_id}.jpg"
 
 
+# How an area is shown to the vision model. Measured with tools/scene_area_check.py (2026-10-14, 784 items): the area
+# cut out 94.4% right, outlined in red on the whole picture 90.2% (it still answers about the whole picture: someone
+# lying outside the area, 37 of 37 wrong), the whole picture as before 66.5%. "outline" is kept for that tool only.
+AREA_WAY = "part"
+AREA_MARGIN = 0.1   # of the area's size, each side: a gate's posts or a car's bumper just outside the line still show
+
+
+def area_picture(frame, points: list, way: str = "part", margin: float = AREA_MARGIN):
+    """The picture sent for a question about one area (points: an area's polygon, fractions of the frame).
+
+    "part": the area's box with a margin is cut out, and what lies outside the polygon within it is darkened, so the
+    area keeps its full detail (a gate is a small part of a wide picture, which is shrunk to 1024 px when sent whole).
+    "outline": the whole picture with the area outlined in red (the prompt says to look only inside it).
+    """
+    import cv2
+    import numpy as np
+    h, w = frame.shape[:2]
+    poly = np.array([[round(x * w), round(y * h)] for x, y in points], dtype=np.int32)
+    if way == "outline":
+        out = frame.copy()
+        cv2.polylines(out, [poly], True, (0, 0, 255), max(3, round(max(h, w) / 250)), cv2.LINE_AA)
+        return out
+    x1, y1 = poly.min(axis=0)
+    x2, y2 = poly.max(axis=0)
+    mx, my = round((x2 - x1) * margin) + 2, round((y2 - y1) * margin) + 2
+    x1, y1, x2, y2 = max(0, x1 - mx), max(0, y1 - my), min(w, x2 + mx), min(h, y2 + my)
+    out = frame[y1:y2, x1:x2].copy()
+    mask = np.zeros(out.shape[:2], np.uint8)
+    cv2.fillPoly(mask, [poly - [x1, y1]], 255)
+    mask = cv2.dilate(mask, np.ones((2 * my + 1, 2 * mx + 1), np.uint8))   # the margin stays bright too
+    out[mask == 0] = (out[mask == 0] * 0.35).astype(out.dtype)
+    return out
+
+
 class SceneRunner:
     def __init__(self, db, pipelines: list, worker, crop_dir, cfg: dict, clock=datetime.now, mono=time.monotonic,
                  on_alert=None):
@@ -49,7 +83,7 @@ class SceneRunner:
         self.clock, self.mono = clock, mono
         self.on_alert = on_alert            # (question, picture name) -> None; step 3 makes it an alert
         self._lock = threading.Lock()
-        self.pending: dict[int, tuple[float, object, list]] = {}   # question -> (sent at, frame, heads)
+        self.pending: dict[int, tuple] = {}   # question -> (sent at, frame, heads, area points or None)
         self.failed_at: dict[int, float] = {}
         self.runs: dict[int, int] = {}       # question -> matching answers in a row
         self.alerted: set[int] = set()       # questions whose current run already alerted
@@ -63,6 +97,13 @@ class SceneRunner:
         if got is None or (self.clock() - got[1]).total_seconds() > float(self.scfg["frame_max_age_s"]):
             return None
         return got
+
+    def _area(self, q: dict) -> list | None:
+        """The points of the area a question is about, or None for the whole picture."""
+        if not q.get("zone_id"):
+            return None
+        z = next((z for z in self.db.list_zones(q["camera"]) if z["id"] == q["zone_id"]), None)
+        return z["points"] if z is not None and z["kind"] == "area" else None
 
     def due(self) -> list[dict]:
         """Enabled questions whose interval has passed since their last answer, oldest answer first."""
@@ -87,9 +128,12 @@ class SceneRunner:
             if got is None:
                 continue   # the camera has no recent picture (off, or not running)
             frame, _, heads = got
+            area = self._area(q)
+            picture = frame if area is None else area_picture(frame, area, AREA_WAY)
+            mode = ("scene", q["question"]) if area is None else ("scene", q["question"], AREA_WAY)
             with self._lock:
-                self.pending[q["id"]] = (self.mono(), frame, heads)
-            if self.worker.submit(job_id(q["id"]), [(frame, None)], ("scene", q["question"])):
+                self.pending[q["id"]] = (self.mono(), frame, heads, area)
+            if self.worker.submit(job_id(q["id"]), [(picture, None)], mode):
                 return q["id"]
             with self._lock:
                 self.pending.pop(q["id"], None)
@@ -157,13 +201,14 @@ class SceneRunner:
     def _save_picture(self, qid: int, sent) -> str | None:
         import cv2
         from . import privacy
-        _, frame, heads = sent
+        _, frame, heads, area = sent
+        shown = (lambda f: f) if area is None else (lambda f: area_picture(f, area, AREA_WAY))   # what the model saw
         name = picture_name(qid)
         try:
-            cv2.imwrite(str(self.crop_dir / name), frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            cv2.imwrite(str(self.crop_dir / name), shown(frame), [cv2.IMWRITE_JPEG_QUALITY, 85])
             path = privacy.blurred_path(self.crop_dir, name)
             path.parent.mkdir(parents=True, exist_ok=True)
-            cv2.imwrite(str(path), privacy.blur_boxes(frame, heads), [cv2.IMWRITE_JPEG_QUALITY, 85])
+            cv2.imwrite(str(path), shown(privacy.blur_boxes(frame, heads)), [cv2.IMWRITE_JPEG_QUALITY, 85])
             return name
         except Exception:
             log.exception("scene question: could not save the picture")

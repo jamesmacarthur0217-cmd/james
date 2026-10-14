@@ -324,12 +324,17 @@ search recordings by words. Not chosen: phone alerts (keep alerts on the pages).
 11. **Done 2026-10-14**: Phase 25 step 4, README "What happened (Summary)". **Phase 25 is done.** Next: Phase 16
     (search recordings by words), the last of this plan; ask the user first.
 
-## Phases 26-29: real-camera week, scene question areas, maintenance, more cameras (approved 2026-10-14, not started)
+## Phases 26-29: real-camera week, scene question areas, maintenance, more cameras (approved 2026-10-14; Phase 27 started)
 
 **Plan: [PHASE26-29-PLAN.md](PHASE26-29-PLAN.md)**: after Phase 16 (search recordings by words): 26 a real-camera week
 with the user (Check page numbers, measured changes per camera), 27 scene questions on one area and only when Away /
 at some hours, 28 maintenance (Ubuntu 26 runner, httpx warning, security updates, the old remote-camera.zip), 29 more
 cameras (when added). The user picks which to keep and the order at the start. Ask before each phase and each step.
+
+2026-10-14: the user skipped Phase 16 for now and chose Phase 27 first.
+1. **Done 2026-10-14**: Phase 27 step 1, a scene question can be about one drawn area (`scene_questions.zone_id`,
+   checked on PostgreSQL; `scene.area_picture`, `AREA_WAY = "part"`). `tools/scene_area_check.py` (784 pictures): area
+   cut out 94.4% right, outlined in red 90.2% (not kept), whole picture 66.5%. README "Scene questions".
 
 ## Critical files
 

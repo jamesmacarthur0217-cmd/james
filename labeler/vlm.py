@@ -101,6 +101,16 @@ PROMPT_SCENE = """This is one picture from a camera at a home or a shop. Answer 
 "yes" or "no". Say "unsure" only if the picture does not show enough to tell (too dark, blurred, or the place asked
 about is not in view).
 Question: {question}"""
+# A question about one area of the picture (Phase 27): the area cut out ("part") or outlined on the whole picture.
+PROMPT_SCENE_PART = """This is part of a picture from a camera at a home or a shop: the area the question is about. Answer the
+question about this area with "yes" or "no". Say "unsure" only if the picture does not show enough to tell (too dark,
+blurred, or the place asked about is not in view).
+Question: {question}"""
+PROMPT_SCENE_OUTLINE = """This is one picture from a camera at a home or a shop. The question is only about the area inside the
+red outline: ignore everything outside it. Answer with "yes" or "no". Say "unsure" only if the picture does not show
+enough to tell (too dark, blurred, or the place asked about is not in view).
+Question: {question}"""
+SCENE_PROMPTS = {"whole": PROMPT_SCENE, "part": PROMPT_SCENE_PART, "outline": PROMPT_SCENE_OUTLINE}
 
 
 def scene_schema() -> dict:
@@ -158,7 +168,8 @@ class VLMClient:
         if mode == "vehicle":
             return self._retry(lambda: self._label_vehicle(person))
         if isinstance(mode, tuple) and mode[0] == "scene":
-            return self._retry(lambda: self._ask_scene(person, mode[1]))
+            way = mode[2] if len(mode) > 2 else "whole"
+            return self._retry(lambda: self._ask_scene(person, mode[1], way))
         return self._retry(lambda: self._label(person, face, mode or self.mode))
 
     def _retry(self, call):
@@ -186,9 +197,9 @@ class VLMClient:
         r.raise_for_status()
         return json.loads(r.json()["message"]["content"])
 
-    def _ask_scene(self, picture: np.ndarray, question: str) -> dict[str, str]:
+    def _ask_scene(self, picture: np.ndarray, question: str, way: str = "whole") -> dict[str, str]:
         started = time.monotonic()
-        answer = clean_scene(self._chat(PROMPT_SCENE.format(question=question), [_b64(picture, SCENE_SIDE)],
+        answer = clean_scene(self._chat(SCENE_PROMPTS[way].format(question=question), [_b64(picture, SCENE_SIDE)],
                                         scene_schema()))
         return {"answer": answer, "seconds": f"{time.monotonic() - started:.2f}"}
 

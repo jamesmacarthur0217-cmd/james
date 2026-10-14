@@ -60,6 +60,7 @@ class SceneIn(BaseModel):
     question: str
     every_min: int = 5
     alert_on: str = "yes"
+    zone_id: int | None = None    # only this area of the picture (an area drawn on the Live page)
 
 
 class CheckIn(BaseModel):
@@ -72,6 +73,7 @@ class CheckIn(BaseModel):
 class SceneUpdate(BaseModel):
     enabled: bool | None = None
     every_min: int | None = None
+    zone_id: int | None = None    # 0 = the whole picture again
 
 
 class ZoneIn(BaseModel):
@@ -540,6 +542,12 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             raise HTTPException(400, "ask every 1 to 60 minutes")
         return minutes * 60
 
+    def _scene_area(camera: str, zone_id: int) -> dict:
+        z = next((z for z in db.list_zones(camera) if z["id"] == zone_id), None)
+        if z is None or z["kind"] != "area":
+            raise HTTPException(400, f"camera {camera} has no area #{zone_id}")
+        return z
+
     @app.get("/api/scene")
     def scene_list():
         return db.list_scene_questions()
@@ -554,9 +562,12 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             raise HTTPException(400, "the question needs 5 to 200 characters, e.g. Is the gate open?")
         if body.alert_on not in ("yes", "no"):
             raise HTTPException(400, "alert when the answer is yes or no")
-        q = db.add_scene_question(body.camera, text, _scene_every(body.every_min), body.alert_on)
+        area = _scene_area(body.camera, body.zone_id) if body.zone_id else None
+        q = db.add_scene_question(body.camera, text, _scene_every(body.every_min), body.alert_on,
+                                  area["id"] if area else None)
         audit(request, "scene question added", f"{body.camera}: {text} (every {body.every_min} min, "
-                                               f"alert on {body.alert_on})")
+                                               f"alert on {body.alert_on}"
+                                               + (f", area {area['name']}" if area else "") + ")")
         return q
 
     @app.patch("/api/scene/{question_id}")
@@ -566,6 +577,11 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             fields["enabled"] = body.enabled
         if body.every_min is not None:
             fields["every_s"] = _scene_every(body.every_min)
+        if body.zone_id is not None:
+            old = next((q for q in db.list_scene_questions() if q["id"] == question_id), None)
+            if old is None:
+                raise HTTPException(404, "question not found")
+            fields["zone_id"] = _scene_area(old["camera"], body.zone_id)["id"] if body.zone_id else None
         q = db.update_scene_question(question_id, **fields)
         if q is None:
             raise HTTPException(404, "question not found")
@@ -642,7 +658,9 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             raise HTTPException(404, "zone not found")
         if zone["camera"] in by_name:
             by_name[zone["camera"]].reload_zones()
-        audit(request, "zone deleted", f"{zone['kind']} {zone['name']!r} on camera {zone['camera']}")
+        audit(request, "zone deleted", f"{zone['kind']} {zone['name']!r} on camera {zone['camera']}"
+                                       + (f" (scene questions now about the whole picture: {'; '.join(zone['questions'])})"
+                                          if zone["questions"] else ""))
         return {"ok": True}
 
     @app.get("/api/zones/counts")

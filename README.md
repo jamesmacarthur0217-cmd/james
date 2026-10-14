@@ -441,7 +441,7 @@ false alarms: most broken tracks are not re-linked on security cameras).
 
 ## Scene questions
 
-A yes/no question about a camera's whole picture, which the vision model answers every few minutes: "Is the gate
+A yes/no question about a camera's picture (or one area of it), which the vision model answers every few minutes: "Is the gate
 open?", "Is there a car in the driveway?", "Are the lights on?". Admins write them on the Alerts page (**Scene
 questions**: camera, question, every 1 minute to 1 hour, 5 minutes by default; alert when the answer is yes, or no for
 a question like "Is the gate closed?"). A question is asked only when the vision model has nothing else to do (people
@@ -470,6 +470,29 @@ close to the floor. Someone lying down on purpose (on a bed or the floor; the ma
 this overstates how often two wrong answers come together. Not measured (no such footage here): smoke or fire, an
 open gate, lights, night pictures, your own cameras: try a question for a day and look at its answers on the Alerts
 page before relying on it.
+
+**One area of the picture.** A question can be about one area drawn on the Live page (a gate, a driveway) instead of
+the whole picture: only that area, with a margin of a tenth of its size, goes to the vision model (the rest of the
+cut-out darkened), and the stored picture is that cut-out. A gate is a small part of a wide picture, and a car parked
+in the street must not answer "Is there a car in the driveway?". If the area is deleted, its questions go back to the
+whole picture (the audit log says which). Choosing the area on the Alerts page comes with Phase 27 step 3; until then
+it is set through `/api/scene` (`zone_id`).
+
+Measured (2026-10-14, `tools/scene_area_check.py`, 784 pictures with a known answer for an area; nothing tuned on them):
+
+| Pictures | Whole picture (before) | Area cut out (used) | Area outlined in red |
+|---|---|---|---|
+| COCO photos, area around a car: "Is there a car?" (150) | 149 right | 148 | 146 |
+| COCO photos, area without a car, a car elsewhere (150) | 1 | 117 (10 unsure) | 124 |
+| MOT16-04 street: the parked car's spot / the walkway / the bicycle stand (35 each) | 35 / 0 / 0 | 35 / 35 / 34 | 35 / 35 / 33 |
+| MOT16-13: far, small cars, area 3x their size (28) | 28 | 28 | 28 |
+| UR Fall, the floor: lying after a fall / not lying (37 / 277) | 37 / 271 | 37 / 269 | 37 / 269 |
+| UR Fall, the wall, someone lying on the floor below it (37) | 0 | 37 | 0 |
+| **All** | **66.5%** | **94.4%** | **90.2%** |
+
+0.6 s per answer either way. The red outline was not kept: the model still answers about the whole picture when
+something is outside the outline (the wall: 37 of 37 wrong). Most cut-out mistakes on COCO are road photos with a piece
+of a car at the cut-out's edge or cars too small to be marked; a few are plain wrong (sky, signs).
 
 **Settings and Health**: the Settings page has a **Scene questions** section (on/off, answers in a row before an alert,
 1-5). The Health page has a "scene questions" line with the last answers, and a warning when a question has not been
