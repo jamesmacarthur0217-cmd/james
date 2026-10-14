@@ -367,8 +367,8 @@ at 0.5 (0.4 not worth it); 0 false on MOT16, 3 on UR Fall (a person crawling). P
 (left) next to the color picture (right): use the right half. Tried, not kept: ignoring animal boxes that are a found
 person. All new tables/columns checked on scratch PostgreSQL databases. Not measured: the user's camera, night pictures.
 
-**Phase 22 (scene questions) started 2026-10-15**: step 1 done (tables `scene_questions`/`scene_answers`, `/api/scene`
-(admins, audited), Alerts page box). Docker was off at the start of 2026-10-15 (PC restarted): a database check hung
+**Phase 22 (scene questions) started 2026-10-14**: step 1 done (tables `scene_questions`/`scene_answers`, `/api/scene`
+(admins, audited), Alerts page box). Docker was off again later on 2026-10-14 (PC restarted): a database check hung
 until it was started (pitfall 11).
 
 **Next: the rest of Phase 22 (scene questions)** in [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md). Its opening questions are

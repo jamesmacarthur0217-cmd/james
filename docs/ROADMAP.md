@@ -283,8 +283,8 @@ Phase 21 started 2026-10-14 (user's choices: dogs, cats and birds; security came
 5. **Done 2026-10-14**: Settings (Animals section and column), Health "animals" line, docs. **Phase 21 is done.**
    Next: Phase 22 (scene questions); ask the user first.
 
-Phase 22 started 2026-10-15 (user's choices: every 5 minutes by default; alert after two answers in a row).
-1. **Done 2026-10-15**: tables `scene_questions`, `scene_answers` (checked on PostgreSQL; answers kept like the audit
+Phase 22 started 2026-10-14 (user's choices: every 5 minutes by default; alert after two answers in a row).
+1. **Done 2026-10-14**: tables `scene_questions`, `scene_answers` (checked on PostgreSQL; answers kept like the audit
    log), admin API `/api/scene`, "Scene questions" box on the Alerts page.
 
 ## Critical files
