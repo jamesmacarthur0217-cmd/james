@@ -802,6 +802,36 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         stop()
         return {"ok": True}
 
+    @app.get("/api/summary")
+    def summary_api(request: Request, period: str | None = None, start: str | None = None, end: str | None = None):
+        """What happened: period away / night / today, or start and end (2026-10-14T18:00). Viewers: no clips and
+        no camera problems (labeler/summary.py)."""
+        from . import summary
+        now = datetime.now()
+        if start or end:
+            try:
+                s = datetime.fromisoformat(start) if start else now - timedelta(days=1)
+                e = datetime.fromisoformat(end) if end else now
+            except ValueError:
+                raise HTTPException(400, "start and end look like 2026-10-14T18:00")
+            if e <= s:
+                raise HTTPException(400, "the end must be after the start")
+            if e - s > timedelta(days=31):
+                raise HTTPException(400, "at most 31 days at once")
+            name = "custom"
+        else:
+            name = period or "away"
+            try:
+                got = summary.period(db, name, now)
+            except ValueError as err:
+                raise HTTPException(400, str(err))
+            if got is None:
+                return {"period": name, "none": "never switched to Away yet"}
+            s, e = got
+        admin = (getattr(request.state, "user", None) or {}).get("role") == "admin"
+        return {"period": name, **summary.build(db, s, e, admin=admin,
+                                               clip_for=lambda i: _clip_for(i) if admin else None)}
+
     @app.get("/api/today")
     def today_summary(request: Request):
         """Today at a glance (labeler/today.py); viewers get the people numbers only."""

@@ -118,6 +118,9 @@ labeler/scene.py     scene questions (Phase 22): SceneRunner (run.py thread "sce
 labeler/checks.py    "was this right?" (Phase 24): candidates per kind (vehicle, animal, alert, scene answer; 30 days,
                      newest first), next_item (the kind with fewest checks first), table checks (verdict yes/no/
                      unsure, correction), /check page + /api/check/next, POST /api/check (admins)
+labeler/summary.py   what happened in a period (Phase 25): away_period from the arming history, night 18-08, today;
+                     build(): people, vehicles, animals, alerts, scene answers that changed, camera problems, one
+                     timeline; /api/summary (viewers: no clips, no camera problems)
 labeler/settings.py  Settings page: data/settings.yaml merged over config.yaml in load_config (only the
                      project's config.yaml, or a config naming settings_file:); validated; masked passwords;
                      POST /api/restart → exit 4 → supervisor restarts at once (VL_SUPERVISED=1 from it)
@@ -402,7 +405,9 @@ fine, the plan's assumption was wrong); old SQLite alert tables rebuilt at start
 they restart their app). Step 3: checks.flags, /api/check/flags, notes (Check page, table checks; results: checks.results/summary_line, Health
 "checked by you", Reports "checks").
 
-**Next: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)**, Phase 25 "while you were away" (approved 2026-10-14): 23 small fixes, 24 "was this right?"
+**Phase 25 started 2026-10-14**: step 1 done (summary data and API).
+
+**Next: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)**, the rest of Phase 25 "while you were away" (approved 2026-10-14): 23 small fixes, 24 "was this right?"
 on the user's cameras, 25 "while you were away" summary, then 16 search recordings by words. Not chosen: phone alerts
 (don't offer again unless asked). Ask before each phase and each step. Before Phase 24 the user restarts their app. Its opening questions are
 already answered (2026-10-14): every 5 minutes by default, alert after two "yes" in a row. Ask the user before starting

@@ -1,4 +1,4 @@
-# Phases 23-25 (+16) plan: small fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phases 23-24 done)
+# Phases 23-25 (+16) plan: small fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phases 23-24 done, 25 started)
 
 ## Context
 
@@ -45,7 +45,7 @@ The answer key measures people's labels; nothing measures the newer detections o
 
 ## Phase 25: "While you were away" summary
 
-1. `labeler/summary.py`: for a period (from the last switch to Away until now, or "last night", "today", a chosen
+1. **Done 2026-10-14.** `labeler/summary.py`: for a period (from the last switch to Away until now, or "last night", "today", a chosen
    range): people (count, pictures of the first few), vehicles, animals, alerts (all kinds), scene answers that
    changed, camera problems; from the existing tables, no new data.
 2. A **Summary** page (admins; viewers get the people-free parts and blurred pictures, as elsewhere) with a timeline

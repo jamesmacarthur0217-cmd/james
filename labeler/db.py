@@ -1240,7 +1240,11 @@ class Database:
                     "animal_id": animal_id, "camera": camera, "message": message,
                     "created_at": e.created_at.isoformat(timespec="seconds")}
 
-    def list_alerts(self, since_id: int = 0, limit: int = 50) -> list[dict]:
+    def list_alerts(self, since_id: int = 0, limit: int = 50, start: datetime | None = None,
+                    end: datetime | None = None) -> list[dict]:
+        """Newest first; start/end: only alerts made in [start, end) (the summary, labeler/summary.py)."""
+        when = [AlertEvent.created_at >= start] if start else []
+        when += [AlertEvent.created_at < end] if end else []
         with self.Session() as s:
             rows = s.execute(select(AlertEvent, Track.crop_path, Vehicle.crop_path, Animal.crop_path, AlertRule.conditions)
                              .outerjoin(Track, Track.id == AlertEvent.track_id)
@@ -1248,7 +1252,7 @@ class Database:
                              .outerjoin(Animal, Animal.id == AlertEvent.animal_id)
                              .outerjoin(AlertRule, AlertRule.id == AlertEvent.rule_id)
                              .where(AlertEvent.id > since_id, (Track.id.is_not(None)) | (Vehicle.id.is_not(None))
-                                    | (Animal.id.is_not(None)) | (AlertEvent.scene_id.is_not(None)))
+                                    | (Animal.id.is_not(None)) | (AlertEvent.scene_id.is_not(None)), *when)
                              .order_by(AlertEvent.id.desc()).limit(limit)).all()
             return [{"id": e.id, "rule_id": e.rule_id, "track_id": e.track_id, "vehicle_id": e.vehicle_id,
                      "animal_id": e.animal_id, "scene_id": e.scene_id, "camera": e.camera, "message": e.message,
@@ -1256,6 +1260,9 @@ class Database:
                      "created_at": e.created_at.isoformat(timespec="seconds"),
                      "fall": any(n == "fallen" for n, _ in json.loads(conds or "[]"))}
                     for e, tcrop, vcrop, acrop, conds in rows]
+
+    def alerts_between(self, start: datetime, end: datetime) -> list[dict]:
+        return self.list_alerts(limit=1000, start=start, end=end)
 
     def latest_alert_id(self) -> int:
         from sqlalchemy import func
@@ -1531,6 +1538,14 @@ class Database:
             return [self._camera_event_dict(e) for e in
                     s.scalars(select(CameraEvent).order_by(CameraEvent.id.desc()).limit(limit))]
 
+    def camera_events_between(self, start: datetime, end: datetime) -> list[dict]:
+        """Camera problems that were going on at some time in [start, end), oldest first."""
+        with self.Session() as s:
+            return [self._camera_event_dict(e) for e in s.scalars(
+                select(CameraEvent).where(CameraEvent.started_at < end,
+                                          (CameraEvent.ended_at.is_(None)) | (CameraEvent.ended_at >= start))
+                .order_by(CameraEvent.started_at))]
+
     def cleanup_camera_events(self, retention_days: int) -> int:
         if retention_days <= 0:
             return 0
@@ -1714,6 +1729,23 @@ class Database:
             return [{"answer": a.answer, "at": a.at.isoformat(timespec="seconds"), "seconds": a.seconds}
                     for a in s.scalars(select(SceneAnswer).where(SceneAnswer.question_id == question_id)
                                        .order_by(SceneAnswer.at.desc(), SceneAnswer.id.desc()).limit(limit))]
+
+    def scene_answer_history(self, start: datetime, end: datetime) -> list[dict]:
+        """Per question: its answers in [start, end) oldest first, and "before": its last yes/no answer before."""
+        out = []
+        with self.Session() as s:
+            for q in s.scalars(select(SceneQuestion).order_by(SceneQuestion.id)):
+                answers = s.scalars(select(SceneAnswer).where(SceneAnswer.question_id == q.id, SceneAnswer.at >= start,
+                                                              SceneAnswer.at < end)
+                                    .order_by(SceneAnswer.at, SceneAnswer.id)).all()
+                if not answers:
+                    continue
+                before = s.scalars(select(SceneAnswer.answer).where(
+                    SceneAnswer.question_id == q.id, SceneAnswer.at < start, SceneAnswer.answer != "unsure")
+                    .order_by(SceneAnswer.at.desc(), SceneAnswer.id.desc()).limit(1)).first()
+                out.append({"id": q.id, "question": q.question, "camera": q.camera, "before": before,
+                            "answers": [{"answer": a.answer, "at": a.at.isoformat(timespec="seconds")} for a in answers]})
+        return out
 
     def cleanup_scene_answers(self, retention_days: int) -> int:
         if retention_days <= 0:
