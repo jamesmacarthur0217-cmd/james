@@ -76,6 +76,10 @@ DEFAULTS: dict = {
     "animals": {"enabled": True, "kinds": ["dog", "cat", "bird"], "min_frames": 5, "lost_after_s": 4.0,
                 "parked_after_s": 60.0, "parked_memory_s": 3600.0, "move_ratio": 0.2, "still_s": 5.0,
                 "still_memory_s": 120.0, "describe_after_s": 5.0},
+    # Scene questions (labeler/scene.py): checked every check_every_s; an alert after answers_in_a_row answers that
+    # match (the user's choice: 2, against single wrong answers). New questions are asked every 5 minutes by default.
+    "scene": {"enabled": True, "check_every_s": 10, "answers_in_a_row": 2, "frame_every_s": 2.0, "frame_max_age_s": 30,
+              "retry_after_s": 60},
     # Fall alerts (labeler/falls.py): upright -> lying within drop_s, the head down min_drop of standing height,
     # then down for after_s. Per camera: cameras[].fall_alert (default on). Measured: tools/fall_check.py.
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,

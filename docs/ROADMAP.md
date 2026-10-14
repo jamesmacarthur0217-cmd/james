@@ -286,6 +286,9 @@ Phase 21 started 2026-10-14 (user's choices: dogs, cats and birds; security came
 Phase 22 started 2026-10-14 (user's choices: every 5 minutes by default; alert after two answers in a row).
 1. **Done 2026-10-14**: tables `scene_questions`, `scene_answers` (checked on PostgreSQL; answers kept like the audit
    log), admin API `/api/scene`, "Scene questions" box on the Alerts page.
+2. **Done 2026-10-14**: `labeler/scene.py` (SceneRunner: one due question at a time, only when the vision model is idle;
+   `Pipeline.scene_frame` every 2 s; answers stored with the picture; two in a row -> on_alert, logged for now).
+   Bus photo: "Is there a bus?" yes twice (0.5-0.7 s), "Is there snow?" no.
 
 ## Critical files
 

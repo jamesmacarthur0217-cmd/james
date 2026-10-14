@@ -206,6 +206,10 @@ class Pipeline:
         self.tracks: dict[int, TrackState] = {}
         self.by_db_id: dict[int, TrackState] = {}
         self._stay_checked = 0.0   # when people and vehicles inside areas were last checked for loitering rules
+        # Scene questions (labeler/scene.py): a clean copy of the picture (no boxes or labels) every few seconds, with
+        # where people's heads are (for the viewers' blurred copy): (frame, wall time, head boxes).
+        self.scene_frame: tuple | None = None
+        self._scene_frame_at = -1e9
         # Areas with a loitering rule (people, vehicles): the live picture shows how long someone is in them.
         self._stay_areas: frozenset[str] = frozenset()
         self._stay_areas_v: frozenset[str] = frozenset()
@@ -473,6 +477,10 @@ class Pipeline:
             blurred = self._draw(privacy.blur_boxes(frame, heads), seen, low_color, now)
         self._publish(self._draw(frame, seen, low_color, now), blurred)
         self._publish_live(seen, now)
+        if now - self._scene_frame_at >= float((self.cfg.get("scene") or {}).get("frame_every_s", 2.0)):
+            self._scene_frame_at = now
+            heads = [geometry.head_box(self.tracks[t].kpts, self.tracks[t].box) for t in seen]
+            self.scene_frame = (frame.copy(), self.clock.wall(), heads)
 
     def _object_classes(self) -> list[int]:
         """The COCO classes the second detector looks for on this camera: vehicles and/or animals."""

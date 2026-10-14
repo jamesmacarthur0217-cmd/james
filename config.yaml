@@ -156,6 +156,12 @@ vehicles:
   every_n_frames: 2           # the vehicle detector looks at every 2nd frame (it about doubles the detector time)
   parked_after_s: 60          # standing still this long = parked (one record, however long it stays)
 
+# Scene questions (Alerts page): yes/no questions the vision model answers about a camera's whole picture, only when
+# it has nothing else to do. An alert after this many matching answers in a row (one wrong answer does not alert).
+scene:
+  enabled: true
+  answers_in_a_row: 2
+
 # Animals: dogs, cats and birds, found by the vehicle detector in the same pass (no extra cost), on security cameras
 # (per camera: animals: true/false). An animal lying still for parked_after_s is "resting": one record.
 animals:

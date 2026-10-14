@@ -112,6 +112,9 @@ labeler/arming.py    Home / Away (Phase 19): table `arming` (each change; newest
                      AlertEngine(db, arming) and create_app (rule condition "armed = away/home"); button in
                      static/session.js (window.VL.arming, "vl-arming" event, VL.switchArming), Live tile, Health
                      line (healthcheck.check_arming), Settings field away_schedule
+labeler/scene.py     scene questions (Phase 22): SceneRunner (run.py thread "scene"), job ids -(2e9 + question id) routed
+                     in run.py route_result; VLMClient.label(frame, None, ("scene", question)), PROMPT_SCENE, 1024 px;
+                     VLMWorker.idle; Pipeline.scene_frame (clean frame + heads every 2 s); tables scene_questions/answers
 labeler/settings.py  Settings page: data/settings.yaml merged over config.yaml in load_config (only the
                      project's config.yaml, or a config naming settings_file:); validated; masked passwords;
                      POST /api/restart → exit 4 → supervisor restarts at once (VL_SUPERVISED=1 from it)
@@ -367,7 +370,7 @@ at 0.5 (0.4 not worth it); 0 false on MOT16, 3 on UR Fall (a person crawling). P
 (left) next to the color picture (right): use the right half. Tried, not kept: ignoring animal boxes that are a found
 person. All new tables/columns checked on scratch PostgreSQL databases. Not measured: the user's camera, night pictures.
 
-**Phase 22 (scene questions) started 2026-10-14**: step 1 done (tables `scene_questions`/`scene_answers`, `/api/scene`
+**Phase 22 (scene questions) started 2026-10-14**: steps 1-2 done (step 2: the runner asks and stores answers); step 1 (tables `scene_questions`/`scene_answers`, `/api/scene`
 (admins, audited), Alerts page box). Docker was off again later on 2026-10-14 (PC restarted): a database check hung
 until it was started (pitfall 11).
 

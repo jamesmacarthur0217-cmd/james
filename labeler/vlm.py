@@ -94,6 +94,25 @@ def clean_vehicle(raw: dict) -> dict[str, str]:
     return out
 
 
+# Scene questions (labeler/scene.py): one yes/no question about the whole picture of a camera.
+SCENE_ANSWERS = ["yes", "no", "unsure"]
+SCENE_SIDE = 1024   # the whole picture, larger than a person's (512): a gate or a light is a small part of it
+PROMPT_SCENE = """This is one picture from a camera at a home or a shop. Answer the question about this whole picture with
+"yes" or "no". Say "unsure" only if the picture does not show enough to tell (too dark, blurred, or the place asked
+about is not in view).
+Question: {question}"""
+
+
+def scene_schema() -> dict:
+    return {"type": "object", "properties": {"answer": {"type": "string", "enum": SCENE_ANSWERS}},
+            "required": ["answer"]}
+
+
+def clean_scene(raw: dict) -> str:
+    answer = str(raw.get("answer", "")).strip().lower()
+    return answer if answer in SCENE_ANSWERS else "unsure"
+
+
 def _b64(image: np.ndarray, max_side: int) -> str:
     h, w = image.shape[:2]
     scale = max_side / max(h, w)
@@ -133,11 +152,13 @@ class VLMClient:
             return False, f"model {self.model!r} is not pulled; run: ollama pull {self.model}"
         return True, "ok"
 
-    def label(self, person: np.ndarray, face: np.ndarray | None, mode: str | None = None) -> dict[str, str]:
-        """Label one person (or, with mode "vehicle", one vehicle). Retries once if Ollama fails (it occasionally
-        restarts its model process)."""
+    def label(self, person: np.ndarray, face: np.ndarray | None, mode=None) -> dict[str, str]:
+        """Label one person (or, with mode "vehicle", one vehicle; with mode ("scene", question), answer a question
+        about a whole picture). Retries once if Ollama fails (it occasionally restarts its model process)."""
         if mode == "vehicle":
             return self._retry(lambda: self._label_vehicle(person))
+        if isinstance(mode, tuple) and mode[0] == "scene":
+            return self._retry(lambda: self._ask_scene(person, mode[1]))
         return self._retry(lambda: self._label(person, face, mode or self.mode))
 
     def _retry(self, call):
@@ -164,6 +185,12 @@ class VLMClient:
             r = requests.post(f"{self.host}/api/chat", json=body, timeout=self.timeout)
         r.raise_for_status()
         return json.loads(r.json()["message"]["content"])
+
+    def _ask_scene(self, picture: np.ndarray, question: str) -> dict[str, str]:
+        started = time.monotonic()
+        answer = clean_scene(self._chat(PROMPT_SCENE.format(question=question), [_b64(picture, SCENE_SIDE)],
+                                        scene_schema()))
+        return {"answer": answer, "seconds": f"{time.monotonic() - started:.2f}"}
 
     def _label_vehicle(self, picture: np.ndarray) -> dict[str, str]:
         return clean_vehicle(self._chat(PROMPT_VEHICLE, [_b64(picture, 512)], vehicle_schema()))
@@ -224,6 +251,12 @@ class VLMWorker:
     def pending(self) -> int:
         """Jobs waiting for a free slot (not counting the ones being labeled)."""
         return self.jobs.qsize()
+
+    @property
+    def idle(self) -> bool:
+        """Nothing waiting and nothing being labeled: scene questions go only then (people and vehicles first)."""
+        with self._idle:
+            return self.jobs.qsize() == 0 and self._jobs_in_flight == 0
 
     def submit(self, track_id: int, frames: list[tuple[np.ndarray, np.ndarray | None]],
                mode: str | None = None) -> bool:

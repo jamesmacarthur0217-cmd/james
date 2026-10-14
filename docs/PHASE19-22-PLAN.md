@@ -61,7 +61,7 @@ Ask at the start: default interval; alert after one "yes" or two in a row.
 alert after two "yes" in a row.** Ask the user before starting the phase and before each step.
 1. **Done 2026-10-14.** Table `scene_questions` (camera, question, every_s default 300, alert on yes/no, enabled, last answer/time/picture)
    and `scene_answers` (history, kept like the audit log). Admins write them on the Alerts page.
-2. Runner: for each due question, the camera's latest clean frame (the pipeline keeps an unannotated copy every
+2. **Done 2026-10-14.** Runner: for each due question, the camera's latest clean frame (the pipeline keeps an unannotated copy every
    few seconds) goes to the vision model only when its queue is empty (people and vehicles first); JSON answer
    yes/no/unsure; an alert when the answer turns to "yes" (two in a row by default, against single wrong answers).
    Job ids in their own range (vehicles use negative ids), routed back like vehicles.

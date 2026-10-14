@@ -108,8 +108,13 @@ def main() -> int:
     pipelines: list[Pipeline] = []
     imports: list[Pipeline] = []   # pipelines of the Import page (labeler/importer.py), while they run
 
+    scene_box: list = []   # the scene question runner, once made (labeler/scene.py)
+
     def route_result(track_id: int, results: list) -> None:
-        """Send a VLM answer to the camera (or video import) that owns this person."""
+        """Send a VLM answer to the camera (or video import) that owns this person, or to the scene questions."""
+        if scene_box and scene_box[0].owns(track_id):
+            scene_box[0].on_result(track_id, results)
+            return
         for p in pipelines + imports:
             if track_id in p.owned_ids:
                 p.on_vlm_result(track_id, results)
@@ -236,6 +241,10 @@ def main() -> int:
     threading.Thread(target=retrainer.loop, args=(app.state.stopping,), name="retrain-check", daemon=True).start()
     from labeler import backups
     threading.Thread(target=backups.loop, args=(cfg, db, app.state.stopping), name="backup", daemon=True).start()
+    if worker is not None and cfg["scene"]["enabled"]:
+        from labeler.scene import SceneRunner
+        scene_box.append(SceneRunner(db, pipelines, worker, crop_dir, cfg))
+        threading.Thread(target=scene_box[0].loop, args=(app.state.stopping,), name="scene", daemon=True).start()
     if health is not None:
         from labeler.health import health_loop
         threading.Thread(target=health_loop, args=(health, pipelines, app.state.stopping),
