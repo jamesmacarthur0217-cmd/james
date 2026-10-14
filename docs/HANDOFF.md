@@ -385,8 +385,11 @@ Settings section, Health line with an overdue warning. Measured with `tools/scen
 and 513/523 (wrong: kneeling), a car 116/116 and 135/135, 0.6 s per answer. Not measured: smoke, fire, gates, lights,
 night, the user's cameras.
 
-**The Phases 19-22 plan is finished.** Next: ask the user what they want next and propose a new round in plan mode
-(open items below; Phase 16 search recordings by words stays approved, not started). Its opening questions are
+**The Phases 19-22 plan is finished.**
+
+**Next: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)** (approved 2026-10-14, not started): 23 small fixes, 24 "was this right?"
+on the user's cameras, 25 "while you were away" summary, then 16 search recordings by words. Not chosen: phone alerts
+(don't offer again unless asked). Ask before each phase and each step. Before Phase 24 the user restarts their app. Its opening questions are
 already answered (2026-10-14): every 5 minutes by default, alert after two "yes" in a row. Ask the user before starting
 the phase, then before each step. State at the end of 2026-10-14: Docker Desktop was started for the PostgreSQL checks
 and left running; the user's own app has not run Phases 13-21 yet (ask them to restart it: stop.bat, start.bat).
@@ -413,5 +416,5 @@ Open items (also in that plan):
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green. The Phases 19-22 plan is finished: propose
-> what to do next, and ask me before each phase and each step starts, and do it step by step.
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with the newest plan in docs/
+> (docs/PHASE23-25-PLAN.md, Phase 23 first; ask me before each phase and each step starts, and do it step by step).
