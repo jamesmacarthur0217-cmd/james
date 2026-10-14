@@ -312,6 +312,34 @@ def check_animals(cfg: dict, db, pipelines: list) -> dict | None:
                                    f"({', '.join(acfg.get('kinds') or [])})")
 
 
+def check_scene(cfg: dict, db, now: datetime | None = None) -> dict | None:
+    """Scene questions (labeler/scene.py): how many, their last answers, and any that are overdue (not answered in
+    twice their interval: the vision model busy all the time, the camera off, or the vision model down)."""
+    scfg = cfg.get("scene") or {}
+    questions = [q for q in db.list_scene_questions() if q["enabled"]]
+    if not scfg.get("enabled"):
+        return _check("scene questions", "off", "turned off (Settings page)") if questions else None
+    if not questions:
+        return None   # nothing asked: no line
+    if not cfg["vlm"].get("enabled"):
+        return _check("scene questions", "warning", f"{len(questions)} questions, but the vision model is turned off "
+                                                    "(vlm.enabled): none are asked")
+    now = now or datetime.now()
+
+    def ago(q) -> float:
+        start = q["last_at"] or q["created_at"]
+        return (now - datetime.fromisoformat(start)).total_seconds()
+
+    late = [q for q in questions if ago(q) > 2 * q["every_s"] + 60]
+    answers = "; ".join(f"{q['question']} {q['last_answer'] or 'not asked yet'}"
+                        + (f" ({int(ago(q) // 60)} min ago)" if q["last_at"] else "") for q in questions[:3])
+    detail = f"{len(questions)} {'question' if len(questions) == 1 else 'questions'}: {answers}"
+    if late:
+        return _check("scene questions", "warning", f"{len(late)} not answered for a while ({', '.join(q['question'] for q in late[:3])}): "
+                      "the vision model may be busy all the time, or the camera or the vision model is down. " + detail)
+    return _check("scene questions", "ok", detail)
+
+
 def check_arming(arming) -> dict:
     """Home / Away (labeler/arming.py): never a problem, but good to see from another device."""
     s = arming.state()
@@ -359,6 +387,12 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
             checks.insert(-1, line)
     except Exception as e:
         checks.insert(-1, _check("vehicles", "warning", f"could not be checked ({e.__class__.__name__})"))
+    try:
+        line = check_scene(cfg, db)
+        if line is not None:
+            checks.insert(-1, line)
+    except Exception as e:
+        checks.insert(-1, _check("scene questions", "warning", f"could not be checked ({e.__class__.__name__})"))
     try:
         line = check_animals(cfg, db, pipelines)
         if line is not None:

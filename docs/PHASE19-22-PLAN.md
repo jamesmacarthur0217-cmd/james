@@ -1,4 +1,4 @@
-# Phases 19-22 plan: Home/Away, loitering, animals, scene questions (approved 2026-10-13; Phases 19-21 done 2026-10-14)
+# Phases 19-22 plan: Home/Away, loitering, animals, scene questions (approved 2026-10-13; all four done 2026-10-14)
 
 ## Context
 
@@ -70,7 +70,7 @@ alert after two "yes" in a row.** Ask the user before starting the phase and bef
 4. **Done 2026-10-14** (`tools/scene_check.py`, README "Scene questions"). Measure reliability with questions whose answers are known: "Is someone lying on the floor?" on UR Fall frames
    (frame marks), "Is there a car?" on MOT16-04/13 frames (marked cars); speed per question. No smoke/fire footage
    here: said honestly, and the user tests it with their own camera.
-5. Settings (on/off, default interval), Health line (questions, last answers, overdue), docs.
+5. **Done 2026-10-14** (Settings: on/off and answers in a row; the interval is per question). **Phase 22 is done.** Settings (on/off, default interval), Health line (questions, last answers, overdue), docs.
 
 ## Critical files
 

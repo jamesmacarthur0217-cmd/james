@@ -9,7 +9,7 @@ import, first kept retraining) are done (2026-10-12). Phase 12 step 1 (a re-iden
 on MOT16 and not adopted (2026-10-12); the rest of Phase 12 waits for real extra cameras. Phase 13 (recording
 while people are in view), Phase 14 (a camera at another site, through Tailscale) and Phase 15 (that camera sent
 from a phone or PC, so it works through company firewalls) are done (2026-10-12). Phase 17 (mobility aids and fall
-alerts) is done (2026-10-13). Phase 18 (vehicles) is done. Phases 19 (Home / Away), 20 (loitering) and 21 (animals) are done (2026-10-14). 662 tests pass.
+alerts) is done (2026-10-13). Phase 18 (vehicles) is done. Phases 19 (Home / Away), 20 (loitering), 21 (animals) and 22 (scene questions) are done (2026-10-14). 685 tests pass.
 
 ## Context (as planned 2026-10-07)
 
@@ -240,7 +240,7 @@ plates; type, color and make/model).
 4. **Done 2026-10-13**: alert rules on vehicles (type, color, zone, time of day), pop-ups and clips.
 5. **Done 2026-10-13**: Settings, Health, installer/offline package, docs. **Phase 18 is done.**
 
-## Phases 19-22: Home/Away, loitering, animals, scene questions (approved 2026-10-13; Phases 19-21 done 2026-10-14)
+## Phases 19-22: Home/Away, loitering, animals, scene questions (approved 2026-10-13; all done 2026-10-14)
 
 **Plan: [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md)**: the user chose all four new ideas as future phases, in this order:
 19 Home/Away arming (rules "only when Away"), 20 loitering alert (stayed in an area too long), 21 animals (with the
@@ -294,6 +294,8 @@ Phase 22 started 2026-10-14 (user's choices: every 5 minutes by default; alert a
    and by retention. Old SQLite databases cannot store them (rule_id stays required there; a warning is logged).
 4. **Done 2026-10-14**: `tools/scene_check.py`: lying on the floor 64/64 yes, 513/523 no (10 wrong: kneeling);
    a car 116/116, no car 135/135; 0.6 s per answer. README "Scene questions".
+5. **Done 2026-10-14**: Settings (on/off, answers in a row), Health line (last answers, overdue warning), docs.
+   **Phase 22 is done; the Phases 19-22 plan is finished.** Next: propose the next round to the user.
 
 ## Critical files
 

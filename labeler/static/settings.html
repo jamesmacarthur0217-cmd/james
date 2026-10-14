@@ -150,6 +150,20 @@
   </section>
 
   <section class="panel">
+    <h2>Scene questions</h2>
+    <div class="grid">
+      <label for="scene_enabled">Scene questions</label>
+      <div><input type="checkbox" id="scene_enabled"> <span class="hint">Yes/no questions about a camera's whole picture
+        ("Is the gate open?"), answered by the vision model when it has nothing else to do. The questions are written on
+        the <a href="/alerts">Alerts</a> page.</span></div>
+      <label for="scene_answers_in_a_row">Alert after (answers in a row)</label>
+      <div><input type="number" id="scene_answers_in_a_row" min="1" max="5" step="1"> <span class="hint">How many
+        matching answers in a row before an alert: 2 means one wrong answer never alerts; 1 alerts sooner but also on a
+        single mistake.</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
     <h2>Vehicles</h2>
     <div class="grid">
       <label for="vehicles_enabled">Vehicles</label>
@@ -239,7 +253,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const SIMPLE = ["retention_days", "audit_retention_days", "blur_faces", "blur_faces_for_viewers", "https", "retrain_enabled",
-                "backup_enabled", "backup_copy_to", "person_videos", "mobility_aids", "falls_enabled", "fall_after_s", "vehicles_enabled", "vehicle_parked_after_s", "animals_enabled", "idle_enabled", "idle_after_s",
+                "backup_enabled", "backup_copy_to", "person_videos", "mobility_aids", "falls_enabled", "fall_after_s", "vehicles_enabled", "vehicle_parked_after_s", "animals_enabled", "scene_enabled", "scene_answers_in_a_row", "idle_enabled", "idle_after_s",
                 "recording_enabled", "recording_when", "recording_keep_days", "recording_max_gb"];
 let loaded = null;        // values as saved (what the next start uses)
 let push = null;          // this PC's address and the receiver's ports (cameras sent from other devices)

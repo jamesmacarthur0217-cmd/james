@@ -117,7 +117,7 @@ or another app (Teams, Discord) holding the camera.
 | **Recordings** | Video of each camera while people are in view: a bar per day, play from any moment (viewers: faces blurred) |
 | **Answer key** | Label recorded people yourself, blind, and see how accurate the system is on this camera |
 | **Import** (admin) | Add recorded videos with their real times (see Importing recorded videos) |
-| **Settings** (admin) | Cameras, how long data is kept, backups, face blurring, HTTPS, weekly retraining, the Home / Away schedule, vehicles and animals; **Restart now** |
+| **Settings** (admin) | Cameras, how long data is kept, backups, face blurring, HTTPS, weekly retraining, the Home / Away schedule, vehicles, animals, scene questions; **Restart now** |
 | **Health** | Whether the database, Ollama, cameras, disk, backups and storage are fine (see Reliability) |
 
 ### Settings page
@@ -446,6 +446,10 @@ close to the floor. Someone lying down on purpose (on a bed or the floor; the ma
 this overstates how often two wrong answers come together. Not measured (no such footage here): smoke or fire, an
 open gate, lights, night pictures, your own cameras: try a question for a day and look at its answers on the Alerts
 page before relying on it.
+
+**Settings and Health**: the Settings page has a **Scene questions** section (on/off, answers in a row before an alert,
+1-5). The Health page has a "scene questions" line with the last answers, and a warning when a question has not been
+answered for twice its interval (the vision model busy all the time, or the camera or the vision model down).
 
 ## Home / Away
 

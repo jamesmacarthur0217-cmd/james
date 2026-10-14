@@ -265,3 +265,38 @@ def test_pop_ups_name_scene_alerts():
     static = Path(__file__).resolve().parent.parent / "labeler" / "static"
     for page in ("session.js", "alerts.html"):
         assert 'e.scene_id ? "scene question"' in (static / page).read_text(encoding="utf-8")
+
+
+# --- step 5: Settings, Health ---
+
+def test_settings_save_the_scene_options(db, tmp_path):
+    import yaml
+    from labeler.config import load_config
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("cameras:\n  - name: gate\n    source: samples/bus.jpg\n"
+                        f"settings_file: {(tmp_path / 'settings.yaml').as_posix()}\n", encoding="utf-8")
+    client = TestClient(create_app(load_config(cfg_file), db, None), client=("127.0.0.1", 5000))
+    form = client.get("/api/settings").json()["values"]
+    assert form["scene_enabled"] is True and form["scene_answers_in_a_row"] == 2
+    r = client.post("/api/settings", json={**form, "scene_answers_in_a_row": 3})
+    assert r.status_code == 200, r.json()
+    assert yaml.safe_load((tmp_path / "settings.yaml").read_text(encoding="utf-8")) == {"scene": {"answers_in_a_row": 3}}
+    assert client.post("/api/settings", json={**form, "scene_answers_in_a_row": 9}).status_code == 400
+
+
+def test_health_line(db):
+    from labeler.healthcheck import check_scene
+    cfg = copy.deepcopy(DEFAULTS)
+    now = datetime.now()
+    assert check_scene(cfg, db, now) is None                                   # no questions: no line
+    q = db.add_scene_question("gate", "Is the gate open?", 300)
+    db.update_scene_question(q["id"], last_answer="no", last_at=now - timedelta(minutes=3))
+    line = check_scene(cfg, db, now)
+    assert line["level"] == "ok" and line["detail"] == "1 question: Is the gate open? no (3 min ago)"
+    db.update_scene_question(q["id"], last_at=now - timedelta(minutes=12))      # 5 min question, 12 min ago
+    line = check_scene(cfg, db, now)
+    assert line["level"] == "warning" and "1 not answered for a while (Is the gate open?)" in line["detail"]
+    cfg["vlm"]["enabled"] = False
+    assert "vision model is turned off" in check_scene(cfg, db, now)["detail"]
+    cfg["scene"]["enabled"] = False
+    assert check_scene(cfg, db, now)["level"] == "off"

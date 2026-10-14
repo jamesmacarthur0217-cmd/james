@@ -19,7 +19,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 ## 2. Current state (2026-10-14)
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
-  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15 and 17-21 done (21: `98be1cd` · `5bc87d8` · `7215d4c` · `8f694b4` · Settings; 20: `98f436a` rule · `89af3de` page · `3141852` live picture · tool; 19: `46daf57` Home/Away state · `1843a06` rules · `b41530b` pages; 17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings; 18: vehicles `2790822` · `91d90e4` · `8374fad` · `0d87bc0` · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
+  was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15 and 17-22 done (22: `722118c` · `cba3db4` · `14f8c19` · `938f2c3` · Settings; 21: `98be1cd` · `5bc87d8` · `7215d4c` · `8f694b4` · Settings; 20: `98f436a` rule · `89af3de` page · `3141852` live picture · tool; 19: `46daf57` Home/Away state · `1843a06` rules · `b41530b` pages; 17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings; 18: vehicles `2790822` · `91d90e4` · `8374fad` · `0d87bc0` · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
   `2429790`/`bc23363` soak tool · `0449255` idle mode · `23273b1` restore drill. Phase 9 (small
   fixes): `8675c46` list redraw · `81dbcb2` backup.dir · `482bdd4` CI v7 · `0296435` relink_check help. Phase 8
   commits, newest first: `3794de3` today at a glance · `e3a6179` photo search · `ea97937` original excerpts ·
@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **662 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **685 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -334,10 +334,11 @@ motorbikes, bicycles, buses, lorries; no number plates; make/model by the vision
   `alert_events.vehicle_id`, `track_id` nullable (`db.NULLABLE_NOW`).
 - Measured with `tools/vehicle_check.py` (coco, speed, count on MOT16, makes on `data/datasets/stanford_cars`).
 
-**The user's own app has not run Phases 13-21 yet**: at its next restart it gets them and changes the PostgreSQL
+**The user's own app has not run Phases 13-22 yet**: at its next restart it gets them and changes the PostgreSQL
 database by itself (zones.lying_ok; the alert "one per rule and person" constraint dropped; alert_events.vehicle_id and
-track_id nullable; new tables vehicles, vehicle_zone_events; Phases 19-21: new tables arming, animals,
-animal_zone_events and the column alert_events.animal_id). Each change was checked on a scratch database on the same
+track_id nullable; new tables vehicles, vehicle_zone_events; Phases 19-22: new tables arming, animals,
+animal_zone_events, scene_questions, scene_answers; alert_events.animal_id, .scene_id, .picture; alert_events.rule_id
+made optional). Each change was checked on a scratch database on the same
 server (scripts in the session scratchpad, not kept: create a database, recreate the old layout, start `Database(url)`,
 check, drop it). Ask the user to restart (stop.bat, start.bat) and look at the Health page.
 
@@ -377,7 +378,15 @@ start); step 1 (tables `scene_questions`/`scene_answers`, `/api/scene`
 (admins, audited), Alerts page box). Docker was off again later on 2026-10-14 (PC restarted): a database check hung
 until it was started (pitfall 11).
 
-**Next: the rest of Phase 22 (scene questions)** in [PHASE19-22-PLAN.md](PHASE19-22-PLAN.md). Its opening questions are
+**Phase 22 (scene questions) is done** (2026-10-14; README "Scene questions"). User's choices: every 5 minutes by default,
+an alert after two answers in a row. `labeler/scene.py` (SceneRunner), tables scene_questions/scene_answers, scene
+alerts (alert_events.scene_id/.picture, rule_id optional; an old SQLite database cannot store them), Alerts page box,
+Settings section, Health line with an overdue warning. Measured with `tools/scene_check.py`: lying on the floor 64/64
+and 513/523 (wrong: kneeling), a car 116/116 and 135/135, 0.6 s per answer. Not measured: smoke, fire, gates, lights,
+night, the user's cameras.
+
+**The Phases 19-22 plan is finished.** Next: ask the user what they want next and propose a new round in plan mode
+(open items below; Phase 16 search recordings by words stays approved, not started). Its opening questions are
 already answered (2026-10-14): every 5 minutes by default, alert after two "yes" in a row. Ask the user before starting
 the phase, then before each step. State at the end of 2026-10-14: Docker Desktop was started for the PostgreSQL checks
 and left running; the user's own app has not run Phases 13-21 yet (ask them to restart it: stop.bat, start.bat).
@@ -404,5 +413,5 @@ Open items (also in that plan):
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with the newest plan in docs/
-> (docs/PHASE19-22-PLAN.md, Phase 22 next; ask me before each phase and each step starts, and do it step by step).
+> docs/ROADMAP.md first, run the tests to confirm everything is green. The Phases 19-22 plan is finished: propose
+> what to do next, and ask me before each phase and each step starts, and do it step by step.

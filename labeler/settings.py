@@ -7,7 +7,7 @@ to go back to config.yaml. Changes apply after a restart (the page has a Restart
 Only the common settings are editable here, each validated: cameras (add, remove, source, mode, retention,
 detector size), how long people and the audit log are kept, face blurring, HTTPS, weekly retraining, the
 daily database backup and its second copy, idle mode, recording, the weekly Home / Away schedule, vehicles and
-animals. Zones and
+animals, scene questions (on/off, answers in a row; the questions themselves are on the Alerts page). Zones and
 alert rules have their own pages; accounts are managed with tools/users.py.
 
 A camera keeps its name for good (zones, alert rules and recorded people refer to it); removing a camera keeps
@@ -88,6 +88,8 @@ class SettingsIn(BaseModel):
     vehicle_parked_after_s: float = Field(ge=10, le=3600)
     animals_enabled: bool
     animal_kinds: list[str] = Field(min_length=1)
+    scene_enabled: bool
+    scene_answers_in_a_row: int = Field(ge=1, le=5)
 
     @field_validator("animal_kinds")
     @classmethod
@@ -157,6 +159,8 @@ SIMPLE = {
     "vehicle_parked_after_s": ("vehicles", "parked_after_s"),
     "animals_enabled": ("animals", "enabled"),
     "animal_kinds": ("animals", "kinds"),
+    "scene_enabled": ("scene", "enabled"),
+    "scene_answers_in_a_row": ("scene", "answers_in_a_row"),
     "backup_copy_to": ("backup", "copy_to"),
     "idle_enabled": ("idle", "enabled"),
     "idle_after_s": ("idle", "after_s"),
