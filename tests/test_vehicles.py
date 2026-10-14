@@ -429,19 +429,38 @@ def test_pipeline_checks_vehicle_rules_and_saves_a_clip(db, camera, tmp_path):
     assert asked == [5, ("clip", 7)]
 
 
-def test_old_sqlite_database_skips_vehicle_alerts_instead_of_failing(tmp_path):
-    from sqlalchemy import text
+def test_old_sqlite_alert_table_is_rebuilt_at_start_keeping_its_alerts(tmp_path):
+    """Phase 23: an SQLite database from before Phase 18 had track_id and rule_id required and "one per rule and
+    person" unique; SQLite cannot change that in place, so the table is made again at start, rows kept."""
+    from sqlalchemy import inspect, text
     from labeler.db import Database
-    db = Database("sqlite:///" + (tmp_path / "old.db").as_posix())
-    with db.engine.begin() as conn:   # the table as it was before: track_id required (new columns added at start)
+    url = "sqlite:///" + (tmp_path / "old.db").as_posix()
+    db = Database(url)
+    cam = db.get_or_create_camera("c", "x", "security")
+    person = db.create_track(cam, 1, datetime.now())
+    rule = db.add_rule("v", [["vehicle", "any"]])["id"]
+    with db.engine.begin() as conn:   # the table as it was before Phase 18
         conn.execute(text("DROP TABLE alert_events"))
         conn.execute(text("CREATE TABLE alert_events (id INTEGER PRIMARY KEY, rule_id INTEGER NOT NULL, "
-                          "track_id INTEGER NOT NULL, vehicle_id INTEGER, animal_id INTEGER, scene_id INTEGER, "
-                          "picture VARCHAR(300), camera VARCHAR(100), message VARCHAR(300), created_at DATETIME)"))
-    cam = db.get_or_create_camera("c", "x", "security")
+                          "track_id INTEGER NOT NULL, camera VARCHAR(100), message VARCHAR(300), created_at DATETIME, "
+                          "UNIQUE (rule_id, track_id))"))
+        conn.execute(text("CREATE INDEX ix_alert_events_rule_id ON alert_events (rule_id)"))
+        conn.execute(text("CREATE INDEX ix_alert_events_track_id ON alert_events (track_id)"))   # two, as for real
+        conn.execute(text("INSERT INTO alert_events (id, rule_id, track_id, camera, message, created_at) "
+                          "VALUES (41, :r, :t, 'c', 'an old alert', '2026-10-01 12:00:00')"), {"r": rule, "t": person})
+    db.engine.dispose()
+    db = Database(url)                                     # the next start
+    cols = {c["name"]: c["nullable"] for c in inspect(db.engine).get_columns("alert_events")}
+    assert cols["rule_id"] and cols["track_id"] and "scene_id" in cols and "picture" in cols
+    assert inspect(db.engine).get_unique_constraints("alert_events") == []
     vid = db.create_vehicle(cam, 1, "car", datetime.now())
-    rule = db.add_rule("v", [["vehicle", "any"]])["id"]
-    assert db.record_alert(rule, None, "c", "v", vehicle_id=vid) is None
+    new = db.record_alert(rule, None, "c", "v", vehicle_id=vid)
+    assert new is not None and new["id"] == 42             # the numbers go on after the kept alert
+    assert [(e["id"], e["message"]) for e in db.list_alerts()] == [(42, "v"), (41, "an old alert")]
+    q = db.add_scene_question("c", "Is the gate open?")
+    assert db.record_scene_alert(q["id"], "c", "Is the gate open? → yes", None) is not None
+    db.engine.dispose()
+    assert Database(url).list_alerts()[0]["scene_id"] == q["id"]   # a third start: nothing to rebuild
 
 
 # --- step 5: Health, a missing detector file, the models tool ---
@@ -483,3 +502,28 @@ def test_models_tool_knows_the_vehicle_detector():
     n = models.names()
     assert n["vehicles"] == "yolo11s.pt" and models.detectors(n) == ["yolo11s-pose.pt", "yolo11s.pt"]
     assert models.detectors({**n, "vehicles": None}) == ["yolo11s-pose.pt"]
+
+
+
+def test_a_failed_sqlite_rebuild_does_not_stop_the_start(tmp_path, monkeypatch, caplog):
+    from sqlalchemy import text
+    from labeler import db as db_mod
+    url = "sqlite:///" + (tmp_path / "old.db").as_posix()
+    db = db_mod.Database(url)
+    with db.engine.begin() as conn:
+        conn.execute(text("DROP TABLE alert_events"))
+        conn.execute(text("CREATE TABLE alert_events (id INTEGER PRIMARY KEY, rule_id INTEGER NOT NULL, "
+                          "track_id INTEGER NOT NULL, camera VARCHAR(100), message VARCHAR(300), created_at DATETIME)"))
+        conn.execute(text("CREATE INDEX ix_alert_events_rule_id ON alert_events (rule_id)"))
+        conn.execute(text("CREATE INDEX ix_alert_events_track_id ON alert_events (track_id)"))
+    db.engine.dispose()
+    monkeypatch.setattr(db_mod.Database, "_fail_rebuild_for_test", True)   # fails after the rename and index drops
+    again = db_mod.Database(url)                            # starts anyway ...
+    assert "could not bring table alert_events up to date" in caplog.text
+    assert again.list_alerts() == []                        # ... with the old table back, under its own name
+    with again.engine.connect() as conn:
+        names = set(conn.execute(text("SELECT name FROM sqlite_master")).scalars())
+    assert "alert_events" in names and "alert_events_old" not in names
+    assert {"ix_alert_events_rule_id", "ix_alert_events_track_id"} <= names
+    monkeypatch.setattr(db_mod.Database, "_fail_rebuild_for_test", False)
+    assert db_mod.Database(url).list_alerts() == []         # and the next start rebuilds it

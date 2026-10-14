@@ -1,4 +1,4 @@
-# Phases 23-25 (+16) plan: small fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phase 23 started)
+# Phases 23-25 (+16) plan: small fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phase 23 done)
 
 ## Context
 
@@ -19,11 +19,14 @@ Before Phase 24 the user restarts their own app (stop.bat, start.bat) so it runs
 
 1. **Done 2026-10-14.** Settings page: the "unsaved changes" mark reacts to every field (today only the cameras table calls `changed()`);
    one input/change listener on the form. Test in `tests/test_pages.py` style plus a browser check.
-2. Non-English text in the console: the console handler (`labeler/logs.py`) writes with the Windows code page, so a
+2. **Not needed (checked 2026-10-14)**: the app writes to the real console window (the supervisor passes it on), which
+   shows any text since Python 3.6; output sent to a file gets `\u5927`-style codes, no error; the log file is UTF-8 and
+   keeps the text (tested). Planned as: Non-English text in the console: the console handler (`labeler/logs.py`) writes with the Windows code page, so a
    scene question or camera name in Chinese gives "--- Logging error ---" there (the log file is UTF-8 already).
    Write the console as UTF-8 with replacement (`sys.stderr.reconfigure(errors="replace")` or a handler with its own
    stream). Test with a Chinese question through the scene runner's log line.
-3. Old SQLite databases: `alert_events.track_id` / `rule_id` stay NOT NULL there (SQLite cannot drop NOT NULL), so
+3. **Done 2026-10-14** (one real transaction; a failure leaves the old table and the app starts anyway). **Phase 23 is
+   done.** Old SQLite databases: `alert_events.track_id` / `rule_id` stay NOT NULL there (SQLite cannot drop NOT NULL), so
    vehicle, animal and scene alerts are skipped with a warning. At start, rebuild that one table on SQLite when it
    has the old layout (create the new table, copy the rows, swap, in one transaction; keep ids). Test with the old
    layout the tests already build (`test_old_sqlite_database_skips_vehicle_alerts...`, which then stores the alert).

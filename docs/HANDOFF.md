@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **685 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **688 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -210,6 +210,10 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
 23. **Tests must not need git-ignored files** (models like `yolo11s.pt`, datasets): GitHub has none of them. One test
    did, and the GitHub run failed for 23 pushes (2026-10-13/14) unnoticed. Check `gh run list --limit 3` after pushing
    (gh is signed in on this PC); to test like GitHub, rename the file for one run.
+24. **Python's sqlite3 commits ALTER/CREATE/DROP by itself**, outside `engine.begin()`: a table rebuild that failed
+   halfway left a test database with only `alert_events_old` (2026-10-14, before the fix was committed). For
+   several DDL statements that must be all-or-nothing, use the raw connection with `isolation_level = None` and an
+   explicit BEGIN / COMMIT / ROLLBACK (`Database._rebuild_sqlite`), and test a failure halfway.
 
 ## 7. Conventions
 
@@ -387,7 +391,10 @@ night, the user's cameras.
 
 **The Phases 19-22 plan is finished.**
 
-**Next: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)** (approved 2026-10-14, not started): 23 small fixes, 24 "was this right?"
+**Phase 23 (small fixes) is done** (2026-10-14): `02c7cf9` Settings unsaved mark; step 2 not needed (console text is
+fine, the plan's assumption was wrong); old SQLite alert tables rebuilt at start (`Database._rebuild_sqlite`).
+
+**Next: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)**, Phase 24 (approved 2026-10-14): 23 small fixes, 24 "was this right?"
 on the user's cameras, 25 "while you were away" summary, then 16 search recordings by words. Not chosen: phone alerts
 (don't offer again unless asked). Ask before each phase and each step. Before Phase 24 the user restarts their app. Its opening questions are
 already answered (2026-10-14): every 5 minutes by default, alert after two "yes" in a row. Ask the user before starting
@@ -417,4 +424,4 @@ Open items (also in that plan):
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with the newest plan in docs/
-> (docs/PHASE23-25-PLAN.md, Phase 23 first; ask me before each phase and each step starts, and do it step by step).
+> (docs/PHASE23-25-PLAN.md, Phase 24 next; ask me before each phase and each step starts, and do it step by step).

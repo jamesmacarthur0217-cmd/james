@@ -476,6 +476,8 @@ def _score(rows: list[tuple[AnswerKey, Track]]) -> dict[str, dict]:
 
 
 class Database:
+    _fail_rebuild_for_test = False   # tests: make the SQLite table rebuild fail halfway (it must roll back)
+
     def __init__(self, url: str):
         url = sqlite_url(url)
         is_sqlite = url.startswith("sqlite")
@@ -607,7 +609,11 @@ class Database:
                         conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}"))
 
     def _drop_old_unique(self) -> None:
-        """PostgreSQL only: SQLite cannot drop a constraint (only tests use it; tables made now have none)."""
+        """Old constraints and NOT NULL columns (DROPPED_UNIQUE, NULLABLE_NOW). PostgreSQL changes them in place;
+        SQLite cannot, so there the table is rebuilt (_rebuild_sqlite)."""
+        if self.engine.dialect.name == "sqlite":
+            self._rebuild_sqlite()
+            return
         if self.engine.dialect.name != "postgresql":
             return
         from sqlalchemy import inspect
@@ -620,6 +626,64 @@ class Database:
             for table, column in NULLABLE_NOW:
                 if any(c["name"] == column and not c["nullable"] for c in insp.get_columns(table)):
                     conn.execute(text(f"ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL"))
+
+    def _rebuild_sqlite(self) -> None:
+        """SQLite: a table with a column in NULLABLE_NOW still NOT NULL, or an old unique constraint from
+        DROPPED_UNIQUE, is made again in today's layout (renamed, new table made, rows copied with their ids, old
+        one dropped), all in one transaction: if anything fails, the old table stays as it was. Without this, an
+        old SQLite database cannot store vehicle, animal or scene alerts (no person, no rule)."""
+        from sqlalchemy import inspect
+        insp = inspect(self.engine)
+        tables = set(insp.get_table_names())
+        stale = set()
+        for table, column in NULLABLE_NOW:
+            if table in tables and any(c["name"] == column and not c["nullable"] for c in insp.get_columns(table)):
+                stale.add(table)
+        for table, columns in DROPPED_UNIQUE:
+            if table in tables and any(sorted(uc["column_names"]) == sorted(columns)
+                                       for uc in insp.get_unique_constraints(table)):
+                stale.add(table)
+        for table in sorted(stale):
+            model = Base.metadata.tables[table]
+            old_cols = {c["name"] for c in insp.get_columns(table)}
+            cols = ", ".join(c.name for c in model.columns if c.name in old_cols)
+            from sqlalchemy.schema import CreateIndex, CreateTable
+            dialect = self.engine.dialect
+            statements = [f"ALTER TABLE {table} RENAME TO {table}_old"]
+            raw = self.engine.raw_connection()
+            try:
+                dbapi = raw.driver_connection
+                cur = dbapi.cursor()
+                # The whole list first, before anything changes (the new table makes its indexes again).
+                indexes = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type = 'index' "
+                                                     "AND tbl_name = ? AND sql IS NOT NULL", (table,)).fetchall()]
+                statements += [f'DROP INDEX "{i}"' for i in indexes]
+                statements += [str(CreateTable(model).compile(dialect=dialect))]
+                statements += [str(CreateIndex(i).compile(dialect=dialect)) for i in model.indexes]
+                statements += [f"INSERT INTO {table} ({cols}) SELECT {cols} FROM {table}_old",
+                               f"DROP TABLE {table}_old"]
+                # One real transaction: Python's sqlite3 would commit ALTER and CREATE at once by itself, and a
+                # failure halfway would leave no table at all. With BEGIN ... COMMIT it is all or nothing.
+                old_mode = dbapi.isolation_level
+                dbapi.isolation_level = None
+                try:
+                    cur.execute("BEGIN")
+                    for sql in statements:
+                        if sql.lstrip().startswith("CREATE TABLE") and self._fail_rebuild_for_test:
+                            raise RuntimeError("test: failing on purpose")
+                        cur.execute(sql)
+                    cur.execute("COMMIT")
+                except Exception:
+                    cur.execute("ROLLBACK")
+                    raise
+                finally:
+                    dbapi.isolation_level = old_mode
+                log.info("database: table %s brought up to date (SQLite)", table)
+            except Exception as e:   # rolled back: the old table is as it was; start anyway
+                log.warning("database: could not bring table %s up to date (%s); some alerts cannot be stored",
+                            table, e.__class__.__name__)
+            finally:
+                raw.close()
 
     # --- vehicles (labeler/vehicles.py) ---------------------------------------------------------------------
 
