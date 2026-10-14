@@ -209,3 +209,59 @@ def test_alert_after_two_answers_in_a_row_and_not_again(db, tmp_path):
     answer(closed["id"], "no")
     assert alerts[-1][0] == "Is the gate closed?"
     answer(999, "yes")                                                          # a deleted question: ignored
+
+
+# --- step 3: the alert ---
+
+def test_alert_is_stored_with_its_own_picture_and_a_clip(db, tmp_path):
+    clock = Clock()
+    runner, worker, cam = _runner(db, tmp_path, clock)
+    asked = []
+    cam.clips = type("Clips", (), {"request": lambda self, event_id, before_s=None: asked.append(event_id)})()
+    q = db.add_scene_question("gate", "Is the gate open?", 300)
+    for _ in range(2):
+        assert runner.tick() == q["id"]
+        runner.on_result(job_id(q["id"]), [{"answer": "yes", "seconds": "1"}])
+        clock.step(300)
+        cam.scene_frame = (cam.scene_frame[0], clock.now, [])
+    events = db.list_alerts()
+    assert len(events) == 1
+    e = events[0]
+    assert (e["scene_id"], e["camera"], e["message"], e["track_id"]) == (q["id"], "gate", "Is the gate open? → yes", None)
+    assert e["crop"] == "scene_1_20261014120500.jpg" and (tmp_path / e["crop"]).is_file()
+    assert (tmp_path / "blurred" / e["crop"]).is_file()                       # viewers get faces blurred
+    assert asked == [e["id"]]
+    tick_again = runner.tick()                                                  # the next answer replaces scene_1.jpg ...
+    runner.on_result(job_id(tick_again), [{"answer": "no", "seconds": "1"}])
+    assert (tmp_path / e["crop"]).is_file()                                     # ... the alert keeps its own copy
+
+
+def test_deleting_the_question_deletes_its_alerts(db, tmp_path):
+    q = db.add_scene_question("gate", "Is the gate open?", 300)
+    db.update_scene_question(q["id"], last_picture="scene_1.jpg")
+    e = db.record_scene_alert(q["id"], "gate", "Is the gate open? → yes", "scene_1_x.jpg")
+    other = db.add_scene_question("gate", "Are the lights on?", 300)
+    db.record_scene_alert(other["id"], "gate", "Are the lights on? → yes", None)
+    gone = db.delete_scene_question(q["id"])
+    assert sorted(gone["files"]) == sorted(["scene_1.jpg", "scene_1_x.jpg", f"clips/alert_{e['id']}.webm"])
+    assert [a["scene_id"] for a in db.list_alerts()] == [other["id"]]
+    assert db.record_scene_alert(q["id"], "gate", "late", None) is None        # deleted meanwhile
+
+
+def test_old_scene_alerts_go_with_retention(db, camera):
+    from labeler.db import AlertEvent
+    q = db.add_scene_question("test-cam", "Is the gate open?", 300)
+    old = db.record_scene_alert(q["id"], "test-cam", "old", "scene_1_old.jpg")
+    db.record_scene_alert(q["id"], "test-cam", "new", "scene_1_new.jpg")
+    with db.Session.begin() as s:
+        s.get(AlertEvent, old["id"]).created_at = datetime.now() - timedelta(days=40)
+    removed = db.cleanup(30)
+    assert "scene_1_old.jpg" in removed and f"clips/alert_{old['id']}.webm" in removed
+    assert [e["message"] for e in db.list_alerts()] == ["new"]
+
+
+def test_pop_ups_name_scene_alerts():
+    from pathlib import Path
+    static = Path(__file__).resolve().parent.parent / "labeler" / "static"
+    for page in ("session.js", "alerts.html"):
+        assert 'e.scene_id ? "scene question"' in (static / page).read_text(encoding="utf-8")

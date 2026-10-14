@@ -9,7 +9,9 @@ and the picture is kept as scene_<id>.jpg (with a copy for viewers in which peop
 
 An alert comes when `answers_in_a_row` answers in a row (2, the user's choice) are the one the question alerts on
 ("yes", or "no" for a question like "Is the gate closed?"); one wrong answer alone does not. It does not come again
-until a different answer has come in between. A failed request is tried again after `retry_after_s`.
+until a different answer has come in between. A failed request is tried again after `retry_after_s`. The alert
+(alert_events with scene_id, no rule) keeps its own copy of the picture (scene_<id>_<time>.jpg: the question's picture
+is replaced at every answer), pops up on every page and gets a clip from the camera, like other alerts.
 
 Vision model jobs for questions use their own numbers (-(SCENE_BASE + question id)): people's are positive, vehicles'
 are minus the vehicle's number, so they never mix (run.py routes answers by number).
@@ -43,6 +45,7 @@ class SceneRunner:
                  on_alert=None):
         self.db, self.pipelines, self.worker, self.crop_dir = db, pipelines, worker, crop_dir
         self.scfg = cfg["scene"]
+        self.cfg_clips = bool(cfg["clips"]["enabled"])
         self.clock, self.mono = clock, mono
         self.on_alert = on_alert            # (question, picture name) -> None; step 3 makes it an alert
         self._lock = threading.Lock()
@@ -130,8 +133,26 @@ class SceneRunner:
         if self.runs[qid] >= int(self.scfg["answers_in_a_row"]) and qid not in self.alerted:
             self.alerted.add(qid)
             log.warning("SCENE [%s] %s -> %s (%d answers in a row)", q["camera"], q["question"], answer, self.runs[qid])
+            self._alert(q, answer, name, at)
             if self.on_alert is not None:
                 self.on_alert(q, name)
+
+    def _alert(self, q: dict, answer: str, name: str | None, at: datetime) -> None:
+        """Store the alert with its own copy of the picture, and ask the camera for a clip."""
+        import shutil
+        from . import privacy
+        picture = None
+        if name and (self.crop_dir / name).is_file():
+            picture = f"scene_{q['id']}_{at:%Y%m%d%H%M%S}.jpg"
+            shutil.copyfile(self.crop_dir / name, self.crop_dir / picture)
+            blurred = privacy.blurred_path(self.crop_dir, name)
+            if blurred.is_file():
+                shutil.copyfile(blurred, privacy.blurred_path(self.crop_dir, picture))
+        event = self.db.record_scene_alert(q["id"], q["camera"], f"{q['question']} → {answer}", picture)
+        p = next((p for p in self.pipelines if p.name == q["camera"]), None)
+        clips = getattr(p, "clips", None)
+        if event is not None and clips is not None and self.cfg_clips:
+            clips.request(event["id"])
 
     def _save_picture(self, qid: int, sent) -> str | None:
         import cv2

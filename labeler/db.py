@@ -191,12 +191,17 @@ class AlertEvent(Base):
     # Each rule fires once per person (record_alert), except fall rules: a person can fall again. So this is not a
     # database rule any more; older PostgreSQL databases lose it at start (DROPPED_UNIQUE).
     id: Mapped[int] = mapped_column(primary_key=True)
-    rule_id: Mapped[int] = mapped_column(ForeignKey("alert_rules.id", ondelete="CASCADE"), index=True)
+    # A scene question's alert (labeler/scene.py) has no rule: rule_id empty, scene_id and its own picture instead.
+    # Older PostgreSQL databases had rule_id NOT NULL: relaxed at start (NULLABLE_NOW).
+    rule_id: Mapped[int | None] = mapped_column(ForeignKey("alert_rules.id", ondelete="CASCADE"), index=True,
+                                                nullable=True)
     # A person's alert has track_id, a vehicle's (labeler/vehicles.py) vehicle_id. Older PostgreSQL databases had
     # track_id NOT NULL: relaxed at start (NULLABLE_NOW).
     track_id: Mapped[int | None] = mapped_column(ForeignKey("tracks.id", ondelete="CASCADE"), index=True, nullable=True)
     vehicle_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
     animal_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)   # an animal's (labeler/animals.py)
+    scene_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)    # a scene question's
+    picture: Mapped[str | None] = mapped_column(String(300))                           # its picture (scene alerts)
     camera: Mapped[str] = mapped_column(String(100))
     message: Mapped[str] = mapped_column(String(300))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
@@ -424,9 +429,10 @@ NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT", "video_path
                           "source_offset_s": "FLOAT"},
                "cameras": {"retention_days": "INTEGER"},
                "zones": {"lying_ok": "BOOLEAN"},
-               "alert_events": {"vehicle_id": "INTEGER", "animal_id": "INTEGER"}}
+               "alert_events": {"vehicle_id": "INTEGER", "animal_id": "INTEGER", "scene_id": "INTEGER",
+                                "picture": "TEXT"}}
 # Columns that may be empty now (table, column): an alert can be about a vehicle instead of a person.
-NULLABLE_NOW = [("alert_events", "track_id")]
+NULLABLE_NOW = [("alert_events", "track_id"), ("alert_events", "rule_id")]
 # Uniqueness rules taken off existing tables at start (table, columns): falls alert again for the same person.
 DROPPED_UNIQUE = [("alert_events", ("rule_id", "track_id"))]
 
@@ -1162,10 +1168,11 @@ class Database:
                              .outerjoin(Animal, Animal.id == AlertEvent.animal_id)
                              .outerjoin(AlertRule, AlertRule.id == AlertEvent.rule_id)
                              .where(AlertEvent.id > since_id, (Track.id.is_not(None)) | (Vehicle.id.is_not(None))
-                                    | (Animal.id.is_not(None)))
+                                    | (Animal.id.is_not(None)) | (AlertEvent.scene_id.is_not(None)))
                              .order_by(AlertEvent.id.desc()).limit(limit)).all()
             return [{"id": e.id, "rule_id": e.rule_id, "track_id": e.track_id, "vehicle_id": e.vehicle_id,
-                     "animal_id": e.animal_id, "camera": e.camera, "message": e.message, "crop": tcrop or vcrop or acrop,
+                     "animal_id": e.animal_id, "scene_id": e.scene_id, "camera": e.camera, "message": e.message,
+                     "crop": tcrop or vcrop or acrop or e.picture,
                      "created_at": e.created_at.isoformat(timespec="seconds"),
                      "fall": any(n == "fallen" for n, _ in json.loads(conds or "[]"))}
                     for e, tcrop, vcrop, acrop, conds in rows]
@@ -1586,13 +1593,32 @@ class Database:
                 setattr(q, k, v)
             return self._scene_dict(q)
 
+    def record_scene_alert(self, question_id: int, camera: str, message: str, picture: str | None) -> dict | None:
+        """A scene question's alert (labeler/scene.py decides when: answers in a row)."""
+        with self.Session.begin() as s:
+            if s.get(SceneQuestion, question_id) is None:
+                return None
+            e = AlertEvent(rule_id=None, scene_id=question_id, camera=camera, message=message, picture=picture)
+            s.add(e)
+            try:
+                s.flush()
+            except IntegrityError:   # an old SQLite database (rule_id required): PostgreSQL ones are updated at start
+                log.warning("a scene alert was not stored (old database rule)")
+                return None
+            return {"id": e.id, "rule_id": None, "scene_id": question_id, "track_id": None, "vehicle_id": None,
+                    "animal_id": None, "camera": camera, "message": message, "crop": picture,
+                    "created_at": e.created_at.isoformat(timespec="seconds")}
+
     def delete_scene_question(self, question_id: int) -> dict | None:
-        """Deletes it with its answers; returns it (for the caller to remove its picture), or None."""
+        """Deletes it with its answers and alerts; returns it, with "files": the pictures and clips to remove."""
         with self.Session.begin() as s:
             q = s.get(SceneQuestion, question_id)
             if q is None:
                 return None
             out = self._scene_dict(q)
+            events = s.execute(select(AlertEvent.id, AlertEvent.picture).where(AlertEvent.scene_id == question_id)).all()
+            out["files"] = [p for p in [q.last_picture] if p] + [p for _, p in events if p] + [clip_name(i) for i, _ in events]
+            s.execute(delete(AlertEvent).where(AlertEvent.scene_id == question_id))
             s.execute(delete(SceneAnswer).where(SceneAnswer.question_id == question_id))
             s.delete(q)
             return out
@@ -1779,6 +1805,13 @@ class Database:
                         s.execute(delete(AlertEvent).where(AlertEvent.animal_id.in_(gone_ids)))
                     for a in gone:
                         s.delete(a)
+                    # Scene question alerts (no person): their pictures and clips, like the camera's people.
+                    gone = s.execute(select(AlertEvent.id, AlertEvent.picture).where(
+                        AlertEvent.scene_id.is_not(None), AlertEvent.camera == cam.name,
+                        AlertEvent.created_at < now - timedelta(days=days))).all()
+                    paths += [p for _, p in gone if p] + [clip_name(i) for i, _ in gone]
+                    if gone:
+                        s.execute(delete(AlertEvent).where(AlertEvent.id.in_([i for i, _ in gone])))
         if old:
             with self._vec_lock:
                 self._vectors = None

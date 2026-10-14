@@ -289,6 +289,9 @@ Phase 22 started 2026-10-14 (user's choices: every 5 minutes by default; alert a
 2. **Done 2026-10-14**: `labeler/scene.py` (SceneRunner: one due question at a time, only when the vision model is idle;
    `Pipeline.scene_frame` every 2 s; answers stored with the picture; two in a row -> on_alert, logged for now).
    Bus photo: "Is there a bus?" yes twice (0.5-0.7 s), "Is there snow?" no.
+3. **Done 2026-10-14**: real alerts: `alert_events.scene_id`, `.picture` (own copy scene_<id>_<time>.jpg), `rule_id`
+   optional (NEW_COLUMNS / NULLABLE_NOW, checked on PostgreSQL); pop-up, Alerts list, clip; deleted with the question
+   and by retention. Old SQLite databases cannot store them (rule_id stays required there; a warning is logged).
 
 ## Critical files
 

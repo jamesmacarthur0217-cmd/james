@@ -516,8 +516,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         q = db.delete_scene_question(question_id)
         if q is None:
             raise HTTPException(404, "question not found")
-        if q["last_picture"]:
-            privacy.remove_picture(crop_dir, q["last_picture"])
+        for name in q["files"]:
+            privacy.remove_picture(crop_dir, name)   # pictures (and blurred copies) and alert clips
         audit(request, "scene question deleted", f"#{question_id} {q['camera']}: {q['question']}")
         return {"ok": True}
 

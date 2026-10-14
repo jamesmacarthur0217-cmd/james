@@ -436,8 +436,8 @@ def test_old_sqlite_database_skips_vehicle_alerts_instead_of_failing(tmp_path):
     with db.engine.begin() as conn:   # the table as it was before: track_id required (new columns added at start)
         conn.execute(text("DROP TABLE alert_events"))
         conn.execute(text("CREATE TABLE alert_events (id INTEGER PRIMARY KEY, rule_id INTEGER NOT NULL, "
-                          "track_id INTEGER NOT NULL, vehicle_id INTEGER, animal_id INTEGER, camera VARCHAR(100), "
-                          "message VARCHAR(300), created_at DATETIME)"))
+                          "track_id INTEGER NOT NULL, vehicle_id INTEGER, animal_id INTEGER, scene_id INTEGER, "
+                          "picture VARCHAR(300), camera VARCHAR(100), message VARCHAR(300), created_at DATETIME)"))
     cam = db.get_or_create_camera("c", "x", "security")
     vid = db.create_vehicle(cam, 1, "car", datetime.now())
     rule = db.add_rule("v", [["vehicle", "any"]])["id"]

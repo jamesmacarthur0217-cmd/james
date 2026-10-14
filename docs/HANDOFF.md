@@ -370,7 +370,9 @@ at 0.5 (0.4 not worth it); 0 false on MOT16, 3 on UR Fall (a person crawling). P
 (left) next to the color picture (right): use the right half. Tried, not kept: ignoring animal boxes that are a found
 person. All new tables/columns checked on scratch PostgreSQL databases. Not measured: the user's camera, night pictures.
 
-**Phase 22 (scene questions) started 2026-10-14**: steps 1-2 done (step 2: the runner asks and stores answers); step 1 (tables `scene_questions`/`scene_answers`, `/api/scene`
+**Phase 22 (scene questions) started 2026-10-14**: steps 1-3 done (step 2: the runner asks and stores answers; step 3:
+real alerts with their own picture and a clip; an old SQLite database cannot store them, PostgreSQL is updated at
+start); step 1 (tables `scene_questions`/`scene_answers`, `/api/scene`
 (admins, audited), Alerts page box). Docker was off again later on 2026-10-14 (PC restarted): a database check hung
 until it was started (pitfall 11).
 

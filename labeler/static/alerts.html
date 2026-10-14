@@ -197,7 +197,7 @@ async function loadEvents() {
   // Keep an open clip playing: only redraw when the list changed.
   const html = data.events.length ? data.events.map(e => `
     <div class="event">${e.crop ? `<img src="/crops/${encodeURIComponent(e.crop)}" alt="">` : '<img alt="">'}
-      <div><b>${esc(e.message)}</b><br><small>${e.animal_id ? `animal #${e.animal_id}` : e.vehicle_id ? `vehicle #${e.vehicle_id}` : `person #${e.track_id}`} · ${esc(e.camera)} · ${esc(e.created_at.replace("T", " "))}</small>
+      <div><b>${esc(e.message)}</b><br><small>${e.scene_id ? "scene question" : e.animal_id ? `animal #${e.animal_id}` : e.vehicle_id ? `vehicle #${e.vehicle_id}` : `person #${e.track_id}`} · ${esc(e.camera)} · ${esc(e.created_at.replace("T", " "))}</small>
         ${e.clip ? `<br><button class="link play" data-clip="${esc(e.clip)}">▶ Play clip</button>` : "<br>"}
         <a class="link" href="/recordings?camera=${encodeURIComponent(e.camera)}&amp;at=${encodeURIComponent(e.created_at)}">▶ Recording</a>
         <div class="clip-box"></div></div>
