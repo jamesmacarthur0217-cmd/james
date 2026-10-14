@@ -16,6 +16,8 @@
   .rule .what { flex: 1; }
   .rule .what small { color: var(--muted); display: block; }
   .rule .what small.often { color: var(--warn); }
+  .rule .what small.sq-limits select { font-size: inherit; padding: 1px 4px; }
+  .rule .what small.sq-limits label { white-space: nowrap; }
   .event { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
   .event img { width: 48px; height: 64px; object-fit: cover; border-radius: 6px; background: var(--chip); flex: none; }
   .event small { color: var(--muted); }
@@ -50,9 +52,12 @@
     </section>
     <section class="panel" style="margin-top:16px">
       <h2>Scene questions</h2>
-      <p class="hint">A yes/no question about a camera's whole picture, asked to the vision model every few minutes,
+      <p class="hint">A yes/no question about a camera's picture, asked to the vision model every few minutes,
         e.g. "Is the gate open?", "Is there a car in the driveway?", "Are the lights on?". An alert comes after two
-        answers in a row that match (one wrong answer does not alert). People and vehicles are labeled first.</p>
+        answers in a row that match (one wrong answer does not alert). People and vehicles are labeled first.
+        It can look at one area only (draw it with <b>Zones</b> on the Live page): only that part goes to the
+        vision model, so a car in the street does not answer for the driveway. It can also be asked only at some
+        hours or only when the house is set to Away (no alerts while the family goes in and out).</p>
       <div class="row"><label for="sq-camera">Camera</label><select id="sq-camera"></select></div>
       <div class="row"><label for="sq-text">Question</label><input id="sq-text" maxlength="200" style="flex:1"
         placeholder="e.g. Is the gate open?"></div>
@@ -61,6 +66,9 @@
           <option value="15">15 min</option><option value="30">30 min</option><option value="60">1 hour</option></select>
         <label for="sq-alert" style="min-width:0">alert when</label><select id="sq-alert">
           <option value="yes">the answer is yes</option><option value="no">the answer is no</option></select></div>
+      <div class="row"><label for="sq-area">Look at</label><select id="sq-area"></select></div>
+      <div class="row"><label for="sq-hours">Ask</label><select id="sq-hours"></select>
+        <label style="min-width:0"><input type="checkbox" id="sq-away"> only when Away</label></div>
       <div class="row"><button class="primary" id="sq-add">Add question</button><span class="muted" id="sq-msg"></span></div>
       <div id="scene"><div class="empty">No questions yet.</div></div>
     </section>
@@ -168,26 +176,57 @@ $("save").onclick = async () => {
 
 // --- Scene questions (labeler/scene.py) ---
 const EVERY = { 60: "1 min", 300: "5 min", 600: "10 min", 900: "15 min", 1800: "30 min", 3600: "1 hour" };
-async function loadScene() {
+const SQ_HOURS = ["22-06", "20-06", "00-06", "18-24", "06-18", "08-18", "09-17"];
+let zoneList = [];   // the cameras' areas and lines (/api/zones), for the area choice
+const hoursText = v => `${v.split("-")[0].padStart(2, "0")}:00 to ${(+v.split("-")[1] % 24 + "").padStart(2, "0")}:00`;
+const inHours = (v, h) => { const [s, e] = v.split("-").map(n => +n % 24); return s < e ? s <= h && h < e : h >= s || h < e; };
+function areaOptions(camera, chosen) {
+  return '<option value="0">the whole picture</option>' + zoneList.filter(z => z.camera === camera && z.kind === "area")
+    .map(z => `<option value="${z.id}"${z.id === chosen ? " selected" : ""}>area: ${esc(z.name)}</option>`).join("");
+}
+function hoursOptions(chosen) {
+  const list = chosen && !SQ_HOURS.includes(chosen) ? [...SQ_HOURS, chosen] : SQ_HOURS;
+  return '<option value="">all day</option>' + list.map(v =>
+    `<option value="${v}"${v === chosen ? " selected" : ""}>${hoursText(v)}</option>`).join("");
+}
+function restingText(q) {   // why a question is not asked now (labeler/scene.py asked_now)
+  const away = window.VL && window.VL.arming ? window.VL.arming.mode === "away" : null;
+  if (q.only_away && away === false) return "not asked now: Home";
+  if (q.hours && !inHours(q.hours, new Date().getHours())) return "not asked now: outside its hours";
+  return "";
+}
+async function loadScene(timer) {
+  if (timer && document.activeElement && document.activeElement.matches("#scene select")) return;   // being chosen
   const r = await fetch("/api/scene");
   if (!r.ok) return;
   const qs = await r.json();
   const flags = await checkFlags();
   $("scene").innerHTML = qs.length ? qs.map(q => {
     const last = q.last_answer ? `last answer: ${esc(q.last_answer)} · ${esc(q.last_at.replace("T", " ").slice(0, 16))}` : "not asked yet";
+    const resting = restingText(q);
     return `<div class="rule" data-id="${q.id}">
       <input type="checkbox" class="sq-on" ${q.enabled ? "checked" : ""} title="Enabled">
       <div class="what"><b>${esc(q.question)}</b><small>${esc(q.camera)} · every ${EVERY[q.every_s] || Math.round(q.every_s / 60) + " min"}
-        · alert on ${esc(q.alert_on)} · ${last}</small>
+        · alert on ${esc(q.alert_on)} · ${last}${resting ? ` · ${resting}` : ""}</small>
+        <small class="sq-limits">look at <select class="sq-area" aria-label="Look at">${areaOptions(q.camera, q.zone_id)}</select>
+          · ask <select class="sq-hours" aria-label="Ask">${hoursOptions(q.hours)}</select>
+          <label><input type="checkbox" class="sq-away"${q.only_away ? " checked" : ""}> only when Away</label></small>
         ${flags.scene[q.id] ? `<small class="often">${esc(flags.scene[q.id])}: try other words, or check that the camera sees the place well</small>` : ""}</div>
       <button class="sq-del danger-quiet">Delete</button></div>`;
   }).join("") : '<div class="empty">No questions yet.</div>';
 }
 $("scene").addEventListener("change", async (e) => {
-  if (!e.target.matches(".sq-on")) return;
-  await fetch(`/api/scene/${e.target.closest(".rule").dataset.id}`, { method: "PATCH",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: e.target.checked }) });
+  const el = e.target;
+  const body = el.matches(".sq-on") ? { enabled: el.checked } : el.matches(".sq-area") ? { zone_id: Number(el.value) }
+             : el.matches(".sq-hours") ? { hours: el.value } : el.matches(".sq-away") ? { only_away: el.checked } : null;
+  if (!body) return;
+  const r = await fetch(`/api/scene/${el.closest(".rule").dataset.id}`, { method: "PATCH",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) alert((await r.json()).detail || "Could not change the question");
+  if (!el.matches(".sq-on")) loadScene();
 });
+$("sq-camera").addEventListener("change", () => { $("sq-area").innerHTML = areaOptions($("sq-camera").value, 0); });
+document.addEventListener("vl-arming", () => loadScene());   // "not asked now: Home" changes with the switch
 $("scene").addEventListener("click", async (e) => {
   if (!e.target.matches(".sq-del") || !confirm("Delete this question and its answers?")) return;
   await fetch(`/api/scene/${e.target.closest(".rule").dataset.id}`, { method: "DELETE" });
@@ -196,7 +235,9 @@ $("scene").addEventListener("click", async (e) => {
 $("sq-add").onclick = async () => {
   const r = await fetch("/api/scene", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ camera: $("sq-camera").value, question: $("sq-text").value,
-                           every_min: Number($("sq-every").value), alert_on: $("sq-alert").value }) });
+                           every_min: Number($("sq-every").value), alert_on: $("sq-alert").value,
+                           zone_id: Number($("sq-area").value) || null, hours: $("sq-hours").value,
+                           only_away: $("sq-away").checked }) });
   if (!r.ok) { $("sq-msg").textContent = (await r.json()).detail || "Could not add"; return; }
   $("sq-msg").textContent = "Added.";
   $("sq-text").value = "";
@@ -237,7 +278,7 @@ async function loadCameraEvents() {
 async function init() {
   fields = (await (await fetch("/api/schema")).json()).all_fields;
   // Zones drawn on the Live page: "entered zone" is a condition like any attribute.
-  const zoneList = await (await fetch("/api/zones")).json();
+  zoneList = await (await fetch("/api/zones")).json();
   const zoneNames = [...new Set(zoneList.map(z => z.name))].sort();
   if (zoneNames.length) fields = { zone: zoneNames, ...fields };
   // Loitering: stayed inside an area (lines have no inside) at least this long; one choice per area and time.
@@ -254,12 +295,14 @@ async function init() {
     $("camera").add(new Option(c.name, c.name));
     if (c.live) $("sq-camera").add(new Option(c.name, c.name));
   }
+  $("sq-area").innerHTML = areaOptions($("sq-camera").value, 0);
+  $("sq-hours").innerHTML = hoursOptions(null);
   loadRules();
   loadScene();
   loadEvents();
   loadCameraEvents();
   setInterval(() => { loadEvents(); loadCameraEvents(); }, 5000);
-  setInterval(loadScene, 30000);
+  setInterval(() => loadScene(true), 30000);
 }
 init();
 </script>

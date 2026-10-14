@@ -324,7 +324,7 @@ search recordings by words. Not chosen: phone alerts (keep alerts on the pages).
 11. **Done 2026-10-14**: Phase 25 step 4, README "What happened (Summary)". **Phase 25 is done.** Next: Phase 16
     (search recordings by words), the last of this plan; ask the user first.
 
-## Phases 26-29: real-camera week, scene question areas, maintenance, more cameras (approved 2026-10-14; Phase 27 started)
+## Phases 26-29: real-camera week, scene question areas, maintenance, more cameras (approved 2026-10-14; Phase 27 done 2026-10-15)
 
 **Plan: [PHASE26-29-PLAN.md](PHASE26-29-PLAN.md)**: after Phase 16 (search recordings by words): 26 a real-camera week
 with the user (Check page numbers, measured changes per camera), 27 scene questions on one area and only when Away /
@@ -338,6 +338,10 @@ cameras (when added). The user picks which to keep and the order at the start. A
 2. **Done 2026-10-14**: Phase 27 step 2, a scene question can be limited to "only when Away" and/or hours
    (`scene_questions.only_away`, `.hours`, checked on PostgreSQL; `scene.asked_now`, `limits_since`): not asked outside
    them, asked at once when they start, answers in a row start afresh; Health does not call it late meanwhile.
+3. **Done 2026-10-15**: Phase 27 step 3, the Alerts page box: **Look at** (whole picture or an area), **Ask** (hours),
+   **only when Away**, when adding and in each question's row ("not asked now: Home / outside its hours"); docs.
+   **Phase 27 is done.** Next: the user picks among 16 (search recordings), 26 (real-camera week, needs their app
+   restarted), 28 (maintenance; the runner check after 2026-10-19), 29 (more cameras, when added).
 
 ## Critical files
 

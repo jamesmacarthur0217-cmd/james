@@ -475,8 +475,8 @@ page before relying on it.
 the whole picture: only that area, with a margin of a tenth of its size, goes to the vision model (the rest of the
 cut-out darkened), and the stored picture is that cut-out. A gate is a small part of a wide picture, and a car parked
 in the street must not answer "Is there a car in the driveway?". If the area is deleted, its questions go back to the
-whole picture (the audit log says which). Choosing the area on the Alerts page comes with Phase 27 step 3; until then
-it is set through `/api/scene` (`zone_id`).
+whole picture (the audit log says which). Choose it on the Alerts page: **Look at** (the whole picture, or one of the
+camera's areas; draw areas with **Zones** on the Live page), when adding a question or later in its row.
 
 Measured (2026-10-14, `tools/scene_area_check.py`, 784 pictures with a known answer for an area; nothing tuned on them):
 
@@ -499,8 +499,8 @@ of a car at the cut-out's edge or cars too small to be marked; a few are plain w
 going in and out by day gives no alerts. Outside its limits a question is not asked at all (the vision model stays free);
 when its hours start or the house goes Away it is asked at once, and its answers in a row start afresh, so a gate left
 open all day alerts again when the night starts. The Health page does not count the time outside the limits as late.
-Choosing the limits on the Alerts page comes with Phase 27 step 3; until then through `/api/scene` (`only_away`,
-`hours`).
+On the Alerts page: **Ask** (all day, or hours such as 22:00 to 06:00) and **only when Away**, when adding a question or
+later in its row; the row says "not asked now: Home" or "not asked now: outside its hours".
 
 **Settings and Health**: the Settings page has a **Scene questions** section (on/off, answers in a row before an alert,
 1-5). The Health page has a "scene questions" line with the last answers, and a warning when a question has not been

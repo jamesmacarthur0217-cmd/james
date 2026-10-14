@@ -467,3 +467,14 @@ def test_health_does_not_call_a_resting_question_late(db):
     arming.set("away", "test")
     assert check_scene(cfg, db, now + timedelta(minutes=5), arming)["level"] == "ok"
     assert check_scene(cfg, db, now + timedelta(minutes=20), arming)["level"] == "warning"
+
+
+# --- Phase 27 step 3: the Alerts page ---
+
+def test_alerts_page_offers_the_area_and_the_limits():
+    from pathlib import Path
+    page = (Path(__file__).resolve().parent.parent / "labeler" / "static" / "alerts.html").read_text(encoding="utf-8")
+    for needle in ('id="sq-area"', 'id="sq-hours"', 'id="sq-away"', 'zone_id: Number($("sq-area").value) || null',
+                   'hours: $("sq-hours").value', 'only_away: $("sq-away").checked', 'class="sq-area"',
+                   '{ zone_id: Number(el.value) }', '"not asked now: Home"'):
+        assert needle in page, needle
