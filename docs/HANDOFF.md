@@ -408,7 +408,9 @@ they restart their app). Step 3: checks.flags, /api/check/flags, notes (Check pa
 **Phase 25 ("while you were away") is done** (2026-10-14; README "What happened (Summary)"): `21d51cf` summary ·
 `3f20e28` page · `483f048` welcome-back note · docs (step 3: session.js welcomeBack) (summary data and API; the Summary page `static/summary.html`, `?period=`).
 
-**Next: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)**, Phase 16 search recordings by words ([PHASE16-PLAN.md](PHASE16-PLAN.md); approved): 23 small fixes, 24 "was this right?"
+**Next: Phase 16** search recordings by words ([PHASE16-PLAN.md](PHASE16-PLAN.md); approved), **then
+[PHASE26-29-PLAN.md](PHASE26-29-PLAN.md)** (approved 2026-10-14): 26 real-camera week with the user, 27 scene question
+areas and limits, 28 maintenance (after 2026-10-19: Ubuntu 26 runner), 29 more cameras. The user picks the order.: 23 small fixes, 24 "was this right?"
 on the user's cameras, 25 "while you were away" summary, then 16 search recordings by words. Not chosen: phone alerts
 (don't offer again unless asked). Ask before each phase and each step. Before Phase 24 the user restarts their app. Its opening questions are
 already answered (2026-10-14): every 5 minutes by default, alert after two "yes" in a row. Ask the user before starting
@@ -437,5 +439,6 @@ Open items (also in that plan):
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with the newest plan in docs/
-> (docs/PHASE23-25-PLAN.md, Phase 16 next; ask me before each phase and each step starts, and do it step by step).
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE16-PLAN.md
+> (search recordings by words) and after it docs/PHASE26-29-PLAN.md; ask me before each phase and each step starts,
+> and do it step by step.
