@@ -62,6 +62,13 @@ class SceneIn(BaseModel):
     alert_on: str = "yes"
 
 
+class CheckIn(BaseModel):
+    kind: str
+    item_id: int
+    right: str
+    correction: str | None = None
+
+
 class SceneUpdate(BaseModel):
     enabled: bool | None = None
     every_min: int | None = None
@@ -471,6 +478,42 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         _rules_changed()
         audit(request, "alert rule deleted", f"rule #{rule_id}")
         return {"ok": True}
+
+    # --- checks: "was this right?" (labeler/checks.py): admins ----------------------------
+
+    @app.get("/check")
+    def check_page():
+        return FileResponse(STATIC / "check.html")
+
+    def _clip_for(event_id: int) -> str | None:
+        name = clip_name(event_id)
+        return name.split("/")[-1] if (crop_dir / name).is_file() else None
+
+    @app.get("/api/check/next")
+    def check_next(skip: str = ""):
+        from . import checks
+        skipped = set()
+        for part in filter(None, skip.split(",")):
+            kind, _, n = part.partition(":")
+            if n.isdigit():
+                skipped.add((kind, int(n)))
+        return {"item": checks.next_item(db, skipped, clip_for=_clip_for), "counts": db.check_counts()}
+
+    @app.post("/api/check")
+    def check_save(body: CheckIn, request: Request):
+        from . import checks
+        if body.kind not in checks.KINDS or body.right not in checks.RIGHT:
+            raise HTTPException(400, "kind or answer not known")
+        item = next((i for i in checks.candidates(db, body.kind) if i["id"] == body.item_id), None)
+        if item is None and body.item_id not in db.checked_ids(body.kind):
+            raise HTTPException(404, "nothing to check with that number (deleted, or older than 30 days)")
+        if item is None:   # checked before: the new answer replaces the old one
+            old = next(c for c in db.list_checks() if c["kind"] == body.kind and c["item_id"] == body.item_id)
+            item = {"what": old["what"], "camera": old["camera"], "corrections": checks.CORRECTIONS.get(body.kind, [])}
+        correction = body.correction if body.right == "no" else None
+        if correction and correction not in item["corrections"]:
+            raise HTTPException(400, f"correction must be one of {', '.join(item['corrections'])}")
+        return db.save_check(body.kind, body.item_id, item["what"], item["camera"], body.right, correction, who(request))
 
     # --- scene questions (labeler/scene.py): admins --------------------------------------
 

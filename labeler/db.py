@@ -375,6 +375,22 @@ class SceneAnswer(Base):
     seconds: Mapped[float | None] = mapped_column(Float)                # how long the vision model took
 
 
+class Check(Base):
+    """An admin's "was this right?" about a vehicle, an animal, an alert or a scene answer (labeler/checks.py).
+    Kept when the item is deleted: it is the measurement. One per item (checking again replaces it)."""
+    __tablename__ = "checks"
+    __table_args__ = (UniqueConstraint("kind", "item_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(10), index=True)       # vehicle | animal | alert | scene
+    item_id: Mapped[int] = mapped_column(Integer)
+    what: Mapped[str] = mapped_column(String(30))                    # e.g. car, dog, fall, loitering, yes
+    camera: Mapped[str] = mapped_column(String(100), index=True)
+    verdict: Mapped[str] = mapped_column(String(6))                  # right? yes | no | unsure ("right" is SQL)
+    correction: Mapped[str | None] = mapped_column(String(30))       # e.g. "cat", "not an animal"
+    checked_by: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+
+
 class AuditEntry(Base):
     """Who did what in the web pages: logins, viewing, searches, exports, deletes, rule changes, reviews.
     Frequent background requests (the Live page's polling) are not logged."""
@@ -1705,6 +1721,48 @@ class Database:
         with self.Session.begin() as s:
             return s.execute(delete(SceneAnswer).where(
                 SceneAnswer.at < datetime.now() - timedelta(days=retention_days))).rowcount
+
+    # --- checks (labeler/checks.py) -------------------------------------------------------
+
+    def save_check(self, kind: str, item_id: int, what: str, camera: str, right: str, correction: str | None,
+                   by: str) -> dict:
+        with self.Session.begin() as s:
+            c = s.scalar(select(Check).where(Check.kind == kind, Check.item_id == item_id))
+            if c is None:
+                c = Check(kind=kind, item_id=item_id)
+                s.add(c)
+            c.what, c.camera, c.verdict, c.correction = what[:30], camera, right, (correction or None)
+            c.checked_by, c.created_at = by[:100], datetime.now()
+            s.flush()
+            return {"id": c.id, "kind": kind, "item_id": item_id, "what": c.what, "camera": camera, "right": right,
+                    "correction": c.correction}
+
+    def checked_ids(self, kind: str) -> set[int]:
+        with self.Session() as s:
+            return set(s.scalars(select(Check.item_id).where(Check.kind == kind)))
+
+    def check_counts(self) -> dict[str, int]:
+        from sqlalchemy import func
+        with self.Session() as s:
+            return dict(s.execute(select(Check.kind, func.count(Check.id)).group_by(Check.kind)).all())
+
+    def list_checks(self) -> list[dict]:
+        with self.Session() as s:
+            return [{"kind": c.kind, "item_id": c.item_id, "what": c.what, "camera": c.camera, "right": c.verdict,
+                     "correction": c.correction, "at": c.created_at.isoformat(timespec="seconds")}
+                    for c in s.scalars(select(Check).order_by(Check.id))]
+
+    def latest_scene_answers(self) -> list[dict]:
+        """Each scene question's newest answer (its picture is the question's last picture), newest first."""
+        out = []
+        with self.Session() as s:
+            for q in s.scalars(select(SceneQuestion)):
+                a = s.scalars(select(SceneAnswer).where(SceneAnswer.question_id == q.id)
+                              .order_by(SceneAnswer.at.desc(), SceneAnswer.id.desc()).limit(1)).first()
+                if a is not None:
+                    out.append({"answer_id": a.id, "question_id": q.id, "question": q.question, "camera": q.camera,
+                                "answer": a.answer, "at": a.at.isoformat(timespec="seconds"), "picture": q.last_picture})
+        return sorted(out, key=lambda a: a["at"], reverse=True)
 
     # --- audit log ----------------------------------------------------------------------
 

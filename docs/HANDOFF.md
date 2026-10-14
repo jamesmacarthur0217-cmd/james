@@ -115,6 +115,9 @@ labeler/arming.py    Home / Away (Phase 19): table `arming` (each change; newest
 labeler/scene.py     scene questions (Phase 22): SceneRunner (run.py thread "scene"), job ids -(2e9 + question id) routed
                      in run.py route_result; VLMClient.label(frame, None, ("scene", question)), PROMPT_SCENE, 1024 px;
                      VLMWorker.idle; Pipeline.scene_frame (clean frame + heads every 2 s); tables scene_questions/answers
+labeler/checks.py    "was this right?" (Phase 24): candidates per kind (vehicle, animal, alert, scene answer; 30 days,
+                     newest first), next_item (the kind with fewest checks first), table checks (verdict yes/no/
+                     unsure, correction), /check page + /api/check/next, POST /api/check (admins)
 labeler/settings.py  Settings page: data/settings.yaml merged over config.yaml in load_config (only the
                      project's config.yaml, or a config naming settings_file:); validated; masked passwords;
                      POST /api/restart → exit 4 → supervisor restarts at once (VL_SUPERVISED=1 from it)
@@ -394,7 +397,9 @@ night, the user's cameras.
 **Phase 23 (small fixes) is done** (2026-10-14): `02c7cf9` Settings unsaved mark; step 2 not needed (console text is
 fine, the plan's assumption was wrong); old SQLite alert tables rebuilt at start (`Database._rebuild_sqlite`).
 
-**Next: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)**, Phase 24 (approved 2026-10-14): 23 small fixes, 24 "was this right?"
+**Phase 24 started 2026-10-14**: step 1 done (Check page, table checks).
+
+**Next: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)**, the rest of Phase 24 (approved 2026-10-14): 23 small fixes, 24 "was this right?"
 on the user's cameras, 25 "while you were away" summary, then 16 search recordings by words. Not chosen: phone alerts
 (don't offer again unless asked). Ask before each phase and each step. Before Phase 24 the user restarts their app. Its opening questions are
 already answered (2026-10-14): every 5 minutes by default, alert after two "yes" in a row. Ask the user before starting

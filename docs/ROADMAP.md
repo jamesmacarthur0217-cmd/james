@@ -297,7 +297,7 @@ Phase 22 started 2026-10-14 (user's choices: every 5 minutes by default; alert a
 5. **Done 2026-10-14**: Settings (on/off, answers in a row), Health line (last answers, overdue warning), docs.
    **Phase 22 is done; the Phases 19-22 plan is finished.** Next: propose the next round to the user.
 
-## Phases 23-25 and 16: fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phase 23 done)
+## Phases 23-25 and 16: fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phase 23 done, 24 started)
 
 **Plan: [PHASE23-25-PLAN.md](PHASE23-25-PLAN.md)**: the user chose, in this order: 23 small fixes (Settings unsaved
 mark, non-English text in the console, old SQLite alert tables), 24 "was this right?" checks on their own cameras
@@ -307,6 +307,8 @@ search recordings by words. Not chosen: phone alerts (keep alerts on the pages).
 2. Phase 23 step 2 not needed: non-English text already shows in the console and is kept in the log file.
 3. **Done 2026-10-14**: Phase 23 step 3, old SQLite alert tables rebuilt at start (one transaction, rows kept).
    **Phase 23 is done.** Next: Phase 24 ("was this right?"); the user restarts their app first.
+4. **Done 2026-10-14**: Phase 24 step 1, the Check page (Y / N / U / S keys, a correction after "wrong"), table
+   `checks` (checked on PostgreSQL), `labeler/checks.py` (kinds take turns, newest first, 30 days).
 
 ## Critical files
 

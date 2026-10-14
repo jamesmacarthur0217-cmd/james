@@ -1,4 +1,4 @@
-# Phases 23-25 (+16) plan: small fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phase 23 done)
+# Phases 23-25 (+16) plan: small fixes, "was this right?", "while you were away", search recordings (approved 2026-10-14; Phase 23 done, Phase 24 started)
 
 ## Context
 
@@ -34,7 +34,7 @@ Before Phase 24 the user restarts their own app (stop.bat, start.bat) so it runs
 ## Phase 24: "Was this right?" on your own cameras
 
 The answer key measures people's labels; nothing measures the newer detections on the user's cameras.
-1. Table `checks` (what: vehicle / animal / fall / loitering alert / scene answer, its id, right yes/no/not sure, by,
+1. **Done 2026-10-14** (column `verdict`, not the SQL word `right`). Table `checks` (what: vehicle / animal / fall / loitering alert / scene answer, its id, right yes/no/not sure, by,
    when) and an admin **Check** page: recent items one at a time with their picture (and clip when there is one),
    keyboard Y / N / S like the Answer key page; mixed so every kind gets checked; items already checked skipped.
 2. Results: per kind and camera, "right N of M" (and for vehicles/animals the kind: "it was a cat, not a dog" as an
