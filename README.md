@@ -602,8 +602,10 @@ power cut the last ~3 seconds are lost and the file still plays; the next start 
 
 ### Time-lapse
 
-About a minute of video showing everything one camera recorded in a day (`labeler/timelapse.py`; the Recordings page's
-button comes with Phase 34 step 2). Every n-th recorded frame is kept so the day fits 60 s at 25 frames a second, with
+About a minute of video showing everything one camera recorded in a day (`labeler/timelapse.py`): **▶ Time-lapse**
+on the Recordings page, next to the day, makes it (a progress line) and plays it, with the time of the moment shown
+under it; **Open this moment** opens the real recording there. Today's time-lapse says when it was made and offers
+**Make again** while the camera keeps recording. Admins and viewers (viewers get the blurred copy). Every n-th recorded frame is kept so the day fits 60 s at 25 frames a second, with
 the camera's clock still written on every frame; a map of which recording and second each frame comes from lets a
 click open the real recording. Made when asked for, kept next to the day's recordings (`timelapse.mp4`, and
 `timelapse.blurred.mp4` with faces blurred for viewers: the user's choice) and made again when the day's recordings
@@ -613,7 +615,8 @@ Measured (2026-10-15, the test copy's 12 recordings of one day, 8,178 frames, tw
 (55 s), made in 8.3 s, 12 s with the blurred copy (+4 s: only the kept frames are blurred), 10.9 MB each; the clock on
 the frames was within 1 s of the map. Reading the recordings is the work, about 1,000 recorded frames a second here:
 a day with 3 hours recorded takes about 2 minutes, a full 24 hours about 15. (Joining the files with FFmpeg was 2x
-faster but dropped half the frames when the size changed, so it was not used.)
+faster but dropped half the frames when the size changed, so it was not used.) In the running test copy, with its
+camera busy at the same time, the same day took 25 s from the button to playing.
 
 ## A video of each person
 

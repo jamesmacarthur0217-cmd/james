@@ -73,6 +73,21 @@ def test_make_writes_the_day_and_a_map_that_opens_the_recordings(db, setup):
     assert timelapse.current(base, "cam1", DAY, timelapse.sources(db, base, "cam1", DAY)) is None
 
 
+def test_today_s_recording_growing_keeps_it_marked_older(db, setup):
+    cfg, base, (a, b) = setup
+    db.update_recording(b, ended_at=None)                                         # still being written
+    srcs = timelapse.sources(db, base, "cam1", DAY)
+    timelapse.make(cfg, base, "cam1", DAY, srcs, seconds=4, writer_factory=Writer)
+    assert timelapse.current(base, "cam1", DAY, srcs)["older"] is False
+    folder = base / "cam1" / DAY
+    (folder / "140500.jsonl").write_text((folder / "140500.jsonl").read_text() + "[20.0, []]\n")   # it grew
+    grown = timelapse.sources(db, base, "cam1", DAY)
+    assert timelapse.current(base, "cam1", DAY, grown)["older"] is True
+    maker = timelapse.Maker(cfg, db, writer_factory=Writer)
+    assert maker.start("cam1", DAY)["state"] == "done"                            # shown as it is
+    assert maker.start("cam1", DAY, again=True)["state"] in ("making", "done")    # made anew on request
+
+
 def test_a_file_shorter_than_its_frame_list_keeps_the_map_right(db, setup):
     cfg, base, (a, b) = setup
     srcs = timelapse.sources(db, base, "cam1", DAY)
@@ -92,6 +107,42 @@ def test_the_time_lapse_goes_with_the_days_last_recording(db, setup, tmp_path):
         p.unlink()
     timelapse.drop_if_alone(folder)
     assert not list(folder.glob("timelapse*"))
+
+
+def test_api_and_page(db, setup):
+    from pathlib import Path
+    from fastapi.testclient import TestClient
+    from labeler import accounts
+    from labeler.web import create_app
+    cfg, base, _ = setup
+    cfg["cameras"] = [{"name": "cam1", "source": 0}]
+    app = create_app(cfg, db, None)
+    app.state.timelapse.writer_factory = Writer
+    admin = TestClient(app, client=("127.0.0.1", 5000))
+    q = {"camera": "cam1", "day": DAY}
+    assert admin.get("/api/recordings/timelapse", params=q).json()["state"] == "none"
+    assert admin.get("/api/recordings/timelapse", params={**q, "camera": "../x"}).status_code == 404
+    assert admin.post("/api/recordings/timelapse", json={**q, "day": "2026-10-01"}).status_code == 404
+    assert admin.post("/api/recordings/timelapse", json=q).json()["state"] in ("making", "done")
+    for _ in range(100):
+        d = admin.get("/api/recordings/timelapse", params=q).json()
+        if d["state"] == "done":
+            break
+        time.sleep(0.05)
+    assert d["state"] == "done" and len(d["frames"]) == 500 and d["fps"] == 25      # a short day: every frame
+    folder = base / "cam1" / DAY
+    (folder / "timelapse.mp4").write_bytes(b"plain")
+    (folder / "timelapse.blurred.mp4").write_bytes(b"blurred")
+    assert admin.get(f"/recordings/timelapse/cam1/{DAY}.mp4").content == b"plain"
+    db.add_user("vic", accounts.hash_password("correct horse battery"), "viewer")
+    viewer = TestClient(app, client=("192.168.1.20", 5000))
+    viewer.post("/api/login", json={"username": "vic", "password": "correct horse battery"})
+    assert viewer.get(f"/recordings/timelapse/cam1/{DAY}.mp4").content == b"blurred"   # faces blurred for viewers
+    assert viewer.get("/api/recordings/timelapse", params=q).status_code == 200
+    assert [e["action"] for e in db.list_audit(10)].count("view time-lapse") == 2
+    page = (Path(__file__).resolve().parent.parent / "labeler" / "static" / "recordings.html").read_text(encoding="utf-8")
+    for needle in ('id="lapse"', 'id="lapse-open"', "playAt(ms(f[2]))", "/recordings/timelapse/"):
+        assert needle in page, needle
 
 
 def test_maker_runs_one_at_a_time_and_says_when_it_is_ready(db, setup):

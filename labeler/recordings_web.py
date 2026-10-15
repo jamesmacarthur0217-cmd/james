@@ -40,6 +40,12 @@ class SearchIn(BaseModel):
     limit: int = 100
 
 
+class TimelapseIn(BaseModel):
+    camera: str
+    day: str
+    again: bool = False   # make it anew (it is older than today's recording being written)
+
+
 def frame_list(path: Path) -> tuple[dict, list[float], list[list]]:
     """A recording's header, each frame's time in the file (seconds from its start) and head boxes."""
     header, times, boxes = {}, [], []
@@ -155,6 +161,61 @@ def add_routes(app, cfg: dict, db, audit, blur_for, agent=None, embedder=None, p
         out = moments.moments(db, items, base, float(cfg["recording"]["fps"]))
         return {"question": question, "explanation": explanation, "how": how, **out,
                 "recording": bool(cfg["recording"]["enabled"]), "keep_days": cfg["recording"]["keep_days"]}
+
+    # --- the day's time-lapse (labeler/timelapse.py) ---------------------------------------------------------------
+    from . import timelapse
+    maker = app.state.timelapse = timelapse.Maker(cfg, db)
+
+    def _day(day: str) -> str:
+        try:
+            return datetime.fromisoformat(day).date().isoformat()
+        except ValueError:
+            raise HTTPException(400, "day must look like 2026-10-12")
+
+    def _camera(camera: str) -> str:
+        if camera not in set(db.recording_cameras()) | {c["name"] for c in cfg["cameras"]}:
+            raise HTTPException(404, f"no camera {camera!r}")
+        return camera
+
+    @app.get("/api/recordings/timelapse")
+    def timelapse_status(camera: str, day: str):
+        """Whether the day's time-lapse is ready (with its frame map), being made (with progress), or not made."""
+        camera, day = _camera(camera), _day(day)
+        srcs = timelapse.sources(db, base, camera, day)
+        info = timelapse.current(base, camera, day, srcs) if srcs else None
+        if info is not None:
+            return {"state": "done", "camera": camera, "day": day, "fps": info["fps"], "frames": info["frames"],
+                    "seconds": round(len(info["frames"]) / info["fps"], 1), "older": info["older"],
+                    "made_at": info.get("made_at"), "version": info.get("made_at") or len(info["frames"])}
+        job = maker.status()
+        if job and (job["camera"], job["day"]) == (camera, day) and job["state"] in ("making", "failed"):
+            return job
+        return {"state": "none", "camera": camera, "day": day, "recorded": bool(srcs)}
+
+    @app.post("/api/recordings/timelapse")
+    def timelapse_start(body: TimelapseIn, request: Request):
+        """Make the day's time-lapse in the background (one at a time); the page asks for its progress."""
+        day = _day(body.day)
+        try:
+            job = maker.start(_camera(body.camera), day, again=body.again)
+        except ValueError as e:
+            raise HTTPException(404, str(e))
+        except RuntimeError as e:
+            raise HTTPException(409, str(e))
+        if job["state"] == "making":
+            audit(request, "make time-lapse", f"{body.camera} {day}")
+        return job
+
+    @app.get("/recordings/timelapse/{camera}/{day}.mp4")
+    def timelapse_file(camera: str, day: str, request: Request):
+        """The time-lapse: admins the picture as recorded, viewers the copy with faces blurred."""
+        camera, day = _camera(camera), _day(day)
+        path = timelapse.day_folder(base, camera, day) / (timelapse.BLURRED if blur_for(request) else timelapse.NAME)
+        if not path.is_file():
+            raise HTTPException(404, "no time-lapse of that day yet")
+        if request.headers.get("range", "bytes=0-").startswith("bytes=0-"):   # a new playback, not a seek
+            audit(request, "view time-lapse", f"{camera} {day}")
+        return FileResponse(path, media_type="video/mp4", headers={"Cache-Control": "private, no-cache"})
 
     @app.post("/api/recordings/search/photo")
     async def search_recordings_photo(request: Request):

@@ -420,6 +420,10 @@ Phase 34 started 2026-10-15 (user's choice: viewers get a copy with faces blurre
    60 s at 25 fps through the recorder's FFmpeg writer, a frame map, a blurred copy; remade when the day's recordings
    change; deleted with the day's last recording (recorder.prune, delete). Test copy: 8,178 frames -> 1,363 in 8.3 s
    (12 s with the blurred copy), clock within 1 s of the map.
+2. **Done 2026-10-15** (with step 3's docs): API (`GET/POST /api/recordings/timelapse`, `GET /recordings/timelapse/
+   <camera>/<day>.mp4`, viewers the blurred file, audited), Recordings page button with progress, the moment's time,
+   Open this moment, Make again for today (the recording being written grows: shown "older" instead of not at all;
+   found in the browser check, where the page stopped at 96%). **Phase 34 is done.** Next: Phase 35 (Update button).
 
 ## Critical files
 

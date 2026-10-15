@@ -44,7 +44,8 @@ def sources(db, base: Path, camera: str, day: str) -> list[dict]:
         path = base / r["path"]
         _, times, boxes = frame_list(path)
         if times and path.is_file():
-            out.append({"id": r["id"], "path": path, "start": r["started_at"], "times": times, "boxes": boxes})
+            out.append({"id": r["id"], "path": path, "start": r["started_at"], "times": times, "boxes": boxes,
+                        "open": r["ended_at"] is None})
     return out
 
 
@@ -64,15 +65,22 @@ def plan(srcs: list[dict], seconds: float = DEFAULT_SECONDS) -> dict:
 
 
 def current(base: Path, camera: str, day: str, srcs: list[dict]) -> dict | None:
-    """The kept time-lapse's frame map, if it is still made from exactly these recordings."""
+    """The kept time-lapse's frame map, if it is made from these recordings. When only the recording still being
+    written has grown since (today's, while someone is in view), it is still shown, marked "older": the page offers
+    to make it again."""
     folder = day_folder(base, camera, day)
     try:
         info = json.loads((folder / MAP).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    if not (folder / NAME).is_file() or info.get("sources") != [[s["id"], len(s["times"])] for s in srcs]:
+    if not (folder / NAME).is_file():
         return None
-    return info
+    saved, now = info.get("sources") or [], [[s["id"], len(s["times"])] for s in srcs]
+    if saved == now:
+        return {**info, "older": False}
+    grown = (len(saved) == len(now) and all(a[0] == b[0] for a, b in zip(saved, now))
+             and all(a[1] == b[1] or (s["open"] and b[1] >= a[1]) for a, b, s in zip(saved, now, srcs)))
+    return {**info, "older": True} if grown else None
 
 
 def drop_if_alone(folder: Path) -> None:
@@ -95,13 +103,14 @@ class Maker:
         with self._lock:
             return dict(self.job) if self.job else None
 
-    def start(self, camera: str, day: str, seconds: float = DEFAULT_SECONDS) -> dict:
-        """Start making a day's time-lapse in the background (or say it is ready, or busy with another)."""
+    def start(self, camera: str, day: str, seconds: float = DEFAULT_SECONDS, again: bool = False) -> dict:
+        """Start making a day's time-lapse in the background (or say it is ready, or busy with another).
+        again: make it anew although one is kept (it is older than today's recording being written)."""
         srcs = sources(self.db, self.base, camera, day)
         if not srcs:
             raise ValueError("nothing was recorded that day")
         info = current(self.base, camera, day, srcs)
-        if info is not None:
+        if info is not None and not (again and info["older"]):
             return {"state": "done", "camera": camera, "day": day, **_summary(info)}
         with self._lock:
             if self.job and self.job["state"] == "making":
@@ -206,5 +215,6 @@ def make(cfg: dict, base: Path, camera: str, day: str, srcs: list[dict], seconds
         btmp.replace(bout)
     info["frames"] = frames
     info["size_mb"] = round(out.stat().st_size / 1e6, 1)
+    info["made_at"] = datetime.now().isoformat(timespec="seconds")
     (folder / MAP).write_text(json.dumps(info), encoding="utf-8")
     return info

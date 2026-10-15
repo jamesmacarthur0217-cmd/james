@@ -72,6 +72,9 @@
       <input type="date" id="day">
       <button id="next" title="The day after">▶</button>
       <span class="muted" id="summary"></span>
+      <button id="lapse" title="About a minute of video of this camera's whole day" hidden>▶ Time-lapse</button>
+      <span class="muted" id="lapse-note"></span>
+      <button id="lapse-again" class="link" title="Make it again with what was recorded since" hidden>Make again</button>
     </div>
     <div class="daybar" id="daybar"></div>
     <div class="legend"><span style="--dot: var(--rec)">recorded</span><span style="--dot: var(--person)">a person appeared</span></div>
@@ -80,7 +83,8 @@
       <video id="video" controls playsinline muted hidden></video>
       <img id="stream" alt="Recording" hidden>
       <p class="now"><b id="now"></b> <span class="muted" id="now-note"></span>
-        <button id="stop" hidden>Stop</button></p>
+        <button id="stop" hidden>Stop</button>
+        <button id="lapse-open" title="Open the real recording at this point of the time-lapse" hidden>Open this moment</button></p>
     </div>
   </section>
   <section class="panel">
@@ -119,7 +123,75 @@ async function load(day, camera) {
     : `Recorded while people are in view; kept ${data.keep_days} days. Click the bar to play from that moment.`;
   drawBar();
   drawList();
+  checkLapse();
 }
+
+// --- The day's time-lapse (labeler/timelapse.py): about a minute of the camera's day; viewers get it blurred ---
+let lapse = null;   // the time-lapse playing: {camera, day, frames: [[recording, second, time]], fps}
+async function lapseStatus() {
+  const q = new URLSearchParams({ camera: data.camera, day: data.day });
+  const r = await fetch("/api/recordings/timelapse?" + q);
+  return r.ok ? r.json() : { state: "none", recorded: false };
+}
+function lapseNote(d) {
+  $("lapse-note").textContent = d.state !== "done" ? ""
+    : `${Math.round(d.seconds)} s` + (d.older && d.made_at ? `, made at ${clock(ms(d.made_at))}` : "");
+  $("lapse-again").hidden = !(d.state === "done" && d.older);
+}
+async function checkLapse() {
+  const d = await lapseStatus();
+  $("lapse").hidden = !(d.recorded || d.state !== "none");
+  lapseNote(d);
+  if (d.state === "making") pollLapse();
+}
+$("lapse").onclick = () => makeLapse(false);
+$("lapse-again").onclick = () => makeLapse(true);
+async function makeLapse(again) {
+  $("lapse-again").hidden = true;
+  const r = await fetch("/api/recordings/timelapse", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ camera: data.camera, day: data.day, again }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { $("lapse-note").textContent = d.detail || "The time-lapse could not be made."; return; }
+  if (d.state === "done") playLapse(await lapseStatus()); else pollLapse();
+}
+async function pollLapse() {
+  const d = await lapseStatus();
+  if (d.state === "making") {
+    $("lapse-note").textContent = `Making the time-lapse… ${Math.min(99, Math.round(100 * d.done_frames / Math.max(1, d.total)))}%`;
+    setTimeout(pollLapse, 1000);
+  } else if (d.state === "failed") {
+    $("lapse-note").textContent = `The time-lapse could not be made: ${d.error}`;
+  } else if (d.state === "done") {
+    lapseNote(d);
+    playLapse(d);
+  } else {
+    $("lapse-note").textContent = "The time-lapse could not be made; try again.";
+  }
+}
+function playLapse(d) {
+  lapse = d; playing = null; queue = null;
+  clearTimeout(stopTimer); stopStream();
+  const v = $("video");
+  $("player").hidden = false; $("stream").hidden = true; $("stop").hidden = true; v.hidden = false;
+  $("lapse-open").hidden = false;
+  v.src = `/recordings/timelapse/${encodeURIComponent(d.camera)}/${d.day}.mp4?v=${d.version}`;
+  v.onloadedmetadata = () => v.play().catch(() => {});
+  const show = () => {
+    const f = d.frames[Math.min(d.frames.length - 1, Math.floor(v.currentTime * d.fps))];
+    $("now").textContent = `${d.camera} · time-lapse of ${d.day} · ${f ? clock(ms(f[2])) : ""}`;
+    $("now-note").textContent = data.admin ? "" : "(faces blurred)";
+  };
+  v.ontimeupdate = show;
+  show();
+  drawList();
+  $("player").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+$("lapse-open").onclick = () => {
+  const v = $("video"), f = lapse && lapse.frames[Math.min(lapse.frames.length - 1, Math.floor(v.currentTime * lapse.fps))];
+  if (!f) return;
+  v.pause();
+  playAt(ms(f[2]));   // the real recording at that moment (labeler/recordings_web.py find)
+};
 
 // The day bar: one axis (hours), recorded stretches as bars, people as ticks; a crosshair shows the time.
 function drawBar() {
@@ -203,6 +275,7 @@ function localIso(t) { const d = new Date(t); return `${localDay(d)}T${clock(t)}
 // `until` (a search's moment): {videoEnd: seconds in the file, seconds: its length, onEnd} stops it at its end.
 function play(rec, offsetS, videoS, until) {
   playing = { rec, startMs: ms(rec.start) };
+  lapse = null; $("lapse-open").hidden = true;
   $("player").hidden = false;
   const v = $("video"), img = $("stream");
   stopStream();
