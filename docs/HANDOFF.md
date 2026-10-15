@@ -16,7 +16,17 @@ Roadmap Phase 1 (licenses) is deferred until they say otherwise. Under Malaysia'
 household use is generally outside the Act; their filled-in camera sign and data-protection summary are in
 `data/privacy/` (git-ignored, contains their email); the blank templates are in `docs/`.
 
-## 2. Current state (2026-10-14)
+## 2. Current state (2026-10-15)
+
+**Latest (2026-10-15, last commit `b15c94f`, 795 tests, GitHub green):** done this day, newest last: Phase 16 search
+recordings by words (`9758ea5` `591615a`), 27 scene question areas and limits (`56fecb7` `fcbc306` `806e0ae`), 28
+steps 2-4 (`cae1a17` httpx2, `5304118` PyTorch 2.14.1 cu130 + setuptools 84, `ae73616` zip), 30 camera picture check
+(`94df715` `03ec5b3`), 31 no movement (`1b51a57` `ab51c07` `f5349fd`), 32 help sign (`c197716` `764dee7` `55f7758`),
+33 search recordings by photo (`0de9d76` `8a0f48d`), 34 time-lapse (`ed76cd9` `c2bb71c`), 35 Update button (`b15c94f`).
+**The Phases 30-35 plan is finished; next: [PHASE36-40-PLAN.md](PHASE36-40-PLAN.md)** (approved 2026-10-15). The user's
+own app has still **not run Phases 13-35**: at its next start (stop.bat, start.bat) it updates PostgreSQL by itself
+(new since Phase 25: scene_questions zone_id / only_away / hours; earlier changes were checked on scratch databases).
+The user has one webcam (no Phase 29); Docker was running at the end of the day; no test copy left running.
 
 - Git: branch `main`, pushed to the user's **private** GitHub repository (`origin`, 2026-10-10; the first push
   was signed in by the user in the browser, Git Credential Manager keeps it). Push after each commit. Roadmap **Phases 0, 2-11 done**, Phase 12 step 1 measured (not adopted), Phases 13-15 and 17-25 done (25: `21d51cf` · `3f20e28` · `483f048`; 24: `f4f1a1d` · `be64dd8` · `cbaea65`; 23: `02c7cf9` · `2989afc`; 22: `722118c` · `cba3db4` · `14f8c19` · `938f2c3` · Settings; 21: `98be1cd` · `5bc87d8` · `7215d4c` · `8f694b4` · Settings; 20: `98f436a` rule · `89af3de` page · `3141852` live picture · tool; 19: `46daf57` Home/Away state · `1843a06` rules · `b41530b` pages; 17: `81da79e` mobility aids · `aba64cb` fall detection · `023bb6e` fall alerts · Settings; 18: vehicles `2790822` · `91d90e4` · `8374fad` · `0d87bc0` · Settings); Phase 16 approved, not started; Phase 1 deferred. Phase 11: `5341d56` keyboard answer key. Phase 10:
@@ -124,6 +134,14 @@ labeler/summary.py   what happened in a period (Phase 25): away_period from the 
 labeler/settings.py  Settings page: data/settings.yaml merged over config.yaml in load_config (only the
                      project's config.yaml, or a config naming settings_file:); validated; masked passwords;
                      POST /api/restart → exit 4 → supervisor restarts at once (VL_SUPERVISED=1 from it)
+labeler/moments.py   search recordings (Phase 16/33): finds -> moments (3 s pad, joined < 60 s, parts per file);
+                     /api/recordings/search (+ /photo, min_similarity 0.85); Recordings page Find box, Play all
+labeler/picture_check.py camera picture check (Phase 30): covered/dark/bright/blurry/backlight/faces; PictureWatch
+                     per camera (80% of 10 min); Health line, Live banner, Settings "Check the picture"
+labeler/quiet.py     no movement (Phase 31): QuietWatch thread, built-in rule "No movement" (quiet=240, 08-22, Home)
+labeler/gestures.py  help sign (Phase 32): hands_up (upright body) + GestureWatch (3 s); built-in rule "Help sign"
+labeler/timelapse.py the day's time-lapse (Phase 34): Maker, frame map, blurred copy for viewers, "older" for today
+labeler/updater.py   Update button (Phase 35): daily git fetch, ff-only pull, pip when requirements changed, restart
 start.bat / stop.bat daily start/stop (wait for Docker + Ollama; stop waits for app exit, backs up DB)
 install.bat/.ps1     new PC: winget Python/Docker/Ollama, .venv, .env, DB, models, admin, autostart,
                      health; -CheckOnly, -Offline <pkg>; PowerShell 5.1 + ASCII only (tests check)
@@ -220,6 +238,14 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
    halfway left a test database with only `alert_events_old` (2026-10-14, before the fix was committed). For
    several DDL statements that must be all-or-nothing, use the raw connection with `isolation_level = None` and an
    explicit BEGIN / COMMIT / ROLLBACK (`Database._rebuild_sqlite`), and test a failure halfway.
+25. **Bash heredocs also eat a backslash at a line end** (a Python `\` line continuation was joined into one line,
+   2026-10-15): write edit scripts with the Write tool and run them with Python.
+26. **The browser pane's tabs can disappear between turns**: open the page again with `navigate` before using refs.
+27. **Windows asyncio "WinError 10054"** (a browser dropping a video connection) was logged as ERROR and counted by the
+   Health page; it is filtered now (`logs.DropClosedConnections`).
+28. **Test stand-ins of `AlertEngine.check`** must accept `helped=` (the help sign) as well as `fallen=` and `stayed=`.
+29. **The time-lapse reads files with OpenCV**, not FFmpeg's concat demuxer, which dropped half the frames when a
+   camera's size changed during the day.
 
 ## 7. Conventions
 
@@ -514,9 +540,16 @@ Open items (also in that plan):
   the tools in `tools/`, never by the app; they can be deleted (`data/datasets/urfd`, `openimages_aids`, `stanford_cars`).
 - Vocabulary refinements (coat, polo, tank top) need answer-key values to be measurable.
 
+**Next (2026-10-15): [PHASE36-40-PLAN.md](PHASE36-40-PLAN.md)**, the user's choices in this order: 36 first-run check
+("what's new" + a guided check page), 37 faster playback, 38 PC watch, 39 unusual quiet, 40 weekly report. Also: Phase
+26 once the user's app runs the new version; Phase 28 step 1 (GitHub runs on Ubuntu 26) after 2026-10-19. Offered on
+2026-10-15 and not chosen (don't offer again unless asked): simple view, full-system long run, privacy hours, snooze
+alerts, activity calendar, camera moved/blocked, left-behind objects (and earlier: phone alerts, picture backups,
+family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurred export).
+
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE30-35-PLAN.md
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE36-40-PLAN.md
 > (and the GitHub runner check of Phase 28 after 2026-10-19); ask me before each phase and each step starts, and do it
 > step by step.

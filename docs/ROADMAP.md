@@ -1,6 +1,10 @@
 # VisionLabeler: next improvements roadmap
 
-## Status (2026-10-14)
+## Status (2026-10-15)
+
+Latest: Phases 16, 27, 28 (steps 2-4) and 30-35 are done (2026-10-15; 795 tests). Next: Phases 36-40
+([PHASE36-40-PLAN.md](PHASE36-40-PLAN.md)). Phase 26 waits for the user's app to run the new version, Phase 28 step 1
+for 2026-10-19, Phase 29 for more cameras.
 
 **Phases 0 and 2-11 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not
@@ -432,6 +436,13 @@ Phase 35 started 2026-10-15.
    supervisor), Settings "Updates" box, Health line "updates", daily check thread (`updates.check`). Tested on scratch
    repositories and a 3-versions-behind clone of this repository. **Phase 35 is done; the Phases 30-35 plan is
    finished.**
+
+## Phases 36-40: first-run check, faster playback, PC watch, unusual quiet, weekly report (approved 2026-10-15, not started)
+
+**Plan: [PHASE36-40-PLAN.md](PHASE36-40-PLAN.md)**: the user's choices, in this order: 36 first-run check ("what's
+new" and a guided check page, with a no-alert "try the help sign"), 37 faster playback (2x-8x, skip, keys; viewers'
+stream too), 38 PC watch (GPU temperature, disk health, unexpected stops), 39 unusual quiet (learn the usual day,
+alert on an odd quiet), 40 weekly report (printable). Ask before each phase and each step.
 
 ## Critical files
 
