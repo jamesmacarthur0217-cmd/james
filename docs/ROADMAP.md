@@ -364,6 +364,14 @@ cameras (when added). The user picks which to keep and the order at the start. A
    needs the user's app running), Phase 28 step 1 (GitHub runner after 2026-10-19), Phase 29 (more cameras: the user
    has none extra).
 
+## Phases 30-35: picture check, no movement, help sign, photo search in recordings, time-lapse, update button (approved 2026-10-15, not started)
+
+**Plan: [PHASE30-35-PLAN.md](PHASE30-35-PLAN.md)**: the user (one webcam, no extra cameras) chose all six new ideas,
+in this order: 30 camera picture check (covered, blurry, dark, backlight, angle), 31 "no movement" alert (4 h,
+08:00-22:00, only when Home), 32 help sign (one hand above the head for 3 s -> alert), 33 search recordings by photo,
+34 time-lapse of the day, 35 an Update button on the Settings page. Not chosen (2026-10-15): sounds, privacy masks,
+Malay/Chinese pages, blurred export. Ask before each phase and each step.
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),

@@ -434,8 +434,11 @@ the viewers' stream) and video_s/video_end_s (frame index / fps: the admins' pla
 the Recordings page's "Find in recordings" box (`static/recordings.html`: drawFound, playMoment, play(..., until) stops
 the file at video_end_s or waits d + 1.5 s for the stream, then the next part / Play all queue). Checked in the browser
 (admin; the viewer path by switching the page's flag; phone width). **Phase 16 is done.**
-Next, ask the user: Phase 26 (real-camera week: their app must run with the webcam; the lens cover open), Phase 28
-step 1 after 2026-10-19; Phase 29 waits for extra cameras (the user has none, 2026-10-15).
+Next: **[PHASE30-35-PLAN.md](PHASE30-35-PLAN.md)** (approved 2026-10-15): 30 camera picture check, 31 "no movement"
+alert (4 h, 08:00-22:00, only when Home), 32 help sign (one hand above the head 3 s), 33 search recordings by photo,
+34 time-lapse of the day, 35 Update button. Also open: Phase 26 (real-camera week: their app must run with the webcam,
+lens cover open), Phase 28 step 1 after 2026-10-19; Phase 29 waits for extra cameras (the user has none, 2026-10-15).
+Not chosen 2026-10-15 (don't offer again unless asked): sounds, privacy masks, Malay/Chinese pages, blurred export.
 
 **Earlier plan: Phase 16** search recordings by words ([PHASE16-PLAN.md](PHASE16-PLAN.md); approved, skipped for now), **then
 [PHASE26-29-PLAN.md](PHASE26-29-PLAN.md)** (approved 2026-10-14): 26 real-camera week with the user, 27 scene question
@@ -468,6 +471,6 @@ Open items (also in that plan):
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE16-PLAN.md
-> (search recordings by words) and after it docs/PHASE26-29-PLAN.md; ask me before each phase and each step starts,
-> and do it step by step.
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE30-35-PLAN.md
+> (and the GitHub runner check of Phase 28 after 2026-10-19); ask me before each phase and each step starts, and do it
+> step by step.
