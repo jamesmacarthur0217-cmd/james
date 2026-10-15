@@ -1226,8 +1226,10 @@ class Database:
                 who, gone = AlertEvent.animal_id == animal_id, s.get(Animal, animal_id) is None
             elif vehicle_id is not None:
                 who, gone = AlertEvent.vehicle_id == vehicle_id, s.get(Vehicle, vehicle_id) is None
-            else:
+            elif track_id is not None:
                 who, gone = AlertEvent.track_id == track_id, s.get(Track, track_id) is None
+            else:   # about no one: "no movement" (labeler/quiet.py), which decides itself when it fires again
+                who, gone, repeat = None, False, True
             exists = None if repeat else s.scalar(select(AlertEvent.id).where(AlertEvent.rule_id == rule_id, who))
             if exists is not None or gone:
                 return None
@@ -1256,14 +1258,24 @@ class Database:
                              .outerjoin(Animal, Animal.id == AlertEvent.animal_id)
                              .outerjoin(AlertRule, AlertRule.id == AlertEvent.rule_id)
                              .where(AlertEvent.id > since_id, (Track.id.is_not(None)) | (Vehicle.id.is_not(None))
-                                    | (Animal.id.is_not(None)) | (AlertEvent.scene_id.is_not(None)), *when)
+                                    | (Animal.id.is_not(None)) | (AlertEvent.scene_id.is_not(None))
+                                    | (AlertEvent.track_id.is_(None) & AlertEvent.vehicle_id.is_(None)   # "no movement"
+                                       & AlertEvent.animal_id.is_(None) & AlertRule.id.is_not(None)), *when)
                              .order_by(AlertEvent.id.desc()).limit(limit)).all()
             return [{"id": e.id, "rule_id": e.rule_id, "track_id": e.track_id, "vehicle_id": e.vehicle_id,
                      "animal_id": e.animal_id, "scene_id": e.scene_id, "camera": e.camera, "message": e.message,
                      "crop": tcrop or vcrop or acrop or e.picture,
                      "created_at": e.created_at.isoformat(timespec="seconds"),
-                     "fall": any(n == "fallen" for n, _ in json.loads(conds or "[]"))}
+                     "fall": any(n == "fallen" for n, _ in json.loads(conds or "[]")),
+                     "quiet": any(n == "quiet" for n, _ in json.loads(conds or "[]"))}
                     for e, tcrop, vcrop, acrop, conds in rows]
+
+    def update_alert_message(self, event_id: int, message: str) -> None:
+        """A "no movement" alert says how it ended (someone seen again)."""
+        with self.Session.begin() as s:
+            e = s.get(AlertEvent, event_id)
+            if e is not None:
+                e.message = message[:500]
 
     def alerts_between(self, start: datetime, end: datetime) -> list[dict]:
         return self.list_alerts(limit=1000, start=start, end=end)
@@ -1992,9 +2004,10 @@ class Database:
                         s.execute(delete(AlertEvent).where(AlertEvent.animal_id.in_(gone_ids)))
                     for a in gone:
                         s.delete(a)
-                    # Scene question alerts (no person): their pictures and clips, like the camera's people.
+                    # Alerts about no one (scene questions, no movement): pictures and clips, like the camera's people.
                     gone = s.execute(select(AlertEvent.id, AlertEvent.picture).where(
-                        AlertEvent.scene_id.is_not(None), AlertEvent.camera == cam.name,
+                        AlertEvent.track_id.is_(None), AlertEvent.vehicle_id.is_(None), AlertEvent.animal_id.is_(None),
+                        AlertEvent.camera == cam.name,
                         AlertEvent.created_at < now - timedelta(days=days))).all()
                     paths += [p for _, p in gone if p] + [clip_name(i) for i, _ in gone]
                     if gone:

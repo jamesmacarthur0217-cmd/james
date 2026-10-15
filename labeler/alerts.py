@@ -22,6 +22,10 @@ an area is kept by labeler/zones.py; the camera checks people and vehicles insid
 they have been in each (`stayed`), and the rule fires once per person or vehicle like the others. A person out of sight
 for more than tracking.lost_after_s leaves the area (their time starts again); a parked vehicle hidden a moment keeps it.
 
+"quiet = 240" (minutes) is no movement (labeler/quiet.py): nobody seen on a camera that long, with "hours" and "armed"
+counting only while they hold; a built-in rule "No movement" (4 h, 08:00-22:00, only when Home: the user's choice) is
+made at start like "Fall". A rule without a camera is for kiosk cameras only (a gate camera sees nobody for hours).
+
 "fallen = yes" is a fall (labeler/falls.py): rules with it are checked only when a fall is confirmed, and fire
 for every fall, also a second one of the same person. A built-in rule "Fall" is made at start when fall alerts
 are on and no rule asks for a fall (turn it off on the Alerts page to stop fall alerts; deleted, it comes back).
@@ -44,6 +48,8 @@ FALL_RULE = [[FALLEN, "yes"]]
 VEHICLE, VEHICLE_COLOR, HOURS, ARMED, STAYED = "vehicle", "vehicle_color", "hours", "armed", "stayed"
 MAX_STAY_S = 24 * 3600
 ANIMAL = "animal"
+QUIET = "quiet"     # minutes with nobody seen (labeler/quiet.py)
+QUIET_RULE = [[QUIET, "240"], ["hours", "08-22"], ["armed", "home"]]
 CAR_GROUP = {"car", "SUV", "van", "pickup"}   # "car" in a rule, like in the Ask box
 HOUR_PRESETS = ["22-06", "20-06", "00-06", "18-24", "06-18", "08-18", "09-17"]
 
@@ -56,8 +62,14 @@ def is_animal_rule(conditions: list[list[str]]) -> bool:
     return any(name == ANIMAL for name, _ in conditions)
 
 
+def is_quiet_rule(conditions: list[list[str]]) -> bool:
+    return any(name == QUIET for name, _ in conditions)
+
+
 def rule_kind(conditions: list[list[str]]) -> str:
-    """Who a rule is about: "person", "vehicle" or "animal"."""
+    """Who a rule is about: "person", "vehicle", "animal" or "quiet" (nobody: no movement)."""
+    if is_quiet_rule(conditions):
+        return "quiet"
     return "vehicle" if is_vehicle_rule(conditions) else "animal" if is_animal_rule(conditions) else "person"
 
 
@@ -136,6 +148,8 @@ def describe(conditions: list[list[str]]) -> str:
             return "any animal" if v == "any" else f"animal = {v}"
         if n == ARMED:
             return f"only when {v.capitalize()}"
+        if n == QUIET:
+            return f"nobody seen for {nice_seconds(int(v) * 60)}"
         if n == STAYED:
             zone, secs = parse_stayed(v)
             return f"stayed in {zone} {nice_seconds(secs)}"
@@ -175,6 +189,16 @@ class AlertEngine:
             self.db.add_rule("Fall", FALL_RULE)
             self.invalidate()
             log.info('alert rule "Fall" added (turn it off on the Alerts page to stop fall alerts)')
+
+    def ensure_quiet_rule(self) -> None:
+        """The built-in "No movement" rule, unless a rule already asks for it (deleted, it comes back)."""
+        if not any(is_quiet_rule(r["conditions"]) for r in self.db.list_rules()):
+            self.db.add_rule("No movement", QUIET_RULE)
+            self.invalidate()
+            log.info('alert rule "No movement" added (4 h, 08:00-22:00, only when Home; Alerts page to change)')
+
+    def quiet_rules(self) -> list[dict]:
+        return [r for r in self._enabled_rules() if is_quiet_rule(r["conditions"])]
 
     def _armed(self) -> str:
         from .arming import HOME

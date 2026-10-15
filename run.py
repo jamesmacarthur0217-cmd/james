@@ -159,6 +159,8 @@ def main() -> int:
     alerts = AlertEngine(db, arming)
     if cfg["falls"]["enabled"]:
         alerts.ensure_fall_rule()
+    if cfg["quiet"]["enabled"]:
+        alerts.ensure_quiet_rule()
     pipelines.extend(Pipeline(cfg, db, worker, embedder, student, camera=cam) for cam in cfg["cameras"])
     for p in pipelines:
         p.alerts = alerts
@@ -241,6 +243,11 @@ def main() -> int:
     threading.Thread(target=retrainer.loop, args=(app.state.stopping,), name="retrain-check", daemon=True).start()
     from labeler import backups
     threading.Thread(target=backups.loop, args=(cfg, db, app.state.stopping), name="backup", daemon=True).start()
+    if cfg["quiet"]["enabled"]:   # no movement (labeler/quiet.py)
+        from labeler.quiet import QuietWatch
+        quiet = QuietWatch(db, alerts, pipelines, arming, health)
+        threading.Thread(target=quiet.loop, args=(app.state.stopping, float(cfg["quiet"]["check_every_s"])),
+                         name="quiet", daemon=True).start()
     if worker is not None and cfg["scene"]["enabled"]:
         from labeler.scene import SceneRunner
         scene_box.append(SceneRunner(db, pipelines, worker, crop_dir, cfg, arming=arming))

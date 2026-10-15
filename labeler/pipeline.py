@@ -210,6 +210,7 @@ class Pipeline:
         # where people's heads are (for the viewers' blurred copy): (frame, wall time, head boxes).
         self.scene_frame: tuple | None = None
         self.scene_people: list = []   # people's boxes in scene_frame
+        self.person_seen_wall = None   # when someone was last in view (labeler/quiet.py: no movement)
         # Camera picture check (labeler/picture_check.py): what is wrong with the picture, if it lasts.
         pcfg = self.cfg.get("picture_check") or {}
         self.picture = None
@@ -490,6 +491,8 @@ class Pipeline:
             heads = [geometry.head_box(self.tracks[t].kpts, self.tracks[t].box) for t in seen]
             self.scene_frame = (frame.copy(), self.clock.wall(), heads)
             self.scene_people = [tuple(self.tracks[t].box[:4]) for t in seen]   # for "Check the picture"
+        if seen:
+            self.person_seen_wall = self.clock.wall()
         if self.picture is not None and not self.blank and self.picture.due():
             try:
                 self.picture.check(frame, [tuple(self.tracks[t].box[:4]) for t in seen])

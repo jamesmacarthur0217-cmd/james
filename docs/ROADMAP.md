@@ -381,6 +381,12 @@ Phase 30 started 2026-10-15.
    10 minutes), Live banner, Health line "camera picture" (with the faces numbers on kiosk cameras), Settings "Check
    the picture" (`GET /api/cameras/{name}/picture`, admins). **Phase 30 is done.** Next: Phase 31 ("no movement").
 
+Phase 31 started 2026-10-15.
+1. **Done 2026-10-15**: rule condition `quiet = <minutes>` (`alerts.QUIET`, rule kind "quiet"), the built-in rule
+   "No movement" (4 h, 08:00-22:00, only when Home; made at start like "Fall"), `labeler/quiet.py` (QuietWatch, a thread
+   once a minute: counts only while the camera works and the hours / Home hold; one alert per quiet stretch; the
+   message says when someone was seen again); alerts about no one are listed and go with retention. No schema change.
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),

@@ -441,6 +441,10 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                 if not valid_hours(cond[1]):
                     raise HTTPException(400, f"hours must look like 22-06, not {cond[1]!r}")
                 continue
+            if len(cond) == 2 and cond[0] == "quiet":   # no movement: minutes with nobody seen (labeler/quiet.py)
+                if not (str(cond[1]).isdigit() and 10 <= int(cond[1]) <= 24 * 60):
+                    raise HTTPException(400, "no movement needs 10 to 1440 minutes")
+                continue
             if len(cond) == 2 and cond[0] == "stayed":
                 try:
                     zone, _ = parse_stayed(cond[1])
@@ -459,6 +463,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         if "animal" in names and set(names) - {"animal", "zone", "hours", "armed", "stayed"}:
             raise HTTPException(400, "an animal rule can ask only for the animal, a zone, how long it stayed, the hours "
                                      "and Home / Away")
+        if "quiet" in names and set(names) - {"quiet", "hours", "armed"}:
+            raise HTTPException(400, "a no-movement rule can ask only for the time, the hours and Home / Away")
         if "fallen" in names and "stayed" in names:
             raise HTTPException(400, "a fall rule cannot also ask how long someone stayed")
         if "vehicle" in names and set(names) - {"vehicle", "vehicle_color", "zone", "hours", "armed", "stayed"}:

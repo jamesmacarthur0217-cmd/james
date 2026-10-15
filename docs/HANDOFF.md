@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **750 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **758 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -446,7 +446,13 @@ noise is no test picture for it, as blurring noise removes its contrast too, so 
 done: `PictureWatch` (Pipeline.picture, checked in Pipeline.run next to scene_frame; `scene_people` = boxes in
 scene_frame), `healthcheck.check_picture`, `GET /api/cameras/{name}/picture` (admins), Live banner `#pic-problem`
 (index.html showPictureProblems from /api/status cameras[].picture), Settings row button `.check-pic`. **Phase 30 is
-done.** Next: Phase 31 ("no movement" alert: 4 h, 08:00-22:00, only when Home).
+done.**
+
+**Phase 31 started 2026-10-15**: step 1 done, `labeler/quiet.py` (QuietWatch; run.py thread "quiet", `quiet:` config),
+`alerts.QUIET` / `QUIET_RULE` / `ensure_quiet_rule` / `quiet_rules`, `Pipeline.person_seen_wall`, `db.record_alert`
+with no track (repeat), `db.update_alert_message`, list_alerts lists rule-only alerts (`"quiet": true`), retention
+deletes alerts about no one per camera. A rule without a camera watches kiosk cameras only. Next: step 2 (pop-up on
+every page, Alerts page condition picker, Summary, Health line, Settings), step 3 (real run with an empty video).
 
 **Earlier plan: Phase 16** search recordings by words ([PHASE16-PLAN.md](PHASE16-PLAN.md); approved, skipped for now), **then
 [PHASE26-29-PLAN.md](PHASE26-29-PLAN.md)** (approved 2026-10-14): 26 real-camera week with the user, 27 scene question
