@@ -176,3 +176,14 @@ def test_pages_show_no_movement():
     alerts = (static / "alerts.html").read_text(encoding="utf-8")
     assert 'quiet: ["60", "120", "180", "240"' in alerts and "nobody seen for ${niceSeconds(v * 60)}" in alerts
     assert 'id="quiet_enabled"' in (static / "settings.html").read_text(encoding="utf-8")
+
+
+def test_health_line_names_the_rule_when_there_are_several(db):
+    from labeler.healthcheck import check_quiet
+    watch, clock, _, _, _ = _setup(db, DAY.replace(hour=9))
+    db.add_rule("Quiet 1 h", [["quiet", "60"]])
+    watch.alerts.invalidate()
+    watch.tick()
+    clock.step(minutes=5)
+    assert check_quiet(watch)["detail"] == ("cam1 (No movement): nobody seen for 5 min (alert after 4 h); "
+                                            "cam1 (Quiet 1 h): nobody seen for 5 min (alert after 1 h)")

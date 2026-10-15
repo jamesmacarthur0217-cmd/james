@@ -389,12 +389,15 @@ def check_quiet(quiet) -> dict | None:
         return _check("no movement", "off", "no rule asks for it, or no kiosk camera to watch (Alerts page)")
     from .alerts import nice_seconds
 
+    several = len({i["rule"] for i in items}) > 1
+
     def one(i):
+        who = f"{i['camera']} ({i['rule']})" if several else i["camera"]
         if "resting" in i:
-            return f"{i['camera']}: not counted now ({i['resting']})"
+            return f"{who}: not counted now ({i['resting']})"
         m = i["quiet_s"] // 60
         took = f"{m // 60} h {m % 60} min" if m >= 60 else f"{m} min"
-        return (f"{i['camera']}: nobody seen for {took} (alert after {nice_seconds(i['after_s'])})"
+        return (f"{who}: nobody seen for {took} (alert after {nice_seconds(i['after_s'])})"
                 + (", alerted" if i["alerted"] else ""))
     level = "warning" if any(i["alerted"] for i in items) else "ok"
     return _check("no movement", level, "; ".join(one(i) for i in items))

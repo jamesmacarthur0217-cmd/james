@@ -723,8 +723,11 @@ without a camera watches the **kiosk cameras** only (a gate camera sees nobody f
 To change it, add your own rule on the Alerts page with **no movement (nobody seen for)** 1 to 12 hours, with the time
 of day and Home / Away if wanted, and delete or turn off the built-in one (while a no-movement rule exists, the
 built-in one is not made again). The Health page line "no movement" shows how long each camera has been quiet; the
-Settings page turns it off (**No movement alerts**). Not measured on real days yet (a long nap, someone reading in
-another room): try it for a week and look at its alerts.
+Settings page turns it off (**No movement alerts**). Real run on a test copy (2026-10-15) with a video of an empty scene
+for 11 minutes and then people, and a 10-minute rule: the alert came 10 minutes after the camera started ("nobody seen
+on cam1 for 10 min (since 15:18)"), and when the people appeared its message became "...; seen again at 15:29, after 11
+min"; nobody was found in the empty part. Not measured on real days yet (a long nap, someone reading in another room):
+try it for a week and look at its alerts.
 
 ## Fall alerts
 

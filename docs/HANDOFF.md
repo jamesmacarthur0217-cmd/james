@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **760 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **761 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -453,7 +453,8 @@ done.**
 with no track (repeat), `db.update_alert_message`, list_alerts lists rule-only alerts (`"quiet": true`), retention
 deletes alerts about no one per camera. A rule without a camera watches kiosk cameras only. Step 2 done (pop-up
 `toast quiet`, `window.VL.alertWho` shared by session.js and alerts.html, picker, Health `check_quiet(app.state.quiet)`,
-Settings `quiet_enabled`). Next: step 3 (a real run with an empty video and a 10-minute rule, the shortest allowed).
+Settings `quiet_enabled`). Step 3 done: real run (empty scene 11 min then MOT16-09 people, a 10-minute rule): alert at
+10 min, "seen again at 15:29, after 11 min". **Phase 31 is done.** Next: Phase 32 (help sign).
 
 **Earlier plan: Phase 16** search recordings by words ([PHASE16-PLAN.md](PHASE16-PLAN.md); approved, skipped for now), **then
 [PHASE26-29-PLAN.md](PHASE26-29-PLAN.md)** (approved 2026-10-14): 26 real-camera week with the user, 27 scene question

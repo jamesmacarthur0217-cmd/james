@@ -389,6 +389,9 @@ Phase 31 started 2026-10-15.
 2. **Done 2026-10-15**: orange pop-up on every page until OK (`toast quiet`, `VL.alertWho`), Alerts page condition
    "no movement (nobody seen for)" 1-12 h and "kiosk cameras", Summary timeline, Health line "no movement"
    (`QuietWatch.state`, `app.state.quiet`), Settings "No movement alerts"; README "No movement".
+3. **Done 2026-10-15**: real run (an empty scene 11 min, then people; a 10-minute rule): the alert 10 min after the start,
+   "seen again at 15:29, after 11 min" when people appeared. The Health line names the rule when there are several.
+   **Phase 31 is done.** Next: Phase 32 (help sign: one hand above the head for 3 s).
 
 ## Critical files
 
