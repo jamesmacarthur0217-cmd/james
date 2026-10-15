@@ -4,6 +4,9 @@ Admins play the MP4 file itself (the browser seeks with HTTP range requests), do
 without re-encoding) and delete recordings. Viewers get a stream made here, frame by frame, with faces blurred from
 the head boxes saved next to each video, so they never receive the file. Every viewing, download and delete is
 in the Audit log (one entry per playback, not one per range request).
+
+Search by words (Phase 16, labeler/moments.py): a description ("man with a backpack yesterday evening") finds
+people, vehicles or animals as the Ask box does, and returns their moments in the recordings, for admins and viewers.
 """
 from __future__ import annotations
 
@@ -32,6 +35,11 @@ class DeleteIn(BaseModel):
     ids: list[int]
 
 
+class SearchIn(BaseModel):
+    question: str
+    limit: int = 100
+
+
 def frame_list(path: Path) -> tuple[dict, list[float], list[list]]:
     """A recording's header, each frame's time in the file (seconds from its start) and head boxes."""
     header, times, boxes = {}, [], []
@@ -57,7 +65,7 @@ def frame_index(times: list[float], offset_s: float) -> int:
     return min(bisect.bisect_left(times, offset_s - 1e-6), max(0, len(times) - 1))
 
 
-def add_routes(app, cfg: dict, db, audit, blur_for) -> None:
+def add_routes(app, cfg: dict, db, audit, blur_for, agent=None, embedder=None) -> None:
     base = recorder.folder(cfg)
 
     def is_admin(request: Request) -> bool:
@@ -120,6 +128,34 @@ def add_routes(app, cfg: dict, db, audit, blur_for) -> None:
                     "video_s": round(i / float(cfg["recording"]["fps"]), 2)}
         raise HTTPException(404, "nothing was recorded then")
 
+    @app.post("/api/recordings/search")
+    def search_recordings(body: SearchIn, request: Request):
+        """Moments in the recordings for a description (labeler/moments.py). With the vision model, the Ask box's
+        search (time, camera, labels, vehicles, animals); without it, people ranked by how they look only."""
+        from . import moments
+        question = " ".join(body.question.split())[:300]
+        if not question:
+            raise HTTPException(400, "type what to look for, e.g. woman in a red top this morning")
+        limit = max(1, min(body.limit, 100))
+        if agent is not None:
+            result = agent.run(question, limit=limit)
+            items = ([{**p, "type": "person"} for p in result.get("people") or []]
+                     + [{**v, "type": "vehicle"} for v in result.get("vehicles") or []]
+                     + [{**a, "type": "animal"} for a in result.get("animals") or []])
+            explanation, how = result["explanation"], "question"
+        elif embedder is not None:
+            hits = db.nearest(embedder.text(question), embedder.model_name, limit=min(limit, 30))
+            items = [{**t, "type": "person"} for t in db.get_tracks([tid for tid, _ in hits])]
+            explanation = (f"Looked for people who look like “{question}” (the vision model is off, so times, "
+                           "cameras and vehicles are not understood; the closest look-alikes come first)")
+            how = "appearance"
+        else:
+            raise HTTPException(503, "searching needs the vision model or the embeddings; both are off")
+        audit(request, "search recordings", question)
+        out = moments.moments(db, items, base, float(cfg["recording"]["fps"]))
+        return {"question": question, "explanation": explanation, "how": how, **out,
+                "recording": bool(cfg["recording"]["enabled"]), "keep_days": cfg["recording"]["keep_days"]}
+
     @app.get("/recordings/file/{rec_id}")
     def recording_file(rec_id: int, request: Request):
         """The MP4 itself, for admins (not on the viewers' allowlist)."""
@@ -129,16 +165,17 @@ def add_routes(app, cfg: dict, db, audit, blur_for) -> None:
         return FileResponse(path, media_type="video/mp4", headers={"Cache-Control": "private, max-age=600"})
 
     @app.get("/recordings/stream/{rec_id}")
-    async def recording_stream(rec_id: int, request: Request, t: float = 0.0):
-        """The recording from `t` seconds on, as a picture stream like the live view, faces blurred for viewers
-        (the time is already written on each frame by the recorder)."""
+    async def recording_stream(rec_id: int, request: Request, t: float = 0.0, d: float | None = None):
+        """The recording from `t` seconds on (for `d` seconds, a search's moment; else to the file's end), as a
+        picture stream like the live view, faces blurred for viewers (the time is written on each frame)."""
         rec, path = get(rec_id)
         header, times, boxes = await run_in_threadpool(frame_list, path)
         if not times:
             raise HTTPException(404, "this recording has no frames yet")
         blur = blur_for(request)
         fps = float(header.get("fps") or cfg["recording"]["fps"])
-        await run_in_threadpool(audit, request, "view recording", f"{rec['camera']} {rec['started_at']} from {t:.0f} s")
+        await run_in_threadpool(audit, request, "view recording", f"{rec['camera']} {rec['started_at']} from {t:.0f} s"
+                                + (f" for {d:g} s" if d is not None else ""))
 
         def open_at(i: int):
             cap = cv2.VideoCapture(str(path))
@@ -158,6 +195,8 @@ def add_routes(app, cfg: dict, db, audit, blur_for) -> None:
             cap = await run_in_threadpool(open_at, i)
             try:
                 while not app.state.stopping.is_set():
+                    if d is not None and i < len(times) and times[i] > t + d:
+                        break   # the moment is over
                     jpeg = await run_in_threadpool(next_jpeg, cap, i)
                     if jpeg is None:
                         break

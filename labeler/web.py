@@ -292,7 +292,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return cfg["web"].get("blur_faces_for_viewers", True) and user.get("role") != "admin"
 
     from . import recordings_web
-    recordings_web.add_routes(app, cfg, db, audit, blur_for)   # the Recordings page (labeler/recorder.py)
+    recordings_web.add_routes(app, cfg, db, audit, blur_for, agent, embedder)   # the Recordings page (labeler/recorder.py)
 
     # Same address, different picture for admins and viewers: never let a shared browser cache mix them up.
     PICTURE_HEADERS = {"Cache-Control": "private, max-age=60", "Vary": "Cookie"}

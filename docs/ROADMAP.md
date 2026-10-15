@@ -211,7 +211,7 @@ here receives), so it needs no incoming port: works through company firewalls, a
 Done: `labeler/receiver.py`, the sending `remote-camera/` script, the Settings page box. Waiting for the user: this
 PC's Tailscale connected again, the firewall rule for 8554/1935, then a phone or PC as a real test.
 
-## Phase 16: Search recordings by words (approved 2026-10-12, not started)
+## Phase 16: Search recordings by words (approved 2026-10-12; started 2026-10-15)
 
 **Approved plan: [PHASE16-PLAN.md](PHASE16-PLAN.md)**: type a description, get video moments from all cameras to
 play (built on the Ask box, the recordings table and the Recordings page). Start after the Phase 15 phone test.
@@ -352,6 +352,12 @@ cameras (when added). The user picks which to keep and the order at the start. A
    (detector boxes, body points, SigLIP vectors, age, falls, counting), speed same or slightly faster.
 6. **Done 2026-10-15**: Phase 28 step 4, `remote-camera.zip` made again from the current `remote-camera/` folder (the
    user's choice) and git-ignored. Left in Phase 28: step 1, the GitHub runs after 2026-10-19 (Ubuntu 26 runner).
+
+2026-10-15: the user has no extra camera (no Phase 29) and chose Phase 16 now.
+7. **Done 2026-10-15**: Phase 16 step 1, `labeler/moments.py` (finds -> moments: padded 3 s, joined per camera while
+   under 60 s, parts per file, exact frames) and `POST /api/recordings/search` (agent or appearance ranking; viewers
+   too; audited); the viewers' stream stops after `d` seconds. Real run: answers in 1.5-4.5 s, moments start at the
+   right second.
 
 ## Critical files
 

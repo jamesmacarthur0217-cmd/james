@@ -57,7 +57,8 @@ VIEWER = {
             "/api/tracks", "/api/tracks/", "/api/search", "/api/alerts/events", "/api/me", "/crops/", "/static/",
             "/health", "/api/health", "/api/today", "/api/vehicles", "/api/animals", "/api/arming", "/api/summary",
             "/recordings", "/api/recordings", "/api/recordings/find", "/recordings/stream/", "/summary"],   # not the file itself
-    "POST": ["/api/ask", "/api/logout", "/api/search/photo", "/api/arming"],   # Home / Away: family switch it
+    "POST": ["/api/ask", "/api/logout", "/api/search/photo", "/api/arming",   # Home / Away: family switch it
+             "/api/recordings/search"],
 }
 
 
