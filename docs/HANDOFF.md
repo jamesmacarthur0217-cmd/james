@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **764 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **767 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -457,9 +457,11 @@ Settings `quiet_enabled`). Step 3 done: real run (empty scene 11 min then MOT16-
 10 min, "seen again at 15:29, after 11 min". **Phase 31 is done.**
 
 **Phase 32 started 2026-10-15**: step 1 done, `labeler/gestures.py` (hands_up per frame, GestureWatch for the hold;
-DEFAULTS margin 0.15 of the torso, hold 3 s, gap 0.5 s, rearm 2 s, both_ok). Next: step 2, measuring
-(`tools/gesture_check.py`: false alarms on MOT16 and UR Fall everyday videos; hands up on COCO people by eye), then
-step 3 (connect to Pipeline like FallWatch, built-in rule "Help sign", red pop-up with a beep, Settings, docs).
+DEFAULTS margin 0.15 of the torso, hold 3 s, gap 0.5 s, rearm 2 s, both_ok, max_tilt 45: `upright`). Step 2 done:
+`tools/gesture_check.py videos` (reuses tools/fall_check.py's cached detections, leaves out its frozen tail) and
+`photos --start 1500` (mosaics in a folder to judge by eye; the first 1,500 photos were used to add the upright check).
+README "Help sign". Next: step 3 (connect to Pipeline like FallWatch, built-in rule "Help sign", red pop-up with a
+beep, Settings; real run with a still photo of a raised hand as the camera).
 
 **Earlier plan: Phase 16** search recordings by words ([PHASE16-PLAN.md](PHASE16-PLAN.md); approved, skipped for now), **then
 [PHASE26-29-PLAN.md](PHASE26-29-PLAN.md)** (approved 2026-10-14): 26 real-camera week with the user, 27 scene question

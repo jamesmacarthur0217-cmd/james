@@ -7,7 +7,10 @@ a hand up held for `hold_s` seconds (3 s, the user's choice), with short gaps al
 not found for a moment); one alert per sign: the hand must be down for `rearm_s` before a new sign counts.
 
 The head's top is the highest of the nose, eyes and ears; when none is found the person is not checked (seen from
-behind, a hand in front of the face: the camera cannot tell where the head is). `both_ok`: whether two hands up
+behind, a hand in front of the face: the camera cannot tell where the head is). The body must be upright (shoulders
+above hips, the torso within `max_tilt` degrees of vertical; not checked when the hips are out of view, as on a desk
+webcam): on COCO photos most wrong "hand up" answers were people lying, upside down or bent over (someone lying on
+the floor is the fall alert's case). `both_ok`: whether two hands up
 count too (stretching does that; measured with tools/gesture_check.py).
 """
 from __future__ import annotations
@@ -21,7 +24,7 @@ from .geometry import L_EAR, L_EYE, L_HIP, L_SHOULDER, NOSE, R_EAR, R_EYE, R_HIP
 
 L_ELBOW, R_ELBOW, L_WRIST, R_WRIST = 7, 8, 9, 10
 MIN_CONF = 0.3
-DEFAULTS = {"hold_s": 3.0, "gap_s": 0.5, "rearm_s": 2.0, "margin": 0.15, "both_ok": True}
+DEFAULTS = {"hold_s": 3.0, "gap_s": 0.5, "rearm_s": 2.0, "margin": 0.15, "both_ok": True, "max_tilt": 45.0}
 
 
 def _pt(kpts: np.ndarray, i: int) -> tuple[float, float] | None:
@@ -41,9 +44,22 @@ def _torso(kpts: np.ndarray) -> float | None:
     return None
 
 
-def hands_up(kpts: np.ndarray | None, margin: float = DEFAULTS["margin"]) -> list[str]:
-    """Which hands are up in one frame: [], ["left"], ["right"] or both."""
+def upright(kpts: np.ndarray, max_tilt: float = DEFAULTS["max_tilt"]) -> bool:
+    """Shoulders above hips, the torso near vertical; True when the hips are not seen (it cannot be told)."""
+    shoulders = [p for p in (_pt(kpts, L_SHOULDER), _pt(kpts, R_SHOULDER)) if p]
+    hips = [p for p in (_pt(kpts, L_HIP), _pt(kpts, R_HIP)) if p]
+    if not shoulders or not hips:
+        return True
+    (sx, sy), (hx, hy) = np.mean(shoulders, axis=0), np.mean(hips, axis=0)
+    return hy > sy and math.degrees(math.atan2(abs(hx - sx), hy - sy)) <= max_tilt
+
+
+def hands_up(kpts: np.ndarray | None, margin: float = DEFAULTS["margin"],
+             max_tilt: float | None = DEFAULTS["max_tilt"]) -> list[str]:
+    """Which hands are up in one frame: [], ["left"], ["right"] or both (max_tilt None: any posture)."""
     if kpts is None or len(kpts) < 17:
+        return []
+    if max_tilt is not None and not upright(kpts, max_tilt):
         return []
     head = [p[1] for p in (_pt(kpts, i) for i in (NOSE, L_EYE, R_EYE, L_EAR, R_EAR)) if p]
     torso = _torso(kpts)
@@ -72,13 +88,13 @@ class GestureWatch:
     def __init__(self, cfg: dict | None = None):
         c = {**DEFAULTS, **(cfg or {})}
         self.hold_s, self.gap_s, self.rearm_s = float(c["hold_s"]), float(c["gap_s"]), float(c["rearm_s"])
-        self.margin, self.both_ok = float(c["margin"]), bool(c["both_ok"])
+        self.margin, self.both_ok, self.max_tilt = float(c["margin"]), bool(c["both_ok"]), float(c["max_tilt"])
         self.people: dict = {}
 
     def update(self, key, t: float, kpts: np.ndarray | None) -> dict | None:
         """{"since": t, "hand": "left"/"right"/"both"} the frame a sign is confirmed (once per sign), else None."""
         h = self.people.setdefault(key, _Hold())
-        up = hands_up(kpts, self.margin)
+        up = hands_up(kpts, self.margin, self.max_tilt)
         if len(up) == 2 and not self.both_ok:
             up = []
         if not up:

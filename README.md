@@ -729,6 +729,26 @@ on cam1 for 10 min (since 15:18)"), and when the people appeared its message bec
 min"; nobody was found in the empty part. Not measured on real days yet (a long nap, someone reading in another room):
 try it for a week and look at its alerts.
 
+## Help sign
+
+A silent call for help: **one hand held above the head for 3 seconds** (`labeler/gestures.py`; the user's choice). From
+the body points the detector already finds, no extra model: a hand is up when its wrist is above the top of the head
+by 15% of the torso's length and its elbow above its shoulder (scratching the head is not), the body upright (someone
+lying on the floor is the fall alert's case; not checked when the hips are out of view, as on a desk webcam), the
+head found (not someone seen from behind). Held 3 s with short gaps allowed; one alert per sign; the hand down for
+2 s before a new sign counts. Two hands up count too (no difference measured).
+
+Measured (2026-10-15, `tools/gesture_check.py`):
+- **False alarms: none** in 40 everyday videos (UR Fall: sitting, lying down, picking things up), 30 fall videos and 7
+  MOT16 street videos. A hand counted as up in single frames now and then (4 of 2,983 frames in the falls, 12 of
+  8,933 in the everyday videos), never for 3 seconds.
+- **One frame, COCO photos** (judged by eye): on the first 1,500 photos, 6 of the 11 people the rule flagged in a
+  random sample of 200 were wrong (lying, upside down, bent over, very dark), so the upright check was added after
+  looking at them; on 1,500 other photos (not looked at before): 46 people flagged, about 38-40 of them really with a
+  hand above the head (tennis serves, jumps, holding something up; wrong: a statue, hands on the head, a towel over
+  the head), and in a random sample of 200 people 4 flagged, all right, 1 missed (a tennis serve).
+- Not measured: a real sign held on video (no such public clip here); see the real run below.
+
 ## Fall alerts
 
 A camera that sees a room from the side notices **a fall**: someone upright is down a moment later (within 1 s),

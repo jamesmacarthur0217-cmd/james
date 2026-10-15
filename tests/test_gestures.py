@@ -30,6 +30,12 @@ def test_one_frame():
     hidden_head = LEFT_UP.copy()
     hidden_head[[0, 1, 2, 3, 4], 2] = 0.1
     assert hands_up(hidden_head) == [] and hands_up(None) == []              # no head found: not checked
+    lying = LEFT_UP.copy()
+    lying[[11, 12], 0], lying[[11, 12], 1] = lying[[11, 12], 0] + 120, 80     # hips beside the shoulders: lying
+    assert hands_up(lying) == [] and hands_up(lying, max_tilt=None) == ["left"]
+    desk = LEFT_UP.copy()
+    desk[11:, 2] = 0.1                                                        # a desk webcam: no hips in view
+    assert hands_up(desk) == ["left"]
     far = LEFT_UP.copy()
     far[:, :2] = far[:, :2] / 4                                               # the same person far away
     assert hands_up(far) == ["left"]
@@ -73,3 +79,14 @@ def test_short_raises_and_gaps():
     assert GestureWatch({"both_ok": False}).update(2, 0, BOTH_UP) is None
     w2 = GestureWatch({"both_ok": False})
     assert not any(w2.update(2, i * 0.1, BOTH_UP) for i in range(40))        # stretching both arms: not a sign
+
+
+def test_check_tool_counts_signs_and_leaves_out_the_frozen_tail():
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+    import gesture_check as gc
+    dets = [(i / 10, [(1, (0, 0, 1, 1), LEFT_UP)]) for i in range(40)]      # 4 s with a hand up
+    signs, up, n = gc.video_signs(dets, both_ok=True)
+    assert len(signs) == 1 and up == 40 and n == 40 and signs[0]["at"] == 3.0
+    assert gc.video_signs(dets, both_ok=True, tail_from=2.0)[0] == []        # the frozen picture is not the video

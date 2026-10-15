@@ -397,6 +397,9 @@ Phase 32 started 2026-10-15.
 1. **Done 2026-10-15**: `labeler/gestures.py`: `hands_up` (wrist above the head's top by 15% of the torso, elbow above
    the shoulder; no head found = not checked) and `GestureWatch` (held 3 s, gaps up to 0.5 s, one alert per sign,
    down 2 s re-arms; `both_ok` decides whether two hands count). Not yet connected to the cameras (step 3).
+2. **Done 2026-10-15**: `tools/gesture_check.py`: 0 false alarms on 77 videos (UR Fall everyday and falls, MOT16); COCO
+   by eye: the upright check added after the first 1,500 photos (6 of 11 flagged wrong in a sample), then on 1,500
+   other photos about 85% of 46 flagged right, a sample of 200: 4/4 right, 1 missed. Two hands count (no difference).
 
 ## Critical files
 
