@@ -405,6 +405,12 @@ Phase 32 started 2026-10-15.
    "help sign alerts" (and "no movement alerts"), Settings (on/off, seconds), README. Real run with a still photo of a
    raised hand: the alert 4 s after the start, once. **Phase 32 is done.** Next: Phase 33 (search recordings by photo).
 
+Phase 33 started 2026-10-15.
+1. **Done 2026-10-15**: `POST /api/recordings/search/photo` (PhotoSearch vector -> db.nearest -> at least
+   `photo_search.min_similarity` 0.85 -> moments, closest first; viewers too; audited). `tools/photo_match_check.py`:
+   0.85 chosen on MOT16-02/04/05 (60/62 kept), on 09/10/11/13 20/28 kept, 76% of others dropped; right person first
+   61-69%. Real run: one woman found 3 times (looping video), nobody else.
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),

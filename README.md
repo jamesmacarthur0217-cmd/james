@@ -583,6 +583,17 @@ street video as the camera: an answer in
 1.5-4.5 s (the language model's reading of the question takes most of it); the frame where a moment starts shows its
 own start time in the clock the recorder writes (13:30:08 and 13:33:10 for two moments).
 
+**Search recordings by photo** (Phase 33; the page's photo button comes with its step 2, until then
+`POST /api/recordings/search/photo` with the picture as the body): the person in a photo (the one in the middle, as in
+Search by photo) is compared with everyone recorded, and the moments of the people at least 0.85 alike
+(`photo_search.min_similarity`) are listed, the closest first, at most 20 people. Measured (2026-10-15,
+`tools/photo_match_check.py`, MOT16 with true identities: a picture of each person against pictures of everyone at
+other moments of the same video): the limit 0.85 was chosen on MOT16-02/04/05 (it keeps 60 of 62 people there); on
+MOT16-09/10/11/13 it kept 20 of 28 and dropped 76% of the other people; the right person was the closest for 61-69%.
+These are street videos with small people, where appearance alone is weak (as for Search by photo): a look-alike, not
+a certain match. Real run on the test copy: a picture of one woman cut from the MOT16 shop-front video found her three
+times (the video loops) and nobody else, in 0.35 s.
+
 Measured (2026-10-12): busy street footage (MOTChallenge) recorded all the time would be **9-13 GB per camera per
 day** at quality 28 (`recording.quality`; 23 looks the same at normal size, 17-22 GB); OpenCV's own encoders would
 have made 23-305 GB. FFmpeg uses 2-6% of one processor core; the camera loop kept its speed (18.5 frames/s without,

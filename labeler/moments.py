@@ -84,10 +84,12 @@ def _parts(db, base: Path, scene: dict, fps_default: float, frames: dict) -> lis
     return parts
 
 
-def moments(db, items: list[dict], base: Path, fps: float, pad_s: float = PAD_S, now: datetime | None = None) -> dict:
+def moments(db, items: list[dict], base: Path, fps: float, pad_s: float = PAD_S, now: datetime | None = None,
+            closest_first: bool = False) -> dict:
     """{"moments": newest first, "found": things found, "on_video": of them in a moment, "not_on_video": the rest}.
 
     items: people, vehicles and animals as the database lists them, each with "type" (person / vehicle / animal).
+    closest_first: a search by photo: moments ordered by their closest person's "similarity" instead.
     """
     now = now or datetime.now()
     out, on_video, frames = [], 0, {}
@@ -101,8 +103,11 @@ def moments(db, items: list[dict], base: Path, fps: float, pad_s: float = PAD_S,
                     "length_s": round(sum(p["end_offset_s"] - p["offset_s"] for p in parts), 1), "parts": parts,
                     "picture": next((it.get("crop") for it in things if it.get("crop")), None),
                     "items": [{"type": it["type"], "id": it["id"], "crop": it.get("crop"), "text": describe(it),
-                               "started_at": it["started_at"], "labels_differ": bool(it.get("labels_differ"))}
+                               "started_at": it["started_at"], "labels_differ": bool(it.get("labels_differ")),
+                               **({"similarity": it["similarity"]} if "similarity" in it else {})}
                               for it in things]})
     out.sort(key=lambda m: m["start"], reverse=True)
+    if closest_first:
+        out.sort(key=lambda m: max(i.get("similarity", 0) for i in m["items"]), reverse=True)
     found = len(items)
     return {"moments": out, "found": found, "on_video": on_video, "not_on_video": found - on_video}

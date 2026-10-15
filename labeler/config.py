@@ -89,6 +89,9 @@ DEFAULTS: dict = {
     # cameras[].help_sign (default on).
     "help_sign": {"enabled": True, "hold_s": 3.0, "gap_s": 0.5, "rearm_s": 2.0, "margin": 0.15, "both_ok": True,
                   "max_tilt": 45.0},
+    # Search recordings by photo (Phase 33): people at least this alike (cosine, SigLIP 2) are listed, closest first;
+    # 0.85 chosen on MOT16-02/04/05 (tools/photo_match_check.py). At most `limit` people.
+    "photo_search": {"min_similarity": 0.85, "limit": 20},
     # No movement (labeler/quiet.py): the built-in "No movement" rule is made at start; checked every check_every_s.
     "quiet": {"enabled": True, "check_every_s": 60.0},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,

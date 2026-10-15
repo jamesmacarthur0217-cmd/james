@@ -179,3 +179,52 @@ def test_recordings_page_has_the_search():
     for needle in ('id="find"', 'fetch("/api/recordings/search"', 'id="play-all"', "playMoment(", "&d=${until.seconds}",
                    "?start=${p.video_s}&end=${p.video_end_s}", "none of them is on video"):
         assert needle in page, needle
+
+
+# --- Phase 33: search recordings by photo ---
+
+def test_search_by_photo_lists_only_people_alike_closest_first(db, tmp_path):
+    from test_photo import BLUE, RED, FakeDetector, FakeEmbedder, _photo
+    from labeler.photo import PhotoSearch
+    emb = FakeEmbedder()
+    cam = db.get_or_create_camera("cam1", "0", "kiosk")
+    _recording(db, tmp_path / "rec", T0, _even(60))
+    red_crop = np.full((50, 20, 3), RED, np.uint8)
+    darker = np.full((50, 20, 3), (60, 40, 220), np.uint8)                       # a reddish brown: alike, less
+    blue_crop = np.full((50, 20, 3), BLUE, np.uint8)
+    ids = {}
+    for name, start, crop in (("red", 5, red_crop), ("darker red", 30, darker), ("blue", 45, blue_crop)):
+        ids[name] = db.create_track(cam, len(ids) + 1, T0 + timedelta(seconds=start))
+        db.update_track(ids[name], ended_at=T0 + timedelta(seconds=start + 3), status="done")
+        db.upsert_embedding(ids[name], emb.track_vector([crop]), emb.model_name)
+    cfg = copy.deepcopy(DEFAULTS)
+    cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
+    cfg["recording"]["dir"] = str(tmp_path / "rec")
+    cfg["cameras"] = [{"name": "cam1", "source": 0}]
+    app = create_app(cfg, db, None, embedder=emb, photo=PhotoSearch(cfg, emb, FakeDetector([(300, 50, 420, 380)])))
+    admin = TestClient(app, client=("127.0.0.1", 5000))
+    r = admin.post("/api/recordings/search/photo", content=_photo([(RED, (300, 50, 420, 380))]))
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["how"] == "photo" and "the person in the photo" in d["explanation"]
+    found = [i["id"] for m in d["moments"] for i in m["items"]]
+    assert found[0] == ids["red"] and ids["blue"] not in found                 # closest first; blue not alike
+    assert d["moments"][0]["items"][0]["similarity"] > 0.99
+    assert db.list_audit(1)[0]["action"] == "search recordings by photo"
+    assert admin.post("/api/recordings/search/photo", content=b"not a picture").status_code == 400
+    db.add_user("vic", accounts.hash_password("correct horse battery"), "viewer")
+    viewer = TestClient(app, client=("192.168.1.20", 5000))
+    viewer.post("/api/login", json={"username": "vic", "password": "correct horse battery"})
+    assert viewer.post("/api/recordings/search/photo", content=_photo([(RED, (300, 50, 420, 380))])).status_code == 200
+    no_emb = TestClient(create_app(cfg, db, None), client=("127.0.0.1", 5000))
+    assert no_emb.post("/api/recordings/search/photo", content=b"x").status_code == 503
+
+
+def test_photo_match_check_scores_found_false_and_first():
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+    import photo_match_check as pm
+    m = np.array([[0.95, 0.90, 0.70], [0.88, 0.80, 0.70], [0.60, 0.70, 0.93]])   # photo i x recorded person j
+    r = pm.score([m], 0.85)
+    assert (r["photos"], r["found"], r["false"], r["first"], r["others"]) == (3, 2, 2, 2, 6)

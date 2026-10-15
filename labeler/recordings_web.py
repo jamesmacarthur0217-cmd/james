@@ -65,7 +65,7 @@ def frame_index(times: list[float], offset_s: float) -> int:
     return min(bisect.bisect_left(times, offset_s - 1e-6), max(0, len(times) - 1))
 
 
-def add_routes(app, cfg: dict, db, audit, blur_for, agent=None, embedder=None) -> None:
+def add_routes(app, cfg: dict, db, audit, blur_for, agent=None, embedder=None, photo=None) -> None:
     base = recorder.folder(cfg)
 
     def is_admin(request: Request) -> bool:
@@ -155,6 +155,41 @@ def add_routes(app, cfg: dict, db, audit, blur_for, agent=None, embedder=None) -
         out = moments.moments(db, items, base, float(cfg["recording"]["fps"]))
         return {"question": question, "explanation": explanation, "how": how, **out,
                 "recording": bool(cfg["recording"]["enabled"]), "keep_days": cfg["recording"]["keep_days"]}
+
+    @app.post("/api/recordings/search/photo")
+    async def search_recordings_photo(request: Request):
+        """Moments of the people who look like the person in a photo (the request body, a JPEG or PNG; not stored;
+        labeler/photo.py), the closest first; only people at least photo_search.min_similarity alike."""
+        from . import moments
+        from .photo import PhotoSearch
+        if embedder is None:
+            raise HTTPException(503, "embeddings are disabled in config.yaml")
+        searcher = photo or getattr(app.state, "photo", None)
+        if searcher is None:
+            searcher = app.state.photo = PhotoSearch(cfg, embedder)
+        data = await request.body()
+        try:
+            vector, info = await run_in_threadpool(searcher.vector, data)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        pcfg = cfg.get("photo_search") or {}
+        least, limit = float(pcfg.get("min_similarity", 0.85)), int(pcfg.get("limit", 20))
+        hits = [(tid, s) for tid, s in await run_in_threadpool(db.nearest, vector, embedder.model_name, limit)
+                if s >= least]
+        sims = dict(hits)
+        items = [{**t, "type": "person", "similarity": round(sims[t["id"]], 3)}
+                 for t in await run_in_threadpool(db.get_tracks, [tid for tid, _ in hits])]
+        n = info["people"]
+        searched = ("the person in the photo" if n == 1 else "the person in the middle of the photo" if n
+                    else "the whole photo (nobody found in it)")
+        await run_in_threadpool(audit, request, "search recordings by photo",
+                                f"picture {info['width']}x{info['height']}, {len(items)} people alike")
+        out = await run_in_threadpool(lambda: moments.moments(db, items, base, float(cfg["recording"]["fps"]),
+                                                              closest_first=True))
+        return {"explanation": f"Looked for people who look like {searched}, the closest first (at least "
+                               f"{least:.2f} alike; a look-alike, not a certain match)",
+                "how": "photo", **out, "recording": bool(cfg["recording"]["enabled"]),
+                "keep_days": cfg["recording"]["keep_days"]}
 
     @app.get("/recordings/file/{rec_id}")
     def recording_file(rec_id: int, request: Request):
