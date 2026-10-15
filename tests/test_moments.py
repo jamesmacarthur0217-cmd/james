@@ -171,3 +171,11 @@ def test_a_busy_camera_is_not_one_long_moment(db, tmp_path):
     assert all(m["length_s"] <= 60 for m in got)
     long = moments(db, [_thing("person", 9, 0, 90)], tmp_path, 10, pad_s=0)["moments"]
     assert len(long) == 1 and long[0]["length_s"] == 90.0                          # one person seen long: whole
+
+
+def test_recordings_page_has_the_search():
+    from pathlib import Path
+    page = (Path(__file__).resolve().parent.parent / "labeler" / "static" / "recordings.html").read_text(encoding="utf-8")
+    for needle in ('id="find"', 'fetch("/api/recordings/search"', 'id="play-all"', "playMoment(", "&d=${until.seconds}",
+                   "?start=${p.video_s}&end=${p.video_end_s}", "none of them is on video"):
+        assert needle in page, needle

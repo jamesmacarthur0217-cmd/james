@@ -568,15 +568,18 @@ Admins play the file itself (the browser seeks), download it and delete whole re
 made by the app with faces blurred (from the head positions saved for every frame) and never the file. Every
 playback, download and delete is in the Audit log. Deleting a person does not cut them out of a recording.
 
-**Search recordings by words** (Phase 16; the page's search box comes with its step 2, until then
-`POST /api/recordings/search {"question": ...}`): a description such as "woman in a green top this morning" or "white
+**Search recordings by words**: the **Find in recordings** box at the top of the Recordings page. A description such as "woman in a green top this morning" or "white
 car yesterday evening" is searched like the Ask box (people, vehicles, animals; time, camera and labels), and each
 find becomes a **moment** in the recordings: from 3 seconds before it was seen to 3 seconds after, starting at the
 right frame even when the camera ran unevenly. Things seen together on one camera are one moment ("2 people") while
 it stays under a minute; a visit over two files plays as two parts. Finds without video (recording off, older than
 `keep_days`, before recording existed) are counted ("9 found, 7 on video"). Admins and viewers may search (viewers'
 pictures and video blurred as everywhere); each search is in the Audit log. Without the vision model only how people
-look is searched (no times or vehicles). Measured on a test copy with a MOT16 street video as the camera: an answer in
+look is searched (no times or vehicles). Each moment shows its picture, camera, time, length and what was found;
+**▶ Play** opens its day and camera on the bar and plays from its start to its end (a moment over two files plays both
+parts); **▶ Play all** plays the moments one after another; admins can **Download** a moment (cut without
+re-encoding). Viewers get the blurred stream, which stops at the moment's end. Measured on a test copy with a MOT16
+street video as the camera: an answer in
 1.5-4.5 s (the language model's reading of the question takes most of it); the frame where a moment starts shows its
 own start time in the clock the recorder writes (13:30:08 and 13:33:10 for two moments).
 

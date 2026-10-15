@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **737 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **738 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -430,8 +430,12 @@ step 1 (check the GitHub runs after 2026-10-19, when `ubuntu-latest` becomes Ubu
 moments; `PAD_S` 3, `MAX_JOIN_S` 60: a busy camera chained everyone into one 2-minute moment before that limit),
 `POST /api/recordings/search` in `labeler/recordings_web.py` (`add_routes(..., agent, embedder)`; agent.run, else
 db.nearest by text), viewers allowed (accounts.VIEWER), stream `?d=`. Parts carry offset_s/end_offset_s (real seconds:
-the viewers' stream) and video_s/video_end_s (frame index / fps: the admins' player and the cut download). Next: step 2,
-the Recordings page (search box, results, Play, Play all, Download).
+the viewers' stream) and video_s/video_end_s (frame index / fps: the admins' player and the cut download). Step 2 done:
+the Recordings page's "Find in recordings" box (`static/recordings.html`: drawFound, playMoment, play(..., until) stops
+the file at video_end_s or waits d + 1.5 s for the stream, then the next part / Play all queue). Checked in the browser
+(admin; the viewer path by switching the page's flag; phone width). **Phase 16 is done.**
+Next, ask the user: Phase 26 (real-camera week: their app must run with the webcam; the lens cover open), Phase 28
+step 1 after 2026-10-19; Phase 29 waits for extra cameras (the user has none, 2026-10-15).
 
 **Earlier plan: Phase 16** search recordings by words ([PHASE16-PLAN.md](PHASE16-PLAN.md); approved, skipped for now), **then
 [PHASE26-29-PLAN.md](PHASE26-29-PLAN.md)** (approved 2026-10-14): 26 real-camera week with the user, 27 scene question

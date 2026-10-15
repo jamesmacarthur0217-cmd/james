@@ -211,7 +211,7 @@ here receives), so it needs no incoming port: works through company firewalls, a
 Done: `labeler/receiver.py`, the sending `remote-camera/` script, the Settings page box. Waiting for the user: this
 PC's Tailscale connected again, the firewall rule for 8554/1935, then a phone or PC as a real test.
 
-## Phase 16: Search recordings by words (approved 2026-10-12; started 2026-10-15)
+## Phase 16: Search recordings by words (approved 2026-10-12; done 2026-10-15)
 
 **Approved plan: [PHASE16-PLAN.md](PHASE16-PLAN.md)**: type a description, get video moments from all cameras to
 play (built on the Ask box, the recordings table and the Recordings page). Start after the Phase 15 phone test.
@@ -358,6 +358,11 @@ cameras (when added). The user picks which to keep and the order at the start. A
    under 60 s, parts per file, exact frames) and `POST /api/recordings/search` (agent or appearance ranking; viewers
    too; audited); the viewers' stream stops after `d` seconds. Real run: answers in 1.5-4.5 s, moments start at the
    right second.
+8. **Done 2026-10-15**: Phase 16 step 2, the Recordings page's **Find in recordings** box: moments with picture,
+   camera, time, length and chips; Play (to the moment's end, its parts in order), Play all, Download (admins); the
+   day bar jumps to the moment; plain messages; phone width. **Phase 16 is done.** Left: Phase 26 (real-camera week,
+   needs the user's app running), Phase 28 step 1 (GitHub runner after 2026-10-19), Phase 29 (more cameras: the user
+   has none extra).
 
 ## Critical files
 

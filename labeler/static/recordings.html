@@ -31,6 +31,19 @@
   table.recs td.num { text-align: right; font-variant-numeric: tabular-nums; }
   table.recs tr.playing td { background: var(--chip); }
   .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  /* Search by words (Phase 16): one row per moment. */
+  .find { display: flex; gap: 8px; flex-wrap: wrap; }
+  .find input { flex: 1; min-width: 200px; font: inherit; }
+  .moments { margin-top: 10px; }
+  .moment { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .moment.playing { background: var(--chip); }
+  .moment img, .moment .pic-none { width: 48px; height: 64px; object-fit: cover; border-radius: 6px; flex: none;
+    background: var(--chip); }
+  .moment .what { flex: 1; min-width: 0; }
+  .moment .what small { color: var(--muted); display: block; font-variant-numeric: tabular-nums; }
+  .moment .chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+  .moment .chip.differs { outline: 1px dashed var(--warn); }
+  @media (max-width: 560px) { .moment { flex-wrap: wrap; } .moment .actions { flex-basis: 100%; padding-left: 58px; } }
 </style>
 </head>
 <body>
@@ -39,6 +52,17 @@
   <nav><a href="/">Live</a><a href="/recordings" class="active">Recordings</a><a href="/summary">Summary</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/check" class="admin-only">Check</a><a href="/audit" class="admin-only">Audit log</a><a href="/import" class="admin-only">Import</a><a href="/settings" class="admin-only">Settings</a><a href="/health">Health</a></nav>
 </header>
 <main>
+  <section class="panel">
+    <h2>Find in recordings</h2>
+    <form class="find" id="find">
+      <input id="question" maxlength="300" aria-label="What to find"
+        placeholder="e.g. woman in a red top this morning, man with a backpack yesterday evening, white car">
+      <button class="primary" type="submit">Search</button>
+      <button type="button" id="play-all" hidden>▶ Play all</button>
+    </form>
+    <p class="hint" id="found-note" style="margin:8px 0 0"></p>
+    <div class="moments" id="moments"></div>
+  </section>
   <section class="panel">
     <div class="controls">
       <label for="camera">Camera</label> <select id="camera"></select>
@@ -66,6 +90,7 @@
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 let data = null, playing = null;   // playing: {rec, startMs}
+let found = null, queue = null, stopTimer = null;   // the last search; Play all: the moments still to play
 
 function pad(n) { return String(n).padStart(2, "0"); }
 function localDay(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
@@ -173,21 +198,27 @@ async function playAt(t) {
 function localIso(t) { const d = new Date(t); return `${localDay(d)}T${clock(t)}`; }
 
 // Admins play the file (seeking by the browser); viewers a stream made by the app with faces blurred.
-function play(rec, offsetS, videoS) {
+// `until` (a search's moment): {videoEnd: seconds in the file, seconds: its length, onEnd} stops it at its end.
+function play(rec, offsetS, videoS, until) {
   playing = { rec, startMs: ms(rec.start) };
   $("player").hidden = false;
   const v = $("video"), img = $("stream");
   stopStream();
+  clearTimeout(stopTimer);
   if (data.admin && !rec.open) {
     img.hidden = true; v.hidden = false; $("stop").hidden = true;
     v.src = `/recordings/file/${rec.id}`;
     v.onloadedmetadata = () => { v.currentTime = videoS ?? offsetS * 1; v.play().catch(() => {}); };
-    v.ontimeupdate = null;
+    v.ontimeupdate = until ? () => {
+      if (v.currentTime >= until.videoEnd) { v.ontimeupdate = null; v.pause(); until.onEnd && until.onEnd(); }
+    } : null;
     showNow(playing.startMs + (offsetS || 0) * 1000, "(the exact time is on the picture)");
   } else {
     v.pause(); v.removeAttribute("src"); v.load(); v.hidden = true;
     img.hidden = false; $("stop").hidden = false;
-    img.src = `/recordings/stream/${rec.id}?t=${offsetS || 0}`;
+    img.src = `/recordings/stream/${rec.id}?t=${offsetS || 0}` + (until ? `&d=${until.seconds}` : "");
+    // The stream ends by itself after d seconds; the page waits as long (it plays in real time), then goes on.
+    if (until && until.onEnd) stopTimer = setTimeout(until.onEnd, (until.seconds + 1.5) * 1000);
     showNow(playing.startMs + (offsetS || 0) * 1000, data.admin ? "(still being recorded; the exact time is on the picture)"
       : "(faces blurred; the exact time is on the picture)");
   }
@@ -196,7 +227,7 @@ function play(rec, offsetS, videoS) {
 }
 function showNow(t, note) { $("now").textContent = `${data.camera} · from ${localDay(new Date(t))} ${clock(t)}`; $("now-note").textContent = note; }
 function stopStream() { const img = $("stream"); if (img.src) { img.removeAttribute("src"); } }
-$("stop").onclick = () => { stopStream(); $("stream").hidden = true; $("stop").hidden = true; };
+$("stop").onclick = () => { stopStream(); clearTimeout(stopTimer); queue = null; $("stream").hidden = true; $("stop").hidden = true; };
 
 async function remove(r) {
   if (!confirm(`Delete the recording from ${clock(ms(r.start))} to ${clock(ms(r.end))}? This cannot be undone.`)) return;
@@ -212,6 +243,79 @@ $("prev").onclick = () => shiftDay(-1);
 $("next").onclick = () => shiftDay(1);
 $("day").onchange = () => load($("day").value, data && data.camera);
 $("camera").onchange = () => load($("day").value, $("camera").value);
+
+// --- Search by words (labeler/moments.py): moments to play, newest first ---
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); }
+const WORD = { person: ["person", "people"], vehicle: ["vehicle", "vehicles"], animal: ["animal", "animals"] };
+function count(items) {
+  const n = {};
+  items.forEach(i => { n[i.type] = (n[i.type] || 0) + 1; });
+  return Object.entries(n).map(([k, c]) => `${c} ${WORD[k][c === 1 ? 0 : 1]}`).join(", ");
+}
+
+$("find").onsubmit = async (e) => {
+  e.preventDefault();
+  const question = $("question").value.trim();
+  if (!question) return;
+  $("found-note").textContent = "Searching…";
+  $("moments").innerHTML = "";
+  $("play-all").hidden = true;
+  const r = await fetch("/api/recordings/search", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { found = null; $("found-note").textContent = d.detail || "The search did not work."; return; }
+  found = d;
+  drawFound();
+};
+
+function drawFound() {
+  const d = found, notes = [d.explanation.replace(/\.?$/, ".")];
+  if (!d.found) notes.push("Nothing found.");
+  else if (!d.on_video) notes.push(`Found ${d.found}, but none of them is on video: ` + (d.recording
+    ? `recordings are kept ${d.keep_days} days, and only while people are in view.` : "recording is turned off."));
+  else notes.push(`Found ${d.found}, ${d.on_video} on video` + (d.not_on_video ? ` (${d.not_on_video} not recorded)` : "")
+    + ` · ${d.moments.length} moment${d.moments.length === 1 ? "" : "s"}.`);
+  $("found-note").textContent = notes.join(" ");
+  $("play-all").hidden = d.moments.length < 2;
+  $("moments").innerHTML = d.moments.map((m, k) => {
+    const day = m.start.slice(0, 10), t = clock(ms(m.start));
+    const chips = m.items.slice(0, 6).map(i => `<span class="chip${i.labels_differ ? " differs" : ""}"
+      title="${i.labels_differ ? "looks similar, but is labeled differently" : ""}">${esc(i.text)}</span>`).join("")
+      + (m.items.length > 6 ? `<span class="chip">+${m.items.length - 6}</span>` : "");
+    const dl = data && data.admin ? m.parts.map((p, j) =>
+      `<button data-dl="${k}:${j}">Download${m.parts.length > 1 ? ` ${j + 1}/${m.parts.length}` : ""}</button>`).join("") : "";
+    return `<div class="moment" data-k="${k}">
+      ${m.picture ? `<img src="/crops/${encodeURIComponent(m.picture)}" alt="" loading="lazy">` : '<span class="pic-none"></span>'}
+      <div class="what"><b>${esc(m.camera)} · ${day} ${t}</b>
+        <small>${length(m.length_s)} · ${count(m.items)}${m.parts.length > 1 ? ` · ${m.parts.length} parts` : ""}</small>
+        <div class="chips">${chips}</div></div>
+      <div class="actions"><button class="primary" data-play="${k}">▶ Play</button>${dl}</div></div>`;
+  }).join("");
+}
+
+$("moments").onclick = (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.play !== undefined) { queue = null; playMoment(Number(b.dataset.play), 0); }
+  if (b.dataset.dl !== undefined) {
+    const [k, j] = b.dataset.dl.split(":").map(Number), p = found.moments[k].parts[j];
+    location.href = `/api/recordings/${p.recording}/download?start=${p.video_s}&end=${p.video_end_s}`;
+  }
+};
+$("play-all").onclick = () => { queue = found.moments.map((_, k) => k).slice(1); playMoment(0, 0); };
+
+// One part of a moment: show its day and camera (the bar and list), play from its start, stop at its end,
+// then its next part, then (Play all) the next moment.
+async function playMoment(k, j) {
+  const m = found.moments[k], p = m.parts[j];
+  document.querySelectorAll(".moment").forEach(el => el.classList.toggle("playing", Number(el.dataset.k) === k));
+  if (!data || data.day !== p.start.slice(0, 10) || data.camera !== m.camera) await load(p.start.slice(0, 10), m.camera);
+  const rec = data.recordings.find(x => x.id === p.recording) || { id: p.recording, start: p.start, open: false };
+  const next = j + 1 < m.parts.length ? () => playMoment(k, j + 1)
+    : queue && queue.length ? () => playMoment(queue.shift(), 0) : null;
+  play(rec, p.offset_s, p.video_s, { videoEnd: p.video_end_s, seconds: Math.max(1, p.end_offset_s - p.offset_s), onEnd: next });
+  $("now-note").textContent += ` · moment ${k + 1} of ${found.moments.length}` + (m.parts.length > 1 ? `, part ${j + 1} of ${m.parts.length}` : "");
+}
 
 // A link like /recordings?camera=cam1&at=2026-10-12T14:05:00 (from a person, an alert or the timeline) plays then.
 (async () => {
