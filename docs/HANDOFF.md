@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **738 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **746 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -439,6 +439,11 @@ alert (4 h, 08:00-22:00, only when Home), 32 help sign (one hand above the head 
 34 time-lapse of the day, 35 Update button. Also open: Phase 26 (real-camera week: their app must run with the webcam,
 lens cover open), Phase 28 step 1 after 2026-10-19; Phase 29 waits for extra cameras (the user has none, 2026-10-15).
 Not chosen 2026-10-15 (don't offer again unless asked): sounds, privacy masks, Malay/Chinese pages, blurred export.
+
+**Phase 30 started 2026-10-15**: step 1 done, `labeler/picture_check.py` (`stats`, `findings`, `check_frame`, `faces`;
+`LIMITS` from `tools/picture_check_eval.py --tune`; the blur measure is Laplacian variance / picture variance: random
+noise is no test picture for it, as blurring noise removes its contrast too, so tests use `samples/bus.jpg`). Next:
+step 2 (Health line "camera picture", Settings "Check the picture" button, a Live banner only for lasting problems).
 
 **Earlier plan: Phase 16** search recordings by words ([PHASE16-PLAN.md](PHASE16-PLAN.md); approved, skipped for now), **then
 [PHASE26-29-PLAN.md](PHASE26-29-PLAN.md)** (approved 2026-10-14): 26 real-camera week with the user, 27 scene question

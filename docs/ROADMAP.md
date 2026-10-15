@@ -372,6 +372,12 @@ in this order: 30 camera picture check (covered, blurry, dark, backlight, angle)
 34 time-lapse of the day, 35 an Update button on the Settings page. Not chosen (2026-10-15): sounds, privacy masks,
 Malay/Chinese pages, blurred export. Ask before each phase and each step.
 
+Phase 30 started 2026-10-15.
+1. **Done 2026-10-15**: `labeler/picture_check.py` (covered, dark, bright, blurry, backlight from frames; faces / small
+   faces from the people recorded) and `tools/picture_check_eval.py` (COCO + MOT16 made worse on purpose; limits tuned
+   on the even half at <= 1% false, reported on the odd half: blur 91-100%, dark 77-91%, bright 86%, backlight 79-90%,
+   covered 100%; 7/200 COCO and 0/70 MOT16 good pictures flagged, mostly rightly). README "Camera picture check".
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),

@@ -606,6 +606,36 @@ it was not used. The Health page's **storage** line shows what pictures, person 
 and logs use, the average per person, people per day (last 7 days) and days of space left at that rate; a
 warning below 30 days, unless retention deletes people before the disk fills.
 
+## Camera picture check
+
+What is wrong with a camera's picture, in plain words, with what to do (`labeler/picture_check.py`; Phase 30, the
+Health page line and a "Check the picture" button come with its step 2). From the frames the camera already has, no
+extra model: **covered** (no detail: lens cover, another app), **dark**, **washed out** (bright), **blurry** (dirty lens
+or out of focus: little fine detail for the picture's contrast, so a plain wall and a busy street compare), **light
+from behind** (people much darker than the window behind them). On kiosk cameras, from the people recorded: **faces
+rarely seen** (camera too high or to the side) or **too small for ages**.
+
+Measured (2026-10-15, `tools/picture_check_eval.py`): 400 COCO photos with people and 140 MOT16 street frames, each
+as it is and made worse on purpose; the limits were set on the even-numbered pictures (the most caught with at most 1%
+of good pictures flagged) and are reported on the odd-numbered ones only:
+
+| Picture | COCO (200) | MOT16 (70) |
+|---|---|---|
+| as it is: flagged | 7 | 0 |
+| slightly soft (blur 1 px) / dimmer (x 0.55): flagged | 10 / 9 | 0 / 0 |
+| blurred (2.5 px at 640 wide): "blurry" | 181 | 70 |
+| darkened (x 0.2): "dark" | 154 | 64 |
+| washed out: "bright" | 172 | 60 |
+| people darkened, background brightened: "light from behind" | 180 | 55 |
+| lens cover: "covered" | 200 | 70 |
+
+The 7 COCO photos flagged as they are were mostly right when looked at (night photos, a white sky, a person on a
+bench against the sky). With a stricter 3% the dark and backlight catches were higher (99% / 90%) but 19 of 200 good
+photos were flagged; the 1% limits were kept. Faces: on the MOT16 shop-front video run as a kiosk camera (102 people,
+the camera at about head height) 26% of the time facing the camera and ages for 76%: no finding, as it should be; the
+limits for faces (15% facing, 30% with ages, 10 people at least) are chosen, not measured (no public footage from a
+camera mounted too high). Not measured: real dirty lenses, night infrared pictures, your webcam.
+
 ## Camera problems
 
 The app watches each camera and reports **no picture** (10 s without a frame, e.g. a network camera that
