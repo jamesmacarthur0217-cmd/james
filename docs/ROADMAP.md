@@ -410,6 +410,10 @@ Phase 33 started 2026-10-15.
    `photo_search.min_similarity` 0.85 -> moments, closest first; viewers too; audited). `tools/photo_match_check.py`:
    0.85 chosen on MOT16-02/04/05 (60/62 kept), on 09/10/11/13 20/28 kept, 76% of others dropped; right person first
    61-69%. Real run: one woman found 3 times (looping video), nobody else.
+2. **Done 2026-10-15** (with step 3's docs): Recordings page "or with a photo" (results with "% alike", closest first,
+   Play / Play all / Download), checked in the browser. Also: the harmless Windows "connection forcibly closed" asyncio
+   errors (a video player seeking) are no longer logged as errors (`logs.DropClosedConnections`), so the Health page's
+   "errors in the log" does not count them. **Phase 33 is done.** Next: Phase 34 (time-lapse of the day).
 
 ## Critical files
 

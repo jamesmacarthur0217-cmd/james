@@ -58,6 +58,8 @@
       <input id="question" maxlength="300" aria-label="What to find"
         placeholder="e.g. woman in a red top this morning, man with a backpack yesterday evening, white car">
       <button class="primary" type="submit">Search</button>
+      <button type="button" id="photo-btn" title="Find a person by a picture of them (JPEG or PNG; it is not stored)">or with a photo</button>
+      <input type="file" id="photo-file" accept="image/jpeg,image/png" hidden>
       <button type="button" id="play-all" hidden>▶ Play all</button>
     </form>
     <p class="hint" id="found-note" style="margin:8px 0 0"></p>
@@ -268,9 +270,28 @@ $("find").onsubmit = async (e) => {
   drawFound();
 };
 
+// Search by photo (Phase 33): the picture is sent as it is and not stored; the closest people come first.
+$("photo-btn").addEventListener("click", () => $("photo-file").click());
+$("photo-file").addEventListener("change", async () => {
+  const file = $("photo-file").files[0];
+  $("photo-file").value = "";
+  if (!file) return;
+  $("found-note").textContent = "Looking at the photo…";
+  $("moments").innerHTML = "";
+  $("play-all").hidden = true;
+  try {
+    const r = await fetch("/api/recordings/search/photo", { method: "POST", body: file,
+                                                             headers: { "Content-Type": file.type || "image/jpeg" } });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { found = null; $("found-note").textContent = d.detail || "The photo could not be searched."; return; }
+    found = d;
+    drawFound();
+  } catch { $("found-note").textContent = "The photo could not be sent."; }
+});
+
 function drawFound() {
   const d = found, notes = [d.explanation.replace(/\.?$/, ".")];
-  if (!d.found) notes.push("Nothing found.");
+  if (!d.found) notes.push(d.how === "photo" ? "Nobody recorded looks enough like the person in the photo." : "Nothing found.");
   else if (!d.on_video) notes.push(`Found ${d.found}, but none of them is on video: ` + (d.recording
     ? `recordings are kept ${d.keep_days} days, and only while people are in view.` : "recording is turned off."));
   else notes.push(`Found ${d.found}, ${d.on_video} on video` + (d.not_on_video ? ` (${d.not_on_video} not recorded)` : "")
@@ -280,7 +301,8 @@ function drawFound() {
   $("moments").innerHTML = d.moments.map((m, k) => {
     const day = m.start.slice(0, 10), t = clock(ms(m.start));
     const chips = m.items.slice(0, 6).map(i => `<span class="chip${i.labels_differ ? " differs" : ""}"
-      title="${i.labels_differ ? "looks similar, but is labeled differently" : ""}">${esc(i.text)}</span>`).join("")
+      title="${i.labels_differ ? "looks similar, but is labeled differently" : ""}">${esc(i.text)}${
+        i.similarity !== undefined ? ` · ${Math.round(i.similarity * 100)}% alike` : ""}</span>`).join("")
       + (m.items.length > 6 ? `<span class="chip">+${m.items.length - 6}</span>` : "");
     const dl = data && data.admin ? m.parts.map((p, j) =>
       `<button data-dl="${k}:${j}">Download${m.parts.length > 1 ? ` ${j + 1}/${m.parts.length}` : ""}</button>`).join("") : "";

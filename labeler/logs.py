@@ -56,6 +56,16 @@ class RecentErrors(logging.Handler):
 recent_errors = RecentErrors()
 
 
+class DropClosedConnections(logging.Filter):
+    """On Windows, Python's asyncio logs an ERROR with a traceback when a browser drops a connection the server is
+    closing (WinError 10054): a video player seeking in a recording does it all the time. Harmless, but it filled the
+    log and the Health page's "errors in the log" line, so it is left out."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        exc = record.exc_info[1] if record.exc_info else None
+        return not (isinstance(exc, ConnectionResetError) and "connection_lost" in record.getMessage())
+
+
 def setup(logs: dict) -> Path:
     """Console (time only) + rotating app log file + the recent-errors memory. Returns the log file's path."""
     root = logging.getLogger()
@@ -72,6 +82,9 @@ def setup(logs: dict) -> Path:
         root.addHandler(h)
     # The model downloader logs every web request it makes at startup ("HTTP Request: GET https://..."): noise.
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    aio = logging.getLogger("asyncio")
+    if not any(isinstance(f, DropClosedConnections) for f in aio.filters):
+        aio.addFilter(DropClosedConnections())
     _log_uncaught()
     return Path(file.baseFilename)
 

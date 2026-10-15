@@ -80,3 +80,19 @@ def test_supervisor_finds_the_config_in_the_app_arguments():
     assert _config_path(["--config", "a.yaml", "--port", "8001"]) == "a.yaml"
     assert _config_path(["--config=b.yaml"]) == "b.yaml"
     assert _config_path(["--port", "8001"]) is None
+
+
+def test_dropped_browser_connections_are_not_errors():
+    from labeler.logs import DropClosedConnections
+    f = DropClosedConnections()
+
+    def record(msg, exc):
+        try:
+            raise exc
+        except Exception:
+            import sys
+            return logging.LogRecord("asyncio", logging.ERROR, __file__, 1, msg, None, sys.exc_info())
+    assert not f.filter(record("Exception in callback _ProactorBasePipeTransport._call_connection_lost()",
+                               ConnectionResetError(10054, "closed by the remote host")))
+    assert f.filter(record("Exception in callback something_else()", ConnectionResetError()))
+    assert f.filter(record("Task exception was never retrieved", ValueError("a real problem")))
