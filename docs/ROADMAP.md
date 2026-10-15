@@ -393,6 +393,11 @@ Phase 31 started 2026-10-15.
    "seen again at 15:29, after 11 min" when people appeared. The Health line names the rule when there are several.
    **Phase 31 is done.** Next: Phase 32 (help sign: one hand above the head for 3 s).
 
+Phase 32 started 2026-10-15.
+1. **Done 2026-10-15**: `labeler/gestures.py`: `hands_up` (wrist above the head's top by 15% of the torso, elbow above
+   the shoulder; no head found = not checked) and `GestureWatch` (held 3 s, gaps up to 0.5 s, one alert per sign,
+   down 2 s re-arms; `both_ok` decides whether two hands count). Not yet connected to the cameras (step 3).
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),
