@@ -263,8 +263,8 @@ def test_old_scene_alerts_go_with_retention(db, camera):
 def test_pop_ups_name_scene_alerts():
     from pathlib import Path
     static = Path(__file__).resolve().parent.parent / "labeler" / "static"
-    for page in ("session.js", "alerts.html"):
-        assert 'e.scene_id ? "scene question"' in (static / page).read_text(encoding="utf-8")
+    assert 'e.scene_id ? "scene question"' in (static / "session.js").read_text(encoding="utf-8")   # VL.alertWho
+    assert "window.VL.alertWho(e)" in (static / "alerts.html").read_text(encoding="utf-8")
 
 
 # --- step 5: Settings, Health ---

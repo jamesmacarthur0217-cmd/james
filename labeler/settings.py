@@ -90,6 +90,7 @@ class SettingsIn(BaseModel):
     animal_kinds: list[str] = Field(min_length=1)
     scene_enabled: bool
     scene_answers_in_a_row: int = Field(ge=1, le=5)
+    quiet_enabled: bool
 
     @field_validator("animal_kinds")
     @classmethod
@@ -161,6 +162,7 @@ SIMPLE = {
     "animal_kinds": ("animals", "kinds"),
     "scene_enabled": ("scene", "enabled"),
     "scene_answers_in_a_row": ("scene", "answers_in_a_row"),
+    "quiet_enabled": ("quiet", "enabled"),
     "backup_copy_to": ("backup", "copy_to"),
     "idle_enabled": ("idle", "enabled"),
     "idle_after_s": ("idle", "after_s"),

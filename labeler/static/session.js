@@ -84,6 +84,11 @@
     else if (!open && beeping) { clearInterval(beeping); beeping = null; }
   }
 
+  // Who or what an alert is about (also used by the Alerts page).
+  window.VL = window.VL || {};
+  window.VL.alertWho = (e) => e.quiet ? "no movement" : e.scene_id ? "scene question" : e.animal_id ? `animal #${e.animal_id}`
+    : e.vehicle_id ? `vehicle #${e.vehicle_id}` : `person #${e.track_id}`;
+
   function showAlert(e, admin) {
     const t = document.createElement("div");
     const picture = e.crop ? `<img src="/crops/${encodeURIComponent(e.crop)}" alt="">` : "";
@@ -96,10 +101,16 @@
         <small class="sound-off">Click anywhere on this page to hear the alarm.</small><br>
         <button class="primary">OK</button></div>`;
       t.querySelector("button").addEventListener("click", () => { t.remove(); updateAlarm(); });
+    } else if (e.quiet) {   // no movement (labeler/quiet.py): stays until OK, like a fall, but without the beep
+      t.className = "toast quiet";
+      t.setAttribute("role", "alertdialog");
+      t.innerHTML = `<div><b>NO MOVEMENT</b> · ${escHtml(e.camera)} · ${time}<br>${escHtml(e.message)}<br>
+        <button class="primary">OK</button></div>`;
+      t.querySelector("button").addEventListener("click", () => t.remove());
     } else {
       t.className = "toast";
       t.innerHTML = `${picture}<div><b>Alert</b> · ${escHtml(e.camera)}<br>${escHtml(e.message)}<br>
-        <small>${e.scene_id ? "scene question" : e.animal_id ? `animal #${e.animal_id}` : e.vehicle_id ? `vehicle #${e.vehicle_id}` : `person #${e.track_id}`}</small></div>`;
+        <small>${window.VL.alertWho(e)}</small></div>`;
       t.addEventListener("click", () => t.remove());
       setTimeout(() => t.remove(), 20000);
     }

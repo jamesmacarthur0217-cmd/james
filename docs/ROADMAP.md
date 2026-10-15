@@ -386,6 +386,9 @@ Phase 31 started 2026-10-15.
    "No movement" (4 h, 08:00-22:00, only when Home; made at start like "Fall"), `labeler/quiet.py` (QuietWatch, a thread
    once a minute: counts only while the camera works and the hours / Home hold; one alert per quiet stretch; the
    message says when someone was seen again); alerts about no one are listed and go with retention. No schema change.
+2. **Done 2026-10-15**: orange pop-up on every page until OK (`toast quiet`, `VL.alertWho`), Alerts page condition
+   "no movement (nobody seen for)" 1-12 h and "kiosk cameras", Summary timeline, Health line "no movement"
+   (`QuietWatch.state`, `app.state.quiet`), Settings "No movement alerts"; README "No movement".
 
 ## Critical files
 

@@ -143,3 +143,36 @@ def test_api_checks_no_movement_rules(db, tmp_path):
     assert ok.status_code == 200, ok.text
     for bad in ([["quiet", "5"]], [["quiet", "x"]], [["quiet", "120"], ["upper_color", "red"]]):
         assert client.post("/api/alerts/rules", json={"name": "bad", "conditions": bad}).status_code == 400
+
+
+# --- step 2: Health line, pages, Settings ---
+
+def test_health_line_says_how_long_it_has_been_quiet(db):
+    from labeler.healthcheck import check_quiet
+    watch, clock, (cam, _gate), health, arming = _setup(db, DAY.replace(hour=9), [Cam(), Cam("gate", "security")])
+    assert check_quiet(None) is None
+    watch.tick()
+    clock.step(hours=1, minutes=20)
+    line = check_quiet(watch)
+    assert line["level"] == "ok" and line["detail"] == "cam1: nobody seen for 1 h 20 min (alert after 4 h)"
+    clock.step(hours=3)
+    watch.tick()
+    assert check_quiet(watch)["level"] == "warning" and check_quiet(watch)["detail"].endswith(", alerted")
+    arming.set("away", "test")
+    assert check_quiet(watch)["detail"] == "cam1: not counted now (only when Home)"
+    health.problems = ["cam1"]
+    assert "camera problem" in check_quiet(watch)["detail"]
+    for r in db.list_rules():
+        db.delete_rule(r["id"])
+    watch.alerts.invalidate()
+    assert check_quiet(watch)["level"] == "off"
+
+
+def test_pages_show_no_movement():
+    from pathlib import Path
+    static = Path(__file__).resolve().parent.parent / "labeler" / "static"
+    js = (static / "session.js").read_text(encoding="utf-8")
+    assert 'e.quiet ? "no movement"' in js and 'className = "toast quiet"' in js
+    alerts = (static / "alerts.html").read_text(encoding="utf-8")
+    assert 'quiet: ["60", "120", "180", "240"' in alerts and "nobody seen for ${niceSeconds(v * 60)}" in alerts
+    assert 'id="quiet_enabled"' in (static / "settings.html").read_text(encoding="utf-8")

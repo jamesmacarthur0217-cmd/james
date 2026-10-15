@@ -245,7 +245,7 @@ def main() -> int:
     threading.Thread(target=backups.loop, args=(cfg, db, app.state.stopping), name="backup", daemon=True).start()
     if cfg["quiet"]["enabled"]:   # no movement (labeler/quiet.py)
         from labeler.quiet import QuietWatch
-        quiet = QuietWatch(db, alerts, pipelines, arming, health)
+        quiet = app.state.quiet = QuietWatch(db, alerts, pipelines, arming, health)   # the Health page reads it
         threading.Thread(target=quiet.loop, args=(app.state.stopping, float(cfg["quiet"]["check_every_s"])),
                          name="quiet", daemon=True).start()
     if worker is not None and cfg["scene"]["enabled"]:

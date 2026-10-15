@@ -380,6 +380,26 @@ def check_picture(cfg: dict, db, pipelines: list, now: datetime | None = None) -
     return _check("camera picture", "ok", f"fine (last checked {max(checked)}; Settings page: Check the picture)")
 
 
+def check_quiet(quiet) -> dict | None:
+    """Phase 31: the "no movement" watch (labeler/quiet.py): how long each watched camera has been quiet."""
+    if quiet is None:
+        return None
+    items = quiet.state()
+    if not items:
+        return _check("no movement", "off", "no rule asks for it, or no kiosk camera to watch (Alerts page)")
+    from .alerts import nice_seconds
+
+    def one(i):
+        if "resting" in i:
+            return f"{i['camera']}: not counted now ({i['resting']})"
+        m = i["quiet_s"] // 60
+        took = f"{m // 60} h {m % 60} min" if m >= 60 else f"{m} min"
+        return (f"{i['camera']}: nobody seen for {took} (alert after {nice_seconds(i['after_s'])})"
+                + (", alerted" if i["alerted"] else ""))
+    level = "warning" if any(i["alerted"] for i in items) else "ok"
+    return _check("no movement", level, "; ".join(one(i) for i in items))
+
+
 def check_checks(db) -> dict | None:
     """Phase 24: what the admins' checks on the Check page say (no line before the first check)."""
     from . import checks
@@ -411,7 +431,7 @@ def check_errors(now: float) -> tuple[dict, list[dict]]:
 
 
 def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: float | None = None,
-               detail: str = "full", arming=None) -> dict:
+               detail: str = "full", arming=None, quiet=None) -> dict:
     """detail: "full" (admins), "viewer" (no log messages) or "status" (monitoring token: problems only)."""
     now_mono, now = time.monotonic(), time.time()
     errors_check, latest_errors = check_errors(now)
@@ -440,6 +460,12 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
             checks.insert(-1, line)
     except Exception as e:
         checks.insert(-1, _check("checked by you", "warning", f"could not be read ({e.__class__.__name__})"))
+    try:
+        line = check_quiet(quiet)
+        if line is not None:
+            checks.insert(-1, line)
+    except Exception as e:
+        checks.insert(-1, _check("no movement", "warning", f"could not be checked ({e.__class__.__name__})"))
     try:
         line = check_picture(cfg, db, pipelines)
         if line is not None:

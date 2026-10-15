@@ -709,6 +709,23 @@ Measured 2026-10-13 (`tools/mobility_check.py`; answers checked by eye):
 - People counted as "no aid" when no aid box touched them and the model said none; people too cut-off or
   blurry to tell were left out (69 of 793).
 
+## No movement
+
+For someone living alone (an elderly parent): an alert when nobody has been seen on the camera for a long time while
+someone should be in. The built-in rule **"No movement"** (made at start, like "Fall"): nobody seen for **4 hours,
+between 08:00 and 22:00, only when the house is set to Home** (`labeler/quiet.py`). The time counts only while all of
+that holds and the camera works: it starts again at 08:00 each day, when the house is switched to Home, and after a
+camera problem (a covered lens or no picture gives its own alert instead). One alert per quiet stretch: an orange
+pop-up on every page that stays until **OK** (no beep), in the Alerts list ("no movement") and on the Summary page;
+when someone is seen again its message says when and after how long ("seen again at 12:30, after 4 h 30 min"). A rule
+without a camera watches the **kiosk cameras** only (a gate camera sees nobody for hours); name a camera to watch it.
+
+To change it, add your own rule on the Alerts page with **no movement (nobody seen for)** 1 to 12 hours, with the time
+of day and Home / Away if wanted, and delete or turn off the built-in one (while a no-movement rule exists, the
+built-in one is not made again). The Health page line "no movement" shows how long each camera has been quiet; the
+Settings page turns it off (**No movement alerts**). Not measured on real days yet (a long nap, someone reading in
+another room): try it for a week and look at its alerts.
+
 ## Fall alerts
 
 A camera that sees a room from the side notices **a fall**: someone upright is down a moment later (within 1 s),

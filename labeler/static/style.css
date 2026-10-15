@@ -95,6 +95,9 @@ button.danger-quiet { margin-left: auto; color: #c9372c; border-color: transpare
 .toast.fall button { margin-top: 6px; }
 @keyframes fall-pulse { 50% { box-shadow: 0 0 0 4px var(--bad); } }
 @media (prefers-reduced-motion: reduce) { .toast.fall { animation: none; } }
+.toast.quiet { border-left: 6px solid var(--warn); background: var(--warn-bg); cursor: default; font-size: 14px; }
+.toast.quiet b { color: var(--warn); }
+.toast.quiet button { margin-top: 6px; }
 .muted { color: var(--muted); font-size: 12px; }
 /* Accounts: admin controls are hidden until the page knows the user is an admin (static/session.js). */
 body:not(.is-admin) .admin-only { display: none !important; }

@@ -107,6 +107,32 @@ class QuietWatch:
                         made.append(event)
         return made
 
+    def state(self) -> list[dict]:
+        """For the Health page: per rule and camera watched, how long it has been quiet, or why it is not counted now."""
+        now = self.clock()
+        problems = self._problems()
+        mode, mode_since = self._armed()
+        out = []
+        with self._lock:
+            for rule in self.alerts.quiet_rules():
+                minutes = int(_value(rule, QUIET))
+                for p in self.pipelines:
+                    if not self.applies(rule, p):
+                        continue
+                    item = {"rule": rule["name"], "camera": p.name, "after_s": minutes * 60,
+                            "alerted": (rule["id"], p.name) in self.open}
+                    hours, armed = _value(rule, HOURS), _value(rule, ARMED)
+                    if not getattr(p, "running", False) or p.name in problems:
+                        item["resting"] = "camera problem"
+                    elif hours and not in_hours(hours, now.hour):
+                        item["resting"] = f"outside {hours}"
+                    elif armed and armed != mode:
+                        item["resting"] = f"only when {armed.capitalize()}"
+                    else:
+                        item["quiet_s"] = round((now - self.quiet_since(rule, p, now, mode_since)).total_seconds())
+                    out.append(item)
+        return out
+
     def _close(self, key: tuple, seen: datetime) -> None:
         item = self.open.pop(key)
         quiet = (seen - item["start"]).total_seconds()
