@@ -380,6 +380,25 @@ def check_picture(cfg: dict, db, pipelines: list, now: datetime | None = None) -
     return _check("camera picture", "ok", f"fine (last checked {max(checked)}; Settings page: Check the picture)")
 
 
+def check_updates(updater) -> dict | None:
+    """Phase 35: whether a new version is on GitHub (labeler/updater.py, checked once a day)."""
+    if updater is None:
+        return None
+    s = updater.state
+    if not s.get("checked_at"):
+        return _check("updates", "ok", "not checked yet (a few minutes after start, then once a day)")
+    when = s["checked_at"][11:16]
+    if not s.get("available"):
+        return _check("updates", "off", f"could not check: {s.get('error')} (checked {when})")
+    if s["hand_changes"]:
+        return _check("updates", "warning", f"files changed by hand ({', '.join(s['hand_changes'][:3])}): the "
+                                            "Update button cannot update until they are undone")
+    if s["behind"]:
+        return _check("updates", "ok", f"{s['behind']} new {'change' if s['behind'] == 1 else 'changes'} on GitHub: "
+                                       f"Update now on the Settings page (checked {when})")
+    return _check("updates", "ok", f"up to date: {s.get('version', '')} (checked {when})")
+
+
 def check_quiet(quiet) -> dict | None:
     """Phase 31: the "no movement" watch (labeler/quiet.py): how long each watched camera has been quiet."""
     if quiet is None:
@@ -434,7 +453,7 @@ def check_errors(now: float) -> tuple[dict, list[dict]]:
 
 
 def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: float | None = None,
-               detail: str = "full", arming=None, quiet=None) -> dict:
+               detail: str = "full", arming=None, quiet=None, updater=None) -> dict:
     """detail: "full" (admins), "viewer" (no log messages) or "status" (monitoring token: problems only)."""
     now_mono, now = time.monotonic(), time.time()
     errors_check, latest_errors = check_errors(now)
@@ -463,6 +482,12 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
             checks.insert(-1, line)
     except Exception as e:
         checks.insert(-1, _check("checked by you", "warning", f"could not be read ({e.__class__.__name__})"))
+    try:
+        line = check_updates(updater)
+        if line is not None:
+            checks.insert(-1, line)
+    except Exception as e:
+        checks.insert(-1, _check("updates", "warning", f"could not be checked ({e.__class__.__name__})"))
     try:
         line = check_quiet(quiet)
         if line is not None:

@@ -1227,6 +1227,18 @@ webcam answer-key people went **61.8% → 62.1%**, kept. Per attribute: gender 6
 by 4-11%, so this is no measurable change; the final labels (74.6% on the Answer key page) come mostly from the
 vision model, which the classifiers only stand in for until it answers. A larger answer key makes the check meaningful.
 
+## Updates
+
+The Settings page's **Updates** box shows whether a new version is on your GitHub repository (checked a few minutes
+after start, then once a day; **Check now** at once) with the titles of the changes. **Update now** (admins; asks first;
+in the Audit log): backs up the database, adds the new version with `git pull --ff-only` (only when nothing in the
+app's folder was changed by hand and the copy has no changes of its own), installs new Python packages only when
+`requirements.txt` changed (if that fails, the files go back to the running version), then restarts (with start.bat;
+otherwise it says to restart by hand). If anything goes wrong, the version running now stays. The Health page line
+"updates" says the same. Git uses the GitHub sign-in this PC already has; it never asks for a password from the app.
+A copy installed from the offline package (not a git copy) says it cannot check. Tested on scratch repositories and
+on a copy of this repository set back 3 versions: listed the 3 changes and updated in under a second (no packages).
+
 ## Tests
 
 The tests need `pytest` and `httpx2` (Starlette's test client; with only the older `httpx` it warns):

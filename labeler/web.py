@@ -815,7 +815,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         role = (getattr(request.state, "user", None) or {}).get("role")
         detail = {"admin": "full", "monitor": "status"}.get(role, "viewer")
         result = healthcheck.run_checks(cfg, db, pipelines, health, app.state.started_at, detail, arming,
-                                        getattr(app.state, "quiet", None))
+                                        getattr(app.state, "quiet", None), getattr(app.state, "updater", None))
         return JSONResponse(result, status_code=200 if result["ok"] else 503, headers={"Cache-Control": "no-store"})
 
     @app.get("/stream")
@@ -1234,6 +1234,37 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             return ts["ip"] if ts and ts.get("state") == "Running" else None
         except Exception:
             return None
+
+    # --- updates (labeler/updater.py): admins -------------------------------------------------------------------
+
+    def _updater():
+        if getattr(app.state, "updater", None) is None:
+            from .updater import Updater
+            app.state.updater = Updater(cfg)
+        return app.state.updater
+
+    @app.get("/api/update")
+    def update_state(check: bool = False):
+        """What is new on GitHub (the state of the last check; check=true fetches now)."""
+        up = _updater()
+        state = up.check(fetch=True) if check or not up.state.get("checked_at") else dict(up.state)
+        return {**state, "problem": up.problem(state), "busy": up.busy,
+                "can_restart": getattr(app.state, "request_restart", None) is not None
+                and settings_mod.restart_available()}
+
+    @app.post("/api/update")
+    def update_now(request: Request):
+        """Update to the newest version, then restart (Settings page, "Update now"; asks first on the page)."""
+        up = _updater()
+        result = up.update()
+        if not result["ok"]:
+            raise HTTPException(409, result["message"])
+        audit(request, "update app", f"{result['from']} -> {result['to']}: " + "; ".join(result["changes"])[:900])
+        do = getattr(app.state, "request_restart", None)
+        result["restarting"] = do is not None and settings_mod.restart_available()
+        if result["restarting"]:
+            threading.Timer(1.0, do).start()   # after the page got its answer
+        return result
 
     @app.post("/api/restart")
     def restart(request: Request):

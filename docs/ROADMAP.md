@@ -364,7 +364,7 @@ cameras (when added). The user picks which to keep and the order at the start. A
    needs the user's app running), Phase 28 step 1 (GitHub runner after 2026-10-19), Phase 29 (more cameras: the user
    has none extra).
 
-## Phases 30-35: picture check, no movement, help sign, photo search in recordings, time-lapse, update button (approved 2026-10-15, not started)
+## Phases 30-35: picture check, no movement, help sign, photo search in recordings, time-lapse, update button (approved 2026-10-15; all done 2026-10-15)
 
 **Plan: [PHASE30-35-PLAN.md](PHASE30-35-PLAN.md)**: the user (one webcam, no extra cameras) chose all six new ideas,
 in this order: 30 camera picture check (covered, blurry, dark, backlight, angle), 31 "no movement" alert (4 h,
@@ -424,6 +424,14 @@ Phase 34 started 2026-10-15 (user's choice: viewers get a copy with faces blurre
    <camera>/<day>.mp4`, viewers the blurred file, audited), Recordings page button with progress, the moment's time,
    Open this moment, Make again for today (the recording being written grows: shown "older" instead of not at all;
    found in the browser check, where the page stopped at 96%). **Phase 34 is done.** Next: Phase 35 (Update button).
+
+Phase 35 started 2026-10-15.
+1. **Done 2026-10-15** (the whole phase; its step 2 was tests and docs): `labeler/updater.py` (check: fetch, behind,
+   titles, files changed by hand, own commits; update: backup, `pull --ff-only`, pip only when requirements.txt
+   changed, reset to the running version if pip fails), `GET/POST /api/update` (admins, audited, restart through the
+   supervisor), Settings "Updates" box, Health line "updates", daily check thread (`updates.check`). Tested on scratch
+   repositories and a 3-versions-behind clone of this repository. **Phase 35 is done; the Phases 30-35 plan is
+   finished.**
 
 ## Critical files
 

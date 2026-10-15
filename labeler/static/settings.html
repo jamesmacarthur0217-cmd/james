@@ -39,6 +39,7 @@
   @media (max-width: 600px) { .push-card .addr { grid-template-columns: 1fr; } }
   @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
   .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .upd-changes { margin: 4px 0 10px; padding-left: 18px; font-size: 13px; }
   .picture-box { margin-top: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
   .picture-box h3 { margin: 0 0 8px; font-size: 15px; }
   .picture-check { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
@@ -254,6 +255,20 @@
       <label for="retrain_enabled">Weekly retraining</label>
       <div><input type="checkbox" id="retrain_enabled"> <span class="hint">Retrains the fast classifiers on your
         cameras' people once a week; a new version is kept only if it scores at least as well on the answer key.</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Updates</h2>
+    <p class="hint">New versions come from your GitHub repository. Update now backs up the database, adds the new
+      version (only if nothing here was changed by hand), installs new Python packages when needed and restarts; if
+      something goes wrong, the version running now stays. Checked once a day by itself.</p>
+    <p id="upd-state" class="muted">Checking…</p>
+    <ul id="upd-changes" class="upd-changes" hidden></ul>
+    <div class="actions">
+      <button id="upd-check">Check now</button>
+      <button class="primary" id="upd-now" hidden>Update now</button>
+      <span class="msg" id="upd-msg"></span>
     </div>
   </section>
 
@@ -487,14 +502,8 @@ $("save").addEventListener("click", async () => {
   finally { $("save").disabled = false; }
 });
 
-$("restart-now").addEventListener("click", async () => {
-  if (!$("unsaved").hidden && !confirm("There are unsaved changes; restart anyway (they are lost)?")) return;
-  $("restart-now").disabled = true;
-  $("unsaved").hidden = true;   // already confirmed: no "leave page?" question when it reloads
-  const r = await fetch("/api/restart", { method: "POST" });
-  if (!r.ok) { $("restart-now").disabled = false; showMsg((await r.json()).detail || "Could not restart.", false); return; }
-  $("restart-text").innerHTML = "<b>Restarting…</b> people in view are saved first; this page reloads when the app is back (about a minute).";
-  // Wait until the app has gone away, then until it answers again.
+// Wait until the app has gone away, then until it answers again; then reload the page.
+async function waitForRestart(show) {
   let wentDown = false;
   for (let i = 0; i < 300; i++) {
     await new Promise(res => setTimeout(res, 1000));
@@ -503,8 +512,58 @@ $("restart-now").addEventListener("click", async () => {
       if (ok && wentDown) { location.reload(); return; }
     } catch { wentDown = true; }
   }
-  $("restart-text").innerHTML = "<b>The app has not come back after 5 minutes.</b> Check its window.";
+  show("<b>The app has not come back after 5 minutes.</b> Check its window.");
+}
+
+$("restart-now").addEventListener("click", async () => {
+  if (!$("unsaved").hidden && !confirm("There are unsaved changes; restart anyway (they are lost)?")) return;
+  $("restart-now").disabled = true;
+  $("unsaved").hidden = true;   // already confirmed: no "leave page?" question when it reloads
+  const r = await fetch("/api/restart", { method: "POST" });
+  if (!r.ok) { $("restart-now").disabled = false; showMsg((await r.json()).detail || "Could not restart.", false); return; }
+  $("restart-text").innerHTML = "<b>Restarting…</b> people in view are saved first; this page reloads when the app is back (about a minute).";
+  waitForRestart(html => { $("restart-text").innerHTML = html; });
 });
+
+// --- Updates (labeler/updater.py) ---
+let upd = null;
+function showUpdate(s) {
+  upd = s;
+  const when = s.checked_at ? ` (checked ${s.checked_at.replace("T", " ").slice(0, 16)})` : "";
+  $("upd-state").textContent = !s.available ? `Cannot check for updates: ${s.error}${when}.`
+    : s.behind ? `${s.behind} new ${s.behind === 1 ? "change" : "changes"} on GitHub${when}. Running now: ${s.version}.`
+    : `Up to date${when}: ${s.version}.`;
+  $("upd-changes").hidden = !s.changes || !s.changes.length;
+  $("upd-changes").innerHTML = (s.changes || []).map(c => `<li>${esc(c)}</li>`).join("");
+  $("upd-now").hidden = !s.available || !s.behind;
+  $("upd-msg").textContent = s.available && s.behind && s.problem ? s.problem : "";
+  $("upd-now").disabled = !!s.problem || s.busy;
+}
+async function loadUpdate(check) {
+  const r = await fetch("/api/update" + (check ? "?check=true" : ""));
+  if (r.ok) showUpdate(await r.json());
+}
+$("upd-check").onclick = async () => { $("upd-state").textContent = "Checking…"; await loadUpdate(true); };
+$("upd-now").onclick = async () => {
+  const list = (upd.changes || []).slice(0, 10).map(c => "  - " + c).join("\n");
+  if (!confirm(`Update to the newest version and restart?\n\n${list}\n\nThe database is backed up first.`)) return;
+  if (!$("unsaved").hidden && !confirm("There are unsaved changes; update anyway (they are lost)?")) return;
+  $("upd-now").disabled = $("upd-check").disabled = true;
+  $("upd-msg").textContent = "Updating… (backup, new version, packages if needed; this can take a few minutes)";
+  const r = await fetch("/api/update", { method: "POST" });
+  const d = await r.json().catch(() => ({}));
+  $("upd-check").disabled = false;
+  if (!r.ok) { $("upd-msg").textContent = d.detail || "The update did not work."; loadUpdate(false); return; }
+  $("unsaved").hidden = true;
+  if (d.restarting) {
+    $("upd-msg").innerHTML = `<b>${esc(d.message)}.</b> Restarting… this page reloads when the app is back.`;
+    waitForRestart(html => { $("upd-msg").innerHTML = html; });
+  } else {
+    $("upd-msg").innerHTML = `<b>${esc(d.message)}.</b> Restart the app (stop.bat, then start.bat) to use the new version.`;
+    loadUpdate(false);
+  }
+};
+loadUpdate(false);
 
 // Every field (not only the cameras table): typing, ticking or choosing shows or hides "Unsaved changes".
 for (const kind of ["input", "change"]) document.querySelector("main").addEventListener(kind, () => { if (loaded) changed(); });

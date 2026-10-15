@@ -31,7 +31,7 @@ household use is generally outside the Act; their filled-in camera sign and data
   `21dc165` night mode · `ab90e2e` reports by hour · `722c4b5` alert clips · `21e9d2d` camera health ·
   `1b51cb6` time in view · zones (`bbcacf6`, `1b43675`, `66a0d83`) · `a777656` remote access ·
   privacy/security (`853b25d` … `f81ebd2`).
-- Tests: **786 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
+- Tests: **795 pass** (`.venv\Scripts\python.exe -m pytest -q`, ~90 s).
 - The user's webcam had its **lens cover closed** for the whole 24-hour check (2026-10-11); they were told to open
   it. A blank picture shows as a camera problem on the Live and Health pages.
 - The user's config: one USB webcam (`cam1`, kiosk mode); `web.host: 0.0.0.0` and `web.https: true` (ready for a
@@ -479,6 +479,12 @@ concat demuxer was tried first and lost half the frames when the camera size cha
 `timelapse.current` marks a map "older" when only the open recording grew (Make again, `again: true`), page
 `checkLapse/makeLapse/pollLapse/playLapse`, `#lapse-open` -> playAt. **Phase 34 is done.** Next: Phase 35 (Update
 button), the last of the plan.
+
+**Phase 35 is done 2026-10-15** (`labeler/updater.py`, `app.state.updater` made in run.py with the database backup;
+web `/api/update`; Settings "Updates" box; Health `check_updates`). The status parsing bug found by the tests: git's
+" M file" lines must not be stripped (it cut the first letter of the name). **The Phases 30-35 plan is finished.**
+Next: ask the user (Phase 26 real-camera week once their app runs the new version; Phase 28 step 1 after 2026-10-19;
+Phase 29 when cameras are added; or new ideas).
 
 **Earlier plan: Phase 16** search recordings by words ([PHASE16-PLAN.md](PHASE16-PLAN.md); approved, skipped for now), **then
 [PHASE26-29-PLAN.md](PHASE26-29-PLAN.md)** (approved 2026-10-14): 26 real-camera week with the user, 27 scene question

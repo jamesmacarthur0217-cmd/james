@@ -245,6 +245,11 @@ def main() -> int:
     threading.Thread(target=retrainer.loop, args=(app.state.stopping,), name="retrain-check", daemon=True).start()
     from labeler import backups
     threading.Thread(target=backups.loop, args=(cfg, db, app.state.stopping), name="backup", daemon=True).start()
+    from labeler.updater import Updater   # the Update button (Settings page) and its daily check
+    app.state.updater = Updater(cfg, backup=(lambda: backups.run_backup(cfg, False)) if db.is_postgres else None)
+    if cfg["updates"]["check"]:
+        threading.Thread(target=app.state.updater.loop, args=(app.state.stopping,), name="updates",
+                         daemon=True).start()
     if cfg["quiet"]["enabled"]:   # no movement (labeler/quiet.py)
         from labeler.quiet import QuietWatch
         quiet = app.state.quiet = QuietWatch(db, alerts, pipelines, arming, health)   # the Health page reads it
