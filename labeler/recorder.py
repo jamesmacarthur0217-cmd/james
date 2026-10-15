@@ -377,6 +377,8 @@ def prune(db, cfg: dict, now: datetime | None = None) -> int:
         path = base / r["path"]
         path.unlink(missing_ok=True)
         path.with_suffix(".jsonl").unlink(missing_ok=True)
+        from .timelapse import drop_if_alone
+        drop_if_alone(path.parent)
         try:
             path.parent.rmdir()   # the day's folder, once empty
         except OSError:

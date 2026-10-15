@@ -278,6 +278,8 @@ def add_routes(app, cfg: dict, db, audit, blur_for, agent=None, embedder=None, p
             path = base / rec["path"]
             path.unlink(missing_ok=True)
             path.with_suffix(".jsonl").unlink(missing_ok=True)
+            from .timelapse import drop_if_alone
+            drop_if_alone(path.parent)
             gone.append(rec)
         db.delete_recordings([r["id"] for r in gone])
         if gone:

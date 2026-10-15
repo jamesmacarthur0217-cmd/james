@@ -415,6 +415,12 @@ Phase 33 started 2026-10-15.
    errors (a video player seeking) are no longer logged as errors (`logs.DropClosedConnections`), so the Health page's
    "errors in the log" does not count them. **Phase 33 is done.** Next: Phase 34 (time-lapse of the day).
 
+Phase 34 started 2026-10-15 (user's choice: viewers get a copy with faces blurred).
+1. **Done 2026-10-15**: `labeler/timelapse.py` (sources, plan, fit, make, Maker, drop_if_alone): every n-th frame to
+   60 s at 25 fps through the recorder's FFmpeg writer, a frame map, a blurred copy; remade when the day's recordings
+   change; deleted with the day's last recording (recorder.prune, delete). Test copy: 8,178 frames -> 1,363 in 8.3 s
+   (12 s with the blurred copy), clock within 1 s of the map.
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),
