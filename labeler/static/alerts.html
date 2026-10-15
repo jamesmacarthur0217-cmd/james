@@ -92,7 +92,7 @@ function condRow() {
   const div = document.createElement("div");
   div.className = "cond";
   const names = Object.keys(fields);
-  const NICE = { zone: "entered zone", fallen: "fell", vehicle: "vehicle (a rule about vehicles)", vehicle_color: "vehicle color",
+  const NICE = { zone: "entered zone", fallen: "fell", help: "made the help sign", vehicle: "vehicle (a rule about vehicles)", vehicle_color: "vehicle color",
                  hours: "time of day", armed: "Home / Away", stayed: "stayed in area (loitering)",
                  animal: "animal (a rule about animals)", quiet: "no movement (nobody seen for)" };
   div.innerHTML = `<select class="c-name">${names.map(n => `<option value="${n}">${NICE[n] || n.replace(/_/g, " ")}</option>`).join("")}</select>
@@ -122,6 +122,7 @@ function stayText(v, sep) {
 function describe(conds) {
   return conds.length ? conds.map(([n, v]) => n === "zone" ? `in zone ${v}` : n === "fallen" ? "fell"
                                               : n === "quiet" ? `nobody seen for ${niceSeconds(v * 60)}`
+                                              : n === "help" ? "made the help sign"
                                               : n === "armed" ? `only when ${v === "away" ? "Away" : "Home"}`
                                               : n === "stayed" ? `stayed in ${stayText(v, " ")}`
                                               : n === "vehicle" ? (v === "any" ? "any vehicle" : `vehicle = ${v}`)
@@ -285,7 +286,7 @@ async function init() {
   // Loitering: stayed inside an area (lines have no inside) at least this long; one choice per area and time.
   const areas = [...new Set(zoneList.filter(z => z.kind === "area").map(z => z.name))].sort();
   if (areas.length) fields = { ...fields, stayed: areas.flatMap(a => STAYS.map(s => `${a}:${s}`)) };
-  fields = { fallen: ["yes"], ...fields };   // a fall (labeler/falls.py)
+  fields = { fallen: ["yes"], help: ["yes"], ...fields };   // a fall (labeler/falls.py), the help sign (gestures.py)
   // Vehicles (labeler/vehicles.py) and the time of day (people and vehicles).
   fields = { ...fields, vehicle: ["any", "car", "SUV", "van", "pickup", "lorry", "bus", "motorbike", "bicycle"],
              vehicle_color: ["white", "black", "silver", "gray", "red", "blue", "green", "yellow", "orange", "brown", "beige", "purple", "pink"],

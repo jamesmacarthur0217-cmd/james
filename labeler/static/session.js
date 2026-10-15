@@ -86,14 +86,22 @@
 
   // Who or what an alert is about (also used by the Alerts page).
   window.VL = window.VL || {};
-  window.VL.alertWho = (e) => e.quiet ? "no movement" : e.scene_id ? "scene question" : e.animal_id ? `animal #${e.animal_id}`
+  window.VL.alertWho = (e) => e.quiet ? "no movement" : e.help ? `help sign · person #${e.track_id}` : e.scene_id ? "scene question" : e.animal_id ? `animal #${e.animal_id}`
     : e.vehicle_id ? `vehicle #${e.vehicle_id}` : `person #${e.track_id}`;
 
   function showAlert(e, admin) {
     const t = document.createElement("div");
     const picture = e.crop ? `<img src="/crops/${encodeURIComponent(e.crop)}" alt="">` : "";
     const time = new Date(e.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    if (e.fall) {
+    if (e.help) {   // the help sign (labeler/gestures.py): red with the beep, like a fall
+      t.className = "toast fall help";
+      t.setAttribute("role", "alertdialog");
+      t.innerHTML = `${picture}<div><b>HELP SIGN</b> · ${escHtml(e.camera)} · ${time}<br>Someone held a hand above
+        their head (person #${e.track_id}).${admin ? ' <a href="/alerts">See the clip</a>' : ""}<br>
+        <small class="sound-off">Click anywhere on this page to hear the alarm.</small><br>
+        <button class="primary">OK</button></div>`;
+      t.querySelector("button").addEventListener("click", () => { t.remove(); updateAlarm(); });
+    } else if (e.fall) {
       t.className = "toast fall";
       t.setAttribute("role", "alertdialog");
       t.innerHTML = `${picture}<div><b>FALL</b> · ${escHtml(e.camera)} · ${time}<br>Someone fell and has not got up

@@ -165,6 +165,13 @@ class Pipeline:
         fcfg = cfg.get("falls") or {}
         self.falls = FallWatch(fcfg) if fcfg.get("enabled") and self.cam.get("fall_alert", True) else None
         self._fall_db: dict[int, int] = {}   # tracker number -> person, kept after the track ends (falls out of sight)
+        # The help sign (labeler/gestures.py): one hand above the head held a few seconds.
+        hcfg = cfg.get("help_sign") or {}
+        self.gestures = None
+        if hcfg.get("enabled") and self.cam.get("help_sign", True):
+            from .gestures import GestureWatch
+            self.gestures = GestureWatch(hcfg)
+        self.help_clip_s = float(hcfg.get("hold_s", 3)) + 5
         # A fall's clip starts 5 s before the fall (confirmed after_s later), so the buffer reaches back further.
         self.fall_clip_s = float(fcfg.get("after_s", 10)) + 5
         pv = cfg.get("person_videos") or {}
@@ -453,6 +460,8 @@ class Pipeline:
                     ok = zones_mod.lying_ok(self.zone_counter.zones, zones_mod.anchor(st.box, frame.shape, self.mode))
                     if self.falls.update(tid, now, st.box, kpts, ok, frame.shape[0]):
                         self._on_fall(tid)
+                if getattr(self, "gestures", None) is not None and self.gestures.update(tid, now, kpts):
+                    self._on_help(tid)
 
         if self.falls is not None:
             for tid, _ in self.falls.tick(now):   # falls confirmed although the person is no longer seen
@@ -613,6 +622,15 @@ class Pipeline:
             self.owned_ids.add(-vehicle_id)
             self.vlm.submit(-vehicle_id, [(crop, None)], "vehicle")
 
+    def _on_help(self, tid: int) -> None:
+        """A help sign is confirmed: a hand held above the head for help_sign.hold_s (labeler/gestures.py)."""
+        st = self.tracks.get(tid)
+        if st is None:
+            return
+        self._ensure_db(st)
+        log.warning("HELP SIGN [%s] person #%s held a hand up for %g s", self.name, st.db_id, self.gestures.hold_s)
+        self._check_alerts(st.db_id, helped=True)
+
     def _on_fall(self, tid: int) -> None:
         """A fall is confirmed: the person was down for falls.after_s (labeler/falls.py)."""
         st = self.tracks.get(tid)
@@ -725,16 +743,18 @@ class Pipeline:
         if any(e["kind"] in ("enter", "in", "out") for e in events):
             self._check_alerts(st.db_id)   # rules can ask for "entered zone X"
 
-    def _check_alerts(self, db_id: int | None, fallen: bool = False, stayed: dict | None = None) -> None:
+    def _check_alerts(self, db_id: int | None, fallen: bool = False, stayed: dict | None = None,
+                      helped: bool = False) -> None:
         if self.alerts is not None and db_id is not None and db_id not in self.deleted_ids:
             try:
-                fired = self.alerts.check(db_id, self.name, fallen=fallen, stayed=stayed)
+                fired = self.alerts.check(db_id, self.name, fallen=fallen, stayed=stayed, helped=helped)
             except Exception:
                 log.exception("checking alert rules failed")
                 return
             if self.clips is not None and self.cfg["clips"]["enabled"]:
                 for event in fired:   # a clip around the moment the alert fired (for a fall: the fall itself)
-                    self.clips.request(event["id"], before_s=self.fall_clip_s if fallen else None)
+                    self.clips.request(event["id"], before_s=self.fall_clip_s if fallen
+                                       else self.help_clip_s if helped else None)
 
     def _store_colors(self, st: TrackState) -> None:
         items = [(name, value, round(conf, 3)) for name, (value, conf) in st.colors().items()]
@@ -906,6 +926,8 @@ class Pipeline:
 
     def _finish(self, tid: int, lost_at: float | None = None) -> None:
         st = self.tracks.pop(tid)
+        if getattr(self, "gestures", None) is not None:
+            self.gestures.forget(tid)
         if st.deleted:
             if self.clips is not None:
                 self.clips.drop_person(st.clip_key)

@@ -161,6 +161,8 @@ def main() -> int:
         alerts.ensure_fall_rule()
     if cfg["quiet"]["enabled"]:
         alerts.ensure_quiet_rule()
+    if cfg["help_sign"]["enabled"]:
+        alerts.ensure_help_rule()
     pipelines.extend(Pipeline(cfg, db, worker, embedder, student, camera=cam) for cam in cfg["cameras"])
     for p in pipelines:
         p.alerts = alerts

@@ -47,7 +47,7 @@ def _form(**changes):
             "falls_enabled": True, "fall_after_s": 10, "vehicles_enabled": True,
             "vehicle_kinds": ["car", "motorbike", "bicycle", "bus", "lorry"], "vehicle_parked_after_s": 60,
             "animals_enabled": True, "animal_kinds": ["dog", "cat", "bird"],
-            "scene_enabled": True, "scene_answers_in_a_row": 2, "quiet_enabled": True,
+            "scene_enabled": True, "scene_answers_in_a_row": 2, "quiet_enabled": True, "help_enabled": True, "help_hold_s": 3,
             "idle_enabled": True, "idle_after_s": 60, "recording_enabled": False, "recording_when": "people",
             "recording_keep_days": 3, "recording_max_gb": 100}
     form.update(changes)

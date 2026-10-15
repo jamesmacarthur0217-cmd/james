@@ -296,7 +296,7 @@ def test_pipeline_fall_goes_to_the_rules_with_a_long_clip(db, camera):
     asked = []
 
     class Alerts:
-        def check(self, track_id, camera_name, fallen=False, stayed=None):
+        def check(self, track_id, camera_name, fallen=False, stayed=None, helped=False):
             asked.append((track_id, fallen))
             return [{"id": 9}]
 

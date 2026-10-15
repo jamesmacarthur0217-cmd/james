@@ -70,7 +70,7 @@ def test_an_alert_that_fires_starts_a_clip(db, camera):
     p = make_pipeline(db)
 
     class Alerts:
-        def check(self, track_id, camera_name, fallen=False, stayed=None):
+        def check(self, track_id, camera_name, fallen=False, stayed=None, helped=False):
             return [{"id": 41}, {"id": 42}]
 
     class Clips:

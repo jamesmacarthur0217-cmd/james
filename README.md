@@ -747,7 +747,15 @@ Measured (2026-10-15, `tools/gesture_check.py`):
   looking at them; on 1,500 other photos (not looked at before): 46 people flagged, about 38-40 of them really with a
   hand above the head (tennis serves, jumps, holding something up; wrong: a statue, hands on the head, a towel over
   the head), and in a random sample of 200 people 4 flagged, all right, 1 missed (a tennis serve).
-- Not measured: a real sign held on video (no such public clip here); see the real run below.
+- Not measured: a real sign held on video (no such public clip here). Real run on a test copy with a still photo of a
+  tennis serve (one hand up) as the camera: the alert came 4 s after the camera started (3 s held once the person was
+  tracked), once only while the hand stayed up, with a clip and the red pop-up. Try it yourself in front of the
+  webcam once your app runs the new version.
+
+The built-in alert rule **"Help sign"** (made at start, like "Fall"; turn it off on the Alerts page) gives a **red
+pop-up with a beep on every page until OK**, like a fall, a clip from a few seconds before, and the Alerts list entry
+"help sign". Settings page, Fall alerts section: **Help sign** on/off and **Hand up for (seconds)** (2-10; 3 by
+default). Per camera in config.yaml: `help_sign: false` under a camera turns it off there.
 
 ## Fall alerts
 

@@ -162,6 +162,11 @@ scene:
   enabled: true
   answers_in_a_row: 2
 
+# Help sign: one hand held above the head for hold_s seconds gives an alert (a red pop-up with a beep, like a fall).
+help_sign:
+  enabled: true
+  hold_s: 3
+
 # No movement: an alert when nobody was seen on a kiosk camera for a long time while someone should be in (the
 # built-in rule "No movement": 4 hours, 08:00-22:00, only when the house is set to Home; change it on the Alerts page).
 quiet:

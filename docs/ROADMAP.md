@@ -400,6 +400,10 @@ Phase 32 started 2026-10-15.
 2. **Done 2026-10-15**: `tools/gesture_check.py`: 0 false alarms on 77 videos (UR Fall everyday and falls, MOT16); COCO
    by eye: the upright check added after the first 1,500 photos (6 of 11 flagged wrong in a sample), then on 1,500
    other photos about 85% of 46 flagged right, a sample of 200: 4/4 right, 1 missed. Two hands count (no difference).
+3. **Done 2026-10-15**: connected to the cameras (`Pipeline.gestures`, `_on_help`), condition `help = yes` and the
+   built-in rule "Help sign" (fires for every sign, like falls), red pop-up with the beep, clip, Check page kind
+   "help sign alerts" (and "no movement alerts"), Settings (on/off, seconds), README. Real run with a still photo of a
+   raised hand: the alert 4 s after the start, once. **Phase 32 is done.** Next: Phase 33 (search recordings by photo).
 
 ## Critical files
 

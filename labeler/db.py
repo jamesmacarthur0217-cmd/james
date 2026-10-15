@@ -1267,7 +1267,8 @@ class Database:
                      "crop": tcrop or vcrop or acrop or e.picture,
                      "created_at": e.created_at.isoformat(timespec="seconds"),
                      "fall": any(n == "fallen" for n, _ in json.loads(conds or "[]")),
-                     "quiet": any(n == "quiet" for n, _ in json.loads(conds or "[]"))}
+                     "quiet": any(n == "quiet" for n, _ in json.loads(conds or "[]")),
+                     "help": any(n == "help" for n, _ in json.loads(conds or "[]"))}
                     for e, tcrop, vcrop, acrop, conds in rows]
 
     def update_alert_message(self, event_id: int, message: str) -> None:

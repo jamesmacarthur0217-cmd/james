@@ -90,3 +90,55 @@ def test_check_tool_counts_signs_and_leaves_out_the_frozen_tail():
     signs, up, n = gc.video_signs(dets, both_ok=True)
     assert len(signs) == 1 and up == 40 and n == 40 and signs[0]["at"] == 3.0
     assert gc.video_signs(dets, both_ok=True, tail_from=2.0)[0] == []        # the frozen picture is not the video
+
+
+# --- step 3: the alert ---
+
+def test_rule_fires_for_every_sign_and_only_for_signs(db, camera):
+    from labeler.alerts import AlertEngine, describe, HELP_RULE
+    alerts = AlertEngine(db)
+    alerts.ensure_help_rule()
+    alerts.ensure_help_rule()
+    assert [r["name"] for r in db.list_rules()] == ["Help sign"] and describe(HELP_RULE) == "made the help sign"
+    from datetime import datetime
+    tid = db.create_track(camera, 1, datetime.now())
+    assert alerts.check(tid, "test-cam") == []                               # labels changed: not a sign
+    assert len(alerts.check(tid, "test-cam", helped=True)) == 1
+    assert len(alerts.check(tid, "test-cam", helped=True)) == 1              # a second sign alerts again
+    events = db.list_alerts()
+    assert events[0]["help"] is True and events[0]["fall"] is False
+    from labeler.checks import alert_what
+    assert alert_what(events[0], HELP_RULE) == "help"
+
+
+def test_pipeline_sign_goes_to_the_rules_with_a_clip(db, camera):
+    from datetime import datetime
+    from labeler.pipeline import TrackState
+    from test_falls import make_pipeline
+    p = make_pipeline(db)
+    p.gestures, p.help_clip_s = GestureWatch(), 8.0
+    asked = []
+
+    class Alerts:
+        def check(self, track_id, camera_name, fallen=False, stayed=None, helped=False):
+            asked.append((track_id, helped))
+            return [{"id": 5}]
+
+    class Clips:
+        def request(self, event_id, before_s=None):
+            asked.append(("clip", event_id, before_s))
+
+    p.alerts, p.clips = Alerts(), Clips()
+    st = TrackState(3, datetime.now(), 0.0, db_id=db.create_track(camera, 3, datetime.now()))
+    p.tracks[3] = st
+    p._on_help(3)
+    assert asked == [(st.db_id, True), ("clip", 5, 8.0)]
+
+
+def test_pages_show_the_help_sign():
+    from pathlib import Path
+    static = Path(__file__).resolve().parent.parent / "labeler" / "static"
+    js = (static / "session.js").read_text(encoding="utf-8")
+    assert 'className = "toast fall help"' in js and "HELP SIGN" in js
+    assert 'help: "made the help sign"' in (static / "alerts.html").read_text(encoding="utf-8")
+    assert 'id="help_hold_s"' in (static / "settings.html").read_text(encoding="utf-8")

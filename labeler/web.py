@@ -431,7 +431,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         from .alerts import parse_stayed, valid_hours
         from .vlm import VEHICLE_COLORS
         allowed = {**schema.FIELDS, **{n: v + ["none"] for n, v in schema.LIST_FIELDS.items()},
-                   "zone": sorted({z["name"] for z in db.list_zones()}), "fallen": ["yes"],
+                   "zone": sorted({z["name"] for z in db.list_zones()}), "fallen": ["yes"], "help": ["yes"],
                    "vehicle": ["any", "car", "SUV", "van", "pickup", "lorry", "bus", "motorbike", "bicycle"],
                    "vehicle_color": [c for c in VEHICLE_COLORS if c != "unknown"], "armed": ["away", "home"],
                    "animal": ["any", "dog", "cat", "bird", "horse", "sheep", "cow"]}
@@ -465,6 +465,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                                      "and Home / Away")
         if "quiet" in names and set(names) - {"quiet", "hours", "armed"}:
             raise HTTPException(400, "a no-movement rule can ask only for the time, the hours and Home / Away")
+        if "fallen" in names and "help" in names:
+            raise HTTPException(400, "a rule is about a fall or a help sign, not both")
         if "fallen" in names and "stayed" in names:
             raise HTTPException(400, "a fall rule cannot also ask how long someone stayed")
         if "vehicle" in names and set(names) - {"vehicle", "vehicle_color", "zone", "hours", "armed", "stayed"}:

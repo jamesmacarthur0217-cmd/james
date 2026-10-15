@@ -83,6 +83,8 @@ class SettingsIn(BaseModel):
     mobility_aids: bool
     falls_enabled: bool
     fall_after_s: float = Field(ge=3, le=300)
+    help_enabled: bool
+    help_hold_s: float = Field(ge=2, le=10)
     vehicles_enabled: bool
     vehicle_kinds: list[str] = Field(min_length=1)
     vehicle_parked_after_s: float = Field(ge=10, le=3600)
@@ -155,6 +157,8 @@ SIMPLE = {
     "mobility_aids": ("labels", "mobility_aids"),
     "falls_enabled": ("falls", "enabled"),
     "fall_after_s": ("falls", "after_s"),
+    "help_enabled": ("help_sign", "enabled"),
+    "help_hold_s": ("help_sign", "hold_s"),
     "vehicles_enabled": ("vehicles", "enabled"),
     "vehicle_kinds": ("vehicles", "kinds"),
     "vehicle_parked_after_s": ("vehicles", "parked_after_s"),

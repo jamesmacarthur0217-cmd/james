@@ -85,6 +85,10 @@ DEFAULTS: dict = {
     "picture_check": {"enabled": True, "every_s": 30.0, "window_s": 600.0, "lasting_share": 0.8},
     # Fall alerts (labeler/falls.py): upright -> lying within drop_s, the head down min_drop of standing height,
     # then down for after_s. Per camera: cameras[].fall_alert (default on). Measured: tools/fall_check.py.
+    # Help sign (labeler/gestures.py): one hand above the head held hold_s; built-in rule "Help sign". Per camera:
+    # cameras[].help_sign (default on).
+    "help_sign": {"enabled": True, "hold_s": 3.0, "gap_s": 0.5, "rearm_s": 2.0, "margin": 0.15, "both_ok": True,
+                  "max_tilt": 45.0},
     # No movement (labeler/quiet.py): the built-in "No movement" rule is made at start; checked every check_every_s.
     "quiet": {"enabled": True, "check_every_s": 60.0},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,

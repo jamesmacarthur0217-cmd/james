@@ -22,12 +22,16 @@ CORRECTIONS = {"vehicle": ["not a vehicle", *VEHICLE_KINDS], "animal": ["not an 
 
 
 def alert_what(event: dict, conditions: list) -> str:
-    """Which kind of alert: fall, loitering, scene, vehicle, animal or person."""
+    """Which kind of alert: fall, help sign, no movement, loitering, scene, vehicle, animal or person."""
     names = {n for n, _ in conditions}
     if event.get("scene_id"):
         return "scene"
     if event.get("fall") or "fallen" in names:
         return "fall"
+    if event.get("help") or "help" in names:
+        return "help"
+    if event.get("quiet") or "quiet" in names:
+        return "quiet"
     if "stayed" in names:
         return "loitering"
     if event.get("animal_id"):
@@ -80,7 +84,8 @@ def candidates(db, kind: str, now: datetime | None = None, clip_for=None) -> lis
 # --- results -----------------------------------------------------------------------------------------------------
 
 FEW = 10   # fewer right + wrong answers than this: shown, but marked "few checks yet"
-ALERT_LABELS = {"fall": "fall alerts", "loitering": "loitering alerts", "scene": "scene alerts",
+ALERT_LABELS = {"fall": "fall alerts", "help": "help sign alerts", "quiet": "no movement alerts",
+                "loitering": "loitering alerts", "scene": "scene alerts",
                 "vehicle": "vehicle alerts", "animal": "animal alerts", "person": "person alerts"}
 ORDER = ["vehicles", "animals", "scene answers", *ALERT_LABELS.values()]
 

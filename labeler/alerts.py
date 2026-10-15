@@ -26,6 +26,9 @@ for more than tracking.lost_after_s leaves the area (their time starts again); a
 counting only while they hold; a built-in rule "No movement" (4 h, 08:00-22:00, only when Home: the user's choice) is
 made at start like "Fall". A rule without a camera is for kiosk cameras only (a gate camera sees nobody for hours).
 
+"help = yes" is the help sign (labeler/gestures.py: one hand above the head held a few seconds): like falls, rules
+with it are checked only when a sign is confirmed and fire for every sign; a built-in rule "Help sign" is made at start.
+
 "fallen = yes" is a fall (labeler/falls.py): rules with it are checked only when a fall is confirmed, and fire
 for every fall, also a second one of the same person. A built-in rule "Fall" is made at start when fall alerts
 are on and no rule asks for a fall (turn it off on the Alerts page to stop fall alerts; deleted, it comes back).
@@ -45,6 +48,8 @@ log = logging.getLogger(__name__)
 ZONE = "zone"   # condition on where the person went, not on how they look
 FALLEN = "fallen"   # condition on a fall having just been confirmed
 FALL_RULE = [[FALLEN, "yes"]]
+HELP = "help"         # condition on a help sign having just been confirmed (labeler/gestures.py)
+HELP_RULE = [[HELP, "yes"]]
 VEHICLE, VEHICLE_COLOR, HOURS, ARMED, STAYED = "vehicle", "vehicle_color", "hours", "armed", "stayed"
 MAX_STAY_S = 24 * 3600
 ANIMAL = "animal"
@@ -107,6 +112,10 @@ def is_fall_rule(conditions: list[list[str]]) -> bool:
     return any(name == FALLEN for name, _ in conditions)
 
 
+def is_help_rule(conditions: list[list[str]]) -> bool:
+    return any(name == HELP for name, _ in conditions)
+
+
 def matches(conditions: list[list[str]], attrs: dict[str, str]) -> bool:
     for name, value in conditions:
         current = attrs.get(name)
@@ -126,7 +135,7 @@ def matches(conditions: list[list[str]], attrs: dict[str, str]) -> bool:
         elif name == VEHICLE_COLOR:
             if current != value and {current, value} != {"gray", "silver"}:
                 return False
-        elif name in schema.LIST_FIELDS or name in (ZONE, FALLEN):
+        elif name in schema.LIST_FIELDS or name in (ZONE, FALLEN, HELP):
             if value not in (current or "").split(","):
                 return False
         elif current != value:
@@ -142,6 +151,8 @@ def describe(conditions: list[list[str]]) -> str:
             return f"in zone {v}"
         if n == FALLEN:
             return "fell"
+        if n == HELP:
+            return "made the help sign"
         if n == VEHICLE:
             return "any vehicle" if v == "any" else f"vehicle = {v}"
         if n == ANIMAL:
@@ -190,6 +201,13 @@ class AlertEngine:
             self.invalidate()
             log.info('alert rule "Fall" added (turn it off on the Alerts page to stop fall alerts)')
 
+    def ensure_help_rule(self) -> None:
+        """The built-in "Help sign" rule, unless a rule already asks for the sign (deleted, it comes back)."""
+        if not any(is_help_rule(r["conditions"]) for r in self.db.list_rules()):
+            self.db.add_rule("Help sign", HELP_RULE)
+            self.invalidate()
+            log.info('alert rule "Help sign" added (one hand above the head for a few seconds; Alerts page to turn off)')
+
     def ensure_quiet_rule(self) -> None:
         """The built-in "No movement" rule, unless a rule already asks for it (deleted, it comes back)."""
         if not any(is_quiet_rule(r["conditions"]) for r in self.db.list_rules()):
@@ -218,12 +236,15 @@ class AlertEngine:
                     out[zone] = min(secs, out.get(zone, secs))
         return out
 
-    def check(self, track_id: int, camera: str, fallen: bool = False, stayed: dict | None = None) -> list[dict]:
+    def check(self, track_id: int, camera: str, fallen: bool = False, stayed: dict | None = None,
+              helped: bool = False) -> list[dict]:
         """Fire every enabled rule this person now matches (once per rule and person). fallen: a fall was just
-        confirmed: only the rules asking for a fall are checked, and they fire again for a later fall.
-        stayed: {area name: seconds inside} (the camera's once-a-second check of people inside areas)."""
+        confirmed: only the rules asking for a fall are checked, and they fire again for a later fall. helped: the
+        same for a help sign. stayed: {area name: seconds inside} (the camera's once-a-second check of people inside
+        areas)."""
         rules = [r for r in self._enabled_rules() if (not r["camera"] or r["camera"] == camera)
-                 and is_fall_rule(r["conditions"]) == fallen and rule_kind(r["conditions"]) == "person"]
+                 and is_fall_rule(r["conditions"]) == fallen and is_help_rule(r["conditions"]) == helped
+                 and rule_kind(r["conditions"]) == "person"]
         if not rules:
             return []
         attrs = self.db.resolved_values(track_id)
@@ -233,6 +254,8 @@ class AlertEngine:
             attrs = {**attrs, ZONE: ",".join(self.db.zones_entered(track_id))}
         if fallen:
             attrs = {**attrs, FALLEN: "yes"}
+        if helped:
+            attrs = {**attrs, HELP: "yes"}
         attrs = {**attrs, "hour": datetime.now().hour, STAYED: stayed or {}}
         if _asks_armed(rules):
             attrs[ARMED] = self._armed()
@@ -240,7 +263,8 @@ class AlertEngine:
         for rule in rules:
             if matches(rule["conditions"], attrs):
                 event = self.db.record_alert(rule["id"], track_id, camera,
-                                             f"{rule['name']}: {describe(rule['conditions'])}", repeat=fallen)
+                                             f"{rule['name']}: {describe(rule['conditions'])}",
+                                             repeat=fallen or helped)
                 if event is not None:
                     log.warning("ALERT [%s] %s -> person #%s", camera, rule["name"], track_id)
                     fired.append(event)
