@@ -80,6 +80,9 @@ DEFAULTS: dict = {
     # match (the user's choice: 2, against single wrong answers). New questions are asked every 5 minutes by default.
     "scene": {"enabled": True, "check_every_s": 10, "answers_in_a_row": 2, "frame_every_s": 2.0, "frame_max_age_s": 30,
               "retry_after_s": 60},
+    # Camera picture check (labeler/picture_check.py): a frame every every_s; a finding is reported when it was in
+    # lasting_share of the checks of the last window_s (Health line, Live banner).
+    "picture_check": {"enabled": True, "every_s": 30.0, "window_s": 600.0, "lasting_share": 0.8},
     # Fall alerts (labeler/falls.py): upright -> lying within drop_s, the head down min_drop of standing height,
     # then down for after_s. Per camera: cameras[].fall_alert (default on). Measured: tools/fall_check.py.
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,

@@ -209,6 +209,13 @@ class Pipeline:
         # Scene questions (labeler/scene.py): a clean copy of the picture (no boxes or labels) every few seconds, with
         # where people's heads are (for the viewers' blurred copy): (frame, wall time, head boxes).
         self.scene_frame: tuple | None = None
+        self.scene_people: list = []   # people's boxes in scene_frame
+        # Camera picture check (labeler/picture_check.py): what is wrong with the picture, if it lasts.
+        pcfg = self.cfg.get("picture_check") or {}
+        self.picture = None
+        if pcfg.get("enabled", True):
+            from .picture_check import PictureWatch
+            self.picture = PictureWatch({"every_s": 30.0, "window_s": 600.0, "lasting_share": 0.8, **pcfg})
         self._scene_frame_at = -1e9
         # Areas with a loitering rule (people, vehicles): the live picture shows how long someone is in them.
         self._stay_areas: frozenset[str] = frozenset()
@@ -294,6 +301,7 @@ class Pipeline:
             "idle": self.idle,
             "vlm_queue": self.vlm.pending if self.vlm else None,
             "vlm_enabled": self.vlm is not None,
+            "picture": self.picture.state() if self.picture is not None else None,
         }
 
     def stop(self) -> None:
@@ -481,6 +489,12 @@ class Pipeline:
             self._scene_frame_at = now
             heads = [geometry.head_box(self.tracks[t].kpts, self.tracks[t].box) for t in seen]
             self.scene_frame = (frame.copy(), self.clock.wall(), heads)
+            self.scene_people = [tuple(self.tracks[t].box[:4]) for t in seen]   # for "Check the picture"
+        if self.picture is not None and not self.blank and self.picture.due():
+            try:
+                self.picture.check(frame, [tuple(self.tracks[t].box[:4]) for t in seen])
+            except Exception:
+                log.exception("[%s] the picture check failed", self.name)
 
     def _object_classes(self) -> list[int]:
         """The COCO classes the second detector looks for on this camera: vehicles and/or animals."""

@@ -62,3 +62,104 @@ def test_eval_makes_pictures_worse_and_scores_them():
     assert got["blur"]["caught"] == 1 and got["original"]["flagged"] == 0
     tuned = ev.tune(rows * 4)
     assert set(tuned) == set(pc.LIMITS)
+
+
+# --- step 2: over time, the Health line, "Check the picture" ---
+
+import copy  # noqa: E402
+from datetime import datetime, timedelta  # noqa: E402
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from labeler.config import DEFAULTS  # noqa: E402
+from labeler.healthcheck import check_picture  # noqa: E402
+from labeler.web import create_app  # noqa: E402
+
+CFG = {"every_s": 30, "window_s": 600, "lasting_share": 0.8}
+
+
+class Clock:
+    def __init__(self):
+        self.mono, self.now = 0.0, datetime(2026, 10, 15, 20, 0)
+
+    def step(self, s):
+        self.mono += s
+        self.now += timedelta(seconds=s)
+
+
+def _watch(clock):
+    return pc.PictureWatch(CFG, clock=lambda: clock.mono, wall=lambda: clock.now)
+
+
+def test_a_problem_must_last_most_of_ten_minutes():
+    clock = Clock()
+    w = _watch(clock)
+    assert w.due() and w.lasting() == {}
+    for i in range(20):                                    # 10 minutes, a check every 30 s
+        w.add(["dark"] if i not in (3, 7) else [])         # 18 of 20 dark: a light on for a moment
+        if i == 8:
+            assert w.lasting() == {}                       # not enough of the window checked yet
+        clock.step(30)
+    assert w.lasting() == {"dark": "2026-10-15T20:00:00"}
+    assert w.state()["advice"] == {"dark": pc.ADVICE["dark"]} and w.state()["checked_at"] == "2026-10-15T20:09:30"
+    for _ in range(5):                                     # 5 of the last 20 fine: no longer 80%
+        w.add([])
+        clock.step(30)
+    assert w.lasting() == {}
+    for _ in range(20):
+        w.add(["covered"])                                 # the Health "blank picture" problem says it already
+        clock.step(30)
+    assert w.lasting() == {}
+    clock.step(-30)
+    assert not w.due()
+
+
+class Cam:
+    def __init__(self, clock, mode="kiosk", frame=None):
+        self.name, self.mode = "cam1", mode
+        self.picture = _watch(clock)
+        self.scene_frame = (frame, datetime.now(), []) if frame is not None else None
+        self.scene_people = []
+
+
+def test_health_line(db):
+    cfg = copy.deepcopy(DEFAULTS)
+    clock = Clock()
+    cam = Cam(clock)
+    assert check_picture(cfg, db, [cam])["detail"].startswith("not checked yet")
+    for _ in range(20):
+        cam.picture.add(["blurry"])
+        clock.step(30)
+    line = check_picture(cfg, db, [cam])
+    assert line["level"] == "warning" and "camera cam1: The picture is blurry" in line["detail"]
+    cam.picture = _watch(clock)
+    cam.picture.add([])
+    assert check_picture(cfg, db, [cam])["detail"].startswith("fine (last checked 20:10")
+    cfg["picture_check"]["enabled"] = False
+    assert check_picture(cfg, db, [cam]) is None
+
+
+def test_check_the_picture_now(db, tmp_path):
+    cfg = copy.deepcopy(DEFAULTS)
+    cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
+    cam = Cam(Clock(), frame=cv2.GaussianBlur(_scene(), (0, 0), 3))
+    cam.status = lambda: {"camera": "cam1"}
+    client = TestClient(create_app(cfg, db, [cam]), client=("127.0.0.1", 5000))
+    d = client.get("/api/cameras/cam1/picture").json()
+    assert d["findings"] == ["blurry"] and d["advice"] == [pc.ADVICE["blurry"]]
+    assert d["image"].startswith("data:image/jpeg;base64,") and d["faces"]["people"] == 0
+    assert client.get("/api/cameras/nope/picture").status_code == 404
+    cam.scene_frame = (cam.scene_frame[0], datetime.now() - timedelta(minutes=5), [])
+    assert client.get("/api/cameras/cam1/picture").status_code == 409     # no recent picture
+
+
+def test_viewers_cannot_check_the_picture(db, tmp_path):
+    from labeler import accounts
+    cfg = copy.deepcopy(DEFAULTS)
+    cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
+    cam = Cam(Clock(), frame=_scene())
+    cam.status = lambda: {"camera": "cam1"}
+    db.add_user("vic", accounts.hash_password("correct horse battery"), "viewer")
+    viewer = TestClient(create_app(cfg, db, [cam]), client=("192.168.1.20", 5000))
+    viewer.post("/api/login", json={"username": "vic", "password": "correct horse battery"})
+    assert viewer.get("/api/cameras/cam1/picture").status_code == 403

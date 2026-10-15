@@ -162,6 +162,11 @@ scene:
   enabled: true
   answers_in_a_row: 2
 
+# Camera picture check: too dark, washed out, blurry, light from behind people; reported on the Health page and the
+# Live page when it lasts most of 10 minutes (the Settings page's "Check the picture" checks at once).
+picture_check:
+  enabled: true
+
 # Animals: dogs, cats and birds, found by the vehicle detector in the same pass (no extra cost), on security cameras
 # (per camera: animals: true/false). An animal lying still for parked_after_s is "resting": one record.
 animals:

@@ -16,6 +16,11 @@ purpose and reported on the other half (README "Camera picture check").
 """
 from __future__ import annotations
 
+import threading
+import time
+from collections import deque
+from datetime import datetime
+
 import cv2
 import numpy as np
 
@@ -83,6 +88,58 @@ def findings(st: dict, blank: bool = False, limits: dict = LIMITS) -> list[str]:
 def check_frame(frame: np.ndarray, people: list | tuple = (), limits: dict = LIMITS) -> list[str]:
     from .sources import is_blank
     return findings(stats(frame, people), is_blank(frame), limits)
+
+
+class PictureWatch:
+    """One camera's checks over time (Pipeline.run checks a frame every `every_s`). A finding *lasts* when it was in at
+    least `lasting_share` of the checks of the last `window_s`, with at least half the window checked: one dark minute
+    (a light switched off and on) or one blurry moment (someone close to the lens) is not reported. "covered" is left
+    to the Health "blank picture" problem, which reports it already."""
+
+    def __init__(self, cfg: dict, clock=time.monotonic, wall=datetime.now):
+        self.every_s, self.window_s = float(cfg["every_s"]), float(cfg["window_s"])
+        self.share = float(cfg["lasting_share"])
+        self.clock, self.wall = clock, wall
+        self._checks: deque = deque()          # (monotonic, wall, findings)
+        self._last_at = -1e18
+        self._lock = threading.Lock()
+
+    def due(self) -> bool:
+        return self.clock() - self._last_at >= self.every_s
+
+    def add(self, found: list[str]) -> None:
+        now = self.clock()
+        with self._lock:
+            self._last_at = now
+            self._checks.append((now, self.wall(), list(found)))
+            while self._checks and now - self._checks[0][0] > self.window_s:
+                self._checks.popleft()
+
+    def check(self, frame: np.ndarray, people: list | tuple = ()) -> list[str]:
+        found = check_frame(frame, people)
+        self.add(found)
+        return found
+
+    def lasting(self) -> dict[str, str]:
+        """{finding: since when (wall time, ISO)} for the findings that last."""
+        with self._lock:
+            checks = list(self._checks)
+        if not checks or len(checks) < max(2, 0.5 * self.window_s / self.every_s):
+            return {}
+        out = {}
+        for code in {c for _, _, found in checks for c in found} - {"covered"}:
+            if sum(code in found for _, _, found in checks) >= self.share * len(checks):
+                first = next(w for _, w, found in checks if code in found)
+                out[code] = first.isoformat(timespec="seconds")
+        return out
+
+    def state(self) -> dict:
+        with self._lock:
+            last = self._checks[-1] if self._checks else None
+        lasting = self.lasting()
+        return {"checked_at": last[1].isoformat(timespec="seconds") if last else None,
+                "findings": last[2] if last else [], "lasting": lasting,
+                "advice": {code: ADVICE[code] for code in lasting}}
 
 
 def faces(people: list[dict], limits: dict = FACES) -> tuple[list[str], dict]:

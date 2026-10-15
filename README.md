@@ -608,12 +608,20 @@ warning below 30 days, unless retention deletes people before the disk fills.
 
 ## Camera picture check
 
-What is wrong with a camera's picture, in plain words, with what to do (`labeler/picture_check.py`; Phase 30, the
-Health page line and a "Check the picture" button come with its step 2). From the frames the camera already has, no
-extra model: **covered** (no detail: lens cover, another app), **dark**, **washed out** (bright), **blurry** (dirty lens
+What is wrong with a camera's picture, in plain words, with what to do (`labeler/picture_check.py`). From the frames
+the camera already has, no extra model: **covered** (no detail: lens cover, another app), **dark**, **washed out** (bright), **blurry** (dirty lens
 or out of focus: little fine detail for the picture's contrast, so a plain wall and a busy street compare), **light
 from behind** (people much darker than the window behind them). On kiosk cameras, from the people recorded: **faces
 rarely seen** (camera too high or to the side) or **too small for ages**.
+
+Each running camera checks a frame every 30 seconds (`picture_check:` in config.yaml). A problem is reported only when
+it was in at least 80% of the checks of the last 10 minutes, so a light switched off for a minute or someone close to
+the lens does not count: then the **Live page** shows a banner with what to do, and the **Health page** line "camera
+picture" says it with the time it started (and, for kiosk cameras, the faces numbers of the last 7 days). A covered
+lens is the Health page's "blank picture" problem, as before. On the **Settings page**, **Check the picture** on a
+camera's row checks it at once: the picture, what is wrong and what to do, the faces numbers and the brightness and
+sharpness. Real run on a test copy with a darkened street video: the banner and the Health line came after the window
+had filled (20 s in the test's settings), and Check the picture said "too dark" (brightness 12 of 255).
 
 Measured (2026-10-15, `tools/picture_check_eval.py`): 400 COCO photos with people and 140 MOT16 street frames, each
 as it is and made worse on purpose; the limits were set on the even-numbered pictures (the most caught with at most 1%

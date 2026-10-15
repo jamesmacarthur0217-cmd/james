@@ -351,6 +351,35 @@ def check_scene(cfg: dict, db, now: datetime | None = None, arming=None) -> dict
     return _check("scene questions", "ok", detail)
 
 
+def check_picture(cfg: dict, db, pipelines: list, now: datetime | None = None) -> dict | None:
+    """Phase 30: what is wrong with each camera's picture (labeler/picture_check.py), when it lasts; on kiosk cameras
+    also whether faces are seen (people of the last 7 days)."""
+    if not (cfg.get("picture_check") or {}).get("enabled", True):
+        return None
+    from .picture_check import ADVICE, faces
+    now = now or datetime.now()
+    notes, checked = [], []
+    for p in pipelines:
+        watch = getattr(p, "picture", None)
+        if watch is None:
+            continue
+        state = watch.state()
+        mine = [f"{ADVICE[c]} (since {since[11:16]})" for c, since in state["lasting"].items()]
+        if getattr(p, "mode", "") == "kiosk":
+            found, n = faces(db.people_between(now - timedelta(days=7), now, p.name, limit=200, newest_first=True))
+            mine += [f"{ADVICE[c]} ({n['facing_share']:.0%} of the time facing the camera, ages for "
+                     f"{n['ages_share']:.0%} of the last {n['people']} people)" for c in found]
+        if mine:
+            notes.append(f"camera {p.name}: " + " ".join(mine))
+        if state["checked_at"]:
+            checked.append(state["checked_at"][11:16])
+    if notes:
+        return _check("camera picture", "warning", "; ".join(notes))
+    if not checked:
+        return _check("camera picture", "ok", "not checked yet (every 30 s once the cameras run)")
+    return _check("camera picture", "ok", f"fine (last checked {max(checked)}; Settings page: Check the picture)")
+
+
 def check_checks(db) -> dict | None:
     """Phase 24: what the admins' checks on the Check page say (no line before the first check)."""
     from . import checks
@@ -411,6 +440,12 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
             checks.insert(-1, line)
     except Exception as e:
         checks.insert(-1, _check("checked by you", "warning", f"could not be read ({e.__class__.__name__})"))
+    try:
+        line = check_picture(cfg, db, pipelines)
+        if line is not None:
+            checks.insert(-1, line)
+    except Exception as e:
+        checks.insert(-1, _check("camera picture", "warning", f"could not be checked ({e.__class__.__name__})"))
     try:
         line = check_scene(cfg, db, arming=arming)
         if line is not None:

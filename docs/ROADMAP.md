@@ -377,6 +377,9 @@ Phase 30 started 2026-10-15.
    faces from the people recorded) and `tools/picture_check_eval.py` (COCO + MOT16 made worse on purpose; limits tuned
    on the even half at <= 1% false, reported on the odd half: blur 91-100%, dark 77-91%, bright 86%, backlight 79-90%,
    covered 100%; 7/200 COCO and 0/70 MOT16 good pictures flagged, mostly rightly). README "Camera picture check".
+2. **Done 2026-10-15** (with step 3's docs): `PictureWatch` per camera (a frame every 30 s; lasting = 80% of the last
+   10 minutes), Live banner, Health line "camera picture" (with the faces numbers on kiosk cameras), Settings "Check
+   the picture" (`GET /api/cameras/{name}/picture`, admins). **Phase 30 is done.** Next: Phase 31 ("no movement").
 
 ## Critical files
 

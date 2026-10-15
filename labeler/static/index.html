@@ -25,6 +25,7 @@
       <button id="fullscreen" title="Show the live view full screen">Full screen</button>
     </div>
     <div class="banner problem" id="cam-problem" hidden></div>
+    <div class="banner" id="pic-problem" hidden></div>
     <div class="video" id="video">
       <img id="live" src="/stream" alt="Live camera feed with labels">
       <svg id="zone-draw" hidden></svg>
@@ -442,7 +443,20 @@ async function status() {
       + `VLM queue <b>${s.vlm_enabled ? s.vlm_queue : "off"}</b> · <b>${s.tracks}</b> people · `
       + `<a href="/review" class="admin-only"><b>${s.needs_review}</b> to review</a>`;
     showCameraProblems(s.camera_problems || []);
+    showPictureProblems(s.cameras || []);
   } catch { $("status").textContent = "disconnected"; }
+}
+
+// The camera picture check (labeler/picture_check.py): a banner while a problem has lasted most of 10 minutes.
+function showPictureProblems(cameras) {
+  const lines = [];
+  for (const c of cameras) {
+    for (const [code, since] of Object.entries((c.picture && c.picture.lasting) || {}))
+      lines.push(`<b>Camera ${esc(c.camera)}:</b> ${esc(c.picture.advice[code])} <span class="muted">(since ${clock(since)})</span>`);
+  }
+  $("pic-problem").hidden = !lines.length;
+  $("pic-problem").innerHTML = lines.join("<br>")
+    + (lines.length ? ' <a href="/settings" class="admin-only">Check the picture</a>' : "");
 }
 
 // Camera problems (labeler/health.py): a banner while they last, a pop-up when a new one starts.

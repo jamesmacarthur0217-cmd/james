@@ -38,6 +38,12 @@
   .push-card .bad { color: #c9372c; }
   @media (max-width: 600px) { .push-card .addr { grid-template-columns: 1fr; } }
   @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .picture-box { margin-top: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
+  .picture-box h3 { margin: 0 0 8px; font-size: 15px; }
+  .picture-check { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+  .picture-check img { width: 100%; max-width: 360px; border-radius: 6px; }
+  .picture-check ul { margin: 0 0 8px; padding-left: 18px; }
 </style>
 </head>
 <body>
@@ -70,6 +76,7 @@
       </table>
     </div>
     <p><button id="add">Add camera</button> <button id="add-push">Add camera sent from a phone or PC</button></p>
+    <div id="picture-box" class="picture-box" hidden></div>
     <div id="push-box"></div>
   </section>
 
@@ -273,7 +280,10 @@ function camRow(c, isNew) {
     <td><input type="checkbox" class="fall"${c.fall_alert === false ? "" : " checked"} title="Fall alerts on this camera"></td>
     <td><input type="checkbox" class="veh"${(c.vehicles ?? c.mode === "security") ? " checked" : ""} title="Vehicles on this camera"></td>
     <td><input type="checkbox" class="ani"${(c.animals ?? c.mode === "security") ? " checked" : ""} title="Animals on this camera"></td>
-    <td><button class="danger-quiet remove">Remove</button></td>`;
+    <td><span class="row-actions">${isNew ? "" : '<button class="check-pic" title="Check this camera\'s picture now: too dark, blurry, light from behind, faces">Check the picture</button>'}
+      <button class="danger-quiet remove">Remove</button></span></td>`;
+  const check = tr.querySelector(".check-pic");
+  if (check) check.addEventListener("click", () => checkPicture(c.name));
   tr.querySelector(".remove").addEventListener("click", () => {
     if ($("cams").children.length <= 1) { showMsg("At least one camera is needed.", false); return; }
     tr.remove(); changed();
@@ -281,6 +291,32 @@ function camRow(c, isNew) {
   tr.addEventListener("input", changed);
   tr.addEventListener("change", changed);
   return tr;
+}
+
+// "Check the picture" (labeler/picture_check.py): the camera's latest picture, what is wrong and what to do.
+async function checkPicture(name) {
+  const box = $("picture-box");
+  box.hidden = false;
+  box.innerHTML = `<p class="muted">Checking camera ${esc(name)}…</p>`;
+  const r = await fetch(`/api/cameras/${encodeURIComponent(name)}/picture`);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { box.innerHTML = `<p><b>Camera ${esc(name)}:</b> ${esc(d.detail || "could not be checked")}</p>`; return; }
+  const advice = [...d.advice, ...(d.faces ? d.faces.advice : [])];
+  const lasting = Object.keys(d.lasting || {});
+  const facesLine = d.faces && d.faces.facing_share !== undefined
+    ? `<p class="muted">Faces (last ${d.faces.people} people): ${Math.round(d.faces.facing_share * 100)}% of the time facing
+       the camera, ages for ${Math.round(d.faces.ages_share * 100)}%.</p>`
+    : d.faces ? `<p class="muted">Faces: not enough people yet to tell (${d.faces.people} of 10).</p>` : "";
+  box.innerHTML = `<h3>Camera ${esc(name)} · ${esc(d.at.replace("T", " "))}</h3>
+    <div class="picture-check">${d.image ? `<img src="${d.image}" alt="The picture checked">` : ""}
+      <div>${advice.length ? "<ul>" + advice.map(a => `<li>${esc(a)}</li>`).join("") + "</ul>"
+                           : "<p><b>The picture looks fine.</b></p>"}
+        ${lasting.length && !advice.length ? `<p class="muted">Over the last 10 minutes it was mostly: ${esc(lasting.join(", "))}.</p>` : ""}
+        ${facesLine}
+        <p class="muted">Brightness ${Math.round(d.stats.mean)} of 255 · sharpness ${d.stats.blur_ratio.toFixed(3)}
+          (blurry under 0.004)</p>
+        <button id="picture-close">Close</button></div></div>`;
+  $("picture-close").onclick = () => { box.hidden = true; };
 }
 
 function readForm() {

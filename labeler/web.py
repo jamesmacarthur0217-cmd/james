@@ -896,6 +896,34 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             raise HTTPException(404, "not in view")
         return Response(jpeg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
+    @app.get("/api/cameras/{name}/picture")
+    def picture_now(name: str):
+        """Check a camera's picture now (Settings page, "Check the picture"; admins): what is wrong, what to do,
+        the picture checked, and what lasted over the last minutes (labeler/picture_check.py)."""
+        import base64
+        from . import picture_check as pc
+        from .sources import is_blank
+        p = by_name.get(name)
+        if p is None:
+            raise HTTPException(404, f"camera {name!r} is not running")
+        got = getattr(p, "scene_frame", None)
+        if got is None or (datetime.now() - got[1]).total_seconds() > 30:
+            raise HTTPException(409, "no recent picture from this camera (starting, or no picture)")
+        frame = got[0]
+        st = pc.stats(frame, getattr(p, "scene_people", []) or [])
+        found = pc.findings(st, bool(is_blank(frame)))
+        out = {"camera": name, "at": got[1].isoformat(timespec="seconds"), "findings": found,
+               "advice": [pc.ADVICE[c] for c in found], "stats": {k: round(v, 3) for k, v in st.items()},
+               "lasting": p.picture.state()["lasting"] if getattr(p, "picture", None) else {}}
+        if p.mode == "kiosk":
+            now = datetime.now()
+            faces, numbers = pc.faces(db.people_between(now - timedelta(days=7), now, name, limit=200, newest_first=True))
+            out["faces"] = {"findings": faces, "advice": [pc.ADVICE[c] for c in faces], **numbers}
+        small = cv2.resize(frame, (640, round(frame.shape[0] * 640 / frame.shape[1])), interpolation=cv2.INTER_AREA)
+        ok, jpg = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        out["image"] = "data:image/jpeg;base64," + base64.b64encode(jpg.tobytes()).decode() if ok else None
+        return out
+
     @app.get("/api/status")
     def status(camera: str | None = None):
         pipeline = pick(camera)
