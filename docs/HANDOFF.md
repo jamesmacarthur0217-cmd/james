@@ -16,9 +16,16 @@ Roadmap Phase 1 (licenses) is deferred until they say otherwise. Under Malaysia'
 household use is generally outside the Act; their filled-in camera sign and data-protection summary are in
 `data/privacy/` (git-ignored, contains their email); the blank templates are in `docs/`.
 
-## 2. Current state (2026-10-15)
+## 2. Current state (2026-10-18)
 
-**2026-10-17/18:** Phase 36 started: step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
+**2026-10-18: a start-up hang fixed** (`labeler/db.py` `_drop_old_unique` / `_add_missing_columns`, pitfall 30): the user's
+own app would have hung for ever at its next start on PostgreSQL. Their database (read only, 2026-10-18) still has
+the old `alert_events (rule_id, track_id)` unique constraint, no `zones.lying_ok`, and a `recordings` table with 2
+recordings (2026-10-12/13): so their app ran Phase 13-15 code then, not 17+. Checked on a throwaway database built
+by the pre-Phase-13 code: opens in 1.2 s, 9 tables and 5 columns added, constraint gone. `tests/test_postgres.py` (skipped
+without `VL_TEST_POSTGRES_URL`) failed on the old code. Docker Desktop was started for it and left running.
+
+**Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo
 with a raised hand for help-sign runs: `data/datasets/coco/val2017/000000032081.jpg` (tennis serve). **Every new phase adds one entry to `whatsnew.ENTRIES`** (with a `marker` when it adds a table or column).
 
@@ -257,6 +264,11 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
 28. **Test stand-ins of `AlertEngine.check`** must accept `helped=` (the help sign) as well as `fallen=` and `stayed=`.
 29. **The time-lapse reads files with OpenCV**, not FFmpeg's concat demuxer, which dropped half the frames when a
    camera's size changed during the day.
+30. **PostgreSQL waits for itself**: reading a table's layout with `inspect(engine)` while a transaction has just
+   changed that table uses a second connection, which waits for ever (no deadlock error: two clients). Use
+   `inspect(conn)` inside the transaction. The scratch checks of Phases 17-22 missed it; the real check is a
+   database built by the OLD code (`git archive <old commit> labeler | tar -x -C <scratch>/old`, run Database
+   there), then today's code. `_no_endless_wait` makes such a wait fail after 60 s instead.
 
 ## 7. Conventions
 

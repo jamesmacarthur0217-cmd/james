@@ -495,6 +495,13 @@ def _score(rows: list[tuple[AnswerKey, Track]]) -> dict[str, dict]:
             for n, v in sorted(stats.items())}
 
 
+def _no_endless_wait(conn) -> None:
+    """PostgreSQL: a layout change at start that cannot get its table (another program, or a bug like the one in
+    _drop_old_unique) fails with an error after a minute, instead of the app hanging at start without a word."""
+    if conn.dialect.name == "postgresql":
+        conn.execute(text("SET LOCAL lock_timeout = '60s'"))
+
+
 class Database:
     _fail_rebuild_for_test = False   # tests: make the SQLite table rebuild fail halfway (it must roll back)
 
@@ -625,8 +632,9 @@ class Database:
 
     def _add_missing_columns(self) -> None:
         from sqlalchemy import inspect
-        insp = inspect(self.engine)
         with self.engine.begin() as conn:
+            _no_endless_wait(conn)
+            insp = inspect(conn)   # the same connection: see _drop_old_unique
             for table, columns in NEW_COLUMNS.items():
                 have = {c["name"] for c in insp.get_columns(table)}
                 for name, sql_type in columns.items():
@@ -643,8 +651,12 @@ class Database:
         if self.engine.dialect.name != "postgresql":
             return
         from sqlalchemy import inspect
-        insp = inspect(self.engine)
         with self.engine.begin() as conn:
+            # Read the layout through the same connection: an inspector on the engine uses a second one, which waits
+            # forever for this transaction's lock on a table it just changed (a database from before Phase 17 hung
+            # at start: the unique constraint dropped, then alert_events' columns read).
+            _no_endless_wait(conn)
+            insp = inspect(conn)
             for table, columns in DROPPED_UNIQUE:
                 for uc in insp.get_unique_constraints(table):
                     if uc.get("name") and sorted(uc["column_names"]) == sorted(columns):

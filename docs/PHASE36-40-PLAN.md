@@ -1,4 +1,4 @@
-# Phases 36-40 plan: first-run check, faster playback, PC watch, unusual quiet, weekly report (approved 2026-10-15; Phase 36 started 2026-10-17)
+# Phases 36-40 plan: first-run check, faster playback, PC watch, unusual quiet, weekly report (approved 2026-10-15; Phase 36 done 2026-10-18)
 
 ## Context
 
@@ -31,6 +31,9 @@ easy and safe.
    **Done 2026-10-18** (`labeler/firstrun.py`, `static/first-run.html`). Found on the real run: a hand already up when
    the button is pressed was never counted (its sign was given before), so starting the test restarts the count.
 3. Tests, a real run (a test copy started on an old `last_version`), docs.
+   **Done 2026-10-18**: a test copy on a database built by the pre-Phase-13 code (no state file) listed all 20
+   features, the banner's link opened the first-run check, everything green. The same on PostgreSQL found a
+   start-up hang from Phase 17-18 (pitfall 30), fixed with a test. **Phase 36 is done.**
 
 ## Phase 37 (L): Faster playback on the Recordings page
 

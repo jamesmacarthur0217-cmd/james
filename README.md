@@ -1279,6 +1279,9 @@ The tests need `pytest` and `httpx2` (Starlette's test client; with only the old
 .venv\Scripts\python.exe -m pytest -q
 ```
 
+`tests/test_postgres.py` also updates an old PostgreSQL database (a throwaway one it makes and drops); it runs only
+when `VL_TEST_POSTGRES_URL` names a server, e.g. the URL in `.env`, and is skipped otherwise (as on GitHub).
+
 504 tests: vocabulary, colors, geometry, database rules, delete, search, retention, re-linking, label voting,
 the VLM worker and retries, classifiers, age source, cameras, accounts and roles, audit log, HTTPS, face
 blurring, supervisor, log files, the health check, the Settings page and restarts, the installer's model packing, backups, the counting check's scoring, person videos, the storage line, original-video excerpts, search by photo, today at a glance, idle mode, the long-run check and the restore drill, the re-identification wrapper, recording and the Recordings page, network-camera logging, receiving cameras from other devices, the second-site checks, video import (start times, MP4 headers, video time), alerts, reports, questions, answer key (also per camera), a syntax check of
