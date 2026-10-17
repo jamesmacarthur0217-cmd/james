@@ -1239,6 +1239,19 @@ otherwise it says to restart by hand). If anything goes wrong, the version runni
 A copy installed from the offline package (not a git copy) says it cannot check. Tested on scratch repositories and
 on a copy of this repository set back 3 versions: listed the 3 changes and updated in under a second (no packages).
 
+### What's new
+
+After an update (by the button, by hand with git, or a new package), the Live page shows one line under the header,
+**"New in this version: …"**, with a link to the **What's new** page (`/whats-new`; also linked from the Updates
+box): each feature added since the version that ran before, in plain words, with where to find it, marked **New**,
+then everything added earlier. Viewers see only what they can use. ✕ hides the line in that browser until the next
+update (opening the page does too); restarting the same version keeps it. The app keeps the newest feature it ran in
+`data/last_version.json` (`whats_new.state_file`). The first start with this feature has no such file, so it judges
+by the database: tables or columns it had to add at that start belong to features that never ran here (a copy that
+last ran before recording, Phase 13, lists everything since); a new database (a new install) lists nothing as new.
+Checked on a test copy: a state file saying Phase 24 listed the 10 later features; no file and a database without
+the Phase 24 table listed Phase 24 and the 10 after it.
+
 ## Tests
 
 The tests need `pytest` and `httpx2` (Starlette's test client; with only the older `httpx` it warns):

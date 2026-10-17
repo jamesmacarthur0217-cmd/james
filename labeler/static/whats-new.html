@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What's new</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/session.js"></script>
+<style>
+  .news { list-style: none; padding: 0; margin: 0; max-width: 760px; }
+  .news li { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .news h3 { font-size: 15px; margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+  .news p { margin: 0 0 4px; }
+  .news a { color: var(--accent); }
+  .news small { color: var(--muted); }
+  .chip.new { background: var(--accent); color: #fff; }
+  .older { margin-top: 18px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>VisionLabeler</h1>
+  <nav><a href="/">Live</a><a href="/recordings">Recordings</a><a href="/summary">Summary</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/check" class="admin-only">Check</a><a href="/audit" class="admin-only">Audit log</a><a href="/import" class="admin-only">Import</a><a href="/settings" class="admin-only">Settings</a><a href="/health">Health</a></nav>
+</header>
+<main>
+  <section class="panel">
+    <h2>What's new</h2>
+    <p class="muted" id="version"></p>
+    <ul class="news" id="new"></ul>
+    <h2 class="older" id="older-title" hidden>Added earlier</h2>
+    <ul class="news" id="older"></ul>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+const PAGES = {"/": "Live page", "/recordings": "Recordings", "/summary": "Summary", "/alerts": "Alerts",
+  "/check": "Check", "/settings": "Settings", "/health": "Health"};
+const ADMIN_PAGES = ["/alerts", "/check", "/settings"];
+
+function item(i) {
+  const only = ADMIN_PAGES.includes(i.page) ? ' class="admin-only"' : "";   // viewers cannot open these
+  const where = i.page ? ` <a href="${esc(i.page)}"${only}>${esc(PAGES[i.page] || i.page)}</a>` : "";
+  return `<li><h3>${esc(i.title)}${i.new ? ' <span class="chip new">New</span>' : ""}</h3>
+    <p>${esc(i.text)}${where}</p><small>Phase ${i.phase} · ${esc(i.commit)}</small></li>`;
+}
+
+async function load() {
+  let d;
+  try { d = await (await fetch("/api/whats-new")).json(); } catch { $("version").textContent = "No answer from the app."; return; }
+  const parts = [];
+  if (d.version) parts.push(`This version: ${d.version}.`);
+  if (d.new && d.since) parts.push(`Updated on ${d.since}: ${d.new} new ${d.new === 1 ? "thing" : "things"}.`);
+  else if (!d.new) parts.push("Nothing new since the last update; everything added before is below.");
+  $("version").textContent = parts.join(" ");
+  const fresh = d.items.filter(i => i.new), old = d.items.filter(i => !i.new);
+  $("new").innerHTML = fresh.map(item).join("");
+  $("older").innerHTML = old.map(item).join("");
+  $("older-title").hidden = !(fresh.length && old.length);
+  try { localStorage.setItem("whatsNewSeen", d.newest); } catch {}   // the Live page's line has been read
+}
+load();
+</script>
+</body>
+</html>

@@ -852,6 +852,19 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     def summary_page():
         return FileResponse(STATIC / "summary.html")
 
+    @app.get("/whats-new")
+    def whats_new_page():
+        return FileResponse(STATIC / "whats-new.html")
+
+    @app.get("/api/whats-new")
+    def whats_new_api(request: Request):
+        """What this version added since the one that ran before (labeler/whatsnew.py); viewers: their part."""
+        w = getattr(app.state, "whats_new", None)
+        if w is None:   # tests and tools that make the app without run.py
+            from .whatsnew import ENTRIES, WhatsNew
+            w = WhatsNew(ENTRIES[-1].key)   # nothing new
+        return w.summary((getattr(request.state, "user", None) or {}).get("role") == "admin")
+
     @app.get("/api/summary")
     def summary_api(request: Request, period: str | None = None, start: str | None = None, end: str | None = None):
         """What happened: period away / night / today, or start and end (2026-10-14T18:00). Viewers: no clips and

@@ -57,7 +57,8 @@ VIEWER = {
             "/api/tracks", "/api/tracks/", "/api/search", "/api/alerts/events", "/api/me", "/crops/", "/static/",
             "/health", "/api/health", "/api/today", "/api/vehicles", "/api/animals", "/api/arming", "/api/summary",
             "/recordings", "/api/recordings", "/api/recordings/find", "/recordings/stream/", "/summary",   # not the file itself
-            "/api/recordings/timelapse", "/recordings/timelapse/"],   # the time-lapse: viewers get the blurred copy
+            "/api/recordings/timelapse", "/recordings/timelapse/",   # the time-lapse: viewers get the blurred copy
+            "/whats-new", "/api/whats-new"],
     "POST": ["/api/ask", "/api/logout", "/api/search/photo", "/api/arming",   # Home / Away: family switch it
              "/api/recordings/search", "/api/recordings/search/photo", "/api/recordings/timelapse"],
 }

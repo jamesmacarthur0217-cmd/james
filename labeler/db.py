@@ -518,7 +518,12 @@ class Database:
         if self.is_postgres:
             with self.engine.begin() as conn:
                 conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        from sqlalchemy import inspect
+        had = set(inspect(self.engine).get_table_names())
         Base.metadata.create_all(self.engine)
+        # What this start had to add: tells how old the last version was (labeler/whatsnew.py).
+        self.created_tables = set(Base.metadata.tables) - had
+        self.added_columns: set[str] = set()
         self._add_missing_columns()
         self._drop_old_unique()
         if self.is_postgres:
@@ -627,6 +632,7 @@ class Database:
                 for name, sql_type in columns.items():
                     if name not in have:
                         conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}"))
+                        self.added_columns.add(f"{table}.{name}")
 
     def _drop_old_unique(self) -> None:
         """Old constraints and NOT NULL columns (DROPPED_UNIQUE, NULLABLE_NOW). PostgreSQL changes them in place;

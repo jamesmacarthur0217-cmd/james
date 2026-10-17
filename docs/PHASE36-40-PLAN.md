@@ -1,4 +1,4 @@
-# Phases 36-40 plan: first-run check, faster playback, PC watch, unusual quiet, weekly report (approved 2026-10-15, not started)
+# Phases 36-40 plan: first-run check, faster playback, PC watch, unusual quiet, weekly report (approved 2026-10-15; Phase 36 started 2026-10-17)
 
 ## Context
 
@@ -19,6 +19,10 @@ easy and safe.
    and, when it changed, the Live page shows a banner "New in this version" linking to `/whats-new`: the README
    sections added since then, in plain words (a short list kept in `labeler/whatsnew.py`, one entry per phase with its
    commit, filtered by `git merge-base --is-ancestor`). Viewers see only what applies to them.
+   **Done 2026-10-17**, a little differently: the list is in the order phases were finished, so the state file
+   (`data/last_version.json`: newest entry ran, and the one before the last update) needs no git (works for offline
+   installs too); a restart of the same version keeps the banner (✕ or opening the page hides it per browser). The
+   user's app has no state file yet, so the first start judges by the tables/columns the database had to add.
 2. **First-run check page** (`/first-run`, admins): a checklist that reads existing APIs: Health all green
    (`/api/health`), database updated (new tables present), Check the picture (`/api/cameras/<name>/picture`),
    recording works (a file from today: `/api/recordings`), Home/Away state, the built-in rules exist (Fall, No movement,

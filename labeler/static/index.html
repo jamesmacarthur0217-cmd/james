@@ -834,6 +834,30 @@ healthStatus();
 setInterval(healthStatus, 30000);
 loadToday();
 setInterval(loadToday, 60000);
+
+// What's new (labeler/whatsnew.py): after an update, one line under the header naming what it added. ✕ hides it in
+// this browser until the next update; opening the What's new page does too.
+async function whatsNew() {
+  let d;
+  try { d = await (await fetch("/api/whats-new")).json(); } catch { return; }
+  if (!d.new) return;
+  try { if (localStorage.getItem("whatsNewSeen") === d.newest) return; } catch {}
+  const titles = d.items.filter(i => i.new).map(i => esc(i.title));
+  const named = titles.length > 3 ? `${titles.slice(0, 3).join(", ")} and ${titles.length - 3} more`
+    : titles.join(", ");
+  const box = document.createElement("div");
+  box.id = "whats-new";
+  box.className = "welcome";
+  box.setAttribute("role", "status");
+  box.innerHTML = `<span>New in this version: ${named}.</span><a href="/whats-new">See what's new</a>
+    <button aria-label="Close">✕</button>`;
+  box.querySelector("button").addEventListener("click", () => {
+    try { localStorage.setItem("whatsNewSeen", d.newest); } catch {}
+    box.remove();
+  });
+  document.querySelector("header").after(box);
+}
+whatsNew();
 </script>
 </body>
 </html>

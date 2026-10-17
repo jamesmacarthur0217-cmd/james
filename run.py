@@ -245,6 +245,8 @@ def main() -> int:
     threading.Thread(target=retrainer.loop, args=(app.state.stopping,), name="retrain-check", daemon=True).start()
     from labeler import backups
     threading.Thread(target=backups.loop, args=(cfg, db, app.state.stopping), name="backup", daemon=True).start()
+    from labeler.whatsnew import WhatsNew   # what this version added since the last one that ran (Live banner)
+    app.state.whats_new = WhatsNew.start(resolve(cfg["whats_new"]["state_file"]), db.created_tables, db.added_columns)
     from labeler.updater import Updater   # the Update button (Settings page) and its daily check
     app.state.updater = Updater(cfg, backup=(lambda: backups.run_backup(cfg, False)) if db.is_postgres else None)
     if cfg["updates"]["check"]:

@@ -172,6 +172,10 @@ help_sign:
 quiet:
   enabled: true
 
+# What's new: after an update the Live page says what the new version added (the newest feature it ran is kept here).
+# whats_new:
+#   state_file: data/last_version.json
+
 # Camera picture check: too dark, washed out, blurry, light from behind people; reported on the Health page and the
 # Live page when it lasts most of 10 minutes (the Settings page's "Check the picture" checks at once).
 picture_check:

@@ -18,7 +18,10 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-15)
 
-**Latest (2026-10-15, last commit `b15c94f`, 795 tests, GitHub green):** done this day, newest last: Phase 16 search
+**2026-10-17:** Phase 36 started: step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
+tests). **Every new phase adds one entry to `whatsnew.ENTRIES`** (with a `marker` when it adds a table or column).
+
+**Earlier (2026-10-15, last commit `b15c94f`, 795 tests, GitHub green):** done this day, newest last: Phase 16 search
 recordings by words (`9758ea5` `591615a`), 27 scene question areas and limits (`56fecb7` `fcbc306` `806e0ae`), 28
 steps 2-4 (`cae1a17` httpx2, `5304118` PyTorch 2.14.1 cu130 + setuptools 84, `ae73616` zip), 30 camera picture check
 (`94df715` `03ec5b3`), 31 no movement (`1b51a57` `ab51c07` `f5349fd`), 32 help sign (`c197716` `764dee7` `55f7758`),
@@ -142,6 +145,9 @@ labeler/quiet.py     no movement (Phase 31): QuietWatch thread, built-in rule "N
 labeler/gestures.py  help sign (Phase 32): hands_up (upright body) + GestureWatch (3 s); built-in rule "Help sign"
 labeler/timelapse.py the day's time-lapse (Phase 34): Maker, frame map, blurred copy for viewers, "older" for today
 labeler/updater.py   Update button (Phase 35): daily git fetch, ff-only pull, pip when requirements changed, restart
+labeler/whatsnew.py  What's new (Phase 36): ENTRIES in the order phases were finished (add one per new phase);
+                     data/last_version.json {last, before}; no file -> guess from Database.created_tables /
+                     added_columns (Entry.marker); Live banner (index.html whatsNew, localStorage whatsNewSeen), /whats-new
 start.bat / stop.bat daily start/stop (wait for Docker + Ollama; stop waits for app exit, backs up DB)
 install.bat/.ps1     new PC: winget Python/Docker/Ollama, .venv, .env, DB, models, admin, autostart,
                      health; -CheckOnly, -Offline <pkg>; PowerShell 5.1 + ASCII only (tests check)

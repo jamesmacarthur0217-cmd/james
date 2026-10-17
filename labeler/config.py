@@ -91,6 +91,8 @@ DEFAULTS: dict = {
                   "max_tilt": 45.0},
     # Update button (labeler/updater.py): check GitHub for a new version once a day (Settings page; Health line).
     "updates": {"check": True},
+    # What's new (labeler/whatsnew.py): the newest feature the app ran last time, to say what an update added.
+    "whats_new": {"state_file": "data/last_version.json"},
     # Search recordings by photo (Phase 33): people at least this alike (cosine, SigLIP 2) are listed, closest first;
     # 0.85 chosen on MOT16-02/04/05 (tools/photo_match_check.py). At most `limit` people.
     "photo_search": {"min_similarity": 0.85, "limit": 20},

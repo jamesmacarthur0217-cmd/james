@@ -35,6 +35,7 @@ def main() -> None:
     cfg.setdefault("logs", {})["dir"] = (folder / "logs").as_posix()
     cfg["settings_file"] = (folder / "settings.yaml").as_posix()   # the Settings page writes here, not data/
     cfg.setdefault("backup", {})["dir"] = (folder / "backups").as_posix()   # never the user's backups
+    cfg.setdefault("whats_new", {})["state_file"] = (folder / "last_version.json").as_posix()   # nor their What's new
     cfg.setdefault("recording", {})["dir"] = (folder / "recordings").as_posix()   # nor their recordings
     # Cameras sent from other devices: own settings folder and ports, so a test copy runs next to the real app.
     cfg.setdefault("receiver", {}).update(dir=(folder / "mediamtx").as_posix(), rtsp_port=18554, rtmp_port=11935)
