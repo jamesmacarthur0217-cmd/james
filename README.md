@@ -1252,6 +1252,21 @@ last ran before recording, Phase 13, lists everything since); a new database (a 
 Checked on a test copy: a state file saying Phase 24 listed the 10 later features; no file and a database without
 the Phase 24 table listed Phase 24 and the 10 after it.
 
+### First-run check
+
+The **First-run check** page (`/first-run`, admins; linked from the Live page's "New in this version" line, What's
+new and the Updates box) says in one list whether everything works after an update, each line with what to do when
+it does not: the Health page (all green, or its problems), the database (every table and column of this version;
+what this start added), the built-in alert rules Fall, Help sign and No movement (on, off, or missing), a recording
+from today (recording starts when someone is in view, so stand in front of a camera first), Home / Away, and each
+camera's picture (the same check as Settings, "Check the picture"). **Check again** runs it once more.
+
+**Try the help sign**: for 30 seconds the camera tells the page when it sees the sign (a bar shows how long a hand is
+up), instead of making an alert: no pop-up, no beep, nothing in the alert list, but a line in the Audit log. A hand
+already up when you press the button counts after 3 more seconds. Checked on a test copy with a COCO photo of a
+tennis serve (one arm straight up): seen 3 s after pressing, no alert; without the restart of the count it was missed
+(a still photo's sign had already been given, before pressing), which is why it is there.
+
 ## Tests
 
 The tests need `pytest` and `httpx2` (Starlette's test client; with only the older `httpx` it warns):

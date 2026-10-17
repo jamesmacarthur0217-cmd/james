@@ -171,6 +171,8 @@ class Pipeline:
         if hcfg.get("enabled") and self.cam.get("help_sign", True):
             from .gestures import GestureWatch
             self.gestures = GestureWatch(hcfg)
+        # "Try the help sign" (first-run page): while it runs, a confirmed sign is reported there, with no alert.
+        self.help_test: dict | None = None
         self.help_clip_s = float(hcfg.get("hold_s", 3)) + 5
         # A fall's clip starts 5 s before the fall (confirmed after_s later), so the buffer reaches back further.
         self.fall_clip_s = float(fcfg.get("after_s", 10)) + 5
@@ -460,9 +462,16 @@ class Pipeline:
                     ok = zones_mod.lying_ok(self.zone_counter.zones, zones_mod.anchor(st.box, frame.shape, self.mode))
                     if self.falls.update(tid, now, st.box, kpts, ok, frame.shape[0]):
                         self._on_fall(tid)
-                if getattr(self, "gestures", None) is not None and self.gestures.update(tid, now, kpts):
-                    self._on_help(tid)
+                if getattr(self, "gestures", None) is not None:
+                    sign = self.gestures.update(tid, now, kpts)
+                    if sign:
+                        self._on_help(tid, sign)
 
+        test = getattr(self, "help_test", None)
+        if test is not None and getattr(self, "gestures", None) is not None and time.time() < test["until"]:
+            if test.pop("rearm", False):   # set by start_help_test (web thread); done here, in the camera's thread
+                self.gestures.rearm(now)
+            test["holding"] = round(self.gestures.holding(now), 1)   # for the page: how long a hand is up now
         if self.falls is not None:
             for tid, _ in self.falls.tick(now):   # falls confirmed although the person is no longer seen
                 self._on_fall(tid)
@@ -622,10 +631,28 @@ class Pipeline:
             self.owned_ids.add(-vehicle_id)
             self.vlm.submit(-vehicle_id, [(crop, None)], "vehicle")
 
-    def _on_help(self, tid: int) -> None:
+    def start_help_test(self, seconds: float = 30.0) -> None:
+        """"Try the help sign" (first-run page): for `seconds`, a confirmed sign is reported, not alerted."""
+        self.help_test = {"until": time.time() + seconds, "seen": None, "holding": 0.0, "rearm": True}
+
+    def help_test_state(self) -> dict:
+        test = getattr(self, "help_test", None)
+        if test is None:
+            return {"active": False, "seen": None}
+        left = max(0.0, test["until"] - time.time())
+        return {"active": left > 0, "left_s": round(left), "holding_s": test["holding"] if left > 0 else 0.0,
+                "seen": test["seen"], "hold_s": self.gestures.hold_s if self.gestures is not None else None}
+
+    def _on_help(self, tid: int, sign: dict | None = None) -> None:
         """A help sign is confirmed: a hand held above the head for help_sign.hold_s (labeler/gestures.py)."""
         st = self.tracks.get(tid)
         if st is None:
+            return
+        test = getattr(self, "help_test", None)
+        if test is not None and time.time() < test["until"]:
+            test["seen"] = {"at": datetime.now().isoformat(timespec="seconds"), "person": st.db_id,
+                            "hand": (sign or {}).get("hand")}
+            log.info("help sign test [%s]: a sign was seen (no alert)", self.name)
             return
         self._ensure_db(st)
         log.warning("HELP SIGN [%s] person #%s held a hand up for %g s", self.name, st.db_id, self.gestures.hold_s)

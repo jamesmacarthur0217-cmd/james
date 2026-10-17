@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>First-run check</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/session.js"></script>
+<style>
+  .checks { list-style: none; padding: 0; margin: 0; max-width: 760px; }
+  .checks li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 4px 8px; padding: 10px 0;
+    border-bottom: 1px solid var(--border); }
+  .checks .mark { font-size: 18px; font-weight: 700; line-height: 1.2; text-align: center; }
+  .checks .ok .mark { color: var(--ok); }
+  .checks .bad .mark { color: var(--bad); }
+  .checks .warn .mark { color: var(--warn); }
+  .checks .info .mark { color: var(--muted); }
+  .checks b { display: block; }
+  .checks p { margin: 2px 0 0; }
+  .checks .todo { color: var(--warn); }
+  .checks a { color: var(--accent); }
+  .checks .lines { margin: 4px 0 0; padding-left: 18px; }
+  .tally { font-weight: 600; margin: 4px 0 12px; }
+  .help-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+  .meter { height: 8px; background: var(--chip); border-radius: 4px; width: min(240px, 100%); overflow: hidden; }
+  .meter div { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+</style>
+</head>
+<body>
+<header>
+  <h1>VisionLabeler</h1>
+  <nav><a href="/">Live</a><a href="/recordings">Recordings</a><a href="/summary">Summary</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/check" class="admin-only">Check</a><a href="/audit" class="admin-only">Audit log</a><a href="/import" class="admin-only">Import</a><a href="/settings" class="admin-only">Settings</a><a href="/health">Health</a></nav>
+</header>
+<main>
+  <section class="panel">
+    <h2>First-run check</h2>
+    <p class="hint">After an update: is everything working? Each line says what to do when it is not.
+      <a href="/whats-new">What's new</a> lists what the update added.</p>
+    <p class="tally" id="tally">Checking…</p>
+    <ul class="checks" id="checks"></ul>
+    <div class="actions" style="margin-top:12px"><button id="again">Check again</button></div>
+  </section>
+  <section class="panel" style="margin-top:16px">
+    <h2>Try the help sign</h2>
+    <p class="hint">For 30 seconds the camera tells this page when it sees the help sign (one hand held above your
+      head), instead of making an alert: no pop-up, no beep, nothing in the alert list.</p>
+    <ul class="checks" id="help"></ul>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+const MARK = {ok: "✓", bad: "✗", warn: "!", info: "i"};
+const kind = (ok) => ok === true ? "ok" : ok === false ? "bad" : "info";
+
+function line(k, title, detail, todo = "", link = "", lines = [], extra = "") {
+  return `<li class="${k}"><span class="mark" aria-label="${k}">${MARK[k]}</span><div><b>${esc(title)}</b>
+    <p>${esc(detail)}${link ? ` <a href="${esc(link)}">Open</a>` : ""}</p>
+    ${lines.length ? `<ul class="lines">${lines.map(l => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}
+    ${todo ? `<p class="todo">${esc(todo)}</p>` : ""}${extra}</div></li>`;
+}
+
+async function getJson(url) {
+  const r = await fetch(url);
+  let body = null;
+  try { body = await r.json(); } catch {}
+  return {status: r.status, body};
+}
+
+// The Health check: 503 means a problem, and the body still says which.
+async function healthLine() {
+  try {
+    const {body} = await getJson("/api/health");
+    if (body.problems.length)
+      return {k: "bad", html: line("bad", "Health page", `${body.problems.length} ${body.problems.length === 1 ? "problem" : "problems"}`,
+        "Open the Health page: each line says what to do.", "/health", body.problems)};
+    if (body.warnings.length)
+      return {k: "warn", html: line("warn", "Health page", "no problems; worth a look:", "", "/health", body.warnings)};
+    return {k: "ok", html: line("ok", "Health page", "all green", "", "/health")};
+  } catch { return {k: "bad", html: line("bad", "Health page", "no answer from the app")}; }
+}
+
+async function pictureLine(cam) {
+  const title = `Camera picture: ${cam.name}`;
+  try {
+    const {status, body} = await getJson(`/api/cameras/${encodeURIComponent(cam.name)}/picture`);
+    if (status === 409 || status === 404)
+      return {k: "bad", html: line("bad", title, body?.detail || "no picture",
+        "Wait a few seconds and check again. If it stays: is the camera plugged in, and is its lens cover open?", "/")};
+    if (!body.findings.length)
+      return {k: "ok", html: line("ok", title, "the picture looks fine", "", "/settings")};
+    return {k: "bad", html: line("bad", title, "the picture is " + body.findings.join(", "), "", "/settings", body.advice)};
+  } catch { return {k: "bad", html: line("bad", title, "could not be checked")}; }
+}
+
+async function check() {
+  $("tally").textContent = "Checking…";
+  let server;
+  try { server = (await getJson("/api/first-run")).body; } catch { $("tally").textContent = "No answer from the app."; return; }
+  const rows = [await healthLine()];
+  for (const i of server.items) rows.push({k: kind(i.ok), html: line(kind(i.ok), i.title, i.detail, i.todo, i.link)});
+  for (const cam of server.cameras) rows.push(await pictureLine(cam));
+  $("checks").innerHTML = rows.map(r => r.html).join("");
+  const bad = rows.filter(r => r.k === "bad").length;
+  $("tally").textContent = bad ? `${bad} ${bad === 1 ? "thing needs" : "things need"} a look.` : "Everything works.";
+  drawHelp(server.cameras);
+}
+
+// --- Try the help sign -------------------------------------------------------------------------------------------
+const helpState = {};   // camera -> last state from the app
+
+function helpRow(cam) {
+  const s = helpState[cam.name];
+  const title = `Help sign: ${cam.name}`;
+  if (!cam.help_sign) return line("info", title, "turned off for this camera", "", "/settings");
+  const button = `<div class="help-row"><button class="primary" data-cam="${esc(cam.name)}">Try the help sign</button></div>`;
+  if (!s) return line("info", title, "not tried yet", "", "", [], button);
+  if (s.seen) {
+    const hand = s.seen.hand ? ` (${s.seen.hand === "both" ? "both hands" : s.seen.hand + " hand"})` : "";
+    return line("ok", title, `seen at ${s.seen.at.slice(11, 19)}${hand}. No alert was made.`, "", "", [], button);
+  }
+  if (s.active) {
+    const pct = s.hold_s ? Math.min(100, 100 * s.holding_s / s.hold_s) : 0;
+    return line("info", title, `Hold one hand above your head for ${s.hold_s} s… ${s.left_s} s left` +
+      (s.holding_s ? ` · hand up ${s.holding_s} s` : ""), "", "", [],
+      `<div class="meter" aria-hidden="true"><div style="width:${pct}%"></div></div>`);
+  }
+  return line("bad", title, "not seen in 30 seconds",
+    "Stand where the camera sees you from your head to your hips, hold one hand clearly above your head, and try again.",
+    "", [], button);
+}
+
+let helpCams = [];
+function drawHelp(cams) {
+  helpCams = cams;
+  $("help").innerHTML = cams.length ? cams.map(helpRow).join("") : line("info", "Help sign", "no camera is running");
+}
+
+$("help").addEventListener("click", async (e) => {
+  const cam = e.target.closest("button[data-cam]")?.dataset.cam;
+  if (!cam) return;
+  const r = await fetch("/api/first-run/help-test", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({camera: cam})});
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) { alert("Could not start: " + (body.detail || r.status)); return; }
+  helpState[cam] = body;
+  drawHelp(helpCams);
+  const timer = setInterval(async () => {
+    try { helpState[cam] = (await getJson(`/api/first-run/help-test?camera=${encodeURIComponent(cam)}`)).body; } catch {}
+    drawHelp(helpCams);
+    if (!helpState[cam]?.active || helpState[cam]?.seen) clearInterval(timer);
+  }, 500);
+});
+
+$("again").addEventListener("click", check);
+check();
+</script>
+</body>
+</html>

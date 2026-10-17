@@ -28,6 +28,8 @@ easy and safe.
    recording works (a file from today: `/api/recordings`), Home/Away state, the built-in rules exist (Fall, No movement,
    Help sign), and a **"try the help sign"** button: for 30 s the camera reports a confirmed sign to the page instead of
    making an alert (a `GestureWatch` test flag on the Pipeline; no alert, no clip). Each item ✓ / ✗ with what to do.
+   **Done 2026-10-18** (`labeler/firstrun.py`, `static/first-run.html`). Found on the real run: a hand already up when
+   the button is pressed was never counted (its sign was given before), so starting the test restarts the count.
 3. Tests, a real run (a test copy started on an old `last_version`), docs.
 
 ## Phase 37 (L): Faster playback on the Recordings page

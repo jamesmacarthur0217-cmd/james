@@ -26,6 +26,7 @@
   <section class="panel">
     <h2>What's new</h2>
     <p class="muted" id="version"></p>
+    <p class="admin-only">After an update: <a href="/first-run">run the first-run check</a> to see that everything works.</p>
     <ul class="news" id="new"></ul>
     <h2 class="older" id="older-title" hidden>Added earlier</h2>
     <ul class="news" id="older"></ul>
@@ -35,8 +36,8 @@
 const $ = (id) => document.getElementById(id);
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 const PAGES = {"/": "Live page", "/recordings": "Recordings", "/summary": "Summary", "/alerts": "Alerts",
-  "/check": "Check", "/settings": "Settings", "/health": "Health"};
-const ADMIN_PAGES = ["/alerts", "/check", "/settings"];
+  "/check": "Check", "/settings": "Settings", "/health": "Health", "/first-run": "First-run check"};
+const ADMIN_PAGES = ["/alerts", "/check", "/settings", "/first-run"];
 
 function item(i) {
   const only = ADMIN_PAGES.includes(i.page) ? ' class="admin-only"' : "";   // viewers cannot open these

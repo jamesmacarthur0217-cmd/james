@@ -55,6 +55,10 @@ class ArmingIn(BaseModel):
     mode: str
 
 
+class HelpTestIn(BaseModel):
+    camera: str
+
+
 class SceneIn(BaseModel):
     camera: str
     question: str
@@ -851,6 +855,36 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     @app.get("/summary")
     def summary_page():
         return FileResponse(STATIC / "summary.html")
+
+    @app.get("/first-run")
+    def first_run_page():
+        return FileResponse(STATIC / "first-run.html")
+
+    @app.get("/api/first-run")
+    def first_run():
+        """After a big update: database, built-in rules, today's recording, Home / Away (labeler/firstrun.py); the
+        page adds the Health check and each camera's picture check."""
+        from . import firstrun
+        return firstrun.server_checks(cfg, db, pipelines, arming)
+
+    @app.post("/api/first-run/help-test")
+    def help_test_start(body: HelpTestIn, request: Request):
+        """"Try the help sign": for 30 s a confirmed sign on this camera is shown on the page, with no alert."""
+        p = by_name.get(body.camera)
+        if p is None:
+            raise HTTPException(404, f"camera {body.camera!r} is not running")
+        if getattr(p, "gestures", None) is None:
+            raise HTTPException(409, "the help sign is turned off for this camera (Settings page)")
+        p.start_help_test(30.0)
+        audit(request, "try help sign", f"camera {p.name}")
+        return p.help_test_state()
+
+    @app.get("/api/first-run/help-test")
+    def help_test_state(camera: str):
+        p = by_name.get(camera)
+        if p is None:
+            raise HTTPException(404, f"camera {camera!r} is not running")
+        return p.help_test_state()
 
     @app.get("/whats-new")
     def whats_new_page():

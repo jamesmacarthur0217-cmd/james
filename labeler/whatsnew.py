@@ -95,6 +95,10 @@ ENTRIES: list[Entry] = [
     Entry("p35", 35, "b15c94f", "Update button",
           "Settings, \"Updates\": the app checks GitHub once a day; \"Update now\" backs up the database, gets the "
           "new version and restarts.", "/settings", "admin"),
+    Entry("p36", 36, "1a9c280", "What's new and the first-run check",
+          "This list, and the first-run check: after an update, one page says whether everything works (health, "
+          "database, alert rules, recording, each camera's picture) and lets you try the help sign without an alert.",
+          "/first-run", "admin"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

@@ -31,7 +31,7 @@ def test_the_list_is_sound():
     assert len(keys) == len(set(keys))
     for e in ENTRIES:
         assert e.who in ("all", "admin") and re.fullmatch(r"[0-9a-f]{7}", e.commit) and e.title and e.text
-        assert e.page in ("", "/", "/recordings", "/summary", "/alerts", "/check", "/settings", "/health")
+        assert e.page in ("", "/", "/recordings", "/summary", "/alerts", "/check", "/settings", "/health", "/first-run")
         if e.marker:   # a table, or a column added at start
             table, _, column = e.marker.partition(".")
             assert table in Base.metadata.tables and (not column or column in NEW_COLUMNS[table]), e.marker

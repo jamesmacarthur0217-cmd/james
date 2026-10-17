@@ -850,6 +850,7 @@ async function whatsNew() {
   box.className = "welcome";
   box.setAttribute("role", "status");
   box.innerHTML = `<span>New in this version: ${named}.</span><a href="/whats-new">See what's new</a>
+    <a href="/first-run" class="admin-only">Run the first-run check</a>
     <button aria-label="Close">✕</button>`;
   box.querySelector("button").addEventListener("click", () => {
     try { localStorage.setItem("whatsNewSeen", d.newest); } catch {}

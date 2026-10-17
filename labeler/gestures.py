@@ -112,5 +112,18 @@ class GestureWatch:
             return {"since": h.since, "hand": "both" if len(up) == 2 else up[0]}
         return None
 
+    def rearm(self, t: float) -> None:
+        """Start everyone's count again at t: a hand already up (its sign given before) counts once more after
+        hold_s. For "Try the help sign", so a hand raised before pressing the button is not missed."""
+        for h in self.people.values():
+            h.fired = False
+            if h.since is not None:
+                h.since = t
+
+    def holding(self, t: float) -> float:
+        """The longest time anyone's hand has been up now (0 when no hand is up), for "Try the help sign"."""
+        return max((t - h.since for h in self.people.values()
+                    if h.since is not None and t - h.last_up <= self.gap_s), default=0.0)
+
     def forget(self, key) -> None:
         self.people.pop(key, None)

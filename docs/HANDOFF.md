@@ -18,8 +18,9 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-15)
 
-**2026-10-17:** Phase 36 started: step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
-tests). **Every new phase adds one entry to `whatsnew.ENTRIES`** (with a `marker` when it adds a table or column).
+**2026-10-17/18:** Phase 36 started: step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
+tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo
+with a raised hand for help-sign runs: `data/datasets/coco/val2017/000000032081.jpg` (tennis serve). **Every new phase adds one entry to `whatsnew.ENTRIES`** (with a `marker` when it adds a table or column).
 
 **Earlier (2026-10-15, last commit `b15c94f`, 795 tests, GitHub green):** done this day, newest last: Phase 16 search
 recordings by words (`9758ea5` `591615a`), 27 scene question areas and limits (`56fecb7` `fcbc306` `806e0ae`), 28
@@ -148,6 +149,10 @@ labeler/updater.py   Update button (Phase 35): daily git fetch, ff-only pull, pi
 labeler/whatsnew.py  What's new (Phase 36): ENTRIES in the order phases were finished (add one per new phase);
                      data/last_version.json {last, before}; no file -> guess from Database.created_tables /
                      added_columns (Entry.marker); Live banner (index.html whatsNew, localStorage whatsNewSeen), /whats-new
+labeler/firstrun.py  First-run check (Phase 36): server_checks (database, built-in rules, recording today, Home/Away);
+                     static/first-run.html adds /api/health and each camera's picture check; "Try the help sign" =
+                     Pipeline.start_help_test (30 s: _on_help reports to help_test, no alert; GestureWatch.rearm in the
+                     camera thread), /api/first-run/help-test
 start.bat / stop.bat daily start/stop (wait for Docker + Ollama; stop waits for app exit, backs up DB)
 install.bat/.ps1     new PC: winget Python/Docker/Ollama, .venv, .env, DB, models, admin, autostart,
                      health; -CheckOnly, -Offline <pkg>; PowerShell 5.1 + ASCII only (tests check)
