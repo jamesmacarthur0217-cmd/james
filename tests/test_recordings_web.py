@@ -134,5 +134,24 @@ def test_page_has_faster_playback():
         assert f'data-speed="{n}"' in page
     assert 'data-skip="-10"' in page and 'data-skip="10"' in page
     assert 'addEventListener("keydown"' in page and "video.defaultPlaybackRate = n" in page
-    assert page.count('$("speed-bar").hidden = false') == 2   # the admins' file and the time-lapse
-    assert '$("speed-bar").hidden = true' in page               # not for the viewers' stream (step 2)
+    assert page.count('$("speed-bar").hidden = false') == 3   # the admins' file, the time-lapse, the stream
+    assert "&speed=${speed}" in page and "function restartStream" in page and "function pauseStream" in page
+
+
+def test_stream_speed_sends_every_nth_frame_at_the_same_pace(setup):
+    """Phase 37 step 2: the viewers' stream at 2x has half the frames and takes half the time; d still ends it."""
+    import time
+    first, _, _ = setup["ids"]
+    v = setup["viewer"]
+
+    def frames(url):
+        began = time.monotonic()
+        body = v.get(url).content
+        return body.count(b"--frame"), time.monotonic() - began
+
+    n1, t1 = frames(f"/recordings/stream/{first}?t=0&d=2")             # 3 s at 10 fps: frames 0.0 ... 2.0 s
+    n2, t2 = frames(f"/recordings/stream/{first}?t=0&d=2&speed=2")     # every 2nd of them
+    n8, _ = frames(f"/recordings/stream/{first}?t=1&speed=8")          # from 1 s to the end: frames 10, 18, 26
+    assert (n1, n2, n8) == (21, 11, 3)
+    assert t2 < 0.75 * t1 and t1 > 1.8
+    assert v.get(f"/recordings/stream/{first}?speed=3").status_code == 400

@@ -100,8 +100,8 @@ ENTRIES: list[Entry] = [
           "database, alert rules, recording, each camera's picture) and lets you try the help sign without an alert.",
           "/first-run", "admin"),
     Entry("p37", 37, "", "Faster playback",
-          "Recordings page: play at 2x, 4x or 8x and skip 10 seconds back or forward, with buttons under the video or "
-          "the keys space, arrows and 1 2 4 8.", "/recordings"),
+          "Recordings page: play at 2x, 4x or 8x and skip 10 seconds back or forward, with buttons under the picture "
+          "or the keys space, arrows and 1 2 4 8. Also for the blurred recordings viewers see.", "/recordings"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

@@ -15,6 +15,7 @@ import bisect
 import json
 import subprocess
 import tempfile
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -64,6 +65,9 @@ def frame_list(path: Path) -> tuple[dict, list[float], list[list]]:
                 times.append(row[0])
                 boxes.append(row[1])
     return header, times, boxes
+
+
+SPEEDS = (1, 2, 4, 8)   # the stream's speeds (the page's buttons)
 
 
 def frame_index(times: list[float], offset_s: float) -> int:
@@ -261,9 +265,12 @@ def add_routes(app, cfg: dict, db, audit, blur_for, agent=None, embedder=None, p
         return FileResponse(path, media_type="video/mp4", headers={"Cache-Control": "private, max-age=600"})
 
     @app.get("/recordings/stream/{rec_id}")
-    async def recording_stream(rec_id: int, request: Request, t: float = 0.0, d: float | None = None):
+    async def recording_stream(rec_id: int, request: Request, t: float = 0.0, d: float | None = None, speed: int = 1):
         """The recording from `t` seconds on (for `d` seconds, a search's moment; else to the file's end), as a
-        picture stream like the live view, faces blurred for viewers (the time is written on each frame)."""
+        picture stream like the live view, faces blurred for viewers (the time is written on each frame). `speed`
+        2, 4 or 8 sends every 2nd, 4th or 8th frame at the same pace (Phase 37), so `d` seconds take d / speed."""
+        if speed not in SPEEDS:
+            raise HTTPException(400, "speed is 1, 2, 4 or 8")
         rec, path = get(rec_id)
         header, times, boxes = await run_in_threadpool(frame_list, path)
         if not times:
@@ -271,14 +278,18 @@ def add_routes(app, cfg: dict, db, audit, blur_for, agent=None, embedder=None, p
         blur = blur_for(request)
         fps = float(header.get("fps") or cfg["recording"]["fps"])
         await run_in_threadpool(audit, request, "view recording", f"{rec['camera']} {rec['started_at']} from {t:.0f} s"
-                                + (f" for {d:g} s" if d is not None else ""))
+                                + (f" for {d:g} s" if d is not None else "") + (f" at {speed}x" if speed > 1 else ""))
 
         def open_at(i: int):
             cap = cv2.VideoCapture(str(path))
             cap.set(cv2.CAP_PROP_POS_FRAMES, i)
             return cap
 
-        def next_jpeg(cap, i: int) -> bytes | None:
+        def next_jpeg(cap, i: int, skip: int) -> bytes | None:
+            """Frame i, after passing over the `skip` frames before it (grab: no picture made of them)."""
+            for _ in range(skip):
+                if not cap.grab():
+                    return None
             ok, frame = cap.read()
             if not ok:
                 return None
@@ -289,16 +300,19 @@ def add_routes(app, cfg: dict, db, audit, blur_for, agent=None, embedder=None, p
         async def frames():
             i = frame_index(times, t)
             cap = await run_in_threadpool(open_at, i)
+            skip, sent, began = 0, 0, time.monotonic()
             try:
                 while not app.state.stopping.is_set():
                     if d is not None and i < len(times) and times[i] > t + d:
                         break   # the moment is over
-                    jpeg = await run_in_threadpool(next_jpeg, cap, i)
+                    jpeg = await run_in_threadpool(next_jpeg, cap, i, skip)
                     if jpeg is None:
                         break
                     yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
-                    i += 1
-                    await asyncio.sleep(1 / fps)
+                    i, skip, sent = i + speed, speed - 1, sent + 1
+                    # Paced by the clock, not by sleeping 1/fps after each frame: reading, blurring and sending take
+                    # time too, and the page works out where the stream is from how long it has been playing.
+                    await asyncio.sleep(max(0.0, began + sent / fps - time.monotonic()))
             finally:
                 cap.release()
         return StreamingResponse(frames(), media_type="multipart/x-mixed-replace; boundary=frame")

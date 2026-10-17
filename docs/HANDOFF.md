@@ -25,8 +25,9 @@ recordings (2026-10-12/13): so their app ran Phase 13-15 code then, not 17+. Che
 by the pre-Phase-13 code: opens in 1.2 s, 9 tables and 5 columns added, constraint gone. `tests/test_postgres.py` (skipped
 without `VL_TEST_POSTGRES_URL`) failed on the old code. Docker Desktop was started for it and left running.
 
-**Phase 37 started 2026-10-18**: step 1 done (Recordings page: 1x-8x, -10/+10 s, keys, for the video element; `endTimer`
-checks a moment's end every 50 ms). Next: step 2, the viewers' blurred stream (`speed` parameter).
+**Phase 37 is done (2026-10-18)**: Recordings page 1x-8x, -10/+10 s, keys; the video (`endTimer` checks a moment's end
+every 50 ms) and the stream (`recording_stream(..., speed)`, paced by the clock; page `streamAt`, `restartStream`,
+`pauseStream` keeps the frame via a canvas). Next: Phase 38 (PC watch).
 
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo

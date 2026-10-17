@@ -594,9 +594,14 @@ a certain match. Real run on the test copy: a picture of one woman cut from the 
 times (the video loops) and nobody else, in 0.35 s. The list shows how alike each person is ("95% alike"); Play,
 Play all and Download work as for words.
 
-**Faster playback**: under the video (admins' recordings and everyone's time-lapse) **−10 s**, **+10 s** and the
-speed **1× 2× 4× 8×**; or the keys space (pause), ← and → (10 s), 1, 2, 4, 8 (not while typing in the search box).
-The speed stays for the next file. A search moment still stops at its end at any speed: checked on a test copy at
+**Faster playback**: under the picture **−10 s**, **+10 s** and the speed **1× 2× 4× 8×**; or the keys space
+(pause), ← and → (10 s), 1, 2, 4, 8 (not while typing in the search box). The speed stays for the next file. Admins'
+recordings and the time-lapse are a video, which changes speed itself. The viewers' blurred stream (and a recording
+still being written) gets `speed` from the app (every 2nd, 4th or 8th frame at the same pace), and a skip or a new
+speed starts it again from where it is: the page works out the place from the time it has played since its first
+frame (the app paces the stream by the clock). Checked against the clock written on the picture: after 6 s at 1×
+and 3 s at 4× the page's place matched it to the second (before counting from the first frame, 4× was 1 s ahead:
+opening the file takes ~0.2 s). **Pause** (for the stream) keeps the last picture on screen. A search moment still stops at its end at any speed: checked on a test copy at
 8×, three moments stopped 0.1-0.4 s after their end (the browser's own time report alone was 2 s late at 8×, so the
 page checks every 50 ms); +10 s past a moment's end goes on to the next one.
 

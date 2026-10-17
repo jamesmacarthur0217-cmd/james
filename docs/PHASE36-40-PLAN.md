@@ -43,6 +43,8 @@ easy and safe.
    late; it now also checks every 50 ms (0.1-0.4 s late).
 2. Viewers (the blurred MJPEG stream, `recordings_web.recording_stream`): a `speed` parameter (send every n-th frame,
    same pacing), and skip = a new stream from `t ± 10`.
+   **Done 2026-10-18** (with step 3's tests, browser check and docs: **Phase 37 is done**). The stream is now paced
+   by the clock (it used to sleep 1/fps after each frame and fall behind); the page counts from its first frame.
 3. Tests (stream with speed sends fewer frames, same duration), browser check, docs.
 
 ## Phase 38 (K): PC watch
