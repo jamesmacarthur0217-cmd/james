@@ -26,6 +26,15 @@
   .rec-player video, .rec-player img { width: 100%; max-height: 70vh; background: #000; border-radius: 8px; display: block; }
   .rec-player [hidden], .rec-player[hidden] { display: none; }
   .now { font-variant-numeric: tabular-nums; margin: 8px 0 0; }
+  /* Faster playback (Phase 37): ±10 s and the speed under the video. */
+  .speed { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+  .speeds { display: inline-flex; }
+  .speeds button { border-radius: 0; margin-left: -1px; min-width: 40px; font-variant-numeric: tabular-nums; }
+  .speeds button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+  .speeds button:last-child { border-radius: 0 6px 6px 0; }
+  .speeds button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .speed .keys { font-size: 12px; }
+  @media (pointer: coarse) { .speed .keys { display: none; } }
   table.recs { border-collapse: collapse; font-size: 13px; width: 100%; margin-top: 8px; }
   table.recs td, table.recs th { border-bottom: 1px solid var(--border); padding: 5px 8px; text-align: left; }
   table.recs td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -82,6 +91,12 @@
     <div class="rec-player" id="player" hidden>
       <video id="video" controls playsinline muted hidden></video>
       <img id="stream" alt="Recording" hidden>
+      <div class="speed" id="speed-bar" hidden>
+        <button data-skip="-10" title="Back 10 seconds (key ←)">−10 s</button>
+        <button data-skip="10" title="Forward 10 seconds (key →)">+10 s</button>
+        <span class="speeds" role="group" aria-label="Speed"><button data-speed="1" aria-pressed="true" title="Normal speed (key 1)">1×</button><button data-speed="2" aria-pressed="false" title="Key 2">2×</button><button data-speed="4" aria-pressed="false" title="Key 4">4×</button><button data-speed="8" aria-pressed="false" title="Key 8">8×</button></span>
+        <span class="muted keys">Keys: space pause · ← → 10 s · 1 2 4 8 speed</span>
+      </div>
       <p class="now"><b id="now"></b> <span class="muted" id="now-note"></span>
         <button id="stop" hidden>Stop</button>
         <button id="lapse-open" title="Open the real recording at this point of the time-lapse" hidden>Open this moment</button></p>
@@ -97,6 +112,7 @@ const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 let data = null, playing = null;   // playing: {rec, startMs}
 let found = null, queue = null, stopTimer = null;   // the last search; Play all: the moments still to play
+let endTimer = null;   // a search moment's end check while the file plays
 
 function pad(n) { return String(n).padStart(2, "0"); }
 function localDay(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
@@ -170,10 +186,10 @@ async function pollLapse() {
 }
 function playLapse(d) {
   lapse = d; playing = null; queue = null;
-  clearTimeout(stopTimer); stopStream();
+  clearTimeout(stopTimer); clearInterval(endTimer); stopStream();
   const v = $("video");
   $("player").hidden = false; $("stream").hidden = true; $("stop").hidden = true; v.hidden = false;
-  $("lapse-open").hidden = false;
+  $("lapse-open").hidden = false; $("speed-bar").hidden = false;
   v.src = `/recordings/timelapse/${encodeURIComponent(d.camera)}/${d.day}.mp4?v=${d.version}`;
   v.onloadedmetadata = () => v.play().catch(() => {});
   const show = () => {
@@ -279,17 +295,21 @@ function play(rec, offsetS, videoS, until) {
   $("player").hidden = false;
   const v = $("video"), img = $("stream");
   stopStream();
-  clearTimeout(stopTimer);
+  clearTimeout(stopTimer); clearInterval(endTimer);
   if (data.admin && !rec.open) {
-    img.hidden = true; v.hidden = false; $("stop").hidden = true;
+    img.hidden = true; v.hidden = false; $("stop").hidden = true; $("speed-bar").hidden = false;
     v.src = `/recordings/file/${rec.id}`;
     v.onloadedmetadata = () => { v.currentTime = videoS ?? offsetS * 1; v.play().catch(() => {}); };
-    v.ontimeupdate = until ? () => {
-      if (v.currentTime >= until.videoEnd) { v.ontimeupdate = null; v.pause(); until.onEnd && until.onEnd(); }
-    } : null;
+    // The browser reports the time only ~4 times a second: at 8x that would stop a moment 2 s late, so check often.
+    const atEnd = () => {
+      if (v.currentTime < until.videoEnd) return;
+      v.ontimeupdate = null; clearInterval(endTimer); v.pause(); until.onEnd && until.onEnd();
+    };
+    v.ontimeupdate = until ? atEnd : null;
+    if (until) endTimer = setInterval(atEnd, 50);
     showNow(playing.startMs + (offsetS || 0) * 1000, "(the exact time is on the picture)");
   } else {
-    v.pause(); v.removeAttribute("src"); v.load(); v.hidden = true;
+    v.pause(); v.removeAttribute("src"); v.load(); v.hidden = true; $("speed-bar").hidden = true;
     img.hidden = false; $("stop").hidden = false;
     img.src = `/recordings/stream/${rec.id}?t=${offsetS || 0}` + (until ? `&d=${until.seconds}` : "");
     // The stream ends by itself after d seconds; the page waits as long (it plays in real time), then goes on.
@@ -300,9 +320,48 @@ function play(rec, offsetS, videoS, until) {
   drawList();
   $("player").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
+// Faster playback (Phase 37) for the video (admins' files, everyone's time-lapse): 1x-8x and ±10 s, by the buttons
+// under it or keys. The speed stays when the next file starts. A search moment still stops at its end: that check
+// reads currentTime, so a skip past the end goes on to the next moment.
+let speed = 1;
+const video = $("video");
+function videoOn() { return !video.hidden && !!video.getAttribute("src"); }
+function setSpeed(n) { speed = n; video.defaultPlaybackRate = n; video.playbackRate = n; }
+function markSpeed() {
+  document.querySelectorAll("#speed-bar [data-speed]").forEach(b =>
+    b.setAttribute("aria-pressed", String(Number(b.dataset.speed) === video.playbackRate)));
+}
+function skip(s) {
+  if (!isFinite(video.duration)) return;
+  video.currentTime = Math.min(Math.max(0, video.currentTime + s), Math.max(0, video.duration - 0.1));
+}
+video.addEventListener("loadedmetadata", () => { video.playbackRate = speed; });
+video.addEventListener("ratechange", markSpeed);   // also when changed in the video's own menu
+$("speed-bar").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.speed) setSpeed(Number(b.dataset.speed)); else skip(Number(b.dataset.skip));
+  b.blur();   // so the space key pauses instead of pressing this button again
+});
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || !videoOn()) return;
+  const t = e.target;
+  if (t.closest && t.closest("input, textarea, select, [contenteditable]")) return;   // typing in the Find box
+  if (e.key === " ") {
+    if (t !== video && t.closest && t.closest("button, a")) return;   // space presses a focused button
+    e.preventDefault();
+    if (video.paused) video.play().catch(() => {}); else video.pause();
+  } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    e.preventDefault();
+    skip(e.key === "ArrowLeft" ? -10 : 10);
+  } else if (["1", "2", "4", "8"].includes(e.key)) {
+    setSpeed(Number(e.key));
+  }
+});
+
 function showNow(t, note) { $("now").textContent = `${data.camera} · from ${localDay(new Date(t))} ${clock(t)}`; $("now-note").textContent = note; }
 function stopStream() { const img = $("stream"); if (img.src) { img.removeAttribute("src"); } }
-$("stop").onclick = () => { stopStream(); clearTimeout(stopTimer); queue = null; $("stream").hidden = true; $("stop").hidden = true; };
+$("stop").onclick = () => { stopStream(); clearTimeout(stopTimer); clearInterval(endTimer); queue = null; $("stream").hidden = true; $("stop").hidden = true; };
 
 async function remove(r) {
   if (!confirm(`Delete the recording from ${clock(ms(r.start))} to ${clock(ms(r.end))}? This cannot be undone.`)) return;

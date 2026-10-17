@@ -30,7 +30,9 @@ def test_the_list_is_sound():
     keys = [e.key for e in ENTRIES]
     assert len(keys) == len(set(keys))
     for e in ENTRIES:
-        assert e.who in ("all", "admin") and re.fullmatch(r"[0-9a-f]{7}", e.commit) and e.title and e.text
+        assert e.who in ("all", "admin") and e.title and e.text
+        # A commit cannot name itself: the newest entry may wait for the next one.
+        assert re.fullmatch(r"[0-9a-f]{7}", e.commit) or (e.commit == "" and e is ENTRIES[-1]), e.key
         assert e.page in ("", "/", "/recordings", "/summary", "/alerts", "/check", "/settings", "/health", "/first-run")
         if e.marker:   # a table, or a column added at start
             table, _, column = e.marker.partition(".")

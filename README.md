@@ -594,6 +594,12 @@ a certain match. Real run on the test copy: a picture of one woman cut from the 
 times (the video loops) and nobody else, in 0.35 s. The list shows how alike each person is ("95% alike"); Play,
 Play all and Download work as for words.
 
+**Faster playback**: under the video (admins' recordings and everyone's time-lapse) **−10 s**, **+10 s** and the
+speed **1× 2× 4× 8×**; or the keys space (pause), ← and → (10 s), 1, 2, 4, 8 (not while typing in the search box).
+The speed stays for the next file. A search moment still stops at its end at any speed: checked on a test copy at
+8×, three moments stopped 0.1-0.4 s after their end (the browser's own time report alone was 2 s late at 8×, so the
+page checks every 50 ms); +10 s past a moment's end goes on to the next one.
+
 Measured (2026-10-12): busy street footage (MOTChallenge) recorded all the time would be **9-13 GB per camera per
 day** at quality 28 (`recording.quality`; 23 looks the same at normal size, 17-22 GB); OpenCV's own encoders would
 have made 23-305 GB. FFmpeg uses 2-6% of one processor core; the camera loop kept its speed (18.5 frames/s without,

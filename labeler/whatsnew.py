@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 class Entry:
     key: str           # stable name, stored in the state file
     phase: int
-    commit: str        # the commit that finished it (shown on the page)
+    commit: str        # the commit that finished it (shown on the page; "" for the newest until the next commit)
     title: str
     text: str          # plain words: what it does and where to find it
     page: str          # where to look ("" = nowhere in particular)
@@ -99,6 +99,9 @@ ENTRIES: list[Entry] = [
           "This list, and the first-run check: after an update, one page says whether everything works (health, "
           "database, alert rules, recording, each camera's picture) and lets you try the help sign without an alert.",
           "/first-run", "admin"),
+    Entry("p37", 37, "", "Faster playback",
+          "Recordings page: play at 2x, 4x or 8x and skip 10 seconds back or forward, with buttons under the video or "
+          "the keys space, arrows and 1 2 4 8.", "/recordings"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

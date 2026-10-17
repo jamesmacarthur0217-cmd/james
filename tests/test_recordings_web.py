@@ -124,3 +124,15 @@ def test_delete_removes_files_but_not_the_one_being_written(setup, db):
     assert not list((setup["base"] / "cam1" / "2026-10-12").glob("140000.*"))
     assert list((setup["base"] / "cam1" / "2026-10-11").glob("140000.*"))       # another day's is kept
     assert db.list_audit(1)[0]["action"] == "delete recordings"
+
+
+def test_page_has_faster_playback():
+    """Phase 37: speed 1x-8x and -10/+10 s under the video, keys, and the speed kept for the next file."""
+    from pathlib import Path
+    page = (Path(__file__).resolve().parent.parent / "labeler" / "static" / "recordings.html").read_text(encoding="utf-8")
+    for n in (1, 2, 4, 8):
+        assert f'data-speed="{n}"' in page
+    assert 'data-skip="-10"' in page and 'data-skip="10"' in page
+    assert 'addEventListener("keydown"' in page and "video.defaultPlaybackRate = n" in page
+    assert page.count('$("speed-bar").hidden = false') == 2   # the admins' file and the time-lapse
+    assert '$("speed-bar").hidden = true' in page               # not for the viewers' stream (step 2)

@@ -43,7 +43,7 @@ function item(i) {
   const only = ADMIN_PAGES.includes(i.page) ? ' class="admin-only"' : "";   // viewers cannot open these
   const where = i.page ? ` <a href="${esc(i.page)}"${only}>${esc(PAGES[i.page] || i.page)}</a>` : "";
   return `<li><h3>${esc(i.title)}${i.new ? ' <span class="chip new">New</span>' : ""}</h3>
-    <p>${esc(i.text)}${where}</p><small>Phase ${i.phase} · ${esc(i.commit)}</small></li>`;
+    <p>${esc(i.text)}${where}</p><small>Phase ${i.phase}${i.commit ? " · " + esc(i.commit) : ""}</small></li>`;
 }
 
 async function load() {

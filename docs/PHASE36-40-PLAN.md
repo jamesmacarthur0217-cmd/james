@@ -39,6 +39,8 @@ easy and safe.
 
 1. Admins (the MP4 file): `video.playbackRate` 1x/2x/4x/8x, buttons −10 s / +10 s, keys (space, ←/→, 1/2/4/8);
    also for the time-lapse and search moments (the moment's end check uses currentTime, so it still works).
+   **Done 2026-10-18.** Found on the real run: at 8x the end check (timeupdate, ~4 a second) stopped a moment 2 s
+   late; it now also checks every 50 ms (0.1-0.4 s late).
 2. Viewers (the blurred MJPEG stream, `recordings_web.recording_stream`): a `speed` parameter (send every n-th frame,
    same pacing), and skip = a new stream from `t ± 10`.
 3. Tests (stream with speed sends fewer frames, same duration), browser check, docs.
