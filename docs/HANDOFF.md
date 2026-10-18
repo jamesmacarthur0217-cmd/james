@@ -297,6 +297,9 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
    `inspect(conn)` inside the transaction. The scratch checks of Phases 17-22 missed it; the real check is a
    database built by the OLD code (`git archive <old commit> labeler | tar -x -C <scratch>/old`, run Database
    there), then today's code. `_no_endless_wait` makes such a wait fail after 60 s instead.
+31. **GitHub runs on UTC**, 8 hours behind Malaysia: a test that takes a recent day or week as "over" by the real
+   clock passes here after midnight and fails there (Phase 40 step 1, fixed in `94ab78d`). Put test data in a week
+   that is past on any clock, or pass `now`.
 
 ## 7. Conventions
 
