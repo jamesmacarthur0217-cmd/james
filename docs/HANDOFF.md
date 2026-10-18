@@ -59,7 +59,9 @@ PostgreSQL, and it caught the old hang with the pre-fix code). That run also cre
 the Phase 39 table is checked there now. Docker was started for it and left running. Step 2 done (run.py `_open_database`: messages, every 30 s while
 slow; `updater.run_upgrade_check` / `check_words` / `last_check`, Updater `check_db`: a failed test puts the
 running version back; Health `check_upgrade`; /api/update `safe_test`; Settings `#upd-safe`; config
-`updates.check_report`). Next: step 3, the check on the user's real database (read only, with their OK).
+`updates.check_report`). Step 3 done: the check on the user's real database (read only, with their OK): 1.1 s,
+154 people, 9 tables, 5 columns, nothing lost, What's new 22 (from Phase 17). **Phase 41 is done (2026-10-19).**
+The user can now restart their app (stop.bat, start.bat) and open the First-run check. Next: Phase 42.
 
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo

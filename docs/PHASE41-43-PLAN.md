@@ -1,4 +1,4 @@
-# Phases 41-43 plan: safe-update test, recordings kept around alerts, the usual day as a chart (approved 2026-10-19; Phase 41 started)
+# Phases 41-43 plan: safe-update test, recordings kept around alerts, the usual day as a chart (approved 2026-10-19; Phase 41 done)
 
 ## Context
 
@@ -31,6 +31,7 @@ that made-up layouts do not.
    running version back when it fails; while the start-up update is slow, the console says so every 30 s.
 3. Real run: the check on the user's real database (read only; the user starts it, or says yes to it running),
    then docs. If it passes, the user restarts their app (stop.bat, start.bat) and opens the First-run check.
+   **Done 2026-10-19**: 1.1 s, 154 people, 9 tables and 5 columns added, nothing lost. **Phase 41 is done.**
 
 ## Phase 42: Recordings kept around alerts
 

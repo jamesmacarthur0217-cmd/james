@@ -1350,6 +1350,11 @@ console says "opening the database...", then "database updated for this version 
 columns" when there was anything to do, and every 30 s while it takes long ("still opening / updating the
 database..."), so a slow or stuck update is never a silent window.
 
+On the user's own database (2026-10-19, read only, with their OK; their app was not running): copied in 1.5 s,
+updated in 1.1 s, 154 people, 9 tables and 5 columns added, the three old rules removed, nothing lost; What's new
+will list 22 features (from Phase 17: the database shows their app last ran Phase 13-15 code). The real database
+was left as it was, and the copy was dropped.
+
 ### What's new
 
 After an update (by the button, by hand with git, or a new package), the Live page shows one line under the header,
