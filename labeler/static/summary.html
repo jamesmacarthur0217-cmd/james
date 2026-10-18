@@ -32,6 +32,31 @@
   .line small { color: var(--muted); }
   .line.t-alert .what { color: var(--warn); }
   .day { font-weight: 600; margin: 12px 0 2px; font-size: 13px; }
+  /* This week (Phase 40): one row per day; printable on one page. */
+  .weekbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  .weekbar[hidden], #week-panel[hidden] { display: none; }
+  .wtable-wrap { overflow-x: auto; }
+  table.week { border-collapse: collapse; width: 100%; font-size: 13px; }
+  table.week th, table.week td { border-bottom: 1px solid var(--border); padding: 5px 8px; text-align: right;
+    font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.week th:first-child, table.week td:first-child, table.week .kinds { text-align: left; }
+  table.week td.kinds { white-space: normal; min-width: 140px; }
+  table.week tr.total td { font-weight: 600; border-bottom: none; }
+  table.week td.warn { color: var(--warn); font-weight: 600; }
+  .listed { list-style: none; padding: 0; margin: 8px 0 0; }
+  .listed li { padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .listed .t { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 6px; }
+  .print-title { display: none; }
+  @media print {
+    :root { --bg: #fff; --panel: #fff; --text: #000; --muted: #444; --border: #bbb; --chip: #eee; --warn: #8a4b00; }
+    body { background: #fff; color: #000; }
+    header, .periods, .custom, .weekbar, #people-panel, #timeline-panel, #toasts, .welcome { display: none !important; }
+    .print-title { display: block; font-size: 16px; margin: 0 0 6px; }
+    main { padding: 0; }
+    .panel { border: none; box-shadow: none; padding: 0 0 8px; margin: 0 !important; break-inside: avoid; }
+    table.week { font-size: 11px; }
+    a { color: inherit; text-decoration: none; }
+  }
   @media (max-width: 520px) { .line { grid-template-columns: 62px 22px 44px minmax(0, 1fr); }
     .line img, .line .pic-none { width: 44px; height: 44px; } }
 </style>
@@ -46,20 +71,33 @@
     <h2>What happened</h2>
     <div class="periods" id="periods">
       <button data-p="away">While you were away</button><button data-p="night">Last night</button>
-      <button data-p="today">Today</button><button data-p="custom">Choose…</button>
+      <button data-p="today">Today</button><button data-p="week">This week</button><button data-p="custom">Choose…</button>
+    </div>
+    <div class="weekbar" id="weekbar" hidden>
+      <button id="week-prev" title="The week before">◀</button>
+      <button id="week-last">Last 7 days</button>
+      <button id="week-next" title="The week after">▶</button>
+      <button class="primary" id="week-print">Print / Save as PDF</button>
     </div>
     <div class="custom" id="custom" hidden>
       <label>From <input type="datetime-local" id="from"></label> <label>until <input type="datetime-local" id="until"></label>
       <button class="primary" id="go">Show</button>
     </div>
+    <h2 class="print-title" id="print-title"></h2>
     <p class="muted" id="when"></p>
     <div class="tiles" id="tiles"></div>
+  </section>
+  <section class="panel" id="week-panel" style="margin-top:16px" hidden>
+    <h2>Day by day</h2>
+    <div class="wtable-wrap"><table class="week" id="week-table"></table></div>
+    <div id="week-listed"></div>
+    <div id="week-more"></div>
   </section>
   <section class="panel" id="people-panel" style="margin-top:16px" hidden>
     <h2 id="people-title">People</h2>
     <div class="faces" id="faces"></div>
   </section>
-  <section class="panel" style="margin-top:16px">
+  <section class="panel" id="timeline-panel" style="margin-top:16px">
     <h2>Timeline</h2>
     <div class="filters" id="filters"></div>
     <div id="timeline"><div class="empty">Loading…</div></div>
@@ -71,6 +109,7 @@ function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&l
 const ICON = { person: "🚶", vehicle: "🚗", animal: "🐾", alert: "⚠️", scene: "❓", camera: "📷" };
 const NAMES = { person: "people", vehicle: "vehicles", animal: "animals", alert: "alerts", scene: "scene answers", camera: "camera and PC problems" };
 let data = null, only = null;
+let weekDay = null;   // This week: null = the last 7 days, else a day ("2026-10-12") of the Monday-Sunday week shown
 const hhmm = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const dayOf = (iso) => new Date(iso).toLocaleDateString([], { weekday: "long", day: "numeric", month: "short" });
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
@@ -78,8 +117,9 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 async function load(period, start, end) {
   document.querySelectorAll("#periods button").forEach(b => b.classList.toggle("on", b.dataset.p === period));
   $("custom").hidden = period !== "custom";
+  $("weekbar").hidden = period !== "week";
   if (period === "custom" && !(start && end)) return;
-  const q = period === "custom" ? { start, end } : { period };
+  const q = period === "custom" ? { start, end } : period === "week" && weekDay ? { period, week: weekDay } : { period };
   try { localStorage.setItem("summaryPeriod", period); } catch {}
   $("timeline").innerHTML = '<div class="empty">Loading…</div>';
   const r = await fetch("/api/summary?" + new URLSearchParams(q));
@@ -94,8 +134,62 @@ async function load(period, start, end) {
   const s = new Date(data.start), e = new Date(data.end);
   const fmt = (d) => d.toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   $("when").textContent = `${fmt(s)} → ${fmt(e)}`;
+  const longDay = (d) => d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+  $("print-title").textContent = data.period === "week"
+    ? `VisionLabeler · ${weekDay ? "week" : "last 7 days"}: ${longDay(s)} – ${longDay(new Date(e - 1))}` : "";
+  $("week-next").disabled = !weekDay;
   draw();
+  drawWeek();
 }
+
+// --- This week (labeler/summary.py week) ---------------------------------------------------------------------
+const KIND = { fall: "fall", help: "help sign", quiet: "no movement", unusual: "unusual quiet", scene: "scene",
+               vehicle: "vehicle", animal: "animal", person: "person" };
+const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+function drawWeek() {
+  $("week-panel").hidden = data.period !== "week";
+  if (data.period !== "week") return;
+  const admin = "storage" in data;   // the app sends storage, problems and checks to admins only
+  const kinds = (k) => Object.entries(k).map(([n, c]) => `${c} ${KIND[n] || n}`).join(", ");
+  const head = ["Day", "People", "Vehicles", "Animals", "Alerts", "Alerts by kind",
+                ...(admin ? ["Camera problems", "PC problems", "Recorded"] : [])];
+  const sum = (key) => data.days.reduce((t, d) => t + (d[key] || 0), 0);
+  const cell = (n, warn) => `<td${warn && n ? ' class="warn"' : ""}>${n}</td>`;
+  const rows = data.days.map(d => {
+    const day = new Date(d.day + "T12:00:00").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+    return `<tr><td>${esc(day)}</td>${cell(d.people)}${cell(d.vehicles)}${cell(d.animals)}${cell(d.alerts, true)}
+      <td class="kinds">${esc(kinds(d.alert_kinds))}</td>` + (admin ? `${cell(d.camera_problems, true)}${cell(d.pc_problems, true)}
+      <td>${d.recorded_h === null ? '<span class="muted" title="recordings are kept ' + data.storage.keep_days + ' days">not kept</span>' : d.recorded_h + " h"}</td>` : "") + "</tr>";
+  }).join("");
+  const recorded = data.days.filter(d => d.recorded_h !== null && d.recorded_h !== undefined);
+  const total = `<tr class="total"><td>Total</td>${cell(sum("people"))}${cell(sum("vehicles"))}${cell(sum("animals"))}${cell(sum("alerts"))}
+    <td class="kinds">${esc(kinds(data.alert_kinds))}</td>` + (admin ? `${cell(sum("camera_problems"))}${cell(sum("pc_problems"))}
+    <td>${recorded.length ? Math.round(recorded.reduce((t, d) => t + d.recorded_h, 0) * 10) / 10 + " h" : ""}</td>` : "") + "</tr>";
+  $("week-table").innerHTML = `<thead><tr>${head.map(h => `<th scope="col"${h === "Alerts by kind" ? ' class="kinds"' : ""}>${h}</th>`).join("")}</tr></thead><tbody>${rows}${total}</tbody>`;
+  const when = (iso) => new Date(iso).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  $("week-listed").innerHTML = `<h3 style="font-size:14px;margin:14px 0 0">Falls, help signs and quiet</h3>` + (data.listed.length
+    ? `<ul class="listed">${data.listed.map(a => `<li><span class="t">${esc(when(a.created_at))}</span><b>${esc(KIND[a.fall ? "fall" : a.help ? "help" : a.unusual ? "unusual" : "quiet"])}</b>
+        · ${esc(a.camera)} · ${esc(a.message)}</li>`).join("")}</ul>` : '<p class="muted">None this week.</p>');
+  if (!admin) { $("week-more").innerHTML = ""; return; }
+  const st = data.storage, ch = data.checks;
+  const checks = ch.count ? ch.results.map(r => `${r.what}: ${r.right} of ${r.right + r.wrong} right`).join("; ") : "none this week";
+  $("week-more").innerHTML = `<p style="margin:14px 0 0"><b>Recordings:</b> ${st.recordings_gb} GB in ${st.files} files now (kept ${st.keep_days} days)</p>
+    <p style="margin:4px 0 0"><b>Checked by you</b> (${ch.count}): ${esc(checks)}</p>`;
+}
+
+function shiftWeek(days) {
+  const base = weekDay ? new Date(weekDay + "T12:00:00") : new Date(data.start);
+  base.setDate(base.getDate() + days);
+  weekDay = isoDay(base);
+  const monday = new Date(base); monday.setDate(base.getDate() - ((base.getDay() + 6) % 7));
+  if (monday.getTime() + 7 * 86400000 > Date.now() && days > 0) weekDay = null;   // the week of today: the last 7 days
+  load("week");
+}
+$("week-prev").onclick = () => shiftWeek(weekDay ? -7 : -1);   // from the last 7 days: the Monday-Sunday week before
+$("week-next").onclick = () => shiftWeek(7);
+$("week-last").onclick = () => { weekDay = null; load("week"); };
+$("week-print").onclick = () => window.print();
 
 function draw() {
   const c = data.counts;
@@ -105,7 +199,7 @@ function draw() {
     + tile(c.vehicles, c.vehicles === 1 ? "vehicle" : "vehicles") + tile(c.animals, c.animals === 1 ? "animal" : "animals")
     + tile(c.alerts, c.alerts === 1 ? "alert" : "alerts", true)
     + (c.scene_changes ? tile(c.scene_changes, c.scene_changes === 1 ? "scene answer changed" : "scene answers changed", true) : "")
-    + (c.camera_problems ? tile(c.camera_problems, "camera problems", true) : "");
+    + (c.camera_problems ? tile(c.camera_problems, "camera and PC problems", true) : "");
   $("people-panel").hidden = !data.people.length;
   $("people-title").textContent = c.people > data.people.length ? `People (the first ${data.people.length} of ${c.people})`
     : "People" + (perCam.length > 1 ? " · " + perCam.map(([k, n]) => `${k}: ${n}`).join(", ") : "");
@@ -144,7 +238,8 @@ $("go").onclick = () => load("custom", $("from").value, $("until").value);
 const asked = new URLSearchParams(location.search).get("period");
 let saved = null;
 try { saved = localStorage.getItem("summaryPeriod"); } catch {}
-const first = ["away", "night", "today"].includes(asked) ? asked : (["away", "night", "today"].includes(saved) ? saved : "away");
+const PERIODS = ["away", "night", "today", "week"];
+const first = PERIODS.includes(asked) ? asked : (PERIODS.includes(saved) ? saved : "away");
 const now = new Date(), pad = (n) => String(n).padStart(2, "0");
 const local = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 $("until").value = local(now);

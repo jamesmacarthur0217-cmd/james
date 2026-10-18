@@ -16,7 +16,7 @@ Roadmap Phase 1 (licenses) is deferred until they say otherwise. Under Malaysia'
 household use is generally outside the Act; their filled-in camera sign and data-protection summary are in
 `data/privacy/` (git-ignored, contains their email); the blank templates are in `docs/`.
 
-## 2. Current state (2026-10-18)
+## 2. Current state (2026-10-19)
 
 **2026-10-18: a start-up hang fixed** (`labeler/db.py` `_drop_old_unique` / `_add_missing_columns`, pitfall 30): the user's
 own app would have hung for ever at its next start on PostgreSQL. Their database (read only, 2026-10-18) still has
@@ -44,7 +44,10 @@ picker). Step 3 done: measured with `tools/unusual_check.py`, the per-hour rule 
 new tables come from create_all, which has never failed; check at the next PostgreSQL start).
 
 **Phase 40 started 2026-10-19**: step 1 done (`summary.week_period`, `summary.week`, `alert_kind`; /api/summary
-`period=week` (+ `week=<day>`)). Next: step 2, the Summary page's "This week" tab, printable.
+`period=week` (+ `week=<day>`)); step 2 done (Summary page "This week": `drawWeek`, `shiftWeek`, weekbar,
+`@media print`); step 3 (tests, browser check, docs) within it. **Phase 40 is done; the Phases 36-40 plan is
+finished (2026-10-19).** Next: ask the user (Phase 28 step 1 when GitHub's runner is Ubuntu 26: it was still
+ubuntu-24.04 on 2026-10-18; Phase 26 once their app runs the new version; new ideas).
 
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo
@@ -604,6 +607,6 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE36-40-PLAN.md
-> (and the GitHub runner check of Phase 28 after 2026-10-19); ask me before each phase and each step starts, and do it
-> step by step.
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then do the GitHub runner check of Phase 28
+> (once ubuntu-latest is Ubuntu 26) and suggest what to do next (the Phases 36-40 plan is finished); ask me before
+> each phase and each step starts, and do it step by step.

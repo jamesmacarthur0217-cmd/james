@@ -108,3 +108,11 @@ def test_api(db, camera, tmp_path):
     viewer.post("/api/login", json={"username": "vic", "password": "correct horse battery"})
     v = viewer.get("/api/summary", params={"period": "week", "week": "2026-10-07"}).json()
     assert "storage" not in v and v["counts"]["people"] == 9
+
+
+def test_summary_page_has_the_week_and_prints():
+    from pathlib import Path
+    page = (Path(__file__).resolve().parent.parent / "labeler" / "static" / "summary.html").read_text(encoding="utf-8")
+    assert 'data-p="week"' in page and 'id="week-table"' in page and "window.print()" in page
+    assert "@media print" in page and "header, .periods" in page   # no menus or buttons on paper
+    assert 'const PERIODS = ["away", "night", "today", "week"]' in page   # ?period=week opens it

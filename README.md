@@ -523,13 +523,18 @@ away: 3 people, 1 alert") with a link to the summary; it never opens anything by
 page's Today tiles have a **Summary** tile too. Viewers (family) see the same, with faces blurred, without clips and
 camera problems (as elsewhere). It takes about 30 ms for a busy day on this PC.
 
-**The week** (Phase 40; `/api/summary?period=week`, the page comes next): the last 7 days (today so far and the 6 days
+**This week** (Phase 40; the Summary page's **This week** button, `/summary?period=week`): the last 7 days (today so far and the 6 days
 before), or the Monday-Sunday week of a chosen day (`&week=2026-10-12`). The same summary, plus one row per day:
 people, vehicles, animals, alerts by kind (fall, help sign, no movement, unusual quiet, scene, vehicle, animal,
 person), and for admins camera problems, PC problems and hours recorded; the falls, help signs and quiet alerts
 listed one by one; recording storage; the week's checks ("was this right?", right / wrong per thing). Recordings are
 kept only 3 days (`recording.keep_days`), so older days say "not kept" rather than 0 hours. Viewers get it without
 problems, storage and checks. Measured: a week of 5,000 people in 0.13 s (SQLite, this PC).
+On the page: a table "Day by day" (with a total), the falls, help signs and quiet alerts, recordings and checks,
+then the people and the timeline as for other periods; **◀ / ▶** go a Monday-Sunday week back or forward,
+**Last 7 days** comes back. **Print / Save as PDF** uses the browser's print: on paper only the title with the
+dates, the tiles, the table, the alerts, storage and checks (no menus, no buttons, no pictures), dark on white also
+in dark mode; a busy made-up week fits one A4 page. On a phone the table scrolls sideways inside its box.
 
 ## Home / Away
 

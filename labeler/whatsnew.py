@@ -106,11 +106,14 @@ ENTRIES: list[Entry] = [
           "The Health page also watches the PC: the graphics card's temperature, each disk's health, and times the app "
           "or the PC stopped without warning (a power cut, the PC turned off without stop.bat). Problems show like "
           "camera problems.", "/health"),
-    Entry("p39", 39, "", "Unusual quiet",
+    Entry("p39", 39, "114d8f5", "Unusual quiet",
           "The app learns when someone is usually seen on each kiosk camera (after 2 weeks), and the built-in rule "
           "\"Unusual quiet\" alerts when nobody is seen for a stretch of the day in which someone nearly always is, "
           "e.g. usually up by 07:00 but nobody seen by 08:00 (only when Home). The Health page shows the usual hours.",
           "/alerts"),
+    Entry("p40", 40, "", "This week",
+          "Summary page, \"This week\": the last 7 days (or any Monday-Sunday week) day by day, the falls, help signs "
+          "and quiet alerts, and a Print / Save as PDF button for one page on paper.", "/summary"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

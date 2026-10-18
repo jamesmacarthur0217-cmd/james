@@ -1,4 +1,4 @@
-# Phases 36-40 plan: first-run check, faster playback, PC watch, unusual quiet, weekly report (approved 2026-10-15; Phase 36 done 2026-10-18)
+# Phases 36-40 plan: first-run check, faster playback, PC watch, unusual quiet, weekly report (approved 2026-10-15; all done 2026-10-19)
 
 ## Context
 
@@ -87,6 +87,9 @@ Builds on Phase 31 (`labeler/quiet.py`) and the history used by `labeler/today.p
    alerts by kind, camera problems, PC problems), recording hours and storage, checks (Phase 24 results), quiet/help/
    fall alerts listed.
    **Done 2026-10-19** (also the unusual quiet alerts; days older than recording.keep_days say "not kept").
+   Steps 2-3 **done 2026-10-19**: "This week" button, ◀ / ▶ weeks, Print / Save as PDF (checked by applying the
+   print rules on screen: one A4 page), viewers without admin columns, phone width. **Phase 40 is done; the plan
+   is finished.**
 2. Summary page "This week" tab with a printable layout (`@media print`: one page, no menus; "Print / Save as PDF"
    button using the browser's print). Viewers: without clips and camera problems, as the Summary.
 3. Tests, browser check (print preview width), docs.
