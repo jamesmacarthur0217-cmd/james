@@ -86,6 +86,7 @@ Builds on Phase 31 (`labeler/quiet.py`) and the history used by `labeler/today.p
 1. `labeler/summary.py` period "week" (the last 7 days, or a chosen week): per day counts (people, vehicles, animals,
    alerts by kind, camera problems, PC problems), recording hours and storage, checks (Phase 24 results), quiet/help/
    fall alerts listed.
+   **Done 2026-10-19** (also the unusual quiet alerts; days older than recording.keep_days say "not kept").
 2. Summary page "This week" tab with a printable layout (`@media print`: one page, no menus; "Print / Save as PDF"
    button using the browser's print). Viewers: without clips and camera problems, as the Summary.
 3. Tests, browser check (print preview width), docs.

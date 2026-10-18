@@ -8,13 +8,19 @@ Periods: "away" = from the last switch to Away until the switch back to Home (or
 Away history (labeler/arming.py); "night" = 18:00 yesterday until 08:00 today (until now if earlier); "today" =
 since midnight. Viewers get the same without clips and camera problems (as on the other pages: Today at a glance
 shows them people numbers only); their pictures come blurred from /crops/ as everywhere.
+
+The week (Phase 40): the last 7 days (today so far and the 6 days before), or the Monday-Sunday week of a chosen day;
+the same summary plus one row per day (people, vehicles, animals, alerts by kind, camera and PC problems, hours
+recorded), the falls, help signs and quiet alerts listed, recording storage and the week's checks (Phase 24).
+Recordings are kept only recording.keep_days (3), so older days say "not kept" instead of 0 hours.
 """
 from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, time, timedelta
 
-PERIODS = ("away", "night", "today")
+PERIODS = ("away", "night", "today", "week")
+LISTED = ("fall", "help", "quiet", "unusual")   # alerts the week lists one by one
 NIGHT_FROM, NIGHT_UNTIL = 18, 8
 PEOPLE_SHOWN = 12
 TIMELINE_MAX = 300
@@ -40,7 +46,77 @@ def period(db, name: str, now: datetime) -> tuple[datetime, datetime] | None:
         return start, min(today + timedelta(hours=NIGHT_UNTIL), now)
     if name == "today":
         return today, now
+    if name == "week":
+        return week_period(now)
     raise ValueError(f"period is one of {', '.join(PERIODS)}")
+
+
+def week_period(now: datetime, day=None) -> tuple[datetime, datetime]:
+    """The last 7 days (from midnight 6 days ago until now), or the Monday-Sunday week of `day` (until now at most)."""
+    if day is None:
+        return datetime.combine(now.date() - timedelta(days=6), time()), now
+    monday = datetime.combine(day - timedelta(days=day.weekday()), time())
+    return monday, min(monday + timedelta(days=7), now)
+
+
+def alert_kind(e: dict) -> str:
+    """fall, help, quiet (no movement), unusual (unusual quiet), scene, vehicle, animal or person."""
+    for k in LISTED:
+        if e.get(k):
+            return k
+    if e.get("scene_id"):
+        return "scene"
+    return "vehicle" if e.get("vehicle_id") else "animal" if e.get("animal_id") else "person"
+
+
+def week(db, start: datetime, end: datetime, admin: bool = True, clip_for=None, cfg: dict | None = None,
+         now: datetime | None = None) -> dict:
+    """The summary of [start, end) (at most 7 days), with one row per day."""
+    now = now or datetime.now()
+    out = build(db, start, end, admin, clip_for, keep_all=True)
+    keep = (cfg or {}).get("recording", {}).get("keep_days", 3)
+    recordings = db.list_recordings(None, start, end)
+    days = []
+    d = start
+    while d < end:
+        nxt = min(d + timedelta(days=1), end)
+        iso, iso_next = d.isoformat(timespec="seconds"), nxt.isoformat(timespec="seconds")
+        inside = lambda at: iso <= at < iso_next   # noqa: E731
+        alerts = Counter(alert_kind(e) for e in out["alerts"] if inside(e["created_at"]))
+        row = {"day": d.date().isoformat(), "people": sum(inside(p["at"]) for p in out["timeline_all"]
+                                                          if p["type"] == "person"),
+               "vehicles": sum(inside(v["started_at"]) for v in out["_vehicles"]),
+               "animals": sum(inside(a["started_at"]) for a in out["_animals"]),
+               "alerts": sum(alerts.values()), "alert_kinds": dict(alerts)}
+        if admin:
+            problems = [p for p in out["camera_problems"] if p["started_at"] < iso_next
+                        and (p["ended_at"] is None or p["ended_at"] >= iso)]
+            row["camera_problems"] = sum(p["camera"] != "PC" for p in problems)
+            row["pc_problems"] = sum(p["camera"] == "PC" for p in problems)
+            if keep and d.date() < now.date() - timedelta(days=keep):
+                row["recorded_h"] = None   # deleted by now: not kept
+            else:
+                secs = 0.0
+                for r in recordings:
+                    a = max(datetime.fromisoformat(r["started_at"]), d)
+                    b = min(datetime.fromisoformat(r["ended_at"]) if r["ended_at"] else now, nxt)
+                    secs += max(0.0, (b - a).total_seconds())
+                row["recorded_h"] = round(secs / 3600, 1)
+        days.append(row)
+        d = nxt
+    out["days"] = days
+    out["listed"] = [e for e in out["alerts"] if alert_kind(e) in LISTED]
+    out["alert_kinds"] = dict(Counter(alert_kind(e) for e in out["alerts"]))
+    if admin:
+        from . import checks
+        rows = db.list_checks(start, end)
+        out["checks"] = {"count": len(rows), "results": [r for r in checks.results(rows) if r["camera"] is None]}
+        stats = db.recording_stats()
+        out["storage"] = {"recordings_gb": round(stats["bytes"] / 1e9, 1), "files": stats["files"],
+                          "oldest": stats["oldest"], "keep_days": keep}
+    for k in ("timeline_all", "_vehicles", "_animals"):
+        out.pop(k)
+    return out
 
 
 def describe_person(p: dict) -> str:
@@ -52,8 +128,8 @@ def describe_person(p: dict) -> str:
     return ", ".join(x for x in (v("apparent_gender"), v("age_group"), top) if known(x)) or "a person"
 
 
-def build(db, start: datetime, end: datetime, admin: bool = True, clip_for=None) -> dict:
-    """The summary of [start, end)."""
+def build(db, start: datetime, end: datetime, admin: bool = True, clip_for=None, keep_all: bool = False) -> dict:
+    """The summary of [start, end); keep_all: also the whole lists, for week()."""
     people = db.people_between(start, end)
     vehicles = db.list_vehicles(limit=1000, start=start, end=end)
     animals = db.list_animals(limit=1000, start=start, end=end)
@@ -92,6 +168,7 @@ def build(db, start: datetime, end: datetime, admin: bool = True, clip_for=None)
         "animal_kinds": dict(Counter(a["kind"] for a in animals).most_common()),
         "alerts": alerts, "scene_changes": changes, "camera_problems": problems,
         "timeline": timeline[-TIMELINE_MAX:], "timeline_cut": max(0, len(timeline) - TIMELINE_MAX),
+        **({"timeline_all": timeline, "_vehicles": vehicles, "_animals": animals} if keep_all else {}),
     }
 
 

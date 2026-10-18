@@ -41,7 +41,10 @@ picker). Step 3 done: measured with `tools/unusual_check.py`, the per-hour rule 
 (`routine.quiet_share` 0.97, `routine.min_quiet_h` 3, `Routine.stretch`); day summaries `routine_days`
 (`routine.store_days`, called first in run.py `_apply_retention`) so 8 weeks survive the 30-day retention; Health
 `check_routine`. **Phase 39 is done (2026-10-18).** The new table was not checked on PostgreSQL (Docker was off;
-new tables come from create_all, which has never failed; check at the next PostgreSQL start). Next: Phase 40.
+new tables come from create_all, which has never failed; check at the next PostgreSQL start).
+
+**Phase 40 started 2026-10-19**: step 1 done (`summary.week_period`, `summary.week`, `alert_kind`; /api/summary
+`period=week` (+ `week=<day>`)). Next: step 2, the Summary page's "This week" tab, printable.
 
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo

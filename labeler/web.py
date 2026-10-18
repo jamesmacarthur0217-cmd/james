@@ -903,11 +903,24 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return w.summary((getattr(request.state, "user", None) or {}).get("role") == "admin")
 
     @app.get("/api/summary")
-    def summary_api(request: Request, period: str | None = None, start: str | None = None, end: str | None = None):
-        """What happened: period away / night / today, or start and end (2026-10-14T18:00). Viewers: no clips and
-        no camera problems (labeler/summary.py)."""
+    def summary_api(request: Request, period: str | None = None, start: str | None = None, end: str | None = None,
+                    week: str | None = None):
+        """What happened: period away / night / today / week (the last 7 days; with week=2026-10-12 the Monday-Sunday
+        week of that day), or start and end (2026-10-14T18:00). Viewers: no clips and no camera problems
+        (labeler/summary.py)."""
         from . import summary
         now = datetime.now()
+        admin = (getattr(request.state, "user", None) or {}).get("role") == "admin"
+        if period == "week":
+            try:
+                day = datetime.fromisoformat(week).date() if week else None
+            except ValueError:
+                raise HTTPException(400, "week looks like 2026-10-12 (any day of that week)")
+            s, e = summary.week_period(now, day)
+            if e <= s:
+                raise HTTPException(400, "that week has not begun yet")
+            return {"period": "week", **summary.week(db, s, e, admin=admin, cfg=cfg, now=now,
+                                                    clip_for=lambda i: _clip_for(i) if admin else None)}
         if start or end:
             try:
                 s = datetime.fromisoformat(start) if start else now - timedelta(days=1)

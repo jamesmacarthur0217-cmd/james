@@ -29,7 +29,7 @@ def test_night_and_today():
     assert summary.period(None, "night", early) == (datetime(2026, 10, 13, 18), early)   # not 08:00 yet: until now
     assert summary.period(None, "today", NOW) == (datetime(2026, 10, 14), NOW)
     with pytest.raises(ValueError):
-        summary.period(None, "week", NOW)
+        summary.period(None, "month", NOW)
 
 
 def _night(db, camera):
@@ -102,7 +102,7 @@ def test_api_periods_and_viewers(db, camera, tmp_path):
     assert client.get("/api/summary", params={"start": "yesterday"}).status_code == 400
     assert client.get("/api/summary", params={"start": "2026-10-14T08:00", "end": "2026-10-13T18:00"}).status_code == 400
     assert client.get("/api/summary", params={"start": "2026-08-01T00:00", "end": "2026-10-01T00:00"}).status_code == 400
-    assert client.get("/api/summary", params={"period": "week"}).status_code == 400
+    assert client.get("/api/summary", params={"period": "month"}).status_code == 400
     assert client.get("/api/summary", params={"period": "today"}).json()["period"] == "today"
     db.add_user("vic", accounts.hash_password("correct horse battery"), "viewer")
     viewer = _app(db, tmp_path, address="192.168.1.20")
