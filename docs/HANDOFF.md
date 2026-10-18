@@ -31,8 +31,11 @@ every 50 ms) and the stream (`recording_stream(..., speed)`, paced by the clock;
 
 **Phase 38 started 2026-10-18**: step 1 done (`labeler/pcwatch.py`, run.py thread "pcwatch"); step 2 done (camera
 events with camera "PC": kinds hot / disk / stopped, `PCWatch.sync`, `db.add_camera_event`; Health `check_pc`,
-`check_stops`; /api/status camera_problems includes `pcwatch.current()`). Next: step 3 (tests + real run: mostly
-done in steps 1-2; ask the user whether anything is left).
+`check_stops`; /api/status camera_problems includes `pcwatch.current()`). Step 3 (tests with made-up outputs, a
+real run with a copy ended by force) was done within steps 1-2. **Phase 38 is done (2026-10-18).**
+
+**Phase 39 started 2026-10-18**: step 1 done (`labeler/routine.py`: `learn`, `Routine.usual_hours`, `away_spans`;
+`db.track_spans`; config `routine`). Not wired into run.py yet. Next: step 2, the built-in rule "Unusual quiet".
 
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo
@@ -165,6 +168,8 @@ labeler/updater.py   Update button (Phase 35): daily git fetch, ff-only pull, pi
 labeler/whatsnew.py  What's new (Phase 36): ENTRIES in the order phases were finished (add one per new phase);
                      data/last_version.json {last, before}; no file -> guess from Database.created_tables /
                      added_columns (Entry.marker); Live banner (index.html whatsNew, localStorage whatsNewSeen), /whats-new
+labeler/routine.py   the usual day (Phase 39): per kiosk camera, weekday/weekend x hour, share of counted days with
+                     someone seen (8 weeks; days with nobody and Away hours left out; learning below 14 days)
 labeler/pcwatch.py   PC watch (Phase 38): nvidia-smi each minute, Get-PhysicalDisk hourly, heartbeat file (pcwatch.
                      heartbeat_file) + mark_ended at run.py's very end; previous_stop at start (boot time via
                      GetTickCount64: PC restarted vs app ended); app.state.pcwatch (state, problems)

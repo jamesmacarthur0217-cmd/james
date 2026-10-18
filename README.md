@@ -769,6 +769,18 @@ on cam1 for 10 min (since 15:18)"), and when the people appeared its message bec
 min"; nobody was found in the empty part. Not measured on real days yet (a long nap, someone reading in another room):
 try it for a week and look at its alerts.
 
+### The usual day
+
+For the coming "Unusual quiet" alert (Phase 39), the app learns when someone is usually seen on each kiosk camera
+(`labeler/routine.py`): for each hour, separately for weekdays and the weekend, the share of days on which someone was
+seen in that hour over the last 8 weeks (`routine.weeks`), from each person's first to last sight. An hour is "usual"
+when it is at least 80% (`routine.usual_share`). Days with nobody at all on the camera are left out (the app was off,
+or nobody was home: either way they say nothing about the usual day), and so is every hour the house was set to
+Away. Until 14 such days (`routine.min_days`) the camera is still learning and no hour is usual. Checked on made-up
+8-week histories: a regular household (up 07:10-08:40, lunch on weekdays, evenings missed 1 day in 20, the weekend
+later) gave weekdays 07, 08, 12, 18-21 and Saturdays 09, 10, 18-21; an irregular one (1-4 visits at any hour) gave no
+usual hour; 10 days of history gave "still learning". The user's own webcam has only a few days of people so far.
+
 ## Help sign
 
 A silent call for help: **one hand held above the head for 3 seconds** (`labeler/gestures.py`; the user's choice). From

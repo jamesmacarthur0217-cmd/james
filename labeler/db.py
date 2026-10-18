@@ -609,6 +609,15 @@ class Database:
         with self.Session() as s:
             return s.scalar(q) or 0
 
+    def track_spans(self, camera: str, since: datetime, until: datetime) -> list[tuple[datetime, datetime]]:
+        """(first seen, last seen) of each person a camera saw that started in [since, until) (labeler/routine.py).
+        A person still in view, or left open by a crash, counts as seen at its start only."""
+        with self.Session() as s:
+            rows = s.execute(select(Track.started_at, Track.ended_at).join(Camera, Track.camera_id == Camera.id)
+                             .where(Camera.name == camera, Track.started_at >= since, Track.started_at < until)
+                             .order_by(Track.started_at)).all()
+        return [(a, b if b is not None and b >= a else a) for a, b in rows]
+
     def track_starts(self, since: datetime, until: datetime) -> list[datetime]:
         with self.Session() as s:
             return list(s.scalars(select(Track.started_at).where(Track.started_at >= since,

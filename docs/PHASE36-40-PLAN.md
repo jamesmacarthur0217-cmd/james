@@ -60,6 +60,7 @@ easy and safe.
 2. Health page lines ("PC": temperature, disk; "unexpected stops (7 days)"), a pop-up like camera problems for a new
    problem, stored like camera events (`camera_events` with camera "PC", so Alerts/Summary list them).
    **Done 2026-10-18** (a stop is stored from the last beat until the next start; hot ends 5 °C below the limit).
+   Step 3 was done within steps 1-2. **Phase 38 is done.**
 3. Tests with fake command outputs; real run (heartbeat left by killing a test copy, then starting it); docs.
 
 ## Phase 39 (B): Unusual quiet — learn the usual day, alert on an odd quiet
@@ -67,6 +68,8 @@ easy and safe.
 Builds on Phase 31 (`labeler/quiet.py`) and the history used by `labeler/today.py` (same weekday, last 4 weeks).
 1. `labeler/routine.py`: per kiosk camera, per weekday kind (weekday / weekend) and hour, the share of days on which
    someone was seen in that hour (tracks of the last 4-8 weeks; needs ≥ 14 days of history, else "still learning").
+   **Done 2026-10-18**: 8 weeks; days with nobody on the camera and hours set to Away are left out; an hour must
+   have at least half its kind's days behind it to be usual.
 2. Built-in rule "Unusual quiet" (condition `unusual = yes`, only when Home): fires when nobody has been seen since
    the start of an hour in which people were seen on at least 80% of usual days, by 1 h after it (e.g. usually up by
    08:00, nobody by 09:00). One alert per day per camera; the message says what is usual. Pop-up like no movement.

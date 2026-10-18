@@ -102,6 +102,9 @@ DEFAULTS: dict = {
     "photo_search": {"min_similarity": 0.85, "limit": 20},
     # No movement (labeler/quiet.py): the built-in "No movement" rule is made at start; checked every check_every_s.
     "quiet": {"enabled": True, "check_every_s": 60.0},
+    # The usual day (labeler/routine.py): per kiosk camera and hour, the share of days someone was seen, over the last
+    # `weeks` weeks; "usual" from usual_share; still learning below min_days counted days.
+    "routine": {"weeks": 8, "min_days": 14, "usual_share": 0.8},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,
               "low_ratio": 0.5, "lost_s": 0.5, "min_width": 1.25},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored
     "embeddings": {"enabled": True, "model": "google/siglip2-base-patch16-224", "device": "cuda"},
