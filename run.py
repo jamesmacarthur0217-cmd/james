@@ -100,7 +100,7 @@ def main() -> int:
     crop_dir.mkdir(parents=True, exist_ok=True)
     _check_disk(crop_dir, cfg["storage"]["min_free_gb"])
 
-    db = Database(cfg["database"]["url"])
+    db = _open_database(cfg["database"]["url"])
     stale = db.close_stale_tracks()
     if stale:
         log.info("marked %d people left active by an earlier unclean stop as finished", stale)
@@ -251,7 +251,10 @@ def main() -> int:
     from labeler.whatsnew import WhatsNew   # what this version added since the last one that ran (Live banner)
     app.state.whats_new = WhatsNew.start(resolve(cfg["whats_new"]["state_file"]), db.created_tables, db.added_columns)
     from labeler.updater import Updater   # the Update button (Settings page) and its daily check
-    app.state.updater = Updater(cfg, backup=(lambda: backups.run_backup(cfg, False)) if db.is_postgres else None)
+    from labeler.updater import run_upgrade_check
+    report = resolve(cfg["updates"]["check_report"])
+    app.state.updater = Updater(cfg, backup=(lambda: backups.run_backup(cfg, False)) if db.is_postgres else None,
+                                check_db=(lambda: run_upgrade_check(report)) if db.is_postgres else None)
     if cfg["updates"]["check"]:
         threading.Thread(target=app.state.updater.loop, args=(app.state.stopping,), name="updates",
                          daemon=True).start()
@@ -350,6 +353,31 @@ def _start_recorders(cfg: dict, db: Database, pipelines: list) -> None:
         p.recorder = recorder.Recorder(cfg, p.name, db, encoder)
     log.info("recording: %s, %s, with %s, into %s", cfg["recording"]["when"],
              f"{cfg['recording']['fps']:g} fps", encoder, recorder.folder(cfg))
+
+
+def _open_database(url: str, every_s: float = 30.0) -> Database:
+    """Open the database, which updates its layout for this version first. A slow update says so every `every_s`
+    (an update once hung without a word: pitfall 30), and the time taken is logged when anything was added."""
+    log.info("opening the database (a new version updates it first)...")
+    done = threading.Event()
+    t0 = time.monotonic()
+
+    def still():
+        while not done.wait(every_s):
+            log.warning("still opening / updating the database (%.0f s)... if this does not end, stop the app and "
+                        "run tools\\upgrade_check.py to see why", time.monotonic() - t0)
+
+    threading.Thread(target=still, name="db-open", daemon=True).start()
+    try:
+        db = Database(url)
+    finally:
+        done.set()
+    if "tracks" in db.created_tables:
+        log.info("a new database was made (%d tables)", len(db.created_tables))
+    elif db.created_tables or db.added_columns:
+        log.info("database updated for this version in %.1f s: %d new tables, %d new columns", time.monotonic() - t0,
+                 len(db.created_tables), len(db.added_columns))
+    return db
 
 
 def _apply_retention(db: Database, cfg: dict, crop_dir) -> None:

@@ -1312,7 +1312,10 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         """What is new on GitHub (the state of the last check; check=true fetches now)."""
         up = _updater()
         state = up.check(fetch=True) if check or not up.state.get("checked_at") else dict(up.state)
+        from .updater import check_words, last_check
+        tested = last_check(resolve(cfg["updates"]["check_report"])) if db.is_postgres else None
         return {**state, "problem": up.problem(state), "busy": up.busy,
+                "safe_test": {"ok": bool(tested.get("ok")), "words": check_words(tested)} if tested else None,
                 "can_restart": getattr(app.state, "request_restart", None) is not None
                 and settings_mod.restart_available()}
 

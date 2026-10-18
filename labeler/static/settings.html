@@ -261,11 +261,13 @@
   <section class="panel">
     <h2>Updates</h2>
     <p class="hint">New versions come from your GitHub repository. Update now backs up the database, adds the new
-      version (only if nothing here was changed by hand), installs new Python packages when needed and restarts; if
+      version (only if nothing here was changed by hand), installs new Python packages when needed, lets the new
+      version open a copy of the database (the safe-update test) and restarts; if
       something goes wrong, the version running now stays. Checked once a day by itself.
       <a href="/whats-new">What's new</a> lists what each version added; the
       <a href="/first-run">first-run check</a> shows whether everything works after an update.</p>
     <p id="upd-state" class="muted">Checking…</p>
+    <p id="upd-safe" class="muted" hidden></p>
     <ul id="upd-changes" class="upd-changes" hidden></ul>
     <div class="actions">
       <button id="upd-check">Check now</button>
@@ -538,6 +540,9 @@ function showUpdate(s) {
   $("upd-changes").hidden = !s.changes || !s.changes.length;
   $("upd-changes").innerHTML = (s.changes || []).map(c => `<li>${esc(c)}</li>`).join("");
   $("upd-now").hidden = !s.available || !s.behind;
+  // The safe-update test (tools/upgrade_check.py): Update now runs it with the new version before restarting.
+  $("upd-safe").hidden = !s.safe_test;
+  if (s.safe_test) $("upd-safe").textContent = `Last safe-update test (a copy of the database opened by the new version): ${s.safe_test.words}`;
   $("upd-msg").textContent = s.available && s.behind && s.problem ? s.problem : "";
   $("upd-now").disabled = !!s.problem || s.busy;
 }

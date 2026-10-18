@@ -399,6 +399,19 @@ def check_updates(updater) -> dict | None:
     return _check("updates", "ok", f"up to date: {s.get('version', '')} (checked {when})")
 
 
+def check_upgrade(cfg: dict) -> dict | None:
+    """Phase 41: the newest safe-update test (tools/upgrade_check.py, also run by the Update button). PostgreSQL only."""
+    if not str(cfg["database"]["url"]).startswith("postgresql"):
+        return None
+    from .config import resolve
+    from .updater import check_words, last_check
+    got = last_check(resolve(cfg["updates"]["check_report"]))
+    if got is None:
+        return _check("safe-update test", "off", "not run yet (the Update button runs it; by hand: "
+                                                 "tools\\upgrade_check.py)")
+    return _check("safe-update test", "ok" if got.get("ok") else "problem", check_words(got))
+
+
 def check_pc(pcwatch) -> dict | None:
     """Phase 38: the PC itself (labeler/pcwatch.py): the graphics card and each disk."""
     if pcwatch is None:
@@ -543,6 +556,12 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
             checks.insert(-1, line)
     except Exception as e:
         checks.insert(-1, _check("updates", "warning", f"could not be checked ({e.__class__.__name__})"))
+    try:
+        line = check_upgrade(cfg)
+        if line is not None:
+            checks.insert(-1, line)
+    except Exception as e:
+        checks.insert(-1, _check("safe-update test", "warning", f"could not be read ({e.__class__.__name__})"))
     if pcwatch is not None:
         for name, make in (("PC", lambda: check_pc(pcwatch)), ("unexpected stops (7 days)", lambda: check_stops(db))):
             try:

@@ -27,6 +27,8 @@ that made-up layouts do not.
 2. **Start-up message**: `run.py` logs "updating the database..." before `Database(...)` and the time taken after it
    when anything was added, so a slow first start is not a silent window. The Update button (Phase 35) and the
    Health page say when the last upgrade check ran and its result (stored in `data/upgrade_check.json`).
+   **Done 2026-10-19**, and more: Update now runs the test with the new version before restarting and puts the
+   running version back when it fails; while the start-up update is slow, the console says so every 30 s.
 3. Real run: the check on the user's real database (read only; the user starts it, or says yes to it running),
    then docs. If it passes, the user restarts their app (stop.bat, start.bat) and opens the First-run check.
 

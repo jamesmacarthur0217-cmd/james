@@ -154,3 +154,52 @@ def test_settings_page_has_the_updates_box():
     page = (Path(__file__).resolve().parent.parent / "labeler" / "static" / "settings.html").read_text(encoding="utf-8")
     for needle in ('id="upd-now"', 'id="upd-check"', 'fetch("/api/update", { method: "POST" })', "waitForRestart("):
         assert needle in page, needle
+
+
+# --- Phase 41: the safe-update test before restarting -------------------------------------------------------------
+
+def test_a_failed_safe_update_test_puts_the_old_version_back(repos):
+    _, dev, app = repos
+    pip_runs = []
+    up = Updater({}, root=app, git=GIT, pip=lambda: pip_runs.append(1) or (True, ""),
+                 check_db=lambda: (1, "FAILED on 2026-10-19 01:00: the update did not finish within 300 s"))
+    old = git(app, "rev-parse", "HEAD")
+    commit(dev, "requirements.txt", "numpy\nhttpx2\n", "New version, new package")
+    git(dev, "push", "-q")
+    r = up.update()
+    assert not r["ok"] and "could not update a copy of your database" in r["message"]
+    assert "did not finish within 300 s" in r["message"]
+    assert git(app, "rev-parse", "HEAD") == old and pip_runs == [1, 1]   # the running version's packages again
+
+
+def test_a_passed_or_impossible_safe_update_test_lets_the_update_go_on(repos):
+    _, dev, app = repos
+    answers = [(0, "OK"), (2, "could not run: Docker off")]
+    up = Updater({}, root=app, git=GIT, check_db=lambda: answers.pop(0))
+    for n in (2, 3):
+        commit(dev, "app.py", f"v{n}\n", f"Version {n}")
+        git(dev, "push", "-q")
+        assert up.update()["ok"] and (app / "app.py").read_text() == f"v{n}\n"
+
+
+def test_run_upgrade_check_reads_only_its_own_report(tmp_path):
+    import json
+    from labeler.updater import check_words, run_upgrade_check
+    report = tmp_path / "upgrade_check.json"
+    report.write_text(json.dumps({"at": "2020-01-01T00:00:00", "ok": True, "seconds": 1, "created": [], "added": []}))
+
+    def run_crashing(args, **kw):   # stops before writing a report: the old one must not be taken for it
+        return subprocess.CompletedProcess(args, 1, "Traceback ...\nImportError: no module\n", "")
+
+    assert run_upgrade_check(report, run=run_crashing) == (1, "ImportError: no module")
+
+    def run_ok(args, **kw):
+        assert args[-2:] == ["--report", str(report)]
+        report.write_text(json.dumps({"at": "2999-01-01T09:00:00", "ok": True, "seconds": 0.94,
+                                      "created": ["vehicles"], "added": ["zones.lying_ok"]}))
+        return subprocess.CompletedProcess(args, 0, "OK", "")
+
+    assert run_upgrade_check(report, run=run_ok) == (0, "OK on 2999-01-01 09:00: 0.9 s, 1 table and 1 column "
+                                                        "added, nothing lost")
+    assert check_words({"at": "2026-10-19T01:00:00", "ok": False, "error": "copying failed"}) == \
+        "FAILED on 2026-10-19 01:00: copying failed"

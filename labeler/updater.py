@@ -9,7 +9,9 @@ the first problem with the running app untouched:
   3. `git pull --ff-only`;
   4. `pip install -r requirements.txt` only when requirements.txt changed; if that fails, the files go back to the
      version that was running (`git reset --hard` to it: safe, as step 1 found no changes by hand);
-  5. the caller restarts the app (exit 4: the supervisor starts it again at once, like "Restart now").
+  5. (PostgreSQL, Phase 41) the safe-update test, tools/upgrade_check.py: the new version opens a copy of the
+     database; if that fails or would hang, the files (and packages) go back to the running version as in step 4;
+  6. the caller restarts the app (exit 4: the supervisor starts it again at once, like "Restart now").
 Git uses the sign-in the user already has (Git Credential Manager); it is never asked to prompt from here.
 """
 from __future__ import annotations
@@ -32,6 +34,41 @@ CHECK_EVERY_S = 24 * 3600
 MAX_TITLES = 30
 
 
+def last_check(path: Path) -> dict | None:
+    """The newest safe-update test (tools/upgrade_check.py writes it), or None."""
+    import json
+    try:
+        got = json.loads(Path(path).read_text(encoding="utf-8"))
+        return got if isinstance(got, dict) and "at" in got else None
+    except (OSError, ValueError):
+        return None
+
+
+def check_words(r: dict) -> str:
+    """One line: "OK on 2026-10-19 01:05: 0.9 s, 10 tables and 5 columns added, nothing lost"."""
+    when = r["at"][:16].replace("T", " ")
+    if not r.get("ok"):
+        return f"FAILED on {when}: {r.get('error') or 'rows were lost: ' + str(r.get('lost'))}"
+    n = lambda k, one: f"{len(r[k])} {one}{'' if len(r[k]) == 1 else 's'}"   # noqa: E731
+    added = f"{n('created', 'table')} and {n('added', 'column')} added" if r["created"] or r["added"] else "nothing to add"
+    return f"OK on {when}: {r['seconds']:.1f} s, {added}, nothing lost"
+
+
+def run_upgrade_check(report: Path, root: Path = ROOT, run=subprocess.run, timeout: float = 2400) -> tuple[int, str]:
+    """The safe-update test in a child process with the files now on disk: (exit code, its result in words)."""
+    started = datetime.now().isoformat(timespec="seconds")
+    try:
+        r = run([sys.executable, str(root / "tools" / "upgrade_check.py"), "--report", str(report)], cwd=root,
+                capture_output=True, text=True, timeout=timeout,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except (OSError, subprocess.SubprocessError) as e:
+        return 2, f"could not run: {e}"
+    got = last_check(report)
+    fresh = got is not None and got["at"] >= started   # written by this run, not left by an earlier one
+    words = check_words(got) if fresh and r.returncode in (0, 1) else (r.stdout.strip().splitlines() or ["?"])[-1]
+    return r.returncode, words
+
+
 def find_git() -> str | None:
     found = shutil.which("git")
     if found:
@@ -44,11 +81,12 @@ def find_git() -> str | None:
 
 class Updater:
     def __init__(self, cfg: dict, root: Path = ROOT, git: str | None = None, run=subprocess.run, backup=None,
-                 pip=None, clock=time.time):
+                 pip=None, clock=time.time, check_db=None):
         self.cfg, self.root, self.run, self.clock = cfg, Path(root), run, clock
         self.git_exe = git or find_git()
         self.backup = backup          # () -> bool, the database backup before updating (None: none)
         self.pip = pip                # () -> (ok, message); default: pip install -r requirements.txt
+        self.check_db = check_db      # () -> (exit code, words): the safe-update test with the new files (None: none)
         self.state: dict = {"checked_at": None}
         self._lock = threading.Lock()
         self.busy = False
@@ -144,6 +182,17 @@ class Updater:
                     self.git("reset", "--hard", old)
                     return {"ok": False, "message": "installing the new Python packages failed, so the old version "
                                                     f"was put back: {msg}"}
+            if self.check_db is not None:
+                code, words = self.check_db()
+                if code == 1:   # the new version could not update a copy of the database: do not restart into it
+                    self.git("reset", "--hard", old)
+                    if reqs:
+                        self._pip()   # the running version's packages again
+                    log.warning("update to %s put back: the safe-update test failed: %s", new[:7], words)
+                    return {"ok": False, "message": "the new version could not update a copy of your database, so "
+                                                    f"the version running now was put back: {words}"}
+                if code != 0:
+                    log.warning("the safe-update test could not run (%s); updating anyway", words)
             log.info("updated from %s to %s (%d changes)", old[:7], new[:7], len(state["changes"]))
             self.check(fetch=False)
             return {"ok": True, "message": f"updated: {len(state['changes'])} changes", "changes": state["changes"],

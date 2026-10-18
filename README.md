@@ -1342,6 +1342,14 @@ alerts: 0.9 s, 10 tables and 5 columns added, the old "once per rule and person"
 rules removed, nothing lost, What's new 24 entries. With the start-up code from before the Phase 36 fix it stopped
 after 30 s and showed what the database was waiting on (the lock from pitfall 30) instead of hanging.
 
+The **Update now** button runs it too, with the new version, after getting it and before restarting: if the new
+version cannot update the copy (an error, rows lost, or longer than 5 minutes), the version running now is put back
+(files and Python packages) and the reason is shown; if the test cannot run at all (Docker off), the update goes on
+as before. The newest result shows in the Updates box and on the Health page ("safe-update test"). At start the
+console says "opening the database...", then "database updated for this version in 0.9 s: 10 new tables, 5 new
+columns" when there was anything to do, and every 30 s while it takes long ("still opening / updating the
+database..."), so a slow or stuck update is never a silent window.
+
 ### What's new
 
 After an update (by the button, by hand with git, or a new package), the Live page shows one line under the header,

@@ -56,8 +56,10 @@ runs the new version.
 
 **Phase 41 started 2026-10-19**: step 1 done (`tools/upgrade_check.py`; checked on a pre-Phase-13 database on
 PostgreSQL, and it caught the old hang with the pre-fix code). That run also created `routine_days` on PostgreSQL:
-the Phase 39 table is checked there now. Docker was started for it and left running. Next: step 2 (start-up
-message, the result on the Update box and the Health page).
+the Phase 39 table is checked there now. Docker was started for it and left running. Step 2 done (run.py `_open_database`: messages, every 30 s while
+slow; `updater.run_upgrade_check` / `check_words` / `last_check`, Updater `check_db`: a failed test puts the
+running version back; Health `check_upgrade`; /api/update `safe_test`; Settings `#upd-safe`; config
+`updates.check_report`). Next: step 3, the check on the user's real database (read only, with their OK).
 
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo

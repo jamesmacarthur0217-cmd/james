@@ -90,7 +90,7 @@ DEFAULTS: dict = {
     "help_sign": {"enabled": True, "hold_s": 3.0, "gap_s": 0.5, "rearm_s": 2.0, "margin": 0.15, "both_ok": True,
                   "max_tilt": 45.0},
     # Update button (labeler/updater.py): check GitHub for a new version once a day (Settings page; Health line).
-    "updates": {"check": True},
+    "updates": {"check": True, "check_report": "data/upgrade_check.json"},   # the safe-update test's result
     # What's new (labeler/whatsnew.py): the newest feature the app ran last time, to say what an update added.
     "whats_new": {"state_file": "data/last_version.json"},
     # PC watch (labeler/pcwatch.py): GPU every every_s (hot from gpu_hot_c), disks every disk_every_s, a heartbeat file
