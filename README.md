@@ -1249,7 +1249,14 @@ without warning, around its last beat; the PC's start time tells which: "the PC 
 cut, Windows updates, or shutting down without stop.bat) or "the app stopped without warning" (its window closed, the
 process ended). Checked on a test copy: ended by force, the next start said so ("around 14:09"); after a normal stop,
 nothing. On this PC: GPU 34 °C at rest, 9 W; both disks Healthy; reading the GPU takes 0.06 s, the disks 1.6 s.
-Step 1 of Phase 38: the findings are in the log file; the Health page, pop-ups and the Alerts list come next.
+Where it shows: the **Health** page has a line "PC" (the card's temperature, power and the hottest since start;
+each disk) and "unexpected stops (7 days)" (how many, and the last one with when it was back). A problem going
+on (hot card, unhealthy disk) shows like a camera problem: the Live page's banner, a pop-up there when it starts,
+and the Alerts page's list "Camera and PC problems", where an unexpected stop is listed from the last sign of
+life until the app ran again; admins also see them in the Summary (🖥️). A hot card counts as cool again only 5 °C
+below the limit, so a temperature around it does not come and go every minute; a failed reading keeps what was
+known. Real run on a test copy with the limit set to 30 °C (the card was at 37 °C), ended by force and started
+again: the Live banner, both Health lines and the three list entries (hot, stopped 14:22-14:23, hot) were right.
 
 ## Updates
 

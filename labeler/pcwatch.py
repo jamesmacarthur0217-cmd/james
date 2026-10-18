@@ -27,6 +27,7 @@ GPU_QUERY = "temperature.gpu,power.draw,memory.used,memory.total,name"
 DISK_PS = ("Get-PhysicalDisk | Select-Object FriendlyName, MediaType, HealthStatus, OperationalStatus, Size "
            "| ConvertTo-Json -Compress")
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+CAMERA = "PC"   # the "camera" of its stored problems (table camera_events)
 
 
 def _num(text: str) -> float | None:
@@ -107,8 +108,9 @@ def describe_stop(stop: dict) -> str:
 
 
 class PCWatch:
-    def __init__(self, cfg: dict, run=subprocess.run, clock=datetime.now, booted: datetime | None = None):
+    def __init__(self, cfg: dict, run=subprocess.run, clock=datetime.now, booted: datetime | None = None, db=None):
         c = cfg["pcwatch"]
+        self.db = db   # problems and stops are stored as camera events of the camera "PC" (Alerts page, Summary)
         self.every_s, self.disk_every_s = float(c["every_s"]), float(c["disk_every_s"])
         self.gpu_hot_c = float(c["gpu_hot_c"])
         self.path = Path(c["heartbeat_file"])
@@ -123,8 +125,14 @@ class PCWatch:
         self.gpu_max_c: float | None = None     # the hottest since start
         self.last_stop = previous_stop(self.path, self.booted)   # read before the first beat overwrites it
         self._lock = threading.Lock()
+        self._open: dict[str, dict] = {}   # problem key ("hot:<gpu>", "disk:<name>") -> its stored event
+        if db is not None:
+            db.close_open_camera_events(CAMERA)   # left open by the last run: it ended then
         if self.last_stop:
             log.warning("PC watch: %s", describe_stop(self.last_stop))
+            if db is not None:   # from the last sign of life until now: how long nothing was watched
+                db.add_camera_event(CAMERA, "stopped", describe_stop(self.last_stop),
+                                    datetime.fromisoformat(self.last_stop["last"]), self.started)
 
     # --- readings ------------------------------------------------------------------------------------------------
     def _cmd(self, args: list[str], timeout: float) -> str:
@@ -176,19 +184,55 @@ class PCWatch:
         self._write("crashed" if crashed else "clean")
 
     # --- results -------------------------------------------------------------------------------------------------
+    def _current(self) -> dict[str, tuple[str, str]]:
+        """What is wrong now: problem key -> (kind, plain words). A hot card stays hot until 5 °C below the limit,
+        so a temperature around it does not open and close a problem every minute; a failed reading keeps what
+        was known (no answer is not "fine")."""
+        out = {}
+        if self.gpu_error:
+            out.update({k: (e["kind"], e["message"]) for k, e in self._open.items() if k.startswith("hot:")})
+        for g in self.gpus or []:
+            key, t = "hot:" + g["name"], g["temp_c"]
+            if t is not None and (t >= self.gpu_hot_c or (key in self._open and t > self.gpu_hot_c - 5)):
+                out[key] = ("hot", f"the graphics card is hot: {t:.0f} °C (check the PC's fans and air flow)")
+        if self.disk_error:
+            out.update({k: (e["kind"], e["message"]) for k, e in self._open.items() if k.startswith("disk:")})
+        for d in self.disks or []:
+            if d["health"] != "Healthy":
+                out["disk:" + d["name"]] = ("disk", f"disk {d['name']}: Windows says {d['health']}"
+                                            + (f" ({d['status']})" if d["status"] and d["status"] != "OK" else "")
+                                            + "; copy your data off it and replace it soon")
+        return out
+
     def problems(self) -> list[str]:
         """What is wrong now, in plain words (empty: fine, or not read yet)."""
-        out = []
         with self._lock:
-            for g in self.gpus or []:
-                if g["temp_c"] is not None and g["temp_c"] >= self.gpu_hot_c:
-                    out.append(f"the graphics card is hot: {g['temp_c']:.0f} °C (check the PC's fans and air flow)")
-            for d in self.disks or []:
-                if d["health"] != "Healthy":
-                    out.append(f"disk {d['name']}: Windows says {d['health']}"
-                               + (f" ({d['status']})" if d["status"] and d["status"] != "OK" else "")
-                               + "; copy your data off it and replace it soon")
-        return out
+            return [words for _, words in self._current().values()]
+
+    def sync(self) -> list[dict]:
+        """Open a stored problem for each new one, close those that are over; returns the ones just opened."""
+        opened = []
+        with self._lock:
+            now = self._current()
+            for key, (kind, words) in now.items():
+                if key not in self._open:
+                    log.warning("PC watch: %s", words)
+                    self._open[key] = (self.db.open_camera_event(CAMERA, kind, words) if self.db is not None
+                                       else {"id": None, "camera": CAMERA, "kind": kind, "message": words,
+                                             "started_at": self.clock().isoformat(timespec="seconds"),
+                                             "ended_at": None})
+                    opened.append(self._open[key])
+            for key in [k for k in self._open if k not in now]:
+                e = self._open.pop(key)
+                log.info("PC watch: over: %s", e["message"])
+                if self.db is not None and e["id"] is not None:
+                    self.db.close_camera_event(e["id"])
+        return opened
+
+    def current(self) -> list[dict]:
+        """Problems going on now, as camera problems (the Live page's banner and pop-up)."""
+        with self._lock:
+            return list(self._open.values())
 
     def state(self) -> dict:
         with self._lock:
@@ -200,15 +244,15 @@ class PCWatch:
 
     def loop(self, stopping: threading.Event) -> None:
         """Beat and read the GPU every every_s, the disks every disk_every_s (first both at once)."""
-        next_disks, said = 0.0, set()
+        next_disks = 0.0
         while not stopping.is_set():
-            self.beat()
-            self.read_gpu()
-            if time.monotonic() >= next_disks:
-                self.read_disks()
-                next_disks = time.monotonic() + self.disk_every_s
-            now = set(self.problems())
-            for p in sorted(now - said):   # once when it starts, not every minute
-                log.warning("PC watch: %s", p)
-            said = now
+            try:
+                self.beat()
+                self.read_gpu()
+                if time.monotonic() >= next_disks:
+                    self.read_disks()
+                    next_disks = time.monotonic() + self.disk_every_s
+                self.sync()   # logged once when a problem starts, not every minute
+            except Exception:
+                log.exception("PC watch failed")
             stopping.wait(self.every_s)

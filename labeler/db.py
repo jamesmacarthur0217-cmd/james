@@ -1566,12 +1566,23 @@ class Database:
             if e is not None and e.ended_at is None:
                 e.ended_at = datetime.now()
 
-    def close_open_camera_events(self) -> int:
-        """At startup: problems still open were ended by the app stopping."""
-        from sqlalchemy import update
+    def add_camera_event(self, camera: str, kind: str, message: str, started_at: datetime,
+                         ended_at: datetime | None) -> dict:
+        """A problem known afterwards, with its own times (the PC watch: the app or the PC was off from .. to ..)."""
         with self.Session.begin() as s:
-            return s.execute(update(CameraEvent).where(CameraEvent.ended_at.is_(None))
-                             .values(ended_at=datetime.now())).rowcount
+            e = CameraEvent(camera=camera, kind=kind, message=message[:300], started_at=started_at, ended_at=ended_at)
+            s.add(e)
+            s.flush()
+            return self._camera_event_dict(e)
+
+    def close_open_camera_events(self, camera: str | None = None) -> int:
+        """At startup: problems still open were ended by the app stopping (all, or one camera's: "PC")."""
+        from sqlalchemy import update
+        q = update(CameraEvent).where(CameraEvent.ended_at.is_(None))
+        if camera is not None:
+            q = q.where(CameraEvent.camera == camera)
+        with self.Session.begin() as s:
+            return s.execute(q.values(ended_at=datetime.now())).rowcount
 
     def list_camera_events(self, limit: int = 50) -> list[dict]:
         with self.Session() as s:

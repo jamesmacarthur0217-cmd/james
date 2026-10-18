@@ -59,6 +59,7 @@ easy and safe.
    app being ended. Real run: a test copy ended by force was reported at its next start; a normal stop was not.
 2. Health page lines ("PC": temperature, disk; "unexpected stops (7 days)"), a pop-up like camera problems for a new
    problem, stored like camera events (`camera_events` with camera "PC", so Alerts/Summary list them).
+   **Done 2026-10-18** (a stop is stored from the last beat until the next start; hot ends 5 °C below the limit).
 3. Tests with fake command outputs; real run (heartbeat left by killing a test copy, then starting it); docs.
 
 ## Phase 39 (B): Unusual quiet — learn the usual day, alert on an odd quiet

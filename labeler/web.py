@@ -819,7 +819,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         role = (getattr(request.state, "user", None) or {}).get("role")
         detail = {"admin": "full", "monitor": "status"}.get(role, "viewer")
         result = healthcheck.run_checks(cfg, db, pipelines, health, app.state.started_at, detail, arming,
-                                        getattr(app.state, "quiet", None), getattr(app.state, "updater", None))
+                                        getattr(app.state, "quiet", None), getattr(app.state, "updater", None),
+                                        getattr(app.state, "pcwatch", None))
         return JSONResponse(result, status_code=200 if result["ok"] else 503, headers={"Cache-Control": "no-store"})
 
     @app.get("/stream")
@@ -988,7 +989,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                 "cameras": [p.status() for p in pipelines],
                 "disk_free_gb": round(free_gb, 1),
                 "disk_low": free_gb < cfg["storage"]["min_free_gb"],
-                "camera_problems": health.current() if health is not None else [],
+                "camera_problems": (health.current() if health is not None else [])
+                + (pcwatch.current() if (pcwatch := getattr(app.state, "pcwatch", None)) is not None else []),
                 **db.stats()}
 
     @app.get("/api/schema")

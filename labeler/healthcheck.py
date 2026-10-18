@@ -399,6 +399,43 @@ def check_updates(updater) -> dict | None:
     return _check("updates", "ok", f"up to date: {s.get('version', '')} (checked {when})")
 
 
+def check_pc(pcwatch) -> dict | None:
+    """Phase 38: the PC itself (labeler/pcwatch.py): the graphics card and each disk."""
+    if pcwatch is None:
+        return None
+    s = pcwatch.state()
+    if s["gpus"] is None:
+        return _check("PC", "ok", "not read yet (a few seconds after start)")
+    parts = []
+    for g in s["gpus"]:
+        temp = f"{g['temp_c']:.0f} °C" if g["temp_c"] is not None else "temperature unknown"
+        parts.append(f"graphics card {temp}" + (f", {g['power_w']:.0f} W" if g["power_w"] is not None else ""))
+    if s["gpu_max_c"] is not None:
+        parts[-1] += f" (hottest since start {s['gpu_max_c']:.0f} °C)"
+    if s["gpu_error"]:
+        parts.append(f"graphics card: {s['gpu_error']}")
+    if s["disks"]:
+        parts.append("disks: " + ", ".join(f"{d['name']} {d['health']}" for d in s["disks"]))
+    elif s["disk_error"]:
+        parts.append(f"disks: {s['disk_error']}")
+    problems = pcwatch.problems()
+    level = ("problem" if any(p.startswith("disk") for p in problems) else "warning") if problems else "ok"
+    return _check("PC", level, "; ".join(problems + parts))
+
+
+def check_stops(db, now: datetime | None = None) -> dict:
+    """Phase 38: times the app or the PC stopped without warning in the last 7 days (stored by the PC watch)."""
+    now = now or datetime.now()
+    stops = [e for e in db.camera_events_between(now - timedelta(days=7), now)
+             if e["camera"] == "PC" and e["kind"] == "stopped"]
+    if not stops:
+        return _check("unexpected stops (7 days)", "ok", "none")
+    last = stops[-1]
+    return _check("unexpected stops (7 days)", "warning",
+                  f"{len(stops)}; the last: {last['message']}" + (
+                      f", back at {last['ended_at'][11:16]}" if last["ended_at"] else ""))
+
+
 def check_quiet(quiet) -> dict | None:
     """Phase 31: the "no movement" watch (labeler/quiet.py): how long each watched camera has been quiet."""
     if quiet is None:
@@ -453,7 +490,7 @@ def check_errors(now: float) -> tuple[dict, list[dict]]:
 
 
 def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: float | None = None,
-               detail: str = "full", arming=None, quiet=None, updater=None) -> dict:
+               detail: str = "full", arming=None, quiet=None, updater=None, pcwatch=None) -> dict:
     """detail: "full" (admins), "viewer" (no log messages) or "status" (monitoring token: problems only)."""
     now_mono, now = time.monotonic(), time.time()
     errors_check, latest_errors = check_errors(now)
@@ -488,6 +525,12 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
             checks.insert(-1, line)
     except Exception as e:
         checks.insert(-1, _check("updates", "warning", f"could not be checked ({e.__class__.__name__})"))
+    if pcwatch is not None:
+        for name, make in (("PC", lambda: check_pc(pcwatch)), ("unexpected stops (7 days)", lambda: check_stops(db))):
+            try:
+                checks.insert(-1, make())
+            except Exception as e:
+                checks.insert(-1, _check(name, "warning", f"could not be checked ({e.__class__.__name__})"))
     try:
         line = check_quiet(quiet)
         if line is not None:

@@ -69,7 +69,7 @@
 const $ = (id) => document.getElementById(id);
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 const ICON = { person: "🚶", vehicle: "🚗", animal: "🐾", alert: "⚠️", scene: "❓", camera: "📷" };
-const NAMES = { person: "people", vehicle: "vehicles", animal: "animals", alert: "alerts", scene: "scene answers", camera: "camera problems" };
+const NAMES = { person: "people", vehicle: "vehicles", animal: "animals", alert: "alerts", scene: "scene answers", camera: "camera and PC problems" };
 let data = null, only = null;
 const hhmm = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const dayOf = (iso) => new Date(iso).toLocaleDateString([], { weekday: "long", day: "numeric", month: "short" });
@@ -121,7 +121,7 @@ function draw() {
     + rows.map(x => {
       const d = dayOf(x.at), head = d !== day ? `<div class="day">${esc(d)}</div>` : "";
       day = d;
-      return head + `<div class="line t-${x.type}"><span class="t">${esc(hhmm(x.at))}</span><span class="icon" title="${NAMES[x.type]}">${ICON[x.type]}</span>
+      return head + `<div class="line t-${x.type}"><span class="t">${esc(hhmm(x.at))}</span><span class="icon" title="${NAMES[x.type]}">${x.type === "camera" && x.camera === "PC" ? "🖥️" : ICON[x.type]}</span>
         ${x.picture ? `<img src="/crops/${encodeURIComponent(x.picture)}" alt="" loading="lazy">` : '<span class="pic-none"></span>'}
         <div><span class="what">${esc(x.text)}</span><br><small>${esc(x.camera || "")}
           · <a class="link" href="/recordings?camera=${encodeURIComponent(x.camera || "")}&amp;at=${encodeURIComponent(x.at)}">▶ Recording</a>

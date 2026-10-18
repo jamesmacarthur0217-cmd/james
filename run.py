@@ -256,7 +256,7 @@ def main() -> int:
     if cfg["pcwatch"]["enabled"]:   # GPU, disks, unexpected stops (labeler/pcwatch.py)
         from labeler.pcwatch import PCWatch
         pcwatch = app.state.pcwatch = PCWatch({**cfg, "pcwatch": {**cfg["pcwatch"], "heartbeat_file": str(
-            resolve(cfg["pcwatch"]["heartbeat_file"]))}})
+            resolve(cfg["pcwatch"]["heartbeat_file"]))}}, db=db)
         threading.Thread(target=pcwatch.loop, args=(app.state.stopping,), name="pcwatch", daemon=True).start()
     if cfg["quiet"]["enabled"]:   # no movement (labeler/quiet.py)
         from labeler.quiet import QuietWatch

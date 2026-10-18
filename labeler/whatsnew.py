@@ -99,9 +99,13 @@ ENTRIES: list[Entry] = [
           "This list, and the first-run check: after an update, one page says whether everything works (health, "
           "database, alert rules, recording, each camera's picture) and lets you try the help sign without an alert.",
           "/first-run", "admin"),
-    Entry("p37", 37, "", "Faster playback",
+    Entry("p37", 37, "c8e1fe3", "Faster playback",
           "Recordings page: play at 2x, 4x or 8x and skip 10 seconds back or forward, with buttons under the picture "
           "or the keys space, arrows and 1 2 4 8. Also for the blurred recordings viewers see.", "/recordings"),
+    Entry("p38", 38, "", "PC watch",
+          "The Health page also watches the PC: the graphics card's temperature, each disk's health, and times the app "
+          "or the PC stopped without warning (a power cut, the PC turned off without stop.bat). Problems show like "
+          "camera problems.", "/health"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

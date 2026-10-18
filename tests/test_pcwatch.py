@@ -119,3 +119,76 @@ def test_loop_beats_reads_and_logs_a_problem_once(tmp_path, caplog):
 def test_boot_time_is_in_the_past():
     b = pcwatch.boot_time()
     assert b is None or b < datetime.now()
+
+
+# --- step 2: stored problems, the Health page, the Live page ------------------------------------------------------
+
+def test_problems_are_stored_as_pc_events_and_closed(db, tmp_path):
+    run = Run(gpu="88, 200, 1, 2, RTX\n")
+    w = PCWatch(_cfg(tmp_path), run=run, booted=None, db=db)
+    w.read_gpu(), w.read_disks()
+    opened = w.sync()
+    assert [e["kind"] for e in opened] == ["hot"] and opened[0]["camera"] == "PC" and w.sync() == []
+    assert [e["message"] for e in w.current()] == [opened[0]["message"]]
+    run.gpu = "82, 200, 1, 2, RTX\n"   # cooler, but not 5 °C below the limit: still hot
+    w.read_gpu()
+    assert w.sync() == [] and len(w.current()) == 1
+    run.gpu = None                     # nvidia-smi gone: no answer is not "fine"
+    w.read_gpu()
+    assert w.sync() == [] and len(w.current()) == 1
+    run.gpu = "60, 50, 1, 2, RTX\n"
+    w.read_gpu()
+    w.sync()
+    assert w.current() == []
+    events = db.list_camera_events()
+    assert len(events) == 1 and events[0]["ended_at"] is not None
+
+
+def test_an_unexpected_stop_is_stored_from_the_last_beat_until_the_start(db, tmp_path):
+    cfg = _cfg(tmp_path)
+    (tmp_path / "heartbeat.json").write_text(json.dumps({"last": "2026-10-18T09:00:00", "started": "2026-10-18T08:00:00",
+                                                         "ended": None}), encoding="utf-8")
+    db.open_camera_event("PC", "hot", "left open by the last run")
+    PCWatch(cfg, run=Run(), clock=lambda: NOW, booted=NOW - timedelta(hours=1), db=db)
+    events = {e["kind"]: e for e in db.list_camera_events()}
+    assert events["hot"]["ended_at"] is not None   # closed: the last run ended
+    s = events["stopped"]
+    assert s["camera"] == "PC" and s["started_at"] == "2026-10-18T09:00:00" and s["ended_at"] == "2026-10-18T12:00:00"
+    assert "the PC was turned off or restarted around 2026-10-18 09:00" in s["message"]
+
+
+def test_health_lines(db, tmp_path):
+    from labeler.healthcheck import check_pc, check_stops
+    w = PCWatch(_cfg(tmp_path), run=Run(), clock=lambda: NOW, booted=None, db=db)
+    assert check_pc(w)["detail"].startswith("not read yet") and check_pc(None) is None
+    w.read_gpu(), w.read_disks()
+    line = check_pc(w)
+    assert line["level"] == "ok" and "graphics card 35 °C, 10 W (hottest since start 35 °C)" in line["detail"]
+    assert "disks: KINGSTON SNV3S1000G Healthy, WDC WD10EZEX Healthy" in line["detail"]
+    w.run = Run(disks='{"FriendlyName":"WDC","HealthStatus":"Unhealthy","OperationalStatus":"OK"}')
+    w.read_disks()
+    line = check_pc(w)
+    assert line["level"] == "problem" and line["detail"].startswith("disk WDC: Windows says Unhealthy;")
+    assert check_stops(db, NOW) == {"name": "unexpected stops (7 days)", "level": "ok", "detail": "none"}
+    db.add_camera_event("PC", "stopped", "the app stopped without warning around 2026-10-17 22:10",
+                        datetime(2026, 10, 17, 22, 10), datetime(2026, 10, 17, 22, 15))
+    db.add_camera_event("PC", "stopped", "too old", datetime(2026, 10, 1), datetime(2026, 10, 1, 1))
+    line = check_stops(db, NOW)
+    assert line["level"] == "warning" and line["detail"] == ("1; the last: the app stopped without warning around "
+                                                             "2026-10-17 22:10, back at 22:15")
+
+
+def test_status_and_health_api_show_the_pc(db, tmp_path):
+    from fastapi.testclient import TestClient
+    from labeler.web import create_app
+    cfg = _cfg(tmp_path)
+    cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
+    app = create_app(cfg, db, [])
+    w = app.state.pcwatch = PCWatch(cfg, run=Run(gpu="95, 1, 1, 2, RTX\n"), booted=None, db=db)
+    w.read_gpu(), w.read_disks(), w.sync()
+    client = TestClient(app, client=("127.0.0.1", 5000))
+    problems = client.get("/api/status").json()["camera_problems"]
+    assert [(p["camera"], p["kind"]) for p in problems] == [("PC", "hot")]
+    names = {c["name"]: c for c in client.get("/api/health").json()["checks"]}
+    assert names["PC"]["level"] == "warning" and names["unexpected stops (7 days)"]["detail"] == "none"
+    assert client.get("/api/camera-events").json()[0]["camera"] == "PC"

@@ -29,8 +29,10 @@ without `VL_TEST_POSTGRES_URL`) failed on the old code. Docker Desktop was start
 every 50 ms) and the stream (`recording_stream(..., speed)`, paced by the clock; page `streamAt`, `restartStream`,
 `pauseStream` keeps the frame via a canvas). Next: Phase 38 (PC watch).
 
-**Phase 38 started 2026-10-18**: step 1 done (`labeler/pcwatch.py`, run.py thread "pcwatch", findings in the log).
-Next: step 2 (Health lines, pop-up, stored as camera events with camera "PC").
+**Phase 38 started 2026-10-18**: step 1 done (`labeler/pcwatch.py`, run.py thread "pcwatch"); step 2 done (camera
+events with camera "PC": kinds hot / disk / stopped, `PCWatch.sync`, `db.add_camera_event`; Health `check_pc`,
+`check_stops`; /api/status camera_problems includes `pcwatch.current()`). Next: step 3 (tests + real run: mostly
+done in steps 1-2; ask the user whether anything is left).
 
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo

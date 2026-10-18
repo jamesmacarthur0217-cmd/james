@@ -466,14 +466,15 @@ function clock(iso) { return new Date(iso).toLocaleTimeString([], { hour: "2-dig
 function showCameraProblems(problems) {
   $("cam-problem").hidden = !problems.length;
   $("cam-problem").innerHTML = problems.map(p =>
-    `<b>Camera ${esc(p.camera)}:</b> ${esc(p.message)} (since ${clock(p.started_at)})`).join("<br>");
+    `<b>${p.camera === "PC" ? "PC" : "Camera " + esc(p.camera)}:</b> ${esc(p.message)} (since ${clock(p.started_at)})`).join("<br>");
   for (const p of problems) {
     if (seenProblems.has(p.id)) continue;
     seenProblems.add(p.id);
     if (!problemsLoaded) continue;   // already going on when the page opened: banner only
     const t = document.createElement("div");
     t.className = "toast";
-    t.innerHTML = `<div><b>Camera problem</b> · ${esc(p.camera)}<br>${esc(p.message)}</div>`;
+    // The PC watch (labeler/pcwatch.py) reports the PC's own problems the same way, as the camera "PC".
+    t.innerHTML = `<div><b>${p.camera === "PC" ? "PC problem" : "Camera problem · " + esc(p.camera)}</b><br>${esc(p.message)}</div>`;
     t.onclick = () => t.remove();
     $("toasts").prepend(t);
     setTimeout(() => t.remove(), 20000);
