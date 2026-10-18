@@ -10,8 +10,8 @@ from labeler.config import DEFAULTS
 from labeler.db import AlertEvent, CameraEvent, Check
 from labeler.web import create_app
 
-NOW = datetime(2026, 10, 18, 15, 0)   # a Sunday afternoon
-MON = datetime(2026, 10, 12)
+NOW = datetime(2026, 10, 11, 15, 0)   # a Sunday afternoon (a week in the past on any clock: GitHub runs on UTC)
+MON = datetime(2026, 10, 5)
 
 
 def _alert(db, rule, track, at, message):
@@ -43,9 +43,9 @@ def _week(db, camera):
                           ended_at=MON + timedelta(days=1, hours=4)))
         s.add(CameraEvent(camera="PC", kind="stopped", message="the PC was turned off",
                           started_at=MON + timedelta(days=3, hours=23), ended_at=MON + timedelta(days=4, hours=1)))
-    r1 = db.add_recording("test-cam", "a.mp4", datetime(2026, 10, 17, 10), "x")
-    db.update_recording(r1, ended_at=datetime(2026, 10, 17, 11, 30), size_bytes=2_000_000_000)
-    r2 = db.add_recording("test-cam", "b.mp4", datetime(2026, 10, 18, 14), "x")   # still open: counts until now
+    r1 = db.add_recording("test-cam", "a.mp4", datetime(2026, 10, 10, 10), "x")
+    db.update_recording(r1, ended_at=datetime(2026, 10, 10, 11, 30), size_bytes=2_000_000_000)
+    r2 = db.add_recording("test-cam", "b.mp4", datetime(2026, 10, 11, 14), "x")   # still open: counts until now
     db.save_check("alert", 1, "fall", "test-cam", "yes", None, "admin")
     db.save_check("vehicle", 1, "car", "test-cam", "no", "van", "admin")
     with db.Session.begin() as s:
@@ -56,21 +56,21 @@ def _week(db, camera):
 
 def test_week_rows_and_lists(db, camera):
     _week(db, camera)
-    s, e = summary.week_period(NOW, date(2026, 10, 15))   # any day of that week: Monday to Sunday
+    s, e = summary.week_period(NOW, date(2026, 10, 8))   # any day of that week: Monday to Sunday
     assert (s, e) == (MON, NOW)
     got = summary.week(db, s, e, cfg=copy.deepcopy(DEFAULTS), now=NOW)
     days = {d["day"]: d for d in got["days"]}
-    assert list(days) == [f"2026-10-{n}" for n in range(12, 19)]
+    assert list(days) == [f"2026-10-{n:02d}" for n in range(5, 12)]
     assert [d["people"] for d in got["days"]] == [1, 1, 3, 1, 1, 1, 1] and got["counts"]["people"] == 9
-    assert days["2026-10-13"]["vehicles"] == 1 and days["2026-10-13"]["camera_problems"] == 1
-    assert days["2026-10-15"]["pc_problems"] == 1 and days["2026-10-16"]["pc_problems"] == 1   # across midnight
-    assert days["2026-10-14"]["alert_kinds"] == {"fall": 1}
-    assert days["2026-10-16"]["alert_kinds"] == {"help": 1, "person": 1}
+    assert days["2026-10-06"]["vehicles"] == 1 and days["2026-10-06"]["camera_problems"] == 1
+    assert days["2026-10-08"]["pc_problems"] == 1 and days["2026-10-09"]["pc_problems"] == 1   # across midnight
+    assert days["2026-10-07"]["alert_kinds"] == {"fall": 1}
+    assert days["2026-10-09"]["alert_kinds"] == {"help": 1, "person": 1}
     assert got["alert_kinds"] == {"fall": 1, "help": 1, "person": 1, "unusual": 1}
     assert [a["message"] for a in got["listed"]] == ["Unusual quiet: nobody seen since 00:00", "Help sign", "Fall: fell"]
     # Recordings: kept 3 days, so earlier days are "not kept"; the open one counts until now.
-    assert days["2026-10-14"]["recorded_h"] is None and days["2026-10-15"]["recorded_h"] == 0.0
-    assert days["2026-10-17"]["recorded_h"] == 1.5 and days["2026-10-18"]["recorded_h"] == 1.0
+    assert days["2026-10-07"]["recorded_h"] is None and days["2026-10-08"]["recorded_h"] == 0.0
+    assert days["2026-10-10"]["recorded_h"] == 1.5 and days["2026-10-11"]["recorded_h"] == 1.0
     assert got["storage"]["recordings_gb"] == 2.0 and got["storage"]["keep_days"] == 3
     assert got["checks"]["count"] == 2
     assert {r["what"]: (r["right"], r["wrong"]) for r in got["checks"]["results"]} == {"fall alerts": (1, 0),
@@ -81,7 +81,7 @@ def test_week_rows_and_lists(db, camera):
 def test_the_last_seven_days_and_viewers(db, camera):
     _week(db, camera)
     s, e = summary.week_period(NOW)
-    assert (s, e) == (datetime(2026, 10, 12), NOW)   # today so far and the 6 days before
+    assert (s, e) == (datetime(2026, 10, 5), NOW)   # today so far and the 6 days before
     viewer = summary.week(db, s, e, admin=False, cfg=copy.deepcopy(DEFAULTS), now=NOW)
     assert "camera_problems" not in viewer["days"][1] and "recorded_h" not in viewer["days"][1]
     assert "checks" not in viewer and "storage" not in viewer and viewer["camera_problems"] == []
@@ -96,9 +96,9 @@ def _client(db, tmp_path, address="127.0.0.1"):
 def test_api(db, camera, tmp_path):
     _week(db, camera)
     admin = _client(db, tmp_path)
-    got = admin.get("/api/summary", params={"period": "week", "week": "2026-10-14"}).json()
-    assert got["period"] == "week" and got["start"] == "2026-10-12T00:00:00" and len(got["days"]) == 7
-    assert got["end"] == "2026-10-19T00:00:00"   # a past week: all of it
+    got = admin.get("/api/summary", params={"period": "week", "week": "2026-10-07"}).json()
+    assert got["period"] == "week" and got["start"] == "2026-10-05T00:00:00" and len(got["days"]) == 7
+    assert got["end"] == "2026-10-12T00:00:00"   # a past week: all of it
     assert admin.get("/api/summary", params={"period": "week", "week": "14-10-2026"}).status_code == 400
     assert admin.get("/api/summary", params={"period": "week", "week": "2099-01-05"}).status_code == 400
     last = admin.get("/api/summary", params={"period": "week"}).json()
@@ -106,5 +106,5 @@ def test_api(db, camera, tmp_path):
     db.add_user("vic", accounts.hash_password("correct horse battery"), "viewer")
     viewer = _client(db, tmp_path, address="192.168.1.20")
     viewer.post("/api/login", json={"username": "vic", "password": "correct horse battery"})
-    v = viewer.get("/api/summary", params={"period": "week", "week": "2026-10-14"}).json()
+    v = viewer.get("/api/summary", params={"period": "week", "week": "2026-10-07"}).json()
     assert "storage" not in v and v["counts"]["people"] == 9
