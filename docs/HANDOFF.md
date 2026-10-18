@@ -29,6 +29,9 @@ without `VL_TEST_POSTGRES_URL`) failed on the old code. Docker Desktop was start
 every 50 ms) and the stream (`recording_stream(..., speed)`, paced by the clock; page `streamAt`, `restartStream`,
 `pauseStream` keeps the frame via a canvas). Next: Phase 38 (PC watch).
 
+**Phase 38 started 2026-10-18**: step 1 done (`labeler/pcwatch.py`, run.py thread "pcwatch", findings in the log).
+Next: step 2 (Health lines, pop-up, stored as camera events with camera "PC").
+
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo
 with a raised hand for help-sign runs: `data/datasets/coco/val2017/000000032081.jpg` (tennis serve). **Every new phase adds one entry to `whatsnew.ENTRIES`** (with a `marker` when it adds a table or column).
@@ -160,6 +163,9 @@ labeler/updater.py   Update button (Phase 35): daily git fetch, ff-only pull, pi
 labeler/whatsnew.py  What's new (Phase 36): ENTRIES in the order phases were finished (add one per new phase);
                      data/last_version.json {last, before}; no file -> guess from Database.created_tables /
                      added_columns (Entry.marker); Live banner (index.html whatsNew, localStorage whatsNewSeen), /whats-new
+labeler/pcwatch.py   PC watch (Phase 38): nvidia-smi each minute, Get-PhysicalDisk hourly, heartbeat file (pcwatch.
+                     heartbeat_file) + mark_ended at run.py's very end; previous_stop at start (boot time via
+                     GetTickCount64: PC restarted vs app ended); app.state.pcwatch (state, problems)
 labeler/firstrun.py  First-run check (Phase 36): server_checks (database, built-in rules, recording today, Home/Away);
                      static/first-run.html adds /api/health and each camera's picture check; "Try the help sign" =
                      Pipeline.start_help_test (30 s: _on_help reports to help_test, no alert; GestureWatch.rearm in the

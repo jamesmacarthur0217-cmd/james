@@ -252,6 +252,12 @@ def main() -> int:
     if cfg["updates"]["check"]:
         threading.Thread(target=app.state.updater.loop, args=(app.state.stopping,), name="updates",
                          daemon=True).start()
+    pcwatch = None
+    if cfg["pcwatch"]["enabled"]:   # GPU, disks, unexpected stops (labeler/pcwatch.py)
+        from labeler.pcwatch import PCWatch
+        pcwatch = app.state.pcwatch = PCWatch({**cfg, "pcwatch": {**cfg["pcwatch"], "heartbeat_file": str(
+            resolve(cfg["pcwatch"]["heartbeat_file"]))}})
+        threading.Thread(target=pcwatch.loop, args=(app.state.stopping,), name="pcwatch", daemon=True).start()
     if cfg["quiet"]["enabled"]:   # no movement (labeler/quiet.py)
         from labeler.quiet import QuietWatch
         quiet = app.state.quiet = QuietWatch(db, alerts, pipelines, arming, health)   # the Health page reads it
@@ -290,6 +296,8 @@ def main() -> int:
         importer.cancel()   # an import stops at once; the people it found are kept
         _finish_labeling(worker)
         pid_file.unlink(missing_ok=True)
+        if pcwatch is not None:   # the last thing: anything after this point counts as stopped normally
+            pcwatch.mark_ended(crashed=exit_code[0] == EXIT_CRASHED)
         log.info("stopped")
     return exit_code[0]
 

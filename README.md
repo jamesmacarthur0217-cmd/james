@@ -1238,6 +1238,19 @@ webcam answer-key people went **61.8% → 62.1%**, kept. Per attribute: gender 6
 by 4-11%, so this is no measurable change; the final labels (74.6% on the Answer key page) come mostly from the
 vision model, which the classifiers only stand in for until it answers. A larger answer key makes the check meaningful.
 
+## PC watch
+
+The app also watches the PC it runs on (`labeler/pcwatch.py`, read only): the graphics card's temperature, power and
+memory once a minute (`nvidia-smi`; hot from 85 °C, `pcwatch.gpu_hot_c`), and each disk's health as Windows sees it
+once an hour (`Get-PhysicalDisk`; anything but Healthy is a problem: copy the data off and replace the disk). While
+it runs it writes a heartbeat (`data/heartbeat.json`) once a minute; a normal stop (Stop, stop.bat, Ctrl+C, Restart
+now) marks it at the very end. At the next start a heartbeat without that mark means the app or the PC stopped
+without warning, around its last beat; the PC's start time tells which: "the PC was turned off or restarted" (a power
+cut, Windows updates, or shutting down without stop.bat) or "the app stopped without warning" (its window closed, the
+process ended). Checked on a test copy: ended by force, the next start said so ("around 14:09"); after a normal stop,
+nothing. On this PC: GPU 34 °C at rest, 9 W; both disks Healthy; reading the GPU takes 0.06 s, the disks 1.6 s.
+Step 1 of Phase 38: the findings are in the log file; the Health page, pop-ups and the Alerts list come next.
+
 ## Updates
 
 The Settings page's **Updates** box shows whether a new version is on your GitHub repository (checked a few minutes

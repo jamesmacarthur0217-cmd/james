@@ -172,6 +172,12 @@ help_sign:
 quiet:
   enabled: true
 
+# PC watch: the graphics card's temperature (hot from 85 °C), each disk's health as Windows sees it, and whether the
+# app or the PC stopped without warning last time (power cut, PC turned off without stop.bat).
+pcwatch:
+  enabled: true
+  gpu_hot_c: 85
+
 # What's new: after an update the Live page says what the new version added (the newest feature it ran is kept here).
 # whats_new:
 #   state_file: data/last_version.json

@@ -54,6 +54,9 @@ easy and safe.
    PowerShell, read-only, hourly), unexpected stops: a heartbeat file (`data/heartbeat.json`, written every minute) —
    found at start without a clean-exit mark = "the app or PC stopped unexpectedly around <time>" (stop.bat and Restart
    now write the mark). Thresholds: GPU ≥ 85 °C, disk not Healthy.
+   **Done 2026-10-18**: the mark is written by run.py itself at the very end of every normal stop (stop.bat and
+   Restart now both end there), "crashed" for a supervisor restart; the PC's boot time tells a PC restart from the
+   app being ended. Real run: a test copy ended by force was reported at its next start; a normal stop was not.
 2. Health page lines ("PC": temperature, disk; "unexpected stops (7 days)"), a pop-up like camera problems for a new
    problem, stored like camera events (`camera_events` with camera "PC", so Alerts/Summary list them).
 3. Tests with fake command outputs; real run (heartbeat left by killing a test copy, then starting it); docs.
