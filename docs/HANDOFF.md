@@ -54,6 +54,11 @@ chart, PC history chart, weekly report saved by itself, a week in one minute). *
 [PHASE41-43-PLAN.md](PHASE41-43-PLAN.md)** (proposed 2026-10-19, waiting for approval). Phase 26 once their app
 runs the new version.
 
+**Phase 41 started 2026-10-19**: step 1 done (`tools/upgrade_check.py`; checked on a pre-Phase-13 database on
+PostgreSQL, and it caught the old hang with the pre-fix code). That run also created `routine_days` on PostgreSQL:
+the Phase 39 table is checked there now. Docker was started for it and left running. Next: step 2 (start-up
+message, the result on the Update box and the Health page).
+
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo
 with a raised hand for help-sign runs: `data/datasets/coco/val2017/000000032081.jpg` (tennis serve). **Every new phase adds one entry to `whatsnew.ENTRIES`** (with a `marker` when it adds a table or column).
@@ -199,6 +204,9 @@ labeler/firstrun.py  First-run check (Phase 36): server_checks (database, built-
 start.bat / stop.bat daily start/stop (wait for Docker + Ollama; stop waits for app exit, backs up DB)
 install.bat/.ps1     new PC: winget Python/Docker/Ollama, .venv, .env, DB, models, admin, autostart,
                      health; -CheckOnly, -Offline <pkg>; PowerShell 5.1 + ASCII only (tests check)
+tools/upgrade_check.py safe-update test (Phase 41): pg_dump | pg_restore inside the container into
+                     visionlabeler_upgrade, Database(url) in a child with a time limit, rows/rules before and after,
+                     pg_stat_activity on a hang; data/upgrade_check.json
 tools/scene_check.py scene questions on UR Fall (lying) and MOT16 (car) frames with known answers
 tools/animal_check.py animals on COCO (per confidence) and false alarms on MOT16 / UR Fall (color half only!)
 tools/loiter_check.py loitering alerts against MOT16 true markings (found, false, late; --min-visibility)

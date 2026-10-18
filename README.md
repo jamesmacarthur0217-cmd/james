@@ -1324,6 +1324,24 @@ otherwise it says to restart by hand). If anything goes wrong, the version runni
 A copy installed from the offline package (not a git copy) says it cannot check. Tested on scratch repositories and
 on a copy of this repository set back 3 versions: listed the 3 changes and updated in under a second (no packages).
 
+### Safe-update test
+
+Before restarting the app on a new version, `tools/upgrade_check.py` tries the start-up database update on a copy:
+
+```bash
+.venv\Scripts\python.exe tools\upgrade_check.py
+```
+
+It makes a throwaway database (`visionlabeler_upgrade`) on the same PostgreSQL server from a dump of the real one,
+inside the database container (the real database is only read, also while the old app runs; no copy of the data is
+written to a file), opens it with today's code with a time limit (`--timeout`, 300 s), counts the rows of every table
+before and after, and says how long it took, what it added, which old rules it removed, that nothing was lost, and
+what What's new will list. Then it drops the copy and writes `data/upgrade_check.json`. Docker must be running
+(start.bat starts it). Checked on 2026-10-19 on a database built by the pre-Phase-13 code with 25 people and 3
+alerts: 0.9 s, 10 tables and 5 columns added, the old "once per rule and person" rule and two "may not be empty"
+rules removed, nothing lost, What's new 24 entries. With the start-up code from before the Phase 36 fix it stopped
+after 30 s and showed what the database was waiting on (the lock from pitfall 30) instead of hanging.
+
 ### What's new
 
 After an update (by the button, by hand with git, or a new package), the Live page shows one line under the header,

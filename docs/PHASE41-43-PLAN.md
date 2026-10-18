@@ -1,4 +1,4 @@
-# Phases 41-43 plan: safe-update test, recordings kept around alerts, the usual day as a chart (proposed 2026-10-19)
+# Phases 41-43 plan: safe-update test, recordings kept around alerts, the usual day as a chart (approved 2026-10-19; Phase 41 started)
 
 ## Context
 
@@ -22,6 +22,8 @@ that made-up layouts do not.
    constraints removed, the row counts before and after (nothing lost), and what What's new would list
    (`whatsnew.guess_before`). Then it drops the copy. A hang or an error is reported with the step it was in.
    Builds on `tools/restore_drill.py` (restore into a test database, checks, drop).
+   **Done 2026-10-19**: on a pre-Phase-13 database: 0.9 s, 10 tables, 5 columns, old rules removed, nothing lost;
+   with the start-up code from before the Phase 36 fix it reported the hang after 30 s with the waiting lock.
 2. **Start-up message**: `run.py` logs "updating the database..." before `Database(...)` and the time taken after it
    when anything was added, so a slow first start is not a silent window. The Update button (Phase 35) and the
    Health page say when the last upgrade check ran and its result (stored in `data/upgrade_check.json`).
