@@ -9,13 +9,9 @@ on:
 
 jobs:
   pytest:
-    # ubuntu-latest moves to Ubuntu 26 from 2026-10-19 (actions/runner-images#14748): until it has, the tests also run
-    # on ubuntu-26.04 once per push, so a break shows before the switch (Phase 28 step 1). Remove that line after it.
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, ubuntu-26.04]
-    runs-on: ${{ matrix.os }}
+    # ubuntu-latest moves to Ubuntu 26 from 2026-10-19 (actions/runner-images#14748). Checked once beforehand on
+    # ubuntu-26.04 (Phase 28 step 1, run 39146666758): the same 856 passed, 6 skipped as on ubuntu-24.04.
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7

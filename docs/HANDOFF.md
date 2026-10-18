@@ -46,8 +46,12 @@ new tables come from create_all, which has never failed; check at the next Postg
 **Phase 40 started 2026-10-19**: step 1 done (`summary.week_period`, `summary.week`, `alert_kind`; /api/summary
 `period=week` (+ `week=<day>`)); step 2 done (Summary page "This week": `drawWeek`, `shiftWeek`, weekbar,
 `@media print`); step 3 (tests, browser check, docs) within it. **Phase 40 is done; the Phases 36-40 plan is
-finished (2026-10-19).** Next: ask the user (Phase 28 step 1 when GitHub's runner is Ubuntu 26: it was still
-ubuntu-24.04 on 2026-10-18; Phase 26 once their app runs the new version; new ideas).
+finished (2026-10-19).** **Phase 28 step 1 done (2026-10-19, `bcfa09a`)**: the tests ran once on ubuntu-26.04
+next to ubuntu-latest (still 24.04): the same 856 passed, 6 skipped; the extra job was removed again (the user asked
+for a one-time check). **Phase 28 is done.** Next: the user picks from the ideas for Phases 41-46 (offered
+2026-10-19: safe-update test on a copy of their database, keep recordings around alerts longer, the usual day as a
+chart, PC history chart, weekly report saved by itself, a week in one minute); Phase 26 once their app runs the
+new version.
 
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo
@@ -508,6 +512,7 @@ scratchpad script (not kept): identical boxes/points/vectors/age, fall_check and
 ever needed: `pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu128`.
 Step 4 done: `remote-camera.zip` made again from the current (sending) folder, user's choice; git-ignored. Left:
 step 1 (check the GitHub runs after 2026-10-19, when `ubuntu-latest` becomes Ubuntu 26; fix if anything breaks).
+**Step 1 done 2026-10-19**: checked beforehand on ubuntu-26.04, nothing broke (see section 2).
 
 **Phase 16 started 2026-10-15** (the user has no extra camera; chose 16): step 1 done, `labeler/moments.py` (finds ->
 moments; `PAD_S` 3, `MAX_JOIN_S` 60: a busy camera chained everyone into one 2-minute moment before that limit),
@@ -607,6 +612,5 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then do the GitHub runner check of Phase 28
-> (once ubuntu-latest is Ubuntu 26) and suggest what to do next (the Phases 36-40 plan is finished); ask me before
-> each phase and each step starts, and do it step by step.
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with what I chose from the
+> Phase 41-46 ideas (HANDOFF section 2); ask me before each phase and each step starts, and do it step by step.

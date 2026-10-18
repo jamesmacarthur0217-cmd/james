@@ -355,7 +355,8 @@ cameras (when added). The user picks which to keep and the order at the start. A
    index `cu130`, driver 580+, the installer checks it), setuptools 84; pip-audit clean. Same outputs before/after
    (detector boxes, body points, SigLIP vectors, age, falls, counting), speed same or slightly faster.
 6. **Done 2026-10-15**: Phase 28 step 4, `remote-camera.zip` made again from the current `remote-camera/` folder (the
-   user's choice) and git-ignored. Left in Phase 28: step 1, the GitHub runs after 2026-10-19 (Ubuntu 26 runner).
+   user's choice) and git-ignored. Step 1 done 2026-10-19: the tests ran once on ubuntu-26.04 before the switch,
+   the same 856 passed, 6 skipped as on 24.04. **Phase 28 is done.**
 
 2026-10-15: the user has no extra camera (no Phase 29) and chose Phase 16 now.
 7. **Done 2026-10-15**: Phase 16 step 1, `labeler/moments.py` (finds -> moments: padded 3 s, joined per camera while
