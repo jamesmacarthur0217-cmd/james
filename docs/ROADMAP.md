@@ -445,6 +445,12 @@ new" and a guided check page, with a no-alert "try the help sign"), 37 faster pl
 stream too), 38 PC watch (GPU temperature, disk health, unexpected stops), 39 unusual quiet (learn the usual day,
 alert on an odd quiet), 40 weekly report (printable). Ask before each phase and each step.
 
+## Phases 41-43: safe-update test, recordings kept around alerts, the usual day as a chart (proposed 2026-10-19)
+
+**Plan: [PHASE41-43-PLAN.md](PHASE41-43-PLAN.md)**: the user's choices, in this order: 41 safe-update test (a copy of
+their real database opened with today's code, before they restart), 42 keep the minutes around alerts 30 days when
+recordings are deleted, 43 the usual day as a chart on the Health page. Ask before each phase and each step.
+
 ## Critical files
 
 - `labeler/pipeline.py` (detector call, labeling, zones/health hooks), `labeler/web.py` (auth, new pages),

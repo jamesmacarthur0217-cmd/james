@@ -50,8 +50,9 @@ finished (2026-10-19).** **Phase 28 step 1 done (2026-10-19, `bcfa09a`)**: the t
 next to ubuntu-latest (still 24.04): the same 856 passed, 6 skipped; the extra job was removed again (the user asked
 for a one-time check). **Phase 28 is done.** Next: the user picks from the ideas for Phases 41-46 (offered
 2026-10-19: safe-update test on a copy of their database, keep recordings around alerts longer, the usual day as a
-chart, PC history chart, weekly report saved by itself, a week in one minute); Phase 26 once their app runs the
-new version.
+chart, PC history chart, weekly report saved by itself, a week in one minute). **The user chose 1, 2, 3:
+[PHASE41-43-PLAN.md](PHASE41-43-PLAN.md)** (proposed 2026-10-19, waiting for approval). Phase 26 once their app
+runs the new version.
 
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo
@@ -612,5 +613,5 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with what I chose from the
-> Phase 41-46 ideas (HANDOFF section 2); ask me before each phase and each step starts, and do it step by step.
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE41-43-PLAN.md;
+> ask me before each phase and each step starts, and do it step by step.
