@@ -30,6 +30,8 @@ def alert_what(event: dict, conditions: list) -> str:
         return "fall"
     if event.get("help") or "help" in names:
         return "help"
+    if event.get("unusual") or "unusual" in names:
+        return "unusual"
     if event.get("quiet") or "quiet" in names:
         return "quiet"
     if "stayed" in names:
@@ -85,6 +87,7 @@ def candidates(db, kind: str, now: datetime | None = None, clip_for=None) -> lis
 
 FEW = 10   # fewer right + wrong answers than this: shown, but marked "few checks yet"
 ALERT_LABELS = {"fall": "fall alerts", "help": "help sign alerts", "quiet": "no movement alerts",
+                "unusual": "unusual quiet alerts",
                 "loitering": "loitering alerts", "scene": "scene alerts",
                 "vehicle": "vehicle alerts", "animal": "animal alerts", "person": "person alerts"}
 ORDER = ["vehicles", "animals", "scene answers", *ALERT_LABELS.values()]

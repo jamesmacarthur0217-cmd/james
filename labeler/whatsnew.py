@@ -102,10 +102,14 @@ ENTRIES: list[Entry] = [
     Entry("p37", 37, "c8e1fe3", "Faster playback",
           "Recordings page: play at 2x, 4x or 8x and skip 10 seconds back or forward, with buttons under the picture "
           "or the keys space, arrows and 1 2 4 8. Also for the blurred recordings viewers see.", "/recordings"),
-    Entry("p38", 38, "", "PC watch",
+    Entry("p38", 38, "32e6b8c", "PC watch",
           "The Health page also watches the PC: the graphics card's temperature, each disk's health, and times the app "
           "or the PC stopped without warning (a power cut, the PC turned off without stop.bat). Problems show like "
           "camera problems.", "/health"),
+    Entry("p39", 39, "", "Unusual quiet",
+          "The app learns when someone is usually seen on each kiosk camera (after 2 weeks), and the built-in rule "
+          "\"Unusual quiet\" alerts when nobody is seen at such a time, e.g. usually up by 08:00 but nobody by 09:00 "
+          "(only when Home).", "/alerts"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

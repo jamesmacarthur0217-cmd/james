@@ -161,6 +161,8 @@ def main() -> int:
         alerts.ensure_fall_rule()
     if cfg["quiet"]["enabled"]:
         alerts.ensure_quiet_rule()
+    if cfg["unusual"]["enabled"]:
+        alerts.ensure_unusual_rule()
     if cfg["help_sign"]["enabled"]:
         alerts.ensure_help_rule()
     pipelines.extend(Pipeline(cfg, db, worker, embedder, student, camera=cam) for cam in cfg["cameras"])
@@ -263,6 +265,13 @@ def main() -> int:
         quiet = app.state.quiet = QuietWatch(db, alerts, pipelines, arming, health)   # the Health page reads it
         threading.Thread(target=quiet.loop, args=(app.state.stopping, float(cfg["quiet"]["check_every_s"])),
                          name="quiet", daemon=True).start()
+    if cfg["unusual"]["enabled"]:   # unusual quiet: the usual day learned per kiosk camera (labeler/routine.py)
+        from labeler.routine import Routine
+        from labeler.unusual import UnusualWatch
+        routine = app.state.routine = Routine(db, cfg, [p.name for p in pipelines if p.mode == "kiosk"])
+        unusual = app.state.unusual = UnusualWatch(db, alerts, pipelines, routine, arming, health)
+        threading.Thread(target=unusual.loop, args=(app.state.stopping, float(cfg["quiet"]["check_every_s"])),
+                         name="unusual", daemon=True).start()
     if worker is not None and cfg["scene"]["enabled"]:
         from labeler.scene import SceneRunner
         scene_box.append(SceneRunner(db, pipelines, worker, crop_dir, cfg, arming=arming))

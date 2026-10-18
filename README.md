@@ -769,9 +769,24 @@ on cam1 for 10 min (since 15:18)"), and when the people appeared its message bec
 min"; nobody was found in the empty part. Not measured on real days yet (a long nap, someone reading in another room):
 try it for a week and look at its alerts.
 
-### The usual day
+### Unusual quiet
 
-For the coming "Unusual quiet" alert (Phase 39), the app learns when someone is usually seen on each kiosk camera
+The built-in rule **Unusual quiet** (`labeler/unusual.py`; only when Home) alerts when nobody is seen on a kiosk
+camera in an hour of the day in which someone usually is: at the end of that hour ("usually up by 08:00, nobody by
+09:00"), once a day per camera, with what is usual in the message ("on weekdays someone usually is (on 100% of 40
+days)"); when someone is seen again it adds "seen at". A pop-up like No movement (stays until OK, no beep). An hour
+counts only if the camera watched all of it while Home: nothing about hours before the app started, during a camera
+problem, or before switching to Home; each hour is judged once, at its end. While the camera is still learning
+(below) nothing fires. The rule can be turned off or made for one camera on the Alerts page ("unusual quiet",
+with Home / Away only: its hours are learned). Tests on made-up households: up at the usual time = no alert; nobody
+07:00-08:00 = an alert at 08:00 and no other that day; seen 18:30 and 19:50 but not 20:00-21:00 = an alert at 21:00.
+Real run (2026-10-18, a test copy on an empty picture with a made-up history, started 18:42): at 20:00 nothing,
+rightly: the start deleted the made-up people older than 30 days (`storage.retention_days`), and in the 9 weekend
+days left the evenings were 78%, below 80%. With 21:10 visits added on those days, it fired by itself at 22:00:20
+and the pop-up showed on the Live page left open. **Note: people are kept 30 days by default, so the usual day is
+learned from about 4 weeks, not 8** (weekends: about 8 days).
+
+How the usual day is learned: the app learns when someone is usually seen on each kiosk camera
 (`labeler/routine.py`): for each hour, separately for weekdays and the weekend, the share of days on which someone was
 seen in that hour over the last 8 weeks (`routine.weeks`), from each person's first to last sight. An hour is "usual"
 when it is at least 80% (`routine.usual_share`). Days with nobody at all on the camera are left out (the app was off,

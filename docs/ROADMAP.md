@@ -437,7 +437,7 @@ Phase 35 started 2026-10-15.
    repositories and a 3-versions-behind clone of this repository. **Phase 35 is done; the Phases 30-35 plan is
    finished.**
 
-## Phases 36-40: first-run check, faster playback, PC watch, unusual quiet, weekly report (approved 2026-10-15; Phases 36-38 done, 39 step 1 done 2026-10-18)
+## Phases 36-40: first-run check, faster playback, PC watch, unusual quiet, weekly report (approved 2026-10-15; Phases 36-38 done, 39 steps 1-2 done 2026-10-18)
 
 **Plan: [PHASE36-40-PLAN.md](PHASE36-40-PLAN.md)**: the user's choices, in this order: 36 first-run check ("what's
 new" and a guided check page, with a no-alert "try the help sign"), 37 faster playback (2x-8x, skip, keys; viewers'

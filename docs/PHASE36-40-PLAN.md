@@ -73,6 +73,7 @@ Builds on Phase 31 (`labeler/quiet.py`) and the history used by `labeler/today.p
 2. Built-in rule "Unusual quiet" (condition `unusual = yes`, only when Home): fires when nobody has been seen since
    the start of an hour in which people were seen on at least 80% of usual days, by 1 h after it (e.g. usually up by
    08:00, nobody by 09:00). One alert per day per camera; the message says what is usual. Pop-up like no movement.
+   **Done 2026-10-18**: each usual hour is judged once at its end, and only if watched whole while Home.
 3. Measuring: synthetic histories (a regular household, an irregular one) for false/late alerts; the user's own data
    once their app has run 2+ weeks (part of Phase 26). Health line "routine: learning (5 of 14 days)". Docs.
 

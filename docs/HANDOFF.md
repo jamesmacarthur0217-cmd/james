@@ -35,7 +35,10 @@ events with camera "PC": kinds hot / disk / stopped, `PCWatch.sync`, `db.add_cam
 real run with a copy ended by force) was done within steps 1-2. **Phase 38 is done (2026-10-18).**
 
 **Phase 39 started 2026-10-18**: step 1 done (`labeler/routine.py`: `learn`, `Routine.usual_hours`, `away_spans`;
-`db.track_spans`; config `routine`). Not wired into run.py yet. Next: step 2, the built-in rule "Unusual quiet".
+`db.track_spans`; config `routine`); step 2 done (`labeler/unusual.py` UnusualWatch, run.py thread "unusual",
+`alerts.UNUSUAL` / `UNUSUAL_RULE` / `ensure_unusual_rule`, list_alerts `"unusual"`, session.js pop-up, Alerts page
+picker; each usual hour judged once at its end: the camera keeps only its last sighting). Next: step 3 (measuring
+false/late alerts on made-up households, Health line "routine: learning (n of 14 days)").
 
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo
@@ -170,6 +173,8 @@ labeler/whatsnew.py  What's new (Phase 36): ENTRIES in the order phases were fin
                      added_columns (Entry.marker); Live banner (index.html whatsNew, localStorage whatsNewSeen), /whats-new
 labeler/routine.py   the usual day (Phase 39): per kiosk camera, weekday/weekend x hour, share of counted days with
                      someone seen (8 weeks; days with nobody and Away hours left out; learning below 14 days)
+labeler/unusual.py   unusual quiet (Phase 39): built-in rule "Unusual quiet" (unusual = yes, armed = home); fires at
+                     the end of a usual hour with nobody seen, once a day per camera, hours watched whole only
 labeler/pcwatch.py   PC watch (Phase 38): nvidia-smi each minute, Get-PhysicalDisk hourly, heartbeat file (pcwatch.
                      heartbeat_file) + mark_ended at run.py's very end; previous_stop at start (boot time via
                      GetTickCount64: PC restarted vs app ended); app.state.pcwatch (state, problems)

@@ -26,6 +26,10 @@ for more than tracking.lost_after_s leaves the area (their time starts again); a
 counting only while they hold; a built-in rule "No movement" (4 h, 08:00-22:00, only when Home: the user's choice) is
 made at start like "Fall". A rule without a camera is for kiosk cameras only (a gate camera sees nobody for hours).
 
+"unusual = yes" is unusual quiet (labeler/unusual.py): nobody seen in an hour in which someone is usually seen
+(labeler/routine.py, learned from the camera's own history), noticed at the end of that hour; once a day per camera.
+The built-in rule "Unusual quiet" also has "armed = home". Like "quiet", it is about no one and kiosk cameras only.
+
 "help = yes" is the help sign (labeler/gestures.py: one hand above the head held a few seconds): like falls, rules
 with it are checked only when a sign is confirmed and fire for every sign; a built-in rule "Help sign" is made at start.
 
@@ -55,6 +59,8 @@ MAX_STAY_S = 24 * 3600
 ANIMAL = "animal"
 QUIET = "quiet"     # minutes with nobody seen (labeler/quiet.py)
 QUIET_RULE = [[QUIET, "240"], ["hours", "08-22"], ["armed", "home"]]
+UNUSUAL = "unusual"   # nobody seen at a time someone usually is (labeler/unusual.py)
+UNUSUAL_RULE = [[UNUSUAL, "yes"], ["armed", "home"]]
 CAR_GROUP = {"car", "SUV", "van", "pickup"}   # "car" in a rule, like in the Ask box
 HOUR_PRESETS = ["22-06", "20-06", "00-06", "18-24", "06-18", "08-18", "09-17"]
 
@@ -71,9 +77,13 @@ def is_quiet_rule(conditions: list[list[str]]) -> bool:
     return any(name == QUIET for name, _ in conditions)
 
 
+def is_unusual_rule(conditions: list[list[str]]) -> bool:
+    return any(name == UNUSUAL for name, _ in conditions)
+
+
 def rule_kind(conditions: list[list[str]]) -> str:
-    """Who a rule is about: "person", "vehicle", "animal" or "quiet" (nobody: no movement)."""
-    if is_quiet_rule(conditions):
+    """Who a rule is about: "person", "vehicle", "animal" or "quiet" (nobody: no movement, unusual quiet)."""
+    if is_quiet_rule(conditions) or is_unusual_rule(conditions):
         return "quiet"
     return "vehicle" if is_vehicle_rule(conditions) else "animal" if is_animal_rule(conditions) else "person"
 
@@ -161,6 +171,8 @@ def describe(conditions: list[list[str]]) -> str:
             return f"only when {v.capitalize()}"
         if n == QUIET:
             return f"nobody seen for {nice_seconds(int(v) * 60)}"
+        if n == UNUSUAL:
+            return "nobody seen when someone usually is"
         if n == STAYED:
             zone, secs = parse_stayed(v)
             return f"stayed in {zone} {nice_seconds(secs)}"
@@ -217,6 +229,16 @@ class AlertEngine:
 
     def quiet_rules(self) -> list[dict]:
         return [r for r in self._enabled_rules() if is_quiet_rule(r["conditions"])]
+
+    def ensure_unusual_rule(self) -> None:
+        """The built-in "Unusual quiet" rule, unless a rule already asks for it (deleted, it comes back)."""
+        if not any(is_unusual_rule(r["conditions"]) for r in self.db.list_rules()):
+            self.db.add_rule("Unusual quiet", UNUSUAL_RULE)
+            self.invalidate()
+            log.info('alert rule "Unusual quiet" added (nobody seen when someone usually is; only when Home)')
+
+    def unusual_rules(self) -> list[dict]:
+        return [r for r in self._enabled_rules() if is_unusual_rule(r["conditions"])]
 
     def _armed(self) -> str:
         from .arming import HOME

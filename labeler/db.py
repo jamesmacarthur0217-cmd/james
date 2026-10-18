@@ -1255,7 +1255,7 @@ class Database:
                 who, gone = AlertEvent.vehicle_id == vehicle_id, s.get(Vehicle, vehicle_id) is None
             elif track_id is not None:
                 who, gone = AlertEvent.track_id == track_id, s.get(Track, track_id) is None
-            else:   # about no one: "no movement" (labeler/quiet.py), which decides itself when it fires again
+            else:   # about no one: "no movement" / "unusual quiet", which decide themselves when they fire again
                 who, gone, repeat = None, False, True
             exists = None if repeat else s.scalar(select(AlertEvent.id).where(AlertEvent.rule_id == rule_id, who))
             if exists is not None or gone:
@@ -1295,6 +1295,7 @@ class Database:
                      "created_at": e.created_at.isoformat(timespec="seconds"),
                      "fall": any(n == "fallen" for n, _ in json.loads(conds or "[]")),
                      "quiet": any(n == "quiet" for n, _ in json.loads(conds or "[]")),
+                     "unusual": any(n == "unusual" for n, _ in json.loads(conds or "[]")),
                      "help": any(n == "help" for n, _ in json.loads(conds or "[]"))}
                     for e, tcrop, vcrop, acrop, conds in rows]
 

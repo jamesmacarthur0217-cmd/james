@@ -437,7 +437,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         allowed = {**schema.FIELDS, **{n: v + ["none"] for n, v in schema.LIST_FIELDS.items()},
                    "zone": sorted({z["name"] for z in db.list_zones()}), "fallen": ["yes"], "help": ["yes"],
                    "vehicle": ["any", "car", "SUV", "van", "pickup", "lorry", "bus", "motorbike", "bicycle"],
-                   "vehicle_color": [c for c in VEHICLE_COLORS if c != "unknown"], "armed": ["away", "home"],
+                   "vehicle_color": [c for c in VEHICLE_COLORS if c != "unknown"], "armed": ["away", "home"], "unusual": ["yes"],
                    "animal": ["any", "dog", "cat", "bird", "horse", "sheep", "cow"]}
         areas = {z["name"] for z in db.list_zones() if z["kind"] == "area"}
         for cond in body.conditions:
@@ -469,6 +469,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                                      "and Home / Away")
         if "quiet" in names and set(names) - {"quiet", "hours", "armed"}:
             raise HTTPException(400, "a no-movement rule can ask only for the time, the hours and Home / Away")
+        if "unusual" in names and set(names) - {"unusual", "armed"}:
+            raise HTTPException(400, "an unusual-quiet rule can ask only for Home / Away (it learns its own hours)")
         if "fallen" in names and "help" in names:
             raise HTTPException(400, "a rule is about a fall or a help sign, not both")
         if "fallen" in names and "stayed" in names:
