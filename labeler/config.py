@@ -103,8 +103,10 @@ DEFAULTS: dict = {
     # No movement (labeler/quiet.py): the built-in "No movement" rule is made at start; checked every check_every_s.
     "quiet": {"enabled": True, "check_every_s": 60.0},
     # The usual day (labeler/routine.py): per kiosk camera and hour, the share of days someone was seen, over the last
-    # `weeks` weeks; "usual" from usual_share; still learning below min_days counted days.
-    "routine": {"weeks": 8, "min_days": 14, "usual_share": 0.8},
+    # `weeks` weeks; "usual" from usual_share; still learning below min_days counted days. Unusual quiet: nobody seen
+    # for at least min_quiet_h whole hours in which someone was seen on at least quiet_share of the days
+    # (labeler/unusual.py; both chosen with tools/unusual_check.py).
+    "routine": {"weeks": 8, "min_days": 14, "usual_share": 0.8, "quiet_share": 0.97, "min_quiet_h": 3},
     # Unusual quiet (labeler/unusual.py): the built-in rule "Unusual quiet" is made at start.
     "unusual": {"enabled": True},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,

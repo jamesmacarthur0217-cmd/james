@@ -11,6 +11,11 @@ Only days that say something count:
 
 Until there are `routine.min_days` (14) such days the camera is "still learning": no hour is usual yet, so the rule
 (Phase 39 step 2) cannot fire on too little history.
+
+People are deleted after 30 days (storage.retention_days), so each finished day is also kept as a small summary
+(table routine_days: the hours someone was seen and how many people; nothing about who): `store_days`, called at the
+start of every retention pass (at start-up and hourly, before old people are deleted). The usual day reads the
+summaries and, for days not summed up yet, the people themselves.
 """
 from __future__ import annotations
 
@@ -51,28 +56,69 @@ def _away_at(spans, t: datetime) -> bool:
     return any(a <= t < b for a, b in spans)
 
 
+def hours_by_day(db, camera: str, start: datetime, end: datetime) -> dict[date, tuple[set[int], int]]:
+    """From the people still kept: day -> (the hours someone was seen, how many people started that day)."""
+    seen: dict[date, tuple[set[int], int]] = {}
+    for a, b in db.track_spans(camera, start - timedelta(hours=MAX_SPAN_H), end):
+        b = min(b, a + timedelta(hours=MAX_SPAN_H))
+        if start <= a < end:
+            hours, n = seen.get(a.date(), (set(), 0))
+            seen[a.date()] = (hours, n + 1)
+        t = a.replace(minute=0, second=0, microsecond=0)
+        while t <= b:
+            if start <= t < end:
+                seen.setdefault(t.date(), (set(), 0))[0].add(t.hour)
+            t += timedelta(hours=1)
+    return seen
+
+
+def _mask(hours: set[int]) -> int:
+    return sum(1 << h for h in hours)
+
+
+def _hours(mask: int) -> set[int]:
+    return {h for h in range(24) if mask >> h & 1}
+
+
+def store_days(db, cameras: list[str], now: datetime, weeks: int = 8) -> int:
+    """Sum up each finished day (before today) of these cameras that has people and no summary yet; drop summaries
+    older than the window and a week more. Returns how many days were stored."""
+    today = now.date()
+    start, end = datetime.combine(today - timedelta(weeks=weeks), time()), datetime.combine(today, time())
+    stored = 0
+    for cam in cameras:
+        have = db.routine_days(cam, start, end)
+        days = {datetime.combine(d, time()): (_mask(hours), n)
+                for d, (hours, n) in hours_by_day(db, cam, start, end).items()
+                if n > 0 and datetime.combine(d, time()) not in have}
+        stored += db.add_routine_days(cam, days)
+    db.cleanup_routine_days(start - timedelta(weeks=1))
+    return stored
+
+
 def learn(db, camera: str, now: datetime, weeks: int = 8, min_days: int = 14) -> dict:
-    """The usual day of one camera from the `weeks` weeks before today (today is not finished, so not counted)."""
+    """The usual day of one camera from the `weeks` weeks before today (today is not finished, so not counted):
+    the stored day summaries, and the people still kept for days not summed up yet."""
     today = now.date()
     first = today - timedelta(weeks=weeks)
     start, end = datetime.combine(first, time()), datetime.combine(today, time())
-    seen: dict[date, set[int]] = {}   # day -> the hours someone was seen
-    for a, b in db.track_spans(camera, start, end):
-        b = min(b, a + timedelta(hours=MAX_SPAN_H))
-        t = a.replace(minute=0, second=0, microsecond=0)
-        while t <= b:
-            if t >= start and t < end:
-                seen.setdefault(t.date(), set()).add(t.hour)
-            t += timedelta(hours=1)
+    seen: dict[date, set[int]] = {d.date(): _hours(mask) for d, (mask, n) in db.routine_days(camera, start, end).items()
+                                  if n > 0}   # day -> the hours someone was seen
+    for d, (hours, n) in hours_by_day(db, camera, start, end).items():
+        if d not in seen and n > 0:
+            seen[d] = hours
     away = away_spans(db, start, end)
     days = {k: 0 for k in KINDS}
     asked = {k: [0] * 24 for k in KINDS}   # days that count for that hour (Home at its middle)
     yes = {k: [0] * 24 for k in KINDS}     # of which someone was seen
+    per_day = {}                            # day -> (kind, hours seen, hours Away): for a whole quiet stretch
     for d, hours in seen.items():
         k = kind_of(d)
         days[k] += 1
+        away_hours = {h for h in range(24) if _away_at(away, datetime.combine(d, time(h, 30)))}
+        per_day[d] = (k, hours, away_hours)
         for h in range(24):
-            if _away_at(away, datetime.combine(d, time(h, 30))):
+            if h in away_hours:
                 continue
             asked[k][h] += 1
             yes[k][h] += h in hours
@@ -81,7 +127,20 @@ def learn(db, camera: str, now: datetime, weeks: int = 8, min_days: int = 14) ->
             "learning": total < min_days, "since": min(seen).isoformat() if seen else None,
             "share": {k: [round(yes[k][h] / asked[k][h], 3) if asked[k][h] else None for h in range(24)]
                       for k in KINDS},
-            "asked": asked}
+            "asked": asked, "per_day": per_day}
+
+
+def hour_ranges(hours: list[int]) -> str:
+    """[7, 8, 12, 18, 19] -> "07:00-09:00, 12:00-13:00, 18:00-20:00"."""
+    out, run = [], []
+    for h in sorted(hours):
+        if run and h != run[-1] + 1:
+            out.append(run)
+            run = []
+        run.append(h)
+    if run:
+        out.append(run)
+    return ", ".join(f"{r[0]:02d}:00-{(r[-1] + 1) % 24:02d}:00" for r in out)
 
 
 class Routine:
@@ -115,6 +174,17 @@ class Routine:
         need = max(1, r["days"][k] // 2)
         return [h for h, s in enumerate(r["share"][k])
                 if s is not None and s >= self.usual_share and r["asked"][k][h] >= need]
+
+    def stretch(self, camera: str, day: date, h1: int, h2: int) -> tuple[int, int] | None:
+        """For the hours h1 .. h2-1 of that kind of day: (days on which someone was seen in them, days that count:
+        Home in all of them). None while still learning."""
+        r = self.get(camera)
+        if r["learning"]:
+            return None
+        k = kind_of(day)
+        hours = set(range(h1, h2))
+        counted = [seen for kind, seen, away in r["per_day"].values() if kind == k and not hours & away]
+        return sum(bool(seen & hours) for seen in counted), len(counted)
 
     def state(self) -> list[dict]:
         """For the Health page: each camera learning (n of 14 days) or its usual hours today."""

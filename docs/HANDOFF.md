@@ -37,8 +37,11 @@ real run with a copy ended by force) was done within steps 1-2. **Phase 38 is do
 **Phase 39 started 2026-10-18**: step 1 done (`labeler/routine.py`: `learn`, `Routine.usual_hours`, `away_spans`;
 `db.track_spans`; config `routine`); step 2 done (`labeler/unusual.py` UnusualWatch, run.py thread "unusual",
 `alerts.UNUSUAL` / `UNUSUAL_RULE` / `ensure_unusual_rule`, list_alerts `"unusual"`, session.js pop-up, Alerts page
-picker; each usual hour judged once at its end: the camera keeps only its last sighting). Next: step 3 (measuring
-false/late alerts on made-up households, Health line "routine: learning (n of 14 days)").
+picker). Step 3 done: measured with `tools/unusual_check.py`, the per-hour rule was replaced by whole quiet stretches
+(`routine.quiet_share` 0.97, `routine.min_quiet_h` 3, `Routine.stretch`); day summaries `routine_days`
+(`routine.store_days`, called first in run.py `_apply_retention`) so 8 weeks survive the 30-day retention; Health
+`check_routine`. **Phase 39 is done (2026-10-18).** The new table was not checked on PostgreSQL (Docker was off;
+new tables come from create_all, which has never failed; check at the next PostgreSQL start). Next: Phase 40.
 
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo
@@ -173,8 +176,8 @@ labeler/whatsnew.py  What's new (Phase 36): ENTRIES in the order phases were fin
                      added_columns (Entry.marker); Live banner (index.html whatsNew, localStorage whatsNewSeen), /whats-new
 labeler/routine.py   the usual day (Phase 39): per kiosk camera, weekday/weekend x hour, share of counted days with
                      someone seen (8 weeks; days with nobody and Away hours left out; learning below 14 days)
-labeler/unusual.py   unusual quiet (Phase 39): built-in rule "Unusual quiet" (unusual = yes, armed = home); fires at
-                     the end of a usual hour with nobody seen, once a day per camera, hours watched whole only
+labeler/unusual.py   unusual quiet (Phase 39): built-in rule "Unusual quiet" (unusual = yes, armed = home); fires when
+                     today's quiet stretch (>= 3 whole hours) had someone on >= 97% of history days; once a day
 labeler/pcwatch.py   PC watch (Phase 38): nvidia-smi each minute, Get-PhysicalDisk hourly, heartbeat file (pcwatch.
                      heartbeat_file) + mark_ended at run.py's very end; previous_stop at start (boot time via
                      GetTickCount64: PC restarted vs app ended); app.state.pcwatch (state, problems)

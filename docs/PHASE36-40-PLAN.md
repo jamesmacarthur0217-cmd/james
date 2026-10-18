@@ -73,9 +73,13 @@ Builds on Phase 31 (`labeler/quiet.py`) and the history used by `labeler/today.p
 2. Built-in rule "Unusual quiet" (condition `unusual = yes`, only when Home): fires when nobody has been seen since
    the start of an hour in which people were seen on at least 80% of usual days, by 1 h after it (e.g. usually up by
    08:00, nobody by 09:00). One alert per day per camera; the message says what is usual. Pop-up like no movement.
-   **Done 2026-10-18**: each usual hour is judged once at its end, and only if watched whole while Home.
+   **Done 2026-10-18**; in step 3 the per-hour check was replaced by whole quiet stretches (measured, below).
 3. Measuring: synthetic histories (a regular household, an irregular one) for false/late alerts; the user's own data
    once their app has run 2+ weeks (part of Phase 26). Health line "routine: learning (5 of 14 days)". Docs.
+   **Done 2026-10-18** (`tools/unusual_check.py`: per hour, a household at home all day had 19 false alerts in 24
+   days; whole stretches of >= 3 hours at 97%: 0-1 per 96 days on seeds not used for choosing, every bad day
+   found 1-2 h after the first usual hour). Also, the user's choice: day summaries (table `routine_days`) so the
+   usual day keeps 8 weeks although people are deleted after 30 days. **Phase 39 is done.**
 
 ## Phase 40 (H): Weekly report
 

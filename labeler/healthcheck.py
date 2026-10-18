@@ -436,6 +436,24 @@ def check_stops(db, now: datetime | None = None) -> dict:
                       f", back at {last['ended_at'][11:16]}" if last["ended_at"] else ""))
 
 
+def check_routine(routine) -> dict | None:
+    """Phase 39: the usual day of each kiosk camera (labeler/routine.py), which "Unusual quiet" alerts on."""
+    if routine is None:
+        return None
+    items = routine.state()
+    if not items:
+        return _check("usual day", "off", "no kiosk camera")
+    from .routine import hour_ranges
+    parts = []
+    for i in items:
+        if i["learning"]:
+            parts.append(f"{i['camera']}: still learning ({i['days']} of {i['min_days']} days with people)")
+        else:
+            usual = hour_ranges(i["usual_hours"]) or "no hour with someone on most days"
+            parts.append(f"{i['camera']}: usual on {i['kind']}s {usual} (from {i['days']} days)")
+    return _check("usual day", "ok", "; ".join(parts))
+
+
 def check_quiet(quiet) -> dict | None:
     """Phase 31: the "no movement" watch (labeler/quiet.py): how long each watched camera has been quiet."""
     if quiet is None:
@@ -490,7 +508,7 @@ def check_errors(now: float) -> tuple[dict, list[dict]]:
 
 
 def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: float | None = None,
-               detail: str = "full", arming=None, quiet=None, updater=None, pcwatch=None) -> dict:
+               detail: str = "full", arming=None, quiet=None, updater=None, pcwatch=None, routine=None) -> dict:
     """detail: "full" (admins), "viewer" (no log messages) or "status" (monitoring token: problems only)."""
     now_mono, now = time.monotonic(), time.time()
     errors_check, latest_errors = check_errors(now)
@@ -531,6 +549,12 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
                 checks.insert(-1, make())
             except Exception as e:
                 checks.insert(-1, _check(name, "warning", f"could not be checked ({e.__class__.__name__})"))
+    try:
+        line = check_routine(routine)
+        if line is not None:
+            checks.insert(-1, line)
+    except Exception as e:
+        checks.insert(-1, _check("usual day", "warning", f"could not be read ({e.__class__.__name__})"))
     try:
         line = check_quiet(quiet)
         if line is not None:

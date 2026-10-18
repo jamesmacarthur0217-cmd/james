@@ -339,6 +339,18 @@ class Recording(Base):
     encoder: Mapped[str] = mapped_column(String(30), default="")
 
 
+class RoutineDay(Base):
+    """One finished day of a kiosk camera for the usual day (labeler/routine.py): only the hours someone was seen
+    (bit h = hour h) and how many people. Kept 8 weeks although people are deleted after 30 days."""
+    __tablename__ = "routine_days"
+    __table_args__ = (UniqueConstraint("camera", "day"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    camera: Mapped[str] = mapped_column(String(100), index=True)
+    day: Mapped[datetime] = mapped_column(DateTime, index=True)   # midnight of that day
+    hours: Mapped[int] = mapped_column(Integer)
+    people: Mapped[int] = mapped_column(Integer)
+
+
 class ArmingChange(Base):
     """Home / Away switched (labeler/arming.py); the newest row is the current state."""
     __tablename__ = "arming"
@@ -1810,6 +1822,29 @@ class Database:
                 out.append({"id": q.id, "question": q.question, "camera": q.camera, "before": before,
                             "answers": [{"answer": a.answer, "at": a.at.isoformat(timespec="seconds")} for a in answers]})
         return out
+
+    # --- the usual day (labeler/routine.py) ----------------------------------------------
+
+    def routine_days(self, camera: str, since: datetime, until: datetime) -> dict[datetime, tuple[int, int]]:
+        """Stored days in [since, until): midnight -> (hours bitmask, people)."""
+        with self.Session() as s:
+            return {r.day: (r.hours, r.people) for r in s.scalars(
+                select(RoutineDay).where(RoutineDay.camera == camera, RoutineDay.day >= since, RoutineDay.day < until))}
+
+    def add_routine_days(self, camera: str, days: dict[datetime, tuple[int, int]]) -> int:
+        """Store finished days (midnight -> (hours bitmask, people)); days already stored are left as they are."""
+        if not days:
+            return 0
+        with self.Session.begin() as s:
+            have = set(s.scalars(select(RoutineDay.day).where(RoutineDay.camera == camera,
+                                                              RoutineDay.day.in_(list(days)))))
+            new = [RoutineDay(camera=camera, day=d, hours=h, people=n) for d, (h, n) in days.items() if d not in have]
+            s.add_all(new)
+            return len(new)
+
+    def cleanup_routine_days(self, before: datetime) -> int:
+        with self.Session.begin() as s:
+            return s.execute(delete(RoutineDay).where(RoutineDay.day < before)).rowcount
 
     def cleanup_scene_answers(self, retention_days: int) -> int:
         if retention_days <= 0:

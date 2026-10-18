@@ -30,6 +30,7 @@ import socket  # noqa: E402
 import sys  # noqa: E402
 import threading  # noqa: E402
 import time  # noqa: E402
+from datetime import datetime  # noqa: E402
 
 from labeler.config import load_config, mask_password, resolve  # noqa: E402
 from labeler.db import Database  # noqa: E402
@@ -269,7 +270,9 @@ def main() -> int:
         from labeler.routine import Routine
         from labeler.unusual import UnusualWatch
         routine = app.state.routine = Routine(db, cfg, [p.name for p in pipelines if p.mode == "kiosk"])
-        unusual = app.state.unusual = UnusualWatch(db, alerts, pipelines, routine, arming, health)
+        unusual = app.state.unusual = UnusualWatch(db, alerts, pipelines, routine, arming, health,
+                                                   share=float(cfg["routine"]["quiet_share"]),
+                                                   min_hours=int(cfg["routine"]["min_quiet_h"]))
         threading.Thread(target=unusual.loop, args=(app.state.stopping, float(cfg["quiet"]["check_every_s"])),
                          name="unusual", daemon=True).start()
     if worker is not None and cfg["scene"]["enabled"]:
@@ -352,6 +355,15 @@ def _start_recorders(cfg: dict, db: Database, pipelines: list) -> None:
 def _apply_retention(db: Database, cfg: dict, crop_dir) -> None:
     """Delete people (and their pictures) older than their camera's retention_days, and old audit entries."""
     from labeler.privacy import remove_picture
+    if (cfg.get("unusual") or {}).get("enabled"):   # first sum up finished days for the usual day (labeler/routine.py)
+        from labeler.routine import store_days
+        kiosk = [c["name"] for c in cfg["cameras"] if c.get("mode") == "kiosk"]   # load_config gives every camera one
+        try:
+            stored = store_days(db, kiosk, datetime.now(), int(cfg["routine"]["weeks"]))
+            if stored:
+                log.info("usual day: summed up %d finished days", stored)
+        except Exception:
+            log.exception("usual day: summing up days failed")
     per_camera = {**db.camera_retention(),   # imported videos keep their own (0 = until deleted by hand)
                   **{c["name"]: c["retention_days"] for c in cfg["cameras"] if c.get("retention_days") is not None}}
     removed = db.cleanup(cfg["storage"]["retention_days"], per_camera)

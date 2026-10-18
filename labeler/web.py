@@ -822,7 +822,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         detail = {"admin": "full", "monitor": "status"}.get(role, "viewer")
         result = healthcheck.run_checks(cfg, db, pipelines, health, app.state.started_at, detail, arming,
                                         getattr(app.state, "quiet", None), getattr(app.state, "updater", None),
-                                        getattr(app.state, "pcwatch", None))
+                                        getattr(app.state, "pcwatch", None), getattr(app.state, "routine", None))
         return JSONResponse(result, status_code=200 if result["ok"] else 503, headers={"Cache-Control": "no-store"})
 
     @app.get("/stream")

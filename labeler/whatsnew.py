@@ -108,8 +108,9 @@ ENTRIES: list[Entry] = [
           "camera problems.", "/health"),
     Entry("p39", 39, "", "Unusual quiet",
           "The app learns when someone is usually seen on each kiosk camera (after 2 weeks), and the built-in rule "
-          "\"Unusual quiet\" alerts when nobody is seen at such a time, e.g. usually up by 08:00 but nobody by 09:00 "
-          "(only when Home).", "/alerts"),
+          "\"Unusual quiet\" alerts when nobody is seen for a stretch of the day in which someone nearly always is, "
+          "e.g. usually up by 07:00 but nobody seen by 08:00 (only when Home). The Health page shows the usual hours.",
+          "/alerts"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

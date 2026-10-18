@@ -771,20 +771,33 @@ try it for a week and look at its alerts.
 
 ### Unusual quiet
 
-The built-in rule **Unusual quiet** (`labeler/unusual.py`; only when Home) alerts when nobody is seen on a kiosk
-camera in an hour of the day in which someone usually is: at the end of that hour ("usually up by 08:00, nobody by
-09:00"), once a day per camera, with what is usual in the message ("on weekdays someone usually is (on 100% of 40
-days)"); when someone is seen again it adds "seen at". A pop-up like No movement (stays until OK, no beep). An hour
-counts only if the camera watched all of it while Home: nothing about hours before the app started, during a camera
-problem, or before switching to Home; each hour is judged once, at its end. While the camera is still learning
-(below) nothing fires. The rule can be turned off or made for one camera on the Alerts page ("unusual quiet",
-with Home / Away only: its hours are learned). Tests on made-up households: up at the usual time = no alert; nobody
-07:00-08:00 = an alert at 08:00 and no other that day; seen 18:30 and 19:50 but not 20:00-21:00 = an alert at 21:00.
-Real run (2026-10-18, a test copy on an empty picture with a made-up history, started 18:42): at 20:00 nothing,
-rightly: the start deleted the made-up people older than 30 days (`storage.retention_days`), and in the 9 weekend
-days left the evenings were 78%, below 80%. With 21:10 visits added on those days, it fired by itself at 22:00:20
-and the pop-up showed on the Live page left open. **Note: people are kept 30 days by default, so the usual day is
-learned from about 4 weeks, not 8** (weekends: about 8 days).
+The built-in rule **Unusual quiet** (`labeler/unusual.py`; only when Home) alerts when a kiosk camera has seen nobody
+for a stretch of the day in which, in its own history, someone (nearly) always was: today's time since the last
+sighting (or since the camera, Home or the day began), at least 3 whole hours (`routine.min_quiet_h`), in which
+someone was seen on at least 97% of the counted days of that kind (`routine.quiet_share`: on 40 weekdays at most one
+without). E.g. usually up at about 07:10 and nobody seen by 08:00: 00:00-08:00 had someone on every day, so it fires
+at 08:00. Once a day per camera, with what is usual in the message ("on weekdays someone is seen between 00:00 and 08:00
+on 40 of 40 days"); when someone is seen again it adds "seen at". A pop-up like No movement (stays until OK, no beep).
+Nothing about time before the app started, during a camera problem or before switching to Home; nothing while the
+camera is still learning. The rule can be turned off or made for one camera on the Alerts page ("unusual quiet", with
+Home / Away only). The Health page line "usual day" shows each kiosk camera's usual hours today, or "still learning
+(5 of 14 days with people)".
+
+Measured with `tools/unusual_check.py` (made-up households, 8 weeks of history, then 4 weeks with the real watch
+ticking every 5 minutes; every 7th test day nobody at all). The first version judged each usual hour (80%) on its own:
+a household at home all day (seen in each hour on 90% of days) got an alert on 19 of 24 normal days. Comparing the
+whole stretch, and at least 3 hours (chosen on seed 1: 2 hours still gave 3 of 24 there), on seeds 2-5 not used for
+choosing (96 normal days each): regular 1 false alert, sleeps in 1, home all day 1, irregular 6, shift work 0; every
+day with nobody up was found for the first three, 1-2 hours after the first usual hour began; the irregular and shift
+households have nothing usual, so a quiet day is not found there (No movement still is).
+
+People are deleted after 30 days (`storage.retention_days`), so the usual day keeps a small summary of each finished
+day (table `routine_days`: the hours someone was seen and how many people; nothing about who), made before each
+retention pass; it learns from 8 weeks. Checked on a test copy with 56 days of made-up people: at start 56 days were
+summed up, then the people older than 30 days were deleted (73 of 146 left) and the Health line still said "from 56
+days". The first real run (before summaries, 2026-10-18) showed the problem: with 29 days left, the weekend evenings
+were 78%; with visits added to the test copy at 21:10 the alert (then per hour) fired by itself at 22:00:20 and the
+pop-up showed on the Live page left open.
 
 How the usual day is learned: the app learns when someone is usually seen on each kiosk camera
 (`labeler/routine.py`): for each hour, separately for weekdays and the weekend, the share of days on which someone was
@@ -795,6 +808,7 @@ Away. Until 14 such days (`routine.min_days`) the camera is still learning and n
 8-week histories: a regular household (up 07:10-08:40, lunch on weekdays, evenings missed 1 day in 20, the weekend
 later) gave weekdays 07, 08, 12, 18-21 and Saturdays 09, 10, 18-21; an irregular one (1-4 visits at any hour) gave no
 usual hour; 10 days of history gave "still learning". The user's own webcam has only a few days of people so far.
+(The usual hours at 80% are shown on the Health page; the alert itself uses whole quiet stretches, above.)
 
 ## Help sign
 
