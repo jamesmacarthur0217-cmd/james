@@ -49,7 +49,8 @@ def _form(**changes):
             "animals_enabled": True, "animal_kinds": ["dog", "cat", "bird"],
             "scene_enabled": True, "scene_answers_in_a_row": 2, "quiet_enabled": True, "help_enabled": True, "help_hold_s": 3,
             "idle_enabled": True, "idle_after_s": 60, "recording_enabled": False, "recording_when": "people",
-            "recording_keep_days": 3, "recording_max_gb": 100}
+            "recording_keep_days": 3, "recording_max_gb": 100,
+            "recording_alert_keep_days": 30, "recording_alert_before_s": 60, "recording_alert_after_s": 120}
     form.update(changes)
     return form
 
@@ -187,6 +188,13 @@ def test_recording_settings_are_saved(paths, db):
     assert r.status_code == 200, r.json()
     assert yaml.safe_load(paths[1].read_text(encoding="utf-8")) == {
         "recording": {"when": "always", "keep_days": 1.5, "max_gb": 50}}
+    r = TestClient(app, client=("127.0.0.1", 5000)).post(   # Phase 42: the minutes kept around alerts
+        "/api/settings", json=_form(recording_alert_keep_days=14, recording_alert_before_s=30))
+    assert r.status_code == 200, r.json()
+    assert yaml.safe_load(paths[1].read_text(encoding="utf-8")) == {
+        "recording": {"alert_keep_days": 14, "alert_before_s": 30}}
+    bad = TestClient(app, client=("127.0.0.1", 5000)).post("/api/settings", json=_form(recording_alert_after_s=5000))
+    assert bad.status_code == 400
 
 
 def test_idle_mode_settings_are_saved(paths, db):

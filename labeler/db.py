@@ -1722,7 +1722,10 @@ class Database:
         with self.Session() as s:
             n, size, oldest = s.execute(select(func.count(Recording.id), func.coalesce(func.sum(Recording.size_bytes), 0),
                                                func.min(Recording.started_at))).one()
-        return {"files": n, "bytes": int(size), "oldest": oldest.isoformat(timespec="seconds") if oldest else None}
+            kept_n, kept_size = s.execute(select(func.count(Recording.id), func.coalesce(func.sum(Recording.size_bytes), 0))
+                                          .where(Recording.kept.is_not(None))).one()
+        return {"files": n, "bytes": int(size), "oldest": oldest.isoformat(timespec="seconds") if oldest else None,
+                "kept_files": kept_n, "kept_bytes": int(kept_size)}
 
     # --- Home / Away (labeler/arming.py) -----------------------------------------------
 

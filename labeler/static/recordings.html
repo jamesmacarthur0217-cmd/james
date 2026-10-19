@@ -7,9 +7,11 @@
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/session.js"></script>
 <style>
-  /* Day bar colors: categorical slots 1 (recorded) and 2 (a person appeared), each mode its own steps. */
-  main { --rec: #2a78d6; --person: #eb6834; --grid: #e6e6e3; }
-  @media (prefers-color-scheme: dark) { main { --rec: #3987e5; --person: #d95926; --grid: #2e3440; } }
+  /* Day bar colors: categorical slots 1 (recorded), 2 (a person appeared) and 3 (kept around an alert, Phase 42),
+     each mode its own steps; validated all-pairs (light aqua is under 3:1: the legend and tooltip name it). */
+  main { --rec: #2a78d6; --person: #eb6834; --kept: #1baf7a; --grid: #e6e6e3; }
+  @media (prefers-color-scheme: dark) { main { --rec: #3987e5; --person: #d95926; --kept: #199e70; --grid: #2e3440; } }
+  .kept-tag { font-size: 11px; padding: 1px 6px; border-radius: 8px; background: var(--chip); margin-left: 6px; }
   .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .controls input[type=date] { font: inherit; }
   .daybar { position: relative; margin-top: 14px; user-select: none; }
@@ -86,7 +88,7 @@
       <button id="lapse-again" class="link" title="Make it again with what was recorded since" hidden>Make again</button>
     </div>
     <div class="daybar" id="daybar"></div>
-    <div class="legend"><span style="--dot: var(--rec)">recorded</span><span style="--dot: var(--person)">a person appeared</span></div>
+    <div class="legend"><span style="--dot: var(--rec)">recorded</span><span style="--dot: var(--person)">a person appeared</span><span style="--dot: var(--kept)" id="legend-kept" hidden>kept around an alert</span></div>
     <p class="hint" id="hint"></p>
     <div class="rec-player" id="player" hidden>
       <video id="video" controls playsinline muted hidden></video>
@@ -222,7 +224,7 @@ function drawBar() {
   svg += "</g>";
   for (const r of data.recordings) {
     const a = x(ms(r.start)), b = Math.max(a + 2, x(r.end ? ms(r.end) : Date.now()));
-    svg += `<rect x="${a}" y="${T + 8}" width="${b - a}" height="${H - B - T - 8}" rx="2" style="fill:var(--rec)"/>`;
+    svg += `<rect x="${a}" y="${T + 8}" width="${b - a}" height="${H - B - T - 8}" rx="2" style="fill:var(${r.kept ? "--kept" : "--rec"})"/>`;
   }
   for (const p of data.people) {
     const px = x(ms(p.at));
@@ -230,6 +232,7 @@ function drawBar() {
   }
   svg += `<line class="hair" x1="0" x2="0" y1="${T}" y2="${H - B}" visibility="hidden"/></svg>`;
   box.innerHTML = svg + '<div class="tip" hidden></div>';
+  $("legend-kept").hidden = !data.recordings.some(r => r.kept);
   const el = box.querySelector("svg"), hair = box.querySelector(".hair"), tip = box.querySelector(".tip");
   const timeAt = (e) => { const b = el.getBoundingClientRect(); const px = (e.clientX - b.left) * W / b.width;
     return day0 + span * Math.min(1, Math.max(0, (px - L) / (W - L - R))); };
@@ -239,7 +242,7 @@ function drawBar() {
     const rec = data.recordings.find(r => ms(r.start) <= t && t <= (r.end ? ms(r.end) : Date.now()));
     tip.hidden = false;
     tip.style.left = (x(t) * b.width / W) + "px";
-    tip.textContent = clock(t) + (rec ? " · recorded" : " · not recorded");
+    tip.textContent = clock(t) + (rec ? (rec.kept ? " · kept around an alert" : " · recorded") : " · not recorded");
   });
   el.addEventListener("pointerleave", () => { tip.hidden = true; hair.setAttribute("visibility", "hidden"); });
   el.addEventListener("click", (e) => playAt(timeAt(e)));
@@ -261,7 +264,9 @@ function drawList() {
     tr.dataset.id = r.id;
     if (playing && playing.rec.id === r.id) tr.className = "playing";
     const end = r.end ? ms(r.end) : Date.now();
-    tr.insertCell().textContent = clock(ms(r.start));
+    const from = tr.insertCell();
+    from.textContent = clock(ms(r.start));
+    if (r.kept) from.insertAdjacentHTML("beforeend", `<span class="kept-tag" title="Kept ${data.alert_keep_days} days: the minutes around an alert, cut from a recording that was deleted">kept: alert</span>`);
     tr.insertCell().textContent = r.open ? "recording now" : clock(end);
     Object.assign(tr.insertCell(), { className: "num", textContent: length((end - ms(r.start)) / 1000) });
     if (data.admin) Object.assign(tr.insertCell(), { className: "num", textContent: r.size_mb + " MB" });

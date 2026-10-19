@@ -231,6 +231,9 @@ def check_recording(cfg: dict, db, pipelines: list) -> dict:
     detail = (f"{stats['files']} files, {gb:.1f} of {float(rc['max_gb']):g} GB, kept {float(rc['keep_days']):g} days"
               + (f", oldest {oldest.replace('T', ' ')[:16]}" if oldest else "")
               + f"; {'while people are in view' if rc['when'] == 'people' else 'always'}")
+    if stats.get("kept_files"):   # Phase 42: the minutes kept around alerts
+        detail += (f"; {stats['kept_files']} {'part' if stats['kept_files'] == 1 else 'parts'} kept around alerts "
+                   f"({stats['kept_bytes'] / 1e6:.0f} MB, {float(rc.get('alert_keep_days', 0)):g} days)")
     encoders = sorted({r.encoder for _, r in recorders if r is not None})
     if encoders:
         detail += f", {', '.join(encoders)}"

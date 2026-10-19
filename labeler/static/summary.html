@@ -160,12 +160,14 @@ function drawWeek() {
     const day = new Date(d.day + "T12:00:00").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
     return `<tr><td>${esc(day)}</td>${cell(d.people)}${cell(d.vehicles)}${cell(d.animals)}${cell(d.alerts, true)}
       <td class="kinds">${esc(kinds(d.alert_kinds))}</td>` + (admin ? `${cell(d.camera_problems, true)}${cell(d.pc_problems, true)}
-      <td>${d.recorded_h === null ? '<span class="muted" title="recordings are kept ' + data.storage.keep_days + ' days">not kept</span>' : d.recorded_h + " h"}</td>` : "") + "</tr>";
+      <td>${(d.recorded_h === null ? '<span class="muted" title="recordings are kept ' + data.storage.keep_days + ' days">not kept</span>' : d.recorded_h + " h")
+        + (d.kept_min ? ` <span class="muted" title="the minutes around alerts, kept longer">+ ${d.kept_min} min kept</span>` : "")}</td>` : "") + "</tr>";
   }).join("");
   const recorded = data.days.filter(d => d.recorded_h !== null && d.recorded_h !== undefined);
   const total = `<tr class="total"><td>Total</td>${cell(sum("people"))}${cell(sum("vehicles"))}${cell(sum("animals"))}${cell(sum("alerts"))}
     <td class="kinds">${esc(kinds(data.alert_kinds))}</td>` + (admin ? `${cell(sum("camera_problems"))}${cell(sum("pc_problems"))}
-    <td>${recorded.length ? Math.round(recorded.reduce((t, d) => t + d.recorded_h, 0) * 10) / 10 + " h" : ""}</td>` : "") + "</tr>";
+    <td>${recorded.length ? Math.round(recorded.reduce((t, d) => t + d.recorded_h, 0) * 10) / 10 + " h" : ""}${sum("kept_min")
+      ? ` <span class="muted">+ ${sum("kept_min")} min kept</span>` : ""}</td>` : "") + "</tr>";
   $("week-table").innerHTML = `<thead><tr>${head.map(h => `<th scope="col"${h === "Alerts by kind" ? ' class="kinds"' : ""}>${h}</th>`).join("")}</tr></thead><tbody>${rows}${total}</tbody>`;
   const when = (iso) => new Date(iso).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
   $("week-listed").innerHTML = `<h3 style="font-size:14px;margin:14px 0 0">Falls, help signs and quiet</h3>` + (data.listed.length

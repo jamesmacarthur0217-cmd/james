@@ -582,7 +582,13 @@ kept). A kept part is a recording like any other: the player, the blurred stream
 on the alert. Its frames are copied as they are, each with its time on the picture and its head boxes. When all
 recordings are over `max_gb`, normal recordings are deleted before kept parts. A day's time-lapse still goes with
 the day's last normal recording. Checked on a test copy with the real encoder: a 72-second recording with an alert
-30 s in was kept whole (9.6 MB, 703 frames, plays: 70.3 s) and the original deleted, in 4.1 s.
+30 s in was kept whole (9.6 MB, 703 frames, plays: 70.3 s) and the original deleted, in 4.1 s. So a full 3-minute
+part of a busy scene is about 25 MB; a quiet room at home is much less.
+
+Where they show: the **Recordings** page draws kept parts on the day bar in their own color (legend "kept around an
+alert") and marks them "kept: alert" in the list; an alert's ▶ Recording opens them; the week report's "Recorded"
+column adds "+ 3 min kept" on days whose recordings are gone; the Health page's recording line counts them ("1 part
+kept around alerts (10 MB, 30 days)"); the Settings page sets the days and the seconds before and after.
 
 The time on the picture was hard to read before 2026-10-19: its dark outline drifted away from the white letters
 along the line (OpenCV spaces thicker letters wider), so it looked doubled. Recordings made since then are clean.

@@ -93,15 +93,14 @@ def week(db, start: datetime, end: datetime, admin: bool = True, clip_for=None, 
                         and (p["ended_at"] is None or p["ended_at"] >= iso)]
             row["camera_problems"] = sum(p["camera"] != "PC" for p in problems)
             row["pc_problems"] = sum(p["camera"] == "PC" for p in problems)
-            if keep and d.date() < now.date() - timedelta(days=keep):
-                row["recorded_h"] = None   # deleted by now: not kept
-            else:
-                secs = 0.0
-                for r in recordings:
-                    a = max(datetime.fromisoformat(r["started_at"]), d)
-                    b = min(datetime.fromisoformat(r["ended_at"]) if r["ended_at"] else now, nxt)
-                    secs += max(0.0, (b - a).total_seconds())
-                row["recorded_h"] = round(secs / 3600, 1)
+            secs = {False: 0.0, True: 0.0}   # normal recordings, parts kept around alerts (Phase 42)
+            for r in recordings:
+                a = max(datetime.fromisoformat(r["started_at"]), d)
+                b = min(datetime.fromisoformat(r["ended_at"]) if r["ended_at"] else now, nxt)
+                secs[bool(r.get("kept"))] += max(0.0, (b - a).total_seconds())
+            old = keep and d.date() < now.date() - timedelta(days=keep)
+            row["recorded_h"] = None if old else round(secs[False] / 3600, 1)   # deleted by now: not kept
+            row["kept_min"] = round(secs[True] / 60)
         days.append(row)
         d = nxt
     out["days"] = days

@@ -1,4 +1,4 @@
-# Phases 41-43 plan: safe-update test, recordings kept around alerts, the usual day as a chart (approved 2026-10-19; Phase 41 done, 42 started)
+# Phases 41-43 plan: safe-update test, recordings kept around alerts, the usual day as a chart (approved 2026-10-19; Phases 41-42 done)
 
 ## Context
 
@@ -48,6 +48,8 @@ own clip is only 20 s.
 2. **Pages**: the Recordings page shows kept parts on their day (a different color on the day bar, "kept: alert"),
    alerts' "▶ Recording" finds them, the week report counts their minutes ("kept around alerts"), Health's storage
    line lists them; Settings gets the two times and the days.
+   **Done 2026-10-19**, and step 3 within steps 1-2 (tests, the real run with the encoder, ~25 MB for a full
+   3-minute part of a busy scene). **Phase 42 is done.**
 3. Tests (cutting, overlaps, deleting, max_gb), a real run on a test copy with an alert in a recording made "old",
    docs; measure the size of a kept part.
 

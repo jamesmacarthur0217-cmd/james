@@ -107,7 +107,7 @@ def add_routes(app, cfg: dict, db, audit, blur_for, agent=None, embedder=None, p
         recs = []
         for r in db.list_recordings(camera, start, end):
             item = {"id": r["id"], "start": r["started_at"], "end": r["ended_at"], "open": r["ended_at"] is None,
-                    "frames": r["frames"]}
+                    "frames": r["frames"], "kept": r.get("kept")}
             if admin:
                 item["size_mb"] = round(r["size_bytes"] / 1e6, 1)
             recs.append(item)
@@ -115,7 +115,8 @@ def add_routes(app, cfg: dict, db, audit, blur_for, agent=None, embedder=None, p
                   for p in db.people_between(start, end, camera, limit=3000)] if camera else []
         return {"camera": camera, "day": start.date().isoformat(), "cameras": cameras, "recordings": recs,
                 "people": people, "admin": admin, "fps": cfg["recording"]["fps"],
-                "keep_days": cfg["recording"]["keep_days"], "enabled": cfg["recording"]["enabled"]}
+                "keep_days": cfg["recording"]["keep_days"], "enabled": cfg["recording"]["enabled"],
+                "alert_keep_days": cfg["recording"].get("alert_keep_days", 0)}
 
     @app.get("/api/recordings/find")
     def find_recording(camera: str, at: str):

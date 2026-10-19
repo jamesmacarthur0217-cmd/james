@@ -64,8 +64,11 @@ running version back; Health `check_upgrade`; /api/update `safe_test`; Settings 
 The user can now restart their app (stop.bat, start.bat) and open the First-run check.
 
 **Phase 42 started 2026-10-19**: step 1 done (kept parts around alerts, `recordings.kept` checked on PostgreSQL;
-also the clock on recordings fixed: `recorder.stamp` outline drawn with the same thickness, pitfall 32). Next:
-step 2, the pages (day bar, week report, Health storage line, Settings).
+also the clock on recordings fixed: `recorder.stamp` outline drawn with the same thickness, pitfall 32); step 2
+done (`/api/recordings` items `kept`, day bar `--kept` = categorical slot 3, validated with the dataviz validator;
+`db.recording_stats` kept_files/kept_bytes; Health recording line; `summary.week` days `kept_min`; Settings
+`recording_alert_*`); step 3's tests and real run were within steps 1-2. **Phase 42 is done (2026-10-19).** Next:
+Phase 43 (the usual day as a chart).
 
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo

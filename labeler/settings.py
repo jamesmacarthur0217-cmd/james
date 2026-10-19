@@ -116,6 +116,9 @@ class SettingsIn(BaseModel):
     recording_when: str
     recording_keep_days: float = Field(gt=0, le=365)
     recording_max_gb: float = Field(ge=1, le=100000)
+    recording_alert_before_s: float = Field(ge=0, le=600)
+    recording_alert_after_s: float = Field(ge=0, le=1800)
+    recording_alert_keep_days: float = Field(ge=0, le=365)
     backup_copy_to: str = Field(default="", max_length=260)
     away_schedule: list[str] = Field(default=[], max_length=20)   # Home / Away (labeler/arming.py)
 
@@ -174,6 +177,9 @@ SIMPLE = {
     "recording_when": ("recording", "when"),
     "recording_keep_days": ("recording", "keep_days"),
     "recording_max_gb": ("recording", "max_gb"),
+    "recording_alert_before_s": ("recording", "alert_before_s"),
+    "recording_alert_after_s": ("recording", "alert_after_s"),
+    "recording_alert_keep_days": ("recording", "alert_keep_days"),
     "away_schedule": ("arming", "schedule"),
 }
 CAMERA_FIELDS = ("name", "source", "mode", "retention_days", "imgsz", "fall_alert", "vehicles", "animals")

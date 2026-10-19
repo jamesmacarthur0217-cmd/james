@@ -31,7 +31,7 @@ class CvWriter:
 
 def _cfg(tmp_path, **rec):
     cfg = copy.deepcopy(DEFAULTS)
-    cfg["recording"].update(dir=str(tmp_path / "rec"), alert_before_s=2, alert_after_s=3, **rec)
+    cfg["recording"].update({"dir": str(tmp_path / "rec"), "alert_before_s": 2, "alert_after_s": 3, **rec})
     return cfg
 
 
@@ -146,3 +146,55 @@ def test_a_kept_part_does_not_hold_the_days_time_lapse(tmp_path):
         (day / name).write_bytes(b"x")
     timelapse.drop_if_alone(day)
     assert sorted(p.name for p in day.iterdir()) == ["140003-alert.jsonl", "140003-alert.mp4"]
+
+
+# --- step 2: where kept parts show ---------------------------------------------------------------------------------
+
+def test_kept_parts_in_the_day_list_storage_health_and_week(db, camera, tmp_path):
+    from fastapi.testclient import TestClient
+    from labeler import summary
+    from labeler.healthcheck import check_recording
+    from labeler.web import create_app
+    cfg = _cfg(tmp_path, enabled=True, keep_days=3)
+    _recording(db, cfg)
+    _alert(db, camera, T0 + timedelta(seconds=10))
+    recorder.prune(db, cfg, now=T0 + timedelta(days=4), writer_factory=lambda p, size: CvWriter(p, size))
+    stats = db.recording_stats()
+    assert stats["kept_files"] == 1 and stats["kept_bytes"] == stats["bytes"] > 0
+    cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
+    cfg["cameras"] = [{"name": "cam1", "source": 0}]
+    client = TestClient(create_app(cfg, db, None), client=("127.0.0.1", 5000))
+    day = client.get("/api/recordings", params={"camera": "cam1", "day": "2026-10-05"}).json()
+    assert [r["kept"] for r in day["recordings"]] == ["alert"] and day["alert_keep_days"] == 30
+    found = client.get("/api/recordings/find", params={"camera": "cam1", "at": "2026-10-05T14:00:10"}).json()
+    assert found["id"] == day["recordings"][0]["id"] and found["offset_s"] == 2.0   # ▶ Recording on the alert
+
+    class Cam:
+        name, recorder = "cam1", type("R", (), {"encoder": "mp4v", "paused": None, "dropped": 0})()
+
+    (tmp_path / "ffmpeg.exe").write_bytes(b"")
+    cfg["recording"]["ffmpeg"] = str(tmp_path / "ffmpeg.exe")
+    line = check_recording(cfg, db, [Cam()])
+    assert "1 part kept around alerts" in line["detail"] and "30 days" in line["detail"]
+    # The week: a 2-minute recording kept whole around an alert shows as 2 minutes kept on a day "not kept".
+    cfg2 = _cfg(tmp_path / "week", keep_days=3, alert_before_s=60, alert_after_s=120)
+    _recording(db, cfg2, start=T0 + timedelta(hours=2), seconds=120)
+    _alert(db, camera, T0 + timedelta(hours=2, seconds=60))
+    recorder.prune(db, cfg2, now=T0 + timedelta(days=4), writer_factory=lambda p, size: CvWriter(p, size))
+    week = summary.week(db, T0.replace(hour=0), T0.replace(hour=0) + timedelta(days=7), cfg=cfg2,
+                        now=T0 + timedelta(days=6))
+    day0 = week["days"][0]
+    assert day0["day"] == "2026-10-05" and day0["recorded_h"] is None and day0["kept_min"] == 2
+    assert all(d["kept_min"] == 0 for d in week["days"][1:])
+
+
+def test_pages_show_kept_parts():
+    from pathlib import Path
+    static = Path(__file__).resolve().parent.parent / "labeler" / "static"
+    page = (static / "recordings.html").read_text(encoding="utf-8")
+    assert "--kept: #1baf7a" in page and "--kept: #199e70" in page and 'id="legend-kept"' in page
+    assert "kept around an alert" in page and 'class="kept-tag"' in page
+    week = (static / "summary.html").read_text(encoding="utf-8")
+    assert "min kept" in week
+    settings = (static / "settings.html").read_text(encoding="utf-8")
+    assert 'id="recording_alert_keep_days"' in settings and 'id="recording_alert_before_s"' in settings

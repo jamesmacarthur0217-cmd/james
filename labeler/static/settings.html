@@ -233,6 +233,13 @@
       <div><input type="number" id="recording_max_gb" min="1" max="100000" step="any"> <span class="hint">All recordings
         together; the oldest are deleted first. About 9-13 GB per camera per day recording a busy street all the time;
         much less at home recording only while people are in view.</span></div>
+      <label for="recording_alert_keep_days">Keep the minutes around alerts (days)</label>
+      <div><input type="number" id="recording_alert_keep_days" min="0" max="365" step="any"> <span class="hint">Before a
+        recording is deleted, the part around each alert in it is kept this long (0 = not kept).</span></div>
+      <label for="recording_alert_before_s">… from (seconds before the alert)</label>
+      <div><input type="number" id="recording_alert_before_s" min="0" max="600" step="any"></div>
+      <label for="recording_alert_after_s">… until (seconds after the alert)</label>
+      <div><input type="number" id="recording_alert_after_s" min="0" max="1800" step="any"></div>
     </div>
   </section>
 
@@ -292,7 +299,8 @@
 const $ = (id) => document.getElementById(id);
 const SIMPLE = ["retention_days", "audit_retention_days", "blur_faces", "blur_faces_for_viewers", "https", "retrain_enabled",
                 "backup_enabled", "backup_copy_to", "person_videos", "mobility_aids", "falls_enabled", "fall_after_s", "help_enabled", "help_hold_s", "vehicles_enabled", "vehicle_parked_after_s", "animals_enabled", "scene_enabled", "scene_answers_in_a_row", "quiet_enabled", "idle_enabled", "idle_after_s",
-                "recording_enabled", "recording_when", "recording_keep_days", "recording_max_gb"];
+                "recording_enabled", "recording_when", "recording_keep_days", "recording_max_gb",
+                "recording_alert_keep_days", "recording_alert_before_s", "recording_alert_after_s"];
 let loaded = null;        // values as saved (what the next start uses)
 let push = null;          // this PC's address and the receiver's ports (cameras sent from other devices)
 const fresh = {};         // camera -> send password made just now (shown once; only its hash is stored)
