@@ -13,6 +13,12 @@ The camera loop only resizes the frame and hands it over; encoding runs in FFmpe
 h264_nvenc), fed by a writer thread through a small queue. If the queue is full (a very slow disk), frames are
 dropped and counted rather than slowing the camera. Recordings are listed in the `recordings` table; `prune()`
 deletes the oldest by `keep_days` and `max_gb`, and recording pauses below storage.min_free_gb.
+
+Before a recording is deleted, the minutes around each alert in it (`alert_before_s` before to `alert_after_s` after;
+alerts close together make one part) are copied into a part of their own, <HHMMSS>-alert.mp4 with its own frame list
+(Phase 42): a recording like any other (the player, the blurred stream for viewers, Download), marked `kept` in the
+table and deleted after `alert_keep_days` instead of keep_days. The frames are copied as they are (OpenCV reads, the
+same FFmpeg writer writes), so each frame keeps its time on the picture and its line in the frame list.
 """
 from __future__ import annotations
 
@@ -307,8 +313,15 @@ def stamp(image: np.ndarray, text: str) -> np.ndarray:
     out = image.copy()
     h = out.shape[0]
     size = max(0.45, h / 1100)
-    for color, width in (((0, 0, 0), 4), ((255, 255, 255), 1)):
-        cv2.putText(out, text, (10, h - 12), cv2.FONT_HERSHEY_SIMPLEX, size, color, width, cv2.LINE_AA)
+    width = 2 if h >= 600 else 1
+    # The dark outline is the same text, same thickness, moved 2 px each way: OpenCV spaces the letters by their
+    # thickness, so a thicker outline under thin text drifted apart along the line and the time looked doubled.
+    for dx in (-2, 0, 2):
+        for dy in (-2, 0, 2):
+            if dx or dy:
+                cv2.putText(out, text, (10 + dx, h - 12 + dy), cv2.FONT_HERSHEY_SIMPLEX, size, (0, 0, 0), width,
+                            cv2.LINE_AA)
+    cv2.putText(out, text, (10, h - 12), cv2.FONT_HERSHEY_SIMPLEX, size, (255, 255, 255), width, cv2.LINE_AA)
     return out
 
 
@@ -369,11 +382,126 @@ def repair(db, cfg: dict, run=subprocess.run) -> int:
     return closed
 
 
-def prune(db, cfg: dict, now: datetime | None = None) -> int:
-    """Delete recordings older than keep_days, then the oldest while all of them are over max_gb."""
+def frame_rows(path: Path) -> tuple[dict, list[tuple[float, list]]]:
+    """A recording's frame list: its header and (time in the file, head boxes) per frame (up to a line cut short)."""
+    header, rows = {}, []
+    side = path.with_suffix(".jsonl")
+    if not side.exists():
+        return header, rows
+    with open(side, encoding="utf-8") as f:
+        for line in f:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                break
+            if isinstance(row, dict):
+                header = row
+            elif isinstance(row, list):
+                rows.append((row[0], row[1]))
+    return header, rows
+
+
+def alert_stretches(alerts_s: list[float], duration: float, before: float, after: float,
+                    join_s: float = 5.0) -> list[tuple[float, float]]:
+    """[(from, to)] seconds in a file around each alert, within the file; overlapping or close ones joined."""
+    out: list[list[float]] = []
+    for t in sorted(alerts_s):
+        a, b = max(0.0, t - before), min(duration, t + after)
+        if b <= a:
+            continue
+        if out and a <= out[-1][1] + join_s:
+            out[-1][1] = max(out[-1][1], b)
+        else:
+            out.append([a, b])
+    return [(a, b) for a, b in out]
+
+
+def keep_around_alerts(db, cfg: dict, rec: dict, writer_factory=None) -> list[int]:
+    """Copy the minutes around the alerts in a recording about to be deleted into parts of their own. Returns their
+    ids (none: no alerts, keeping is off, or FFmpeg is missing)."""
     rc, base = cfg["recording"], folder(cfg)
-    old = db.recordings_to_prune(float(rc["keep_days"]), int(float(rc["max_gb"]) * 1e9), now)
+    if float(rc.get("alert_keep_days", 0)) <= 0 or rec.get("kept") or not rec.get("ended_at"):
+        return []
+    path = base / rec["path"]
+    start, end = datetime.fromisoformat(rec["started_at"]), datetime.fromisoformat(rec["ended_at"])
+    alerts = db.alert_times(rec["camera"], start, end + timedelta(seconds=1))
+    header, rows = frame_rows(path)
+    if not alerts or not rows or not path.exists():
+        return []
+    stretches = alert_stretches([(a - start).total_seconds() for a in alerts], rows[-1][0],
+                                float(rc.get("alert_before_s", 60)), float(rc.get("alert_after_s", 120)))
+    fps = float(header.get("fps") or rc["fps"])
+    if writer_factory is None:
+        ffmpeg = ffmpeg_path(cfg)
+        encoder = pick_encoder(ffmpeg, rc["encoder"]) if ffmpeg.exists() else None
+        if encoder is None:
+            log.warning("recordings: FFmpeg is missing, so the minutes around %d alerts in %s are not kept",
+                        len(alerts), rec["path"])
+            return []
+        writer_factory = lambda p, size: FFmpegWriter(ffmpeg, p, size, fps, encoder, int(rc["quality"]))  # noqa: E731
+    kept = []
+    for a, b in stretches:
+        first = next((i for i, (t, _) in enumerate(rows) if t >= a), None)
+        if first is None:
+            continue
+        last = max(i for i, (t, _) in enumerate(rows) if t <= b) if rows[first][0] <= b else first
+        t0 = rows[first][0]
+        part_start = start + timedelta(seconds=t0)
+        rel = Path(rec["path"]).parent / f"{part_start:%H%M%S}-alert.mp4"
+        n = 2
+        while (base / rel).exists():   # two parts starting in the same second
+            rel = Path(rec["path"]).parent / f"{part_start:%H%M%S}-alert{n}.mp4"
+            n += 1
+        out = base / rel
+        cap = cv2.VideoCapture(str(path))
+        writer, written, size = None, 0, None
+        try:
+            with open(out.with_suffix(".jsonl"), "w", encoding="utf-8") as side:
+                for i in range(last + 1):
+                    if i < first:
+                        if not cap.grab():
+                            break
+                        continue
+                    ok, frame = cap.read()
+                    if not ok:
+                        break
+                    if writer is None:
+                        size = (frame.shape[1], frame.shape[0])
+                        writer = writer_factory(out, size)
+                        side.write(json.dumps({"w": size[0], "h": size[1], "fps": fps, "kept": "alert",
+                                               "from": rec["path"]}) + "\n")
+                    writer.write(frame)
+                    side.write(json.dumps([round(rows[i][0] - t0, 2), rows[i][1]]) + "\n")
+                    written += 1
+        finally:
+            cap.release()
+            ok, message = writer.close() if writer is not None else (False, "no frames")
+        if not written or not out.exists() or not out.stat().st_size:
+            log.warning("recordings: could not keep %s (%s)", rel.as_posix(), message)
+            out.unlink(missing_ok=True)
+            out.with_suffix(".jsonl").unlink(missing_ok=True)
+            continue
+        rec_id = db.add_recording(rec["camera"], rel.as_posix(), part_start, rec.get("encoder") or "")
+        db.update_recording(rec_id, frames=written, size_bytes=out.stat().st_size, kept="alert",
+                            ended_at=part_start + timedelta(seconds=rows[first + written - 1][0] - t0 + 1 / fps))
+        kept.append(rec_id)
+    if kept:
+        log.info("recordings: kept %d part(s) around %d alert(s) of %s", len(kept), len(alerts), rec["path"])
+    return kept
+
+
+def prune(db, cfg: dict, now: datetime | None = None, writer_factory=None) -> int:
+    """Delete recordings older than keep_days (kept parts: alert_keep_days), then the oldest while all of them are
+    over max_gb; first keeping the minutes around alerts in each one deleted."""
+    rc, base = cfg["recording"], folder(cfg)
+    old = db.recordings_to_prune(float(rc["keep_days"]), int(float(rc["max_gb"]) * 1e9), now,
+                                 float(rc.get("alert_keep_days", 0)))
     for r in old:
+        if not r.get("kept"):
+            try:
+                keep_around_alerts(db, cfg, r, writer_factory)
+            except Exception:   # never stop the deleting: the disk must not fill up
+                log.exception("recordings: keeping the minutes around alerts in %s failed", r["path"])
         path = base / r["path"]
         path.unlink(missing_ok=True)
         path.with_suffix(".jsonl").unlink(missing_ok=True)

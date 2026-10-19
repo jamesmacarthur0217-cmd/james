@@ -203,6 +203,17 @@ def test_the_time_is_written_on_a_copy():
     assert out[300:360, :400].max() == 255               # white text near the bottom left
 
 
+def test_the_outline_lines_up_with_the_text():
+    """The dark outline ends within 2-3 px of the white text: it once drifted along the line (thicker letters are
+    spaced wider in OpenCV), so the time looked doubled."""
+    for h in (360, 720, 1080):
+        out = recorder.stamp(np.full((h, int(h * 16 / 9), 3), 128, np.uint8), "cam1  2026-10-19 21:19:21")
+        gray = out[:, :, 0].astype(int)
+        white_cols = np.where((gray > 230).any(axis=0))[0]
+        dark_cols = np.where((gray < 30).any(axis=0))[0]
+        assert 0 < dark_cols[-1] - white_cols[-1] <= 3 and 0 < white_cols[0] - dark_cols[0] <= 3
+
+
 def test_encoder_quality_settings():
     assert recorder.encoder_args("h264_nvenc", 28)[recorder.encoder_args("h264_nvenc", 28).index("-cq") + 1] == "28"
     assert recorder.encoder_args("h264_mf", 28)[-1] == "60"

@@ -1,4 +1,4 @@
-# Phases 41-43 plan: safe-update test, recordings kept around alerts, the usual day as a chart (approved 2026-10-19; Phase 41 done)
+# Phases 41-43 plan: safe-update test, recordings kept around alerts, the usual day as a chart (approved 2026-10-19; Phase 41 done, 42 started)
 
 ## Context
 
@@ -42,6 +42,9 @@ own clip is only 20 s.
    key frames, no re-encoding, as Download does) into a kept part (a `recordings` row marked `kept`, with its own
    frame list and blurred stream like any recording), kept `recording.alert_keep_days` (30) and counted within
    `max_gb`. Overlapping alerts make one part.
+   **Done 2026-10-19** (the frames are copied with OpenCV and the same FFmpeg writer, not cut with `-c copy`, so
+   each frame matches its frame list exactly). Found on the real run: the clock on all recordings looked doubled
+   (outline thicker than the text); fixed.
 2. **Pages**: the Recordings page shows kept parts on their day (a different color on the day bar, "kept: alert"),
    alerts' "▶ Recording" finds them, the week report counts their minutes ("kept around alerts"), Health's storage
    line lists them; Settings gets the two times and the days.

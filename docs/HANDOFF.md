@@ -61,7 +61,11 @@ slow; `updater.run_upgrade_check` / `check_words` / `last_check`, Updater `check
 running version back; Health `check_upgrade`; /api/update `safe_test`; Settings `#upd-safe`; config
 `updates.check_report`). Step 3 done: the check on the user's real database (read only, with their OK): 1.1 s,
 154 people, 9 tables, 5 columns, nothing lost, What's new 22 (from Phase 17). **Phase 41 is done (2026-10-19).**
-The user can now restart their app (stop.bat, start.bat) and open the First-run check. Next: Phase 42.
+The user can now restart their app (stop.bat, start.bat) and open the First-run check.
+
+**Phase 42 started 2026-10-19**: step 1 done (kept parts around alerts, `recordings.kept` checked on PostgreSQL;
+also the clock on recordings fixed: `recorder.stamp` outline drawn with the same thickness, pitfall 32). Next:
+step 2, the pages (day bar, week report, Health storage line, Settings).
 
 **Phase 36 is done (2026-10-18).** Step 1 done ("What's new": `labeler/whatsnew.py`, Live banner, `/whats-new`; 808
 tests); step 2 done (First-run check `/first-run`, `labeler/firstrun.py`, Try the help sign; 819 tests). A still photo
@@ -208,6 +212,9 @@ labeler/firstrun.py  First-run check (Phase 36): server_checks (database, built-
 start.bat / stop.bat daily start/stop (wait for Docker + Ollama; stop waits for app exit, backs up DB)
 install.bat/.ps1     new PC: winget Python/Docker/Ollama, .venv, .env, DB, models, admin, autostart,
                      health; -CheckOnly, -Offline <pkg>; PowerShell 5.1 + ASCII only (tests check)
+labeler/recorder.py  + Phase 42: keep_around_alerts (before prune deletes a file: alert_stretches, frames copied with
+                     OpenCV + FFmpegWriter, <HHMMSS>-alert.mp4, recordings.kept = "alert", alert_keep_days);
+                     db.recordings_to_prune(..., kept_days) deletes normal ones first when over max_gb
 tools/upgrade_check.py safe-update test (Phase 41): pg_dump | pg_restore inside the container into
                      visionlabeler_upgrade, Database(url) in a child with a time limit, rows/rules before and after,
                      pg_stat_activity on a hang; data/upgrade_check.json
@@ -320,6 +327,10 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
 31. **GitHub runs on UTC**, 8 hours behind Malaysia: a test that takes a recent day or week as "over" by the real
    clock passes here after midnight and fails there (Phase 40 step 1, fixed in `94ab78d`). Put test data in a week
    that is past on any clock, or pass `now`.
+32. **Text drawn twice must have the same thickness** in OpenCV: letters are spaced by thickness, so a thick dark
+   outline under thin white text drifts apart along the line (the recordings' clock looked doubled for weeks). Also:
+   in Python edit scripts, code that contains "\n" goes into raw strings (r'''...'''), or it becomes a real line
+   break in the file (Phase 42).
 
 ## 7. Conventions
 

@@ -575,6 +575,18 @@ oldest deleted first every hour; recording pauses (Health page: problem) when th
 `storage.min_free_gb`. FFmpeg makes the files (`tools\get_ffmpeg.py`, set up by install.bat: the LGPL build of
 FFmpeg 8.1), on the graphics card (NVENC) when there is an NVIDIA one, else with Windows' encoder or OpenH264.
 
+**Kept around alerts** (Phase 42): before a recording is deleted, the minutes around each alert in it, from 1 minute
+before to 2 minutes after (`recording.alert_before_s`, `alert_after_s`; alerts close together make one part), are
+copied into a part of their own (`<time>-alert.mp4`), kept **30 days** (`recording.alert_keep_days`; 0 = not
+kept). A kept part is a recording like any other: the player, the blurred stream for viewers, Download, ▶ Recording
+on the alert. Its frames are copied as they are, each with its time on the picture and its head boxes. When all
+recordings are over `max_gb`, normal recordings are deleted before kept parts. A day's time-lapse still goes with
+the day's last normal recording. Checked on a test copy with the real encoder: a 72-second recording with an alert
+30 s in was kept whole (9.6 MB, 703 frames, plays: 70.3 s) and the original deleted, in 4.1 s.
+
+The time on the picture was hard to read before 2026-10-19: its dark outline drifted away from the white letters
+along the line (OpenCV spaces thicker letters wider), so it looked doubled. Recordings made since then are clean.
+
 The **Recordings** page shows each day as a bar (when it recorded, when people appeared); click it to play from
 that moment. **▶ Recording** on a person (Live page, timeline) and on an alert opens the recording at that moment.
 Admins play the file itself (the browser seeks), download it and delete whole recordings; viewers get a stream

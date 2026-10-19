@@ -38,6 +38,7 @@ def test_an_old_database_is_updated_at_start(scratch_url):
                           "UNIQUE (rule_id, track_id)"))
         conn.execute(text("ALTER TABLE alert_events ALTER COLUMN track_id SET NOT NULL"))
         conn.execute(text("ALTER TABLE zones DROP COLUMN lying_ok"))
+        conn.execute(text("ALTER TABLE recordings DROP COLUMN kept"))   # Phase 42
         conn.execute(text("DROP TABLE checks"))
     first.engine.dispose()
     opened = []
@@ -46,7 +47,7 @@ def test_an_old_database_is_updated_at_start(scratch_url):
     t.join(60)
     assert opened, "opening the old database hung"
     db = opened[0]
-    assert db.created_tables == {"checks"} and db.added_columns == {"zones.lying_ok"}
+    assert db.created_tables == {"checks"} and db.added_columns == {"zones.lying_ok", "recordings.kept"}
     insp = inspect(db.engine)
     assert insp.get_unique_constraints("alert_events") == []
     assert next(c for c in insp.get_columns("alert_events") if c["name"] == "track_id")["nullable"]

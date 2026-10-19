@@ -337,6 +337,9 @@ class Recording(Base):
     frames: Mapped[int] = mapped_column(Integer, default=0)
     size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
     encoder: Mapped[str] = mapped_column(String(30), default="")
+    # "alert": the minutes around alerts, cut from a recording before it was deleted (recorder.keep_around_alerts),
+    # kept recording.alert_keep_days instead of keep_days. Empty for a normal recording.
+    kept: Mapped[str | None] = mapped_column(String(20))
 
 
 class RoutineDay(Base):
@@ -459,6 +462,7 @@ def resolve(attrs: list[Attribute]) -> dict[str, dict]:
 NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT", "video_paths": "TEXT", "source_file": "TEXT",
                           "source_offset_s": "FLOAT"},
                "cameras": {"retention_days": "INTEGER"},
+               "recordings": {"kept": "VARCHAR(20)"},
                "zones": {"lying_ok": "BOOLEAN"},
                "scene_questions": {"zone_id": "INTEGER", "only_away": "BOOLEAN", "hours": "VARCHAR(5)"},
                "alert_events": {"vehicle_id": "INTEGER", "animal_id": "INTEGER", "scene_id": "INTEGER",
@@ -1646,7 +1650,7 @@ class Database:
     def _recording_dict(r: Recording) -> dict:
         return {"id": r.id, "camera": r.camera, "path": r.path, "started_at": r.started_at.isoformat(timespec="seconds"),
                 "ended_at": r.ended_at.isoformat(timespec="seconds") if r.ended_at else None,
-                "frames": r.frames, "size_bytes": r.size_bytes, "encoder": r.encoder}
+                "frames": r.frames, "size_bytes": r.size_bytes, "encoder": r.encoder, "kept": r.kept}
 
     def get_recording(self, rec_id: int) -> dict | None:
         with self.Session() as s:
@@ -1675,20 +1679,38 @@ class Database:
                 q = q.where((Recording.ended_at.is_(None)) | (Recording.ended_at >= start))
             return [self._recording_dict(r) for r in s.scalars(q)]
 
-    def recordings_to_prune(self, keep_days: float, max_bytes: int, now: datetime | None = None) -> list[dict]:
-        """Finished recordings to delete: older than keep_days, then the oldest until the rest fit in max_bytes."""
+    def recordings_to_prune(self, keep_days: float, max_bytes: int, now: datetime | None = None,
+                            kept_days: float = 0) -> list[dict]:
+        """Finished recordings to delete: older than keep_days (kept parts: kept_days), then the oldest until the rest
+        fit in max_bytes, normal recordings before kept parts."""
         now = now or datetime.now()
         with self.Session() as s:
             done = [self._recording_dict(r) for r in s.scalars(
                 select(Recording).where(Recording.ended_at.is_not(None)).order_by(Recording.started_at))]
-            total = sum(r["size_bytes"] for r in done)
-        out = []
-        cutoff = (now - timedelta(days=keep_days)).isoformat(timespec="seconds") if keep_days > 0 else None
+        def cut(days: float) -> str | None:
+            return (now - timedelta(days=days)).isoformat(timespec="seconds") if days > 0 else None
+
+        cutoffs = {False: cut(keep_days), True: cut(kept_days)}   # by "is a kept part"
+        old = []
         for r in done:
-            if (cutoff and r["ended_at"] < cutoff) or (max_bytes > 0 and total > max_bytes):
+            limit = cutoffs[bool(r["kept"])]
+            if limit and r["ended_at"] < limit:
+                old.append(r)
+        out, total = list(old), sum(r["size_bytes"] for r in done) - sum(r["size_bytes"] for r in old)
+        for r in [r for r in done if not r["kept"]] + [r for r in done if r["kept"]]:
+            if max_bytes <= 0 or total <= max_bytes:
+                break
+            if r not in out:
                 out.append(r)
                 total -= r["size_bytes"]
         return out
+
+    def alert_times(self, camera: str, start: datetime, end: datetime) -> list[datetime]:
+        """When the alerts of one camera in [start, end) were made (for the minutes kept around them)."""
+        with self.Session() as s:
+            return list(s.scalars(select(AlertEvent.created_at).where(
+                AlertEvent.camera == camera, AlertEvent.created_at >= start, AlertEvent.created_at < end)
+                .order_by(AlertEvent.created_at)))
 
     def delete_recordings(self, ids: list[int]) -> None:
         if ids:

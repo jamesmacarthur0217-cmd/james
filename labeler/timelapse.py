@@ -84,8 +84,10 @@ def current(base: Path, camera: str, day: str, srcs: list[dict]) -> dict | None:
 
 
 def drop_if_alone(folder: Path) -> None:
-    """A day's time-lapse goes with the day's last recording (deleted by hand or by keep_days / max_gb)."""
-    if folder.is_dir() and not [p for p in folder.iterdir() if not p.name.startswith("timelapse")]:
+    """A day's time-lapse goes with the day's last recording (deleted by hand or by keep_days / max_gb); the parts kept
+    around alerts do not hold it (its frame map points to the recordings themselves)."""
+    if folder.is_dir() and not [p for p in folder.iterdir() if not p.name.startswith("timelapse")
+                                and "-alert" not in p.name]:
         for p in folder.glob("timelapse*"):
             p.unlink(missing_ok=True)
 

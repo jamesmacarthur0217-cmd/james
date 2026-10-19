@@ -34,6 +34,9 @@ DEFAULTS: dict = {
     # Off unless config.yaml (or the Settings page) turns it on: it uses a lot of disk and stores everything seen.
     "recording": {"enabled": False, "when": "people", "before_s": 10, "after_s": 10, "fps": 10, "max_width": 1280,
                   "quality": 28, "encoder": "auto", "max_file_min": 10, "keep_days": 3, "max_gb": 100,
+                  # Phase 42: before a recording is deleted, the minutes around each alert in it are kept apart
+                  # (alert_before_s .. alert_after_s around the alert) for alert_keep_days (0 = not kept).
+                  "alert_before_s": 60, "alert_after_s": 120, "alert_keep_days": 30,
                   "dir": "data/recordings", "ffmpeg": "data/ffmpeg/ffmpeg.exe"},
     "health": {"enabled": True, "offline_after_s": 10, "blank_after_s": 10, "slow_after_s": 30, "min_fps": 5,
                "startup_grace_s": 30},
