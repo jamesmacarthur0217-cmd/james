@@ -18,6 +18,26 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-19)
 
+**Latest (2026-10-19, end of the session; last commit `6d7fe99` + this handoff, 884 tests + 1 PostgreSQL test that is
+skipped without `VL_TEST_POSTGRES_URL`, GitHub green).** Done since 2026-10-17, newest last: Phase 36 What's new +
+First-run check (`67b69b3`, incl. the PostgreSQL start-up hang fix), 37 faster playback (`c8e1fe3`), 38 PC watch
+(`32e6b8c`), 39 unusual quiet (`114d8f5`), 40 the week, printable (`83f1ba4`), 28 step 1 Ubuntu 26 runner checked once
+(`04b9f46`), 41 safe-update test (`6546920`), 42 recordings kept around alerts + the clock on recordings fixed
+(`c5aa0e8`, `6d7fe99`). **Next: Phase 43** (the usual day as a chart), the last of
+[PHASE41-43-PLAN.md](PHASE41-43-PLAN.md); its steps are written there in detail.
+
+- **Waiting for the user:** restart their own app (stop.bat, start.bat). The safe-update test passed on their real
+  database (2026-10-19, read only: 1.1 s, 154 people, 9 tables and 5 columns added, nothing lost); then the First-run
+  check page (link in the Live page's "New in this version" line). Then Phase 26 (real-camera week, lens cover open).
+  Before any fine-tuning of the vision model: label 200-300 webcam people on the Answer key page (26 now).
+- **Decided this session:** age fine-tuning is a separate project in `C:\AgeModel` (another session did it: MiVOLO v2
+  and a Qwen3-VL age variant, share zips in `C:\AgeModel\share`); never wire it into VisionLabeler unless the user asks.
+  MaskFlow (a SAM 3 labelling platform, github.com/ZhangEmo28/maskflow): not now; worth a look only if YOLO must learn
+  something new or work on a hard camera. Not chosen for Phases 41-46: PC history chart, weekly report saved by
+  itself, a week in one minute. A long full-system run (people in view + recording on) was mentioned as never done.
+- **State:** Docker Desktop was started by this session and left running; no test copy running. Ollama also holds
+  `qwen3-vl:8b-instruct` and `qwen3-vl:4b` (unused by the app, ~9 GB; the user decides whether to delete them).
+
 **2026-10-18: a start-up hang fixed** (`labeler/db.py` `_drop_old_unique` / `_add_missing_columns`, pitfall 30): the user's
 own app would have hung for ever at its next start on PostgreSQL. Their database (read only, 2026-10-18) still has
 the old `alert_events (rule_id, track_id)` unique constraint, no `zones.lying_ok`, and a `recordings` table with 2
@@ -639,5 +659,5 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE41-43-PLAN.md;
-> ask me before each phase and each step starts, and do it step by step.
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE41-43-PLAN.md
+> (Phase 43, the usual day as a chart); ask me before each phase and each step starts, and do it step by step.

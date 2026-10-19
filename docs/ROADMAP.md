@@ -1,10 +1,12 @@
 # VisionLabeler: next improvements roadmap
 
-## Status (2026-10-15)
+## Status (2026-10-19)
 
-Latest: Phases 16, 27, 28 (steps 2-4) and 30-35 are done (2026-10-15; 795 tests). Next: Phases 36-40
-([PHASE36-40-PLAN.md](PHASE36-40-PLAN.md)). Phase 26 waits for the user's app to run the new version, Phase 28 step 1
-for 2026-10-19, Phase 29 for more cameras.
+Latest: Phases 36-42 and 28 are done (2026-10-17 to 2026-10-19; 884 tests). Next: Phase 43, the usual day as a chart
+([PHASE41-43-PLAN.md](PHASE41-43-PLAN.md)). Phase 26 waits for the user's app to run the new version (the
+safe-update test passed on their database), Phase 29 for more cameras.
+
+Earlier (2026-10-15): Phases 16, 27, 28 (steps 2-4) and 30-35 done (795 tests).
 
 **Phases 0 and 2-11 are done** (each item below is marked with what was done, measured or rejected;
 details in docs/HANDOFF.md and README.md). **Phase 1 is deferred**: the user uses the system at home, not

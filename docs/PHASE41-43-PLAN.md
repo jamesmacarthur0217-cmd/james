@@ -55,13 +55,30 @@ own clip is only 20 s.
 
 ## Phase 43: The usual day as a chart
 
-1. **API**: `/api/routine` (admins and viewers): per kiosk camera the learned shares per hour for weekdays and the
-   weekend (`routine.learn`), the days counted, still learning or not, today's quiet stretch so far (from
-   `UnusualWatch`) and whether "Unusual quiet" fired today.
-2. **Chart** on the Health page under the line "usual day" (and linked from the Alerts page's rule): 24 hourly bars per
-   kind of day, the 80% line, today's quiet stretch marked; hover for the numbers, a table view, both color modes,
-   phone width. Follows the dataviz skill (read it before writing the chart).
-3. Tests, browser check (admin, viewer path, phone width, dark mode), docs.
+Reuse: `Routine.get(camera)` (shares per kind and hour, `asked`, `days`, `learning`, `per_day`), `Routine.state()`,
+`routine.hour_ranges`, `UnusualWatch.quiet_since()` / `last_seen()` (`labeler/unusual.py`), the Reports page's hour
+bar chart (`labeler/static/reports.html` `drawBars`, `.viz` tokens, "Show as a table"), `app.state.routine` /
+`app.state.unusual` (made in `run.py`).
+
+1. **API `GET /api/routine`** (`labeler/web.py`; add to `accounts.VIEWER` GET list): per kiosk camera: `learning`,
+   `days` (weekday / weekend counts), `min_days`, `share` and `asked` per kind (24 values each), `usual_share` (0.8)
+   and `quiet_share` (0.97), today's kind, today's quiet stretch from `UnusualWatch.quiet_since` (start time, whole
+   hours so far, the history share for it via `Routine.stretch`), and whether "Unusual quiet" fired today
+   (`UnusualWatch.fired`). `{"cameras": []}` without kiosk cameras or with `unusual.enabled` off. Tests with the
+   made-up households of `tests/test_routine.py` (`_regular`, `_people`).
+2. **Chart on the Health page** (`labeler/static/health.html`, under the "usual day" line, anchor `#usual`); read the
+   dataviz skill first (its validator runs from a copy named `validate_palette.js` in a folder with
+   `{"type":"module"}` in package.json): per camera two small 24-bar charts (weekday, weekend; today's kind first),
+   one hue (categorical slot 1, `#2a78d6` light / `#3987e5` dark), a dashed 80% line labelled "usual", hours with too
+   few days drawn hollow, today's quiet stretch as a gray band with a label; hover tooltip ("08:00-09:00: seen on 38
+   of 40 weekdays"); "Show as a table"; "still learning (5 of 14 days)" instead of bars while learning; ResizeObserver
+   redraw (pitfall 12); dark and light; phone width. Link "see the usual day" from the Alerts page's "Unusual quiet"
+   rule row to `/health#usual`.
+3. **Tests, browser check, docs**: page test (ids, tokens); a test copy (`tools/make_test_config.py`) whose database is
+   filled by a small script with 8 weeks of made-up people for a kiosk `cam1` (as `tests/test_routine.py` `_regular`)
+   and run on an empty picture; browser check (admin and the viewer path, dark and light, phone width); README
+   "Unusual quiet" section; HANDOFF; What's new entry `p43` (and fill in `p42`'s commit `6d7fe99`); this plan and the
+   roadmap: "Phase 43 done; the 41-43 plan is finished".
 
 ## Way of working (unchanged)
 
