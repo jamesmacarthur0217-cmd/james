@@ -961,7 +961,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             item = routine.chart(cam)
             item["today"] = unusual.today(cam) if unusual is not None else None
             cameras.append(item)
-        return {"date": today.isoformat(), "kind": kind_of(today), "usual_share": float(r["usual_share"]),
+        return {"date": today.isoformat(), "kind": kind_of(today), "weeks": int(r["weeks"]),
+                "usual_share": float(r["usual_share"]),
                 "quiet_share": float(r["quiet_share"]), "min_quiet_h": int(r["min_quiet_h"]), "cameras": cameras}
 
     @app.get("/api/today")

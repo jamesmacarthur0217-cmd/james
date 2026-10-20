@@ -76,6 +76,10 @@ bar chart (`labeler/static/reports.html` `drawBars`, `.viz` tokens, "Show as a t
    of 40 weekdays"); "Show as a table"; "still learning (5 of 14 days)" instead of bars while learning; ResizeObserver
    redraw (pitfall 12); dark and light; phone width. Link "see the usual day" from the Alerts page's "Unusual quiet"
    rule row to `/health#usual`.
+   **Done 2026-10-20**: Health panel `#usual` (`drawUsual`, `drawDay`, `usualTable`; the "usual" label sits in a
+   right margin so it never covers the 23:00 bar on a phone; the chart loads after the checks so `#usual` lands
+   right); `/api/routine` also gives `weeks`. Checked in the browser with made-up data (page-only server): dark,
+   light, phone width (no sideways scroll), hover, table, the Alerts link; 892 tests.
 3. **Tests, browser check, docs**: page test (ids, tokens); a test copy (`tools/make_test_config.py`) whose database is
    filled by a small script with 8 weeks of made-up people for a kiosk `cam1` (as `tests/test_routine.py` `_regular`)
    and run on an empty picture; browser check (admin and the viewer path, dark and light, phone width); README

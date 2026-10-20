@@ -26,6 +26,36 @@
   code { background: var(--chip); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
   .panel + .panel { margin-top: 16px; }
   @media (max-width: 600px) { .check { grid-template-columns: 14px 1fr; } .check .detail { grid-column: 2; } }
+  /* The usual day (Phase 43): one hue (categorical slot 1, validated on the panel color in both modes); the quiet
+     band is a neutral gray wash, never a hue. */
+  .viz { --series-1: #2a78d6; --grid: #e6e6e3; --band: rgba(102, 112, 133, 0.14); }
+  @media (prefers-color-scheme: dark) { .viz { --series-1: #3987e5; --grid: #2e3440; --band: rgba(152, 162, 179, 0.16); } }
+  .usual-cam + .usual-cam { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .usual-cam h3 { margin: 0 0 4px; font-size: 15px; }
+  .usual-cam .hint { margin: 0 0 4px; }
+  .days { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 10px 0 4px; }
+  .days figure { margin: 0; min-width: 0; }
+  .days figcaption { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .day { position: relative; }
+  .day svg { display: block; }
+  .day .axis text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .day .grid line { stroke: var(--grid); }
+  .day .bar { fill: var(--series-1); }
+  .day .bar.hollow { fill: none; stroke: var(--series-1); stroke-width: 1.5; }
+  .day .bar.hover { opacity: 0.75; }
+  .day .usual-line { stroke: var(--muted); stroke-dasharray: 4 3; }
+  .day .note { fill: var(--muted); font-size: 11px; paint-order: stroke; stroke: var(--panel); stroke-width: 3px; }
+  .day .quiet { fill: var(--band); }
+  .day .hit { fill: transparent; }
+  .tip { position: absolute; pointer-events: none; background: var(--text); color: var(--bg); font-size: 12px;
+         padding: 4px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); display: none; z-index: 2; }
+  .key { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: 12px; margin: 2px 0 0; }
+  .key[hidden] { display: none; }
+  .key span { display: inline-flex; align-items: center; gap: 6px; }
+  .key svg { display: block; }
+  table.data { border-collapse: collapse; font-size: 13px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  table.data td, table.data th { border-bottom: 1px solid var(--border); padding: 3px 14px 3px 0; text-align: left; }
+  #usual details { margin-top: 8px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -38,6 +68,15 @@
     <p class="overall"><span class="dot" id="overall-dot"></span><span id="overall">Checking…</span></p>
     <p class="hint" id="meta"></p>
     <div class="checks" id="checks"></div>
+  </section>
+  <section class="panel viz" id="usual" hidden>
+    <h2>The usual day</h2>
+    <p class="hint">On how many days someone was seen in each hour, over the last <span id="usual-weeks">8</span> weeks
+      (Away hours and days with nobody at all are left out). "Unusual quiet" alerts when nobody is seen for
+      <span id="usual-min">3</span> or more whole hours that had someone on <span id="usual-quiet">97%</span> of days
+      or more.</p>
+    <div id="usual-cams"></div>
+    <p class="key" id="usual-key"></p>
   </section>
   <section class="panel admin-only" id="errors-panel" hidden>
     <h2>Latest errors in the log</h2>
@@ -97,8 +136,156 @@ async function load() {
   $("errors").innerHTML = errors.map(e => `<li><time>${esc(e.at.replace("T", " "))}</time>${esc(e.message)}</li>`).join("");
 }
 
-load();
-setInterval(load, 30000);
+// The usual day (Phase 43, /api/routine): per kiosk camera two small 24-bar charts (weekdays, weekends; today's kind
+// first): the share of counted days on which someone was seen in each hour (labeler/routine.py). One hue; the dashed
+// line is the "usual" share; an hour with too few counted days (Away on most) is drawn hollow; today's quiet stretch
+// (its whole hours, as "Unusual quiet" judges it) is a gray band. Drawn at the element's width, again on resize.
+const KIND_WORDS = { weekday: ["Weekdays", "weekdays"], weekend: ["Weekends", "weekend days"] };
+const hh = (h) => `${String(h % 24).padStart(2, "0")}:00`;
+const pct = (v) => `${Math.round(v * 100)}%`;
+let usual = null, usualJson = "", usualScrolled = false;
+
+function seenDays(c, kind, h) {
+  return Math.round(c.share[kind][h] * c.asked[kind][h]);
+}
+
+function hourTip(c, kind, h) {
+  const asked = c.asked[kind][h], words = KIND_WORDS[kind][1];
+  if (!asked) return `${hh(h)}-${hh(h + 1)}: no ${words} counted (Away)`;
+  let t = `${hh(h)}-${hh(h + 1)}: seen on ${seenDays(c, kind, h)} of ${asked} ${words}`;
+  if (asked < c.need[kind]) t += " (too few to judge)";
+  else if (c.usual_hours[kind].includes(h)) t += " (usual)";
+  return t;
+}
+
+function drawDay(el) {
+  const c = usual.cameras[el.dataset.cam], kind = el.dataset.kind;
+  const W = Math.max(260, el.clientWidth), H = 150, L = 38, R = 36, B = 22, T = 16;   // R: room for "usual"
+  const bw = (W - L - R) / 24, y = (v) => H - B - (H - B - T) * v;
+  const t = c.today, band = kind === usual.kind && t && t.watched && t.hours > 0 ? [t.from_h, t.to_h] : null;
+  let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" `
+    + `aria-label="${esc(KIND_WORDS[kind][0])} on ${esc(c.camera)}: share of days with someone seen, per hour">`;
+  if (band) {
+    const x1 = L + band[0] * bw, x2 = L + band[1] * bw, right = x1 > W - R - 80;
+    svg += `<rect class="quiet" x="${x1}" y="${T}" width="${x2 - x1}" height="${H - B - T}"/>`
+      + `<text class="note" x="${right ? x2 : x1}" y="${T - 4}" text-anchor="${right ? "end" : "start"}">quiet today</text>`;
+  }
+  svg += '<g class="grid">' + [0, 0.5, 1].map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/>`).join("");
+  svg += '</g><g class="axis">' + [0, 0.5, 1].map(v => `<text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${pct(v)}</text>`).join("");
+  for (const h of [0, 6, 12, 18])
+    svg += `<text x="${L + h * bw}" y="${H - 6}" text-anchor="${h ? "middle" : "start"}">${hh(h)}</text>`;
+  svg += "</g>";
+  const w = Math.min(24, Math.max(1, bw - 2));
+  for (let h = 0; h < 24; h++) {
+    const s = c.share[kind][h];
+    if (!s) continue;
+    const x = L + h * bw + (bw - w) / 2, yy = y(s), rad = Math.min(4, w / 2, H - B - yy);
+    const hollow = c.asked[kind][h] < c.need[kind];
+    svg += `<path class="bar${hollow ? " hollow" : ""}" data-h="${h}" d="M${x},${H - B} V${yy + rad} `
+      + `Q${x},${yy} ${x + rad},${yy} H${x + w - rad} Q${x + w},${yy} ${x + w},${yy + rad} V${H - B} Z"/>`;
+  }
+  const ul = y(usual.usual_share);
+  svg += `<line class="usual-line" x1="${L}" x2="${W - R + 2}" y1="${ul}" y2="${ul}"/>`
+    + `<text class="note" x="${W - R + 5}" y="${ul + 4}">usual</text>`;
+  for (let h = 0; h < 24; h++)   // hover areas over the whole column, so short or empty hours are easy to hit
+    svg += `<rect class="hit" x="${L + h * bw}" y="${T}" width="${bw}" height="${H - B - T}" data-h="${h}"/>`;
+  el.innerHTML = svg + "</svg>" + '<div class="tip"></div>';
+  const tip = el.querySelector(".tip");
+  el.querySelectorAll(".hit").forEach(hit => {
+    hit.addEventListener("mousemove", (e) => {
+      const box = el.getBoundingClientRect();
+      tip.style.display = "block";
+      tip.style.left = Math.min(Math.max(e.clientX - box.left, 90), box.width - 90) + "px";
+      tip.style.top = (e.clientY - box.top) + "px";
+      tip.textContent = hourTip(c, kind, +hit.dataset.h);
+      el.querySelectorAll(".bar").forEach(b => b.classList.toggle("hover", b.dataset.h === hit.dataset.h));
+    });
+    hit.addEventListener("mouseleave", () => {
+      tip.style.display = "none";
+      el.querySelectorAll(".bar.hover").forEach(b => b.classList.remove("hover"));
+    });
+  });
+}
+
+function todayLine(c) {
+  const t = c.today, words = KIND_WORDS[usual.kind][1];
+  if (!t) return "";
+  if (!t.watched) return "Today: Away, so quiet is not watched.";
+  const since = t.since.slice(11, 16);
+  if (t.hours < 1) return `Today: quiet since ${since} (less than a whole hour).`;
+  let s = `Today: nobody seen since ${since}; in ${hh(t.from_h)}-${hh(t.to_h)} someone was seen on `
+    + `${t.seen_days} of ${t.days} ${words}.`;
+  if (t.fired) s += " Unusual quiet alerted today.";
+  else if (t.unusual) s += " That is unusual.";
+  return s;
+}
+
+function usualTable(c, kinds) {
+  const cell = (k, h) => !c.asked[k][h] ? "–"
+    : `${seenDays(c, k, h)} of ${c.asked[k][h]} (${pct(c.share[k][h])})`
+      + (c.asked[k][h] < c.need[k] ? " · too few days" : c.usual_hours[k].includes(h) ? " · usual" : "");
+  return '<table class="data"><tr><th>Hour</th>' + kinds.map(k => `<th>${KIND_WORDS[k][0]}</th>`).join("") + "</tr>"
+    + Array.from({ length: 24 }, (_, h) => `<tr><td>${hh(h)}-${hh(h + 1)}</td>`
+      + kinds.map(k => `<td>${cell(k, h)}</td>`).join("") + "</tr>").join("") + "</table>";
+}
+
+function drawUsual(data) {
+  usual = data;
+  $("usual").hidden = !data.cameras.length;
+  if (!data.cameras.length) return;
+  $("usual-weeks").textContent = data.weeks;
+  $("usual-min").textContent = data.min_quiet_h;
+  $("usual-quiet").textContent = pct(data.quiet_share);
+  const kinds = data.kind === "weekend" ? ["weekend", "weekday"] : ["weekday", "weekend"];
+  let learning = true;
+  $("usual-cams").innerHTML = data.cameras.map((c, i) => {
+    if (c.learning) return `<div class="usual-cam"><h3>${esc(c.camera)}</h3><p class="hint">Still learning (${c.total_days}
+      of ${c.min_days} days with people). The chart appears after ${c.min_days} days.</p></div>`;
+    learning = false;
+    return `<div class="usual-cam"><h3>${esc(c.camera)}</h3>
+      <p class="hint">From ${c.total_days} days (${c.days.weekday} weekdays, ${c.days.weekend} weekend days) since
+        ${esc(c.since || "?")}. ${esc(todayLine(c))}</p>
+      <div class="days">${kinds.map(k => `<figure><figcaption>${KIND_WORDS[k][0]}${k === data.kind ? " (today)" : ""}</figcaption>
+        <div class="day" data-cam="${i}" data-kind="${k}"></div></figure>`).join("")}</div>
+      <details><summary>Show as a table</summary>${usualTable(c, kinds)}</details></div>`;
+  }).join("");
+  const sw = (inner) => `<svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true">${inner}</svg>`;
+  $("usual-key").hidden = learning;
+  $("usual-key").innerHTML = learning ? "" :
+    `<span>${sw('<rect x="3" y="1" width="8" height="11" rx="2" fill="var(--series-1)"/>')}share of days with someone seen</span>`
+    + `<span>${sw('<rect x="3.75" y="1.75" width="6.5" height="9.5" rx="2" fill="none" stroke="var(--series-1)" stroke-width="1.5"/>')}too few days to judge</span>`
+    + `<span>${sw('<line x1="0" x2="14" y1="6" y2="6" stroke="var(--muted)" stroke-dasharray="4 3"/>')}usual: ${pct(data.usual_share)} or more</span>`
+    + `<span>${sw('<rect x="0" y="0" width="14" height="12" fill="var(--band)"/>')}quiet today (whole hours)</span>`;
+  document.querySelectorAll("#usual .day").forEach(drawDay);
+  if (location.hash === "#usual" && !usualScrolled) {
+    usualScrolled = true;
+    $("usual").scrollIntoView();
+  }
+}
+
+async function loadUsual() {
+  try {
+    const r = await fetch("/api/routine");
+    if (!r.ok) return;
+    const text = await r.text();
+    if (text !== usualJson) {   // redraw only when it changed, so an open table or a hover stays put
+      usualJson = text;
+      drawUsual(JSON.parse(text));
+    }
+  } catch { /* the overall line already says when the app does not answer */ }
+}
+
+let usualWidth = 0;
+new ResizeObserver(() => {
+  const w = $("usual-cams").clientWidth;
+  if (usual && w && w !== usualWidth) {
+    usualWidth = w;
+    document.querySelectorAll("#usual .day").forEach(drawDay);
+  }
+}).observe($("usual-cams"));
+
+load().then(loadUsual);   // the checks first, so the jump to #usual lands where the chart stays
+setInterval(() => { load(); loadUsual(); }, 30000);
 </script>
 </body>
 </html>

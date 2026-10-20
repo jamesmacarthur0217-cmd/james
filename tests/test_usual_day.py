@@ -79,6 +79,17 @@ def test_nothing_without_the_usual_day(db, camera, tmp_path):
     assert _client(db, tmp_path, watch).get("/api/routine").json()["cameras"] == []
 
 
+def test_the_pages(db, tmp_path):
+    from pathlib import Path
+    static = Path(__file__).resolve().parent.parent / "labeler" / "static"
+    health = (static / "health.html").read_text(encoding="utf-8")
+    for part in ['id="usual"', 'id="usual-cams"', 'id="usual-key"', 'fetch("/api/routine")', "ResizeObserver",
+                 "Show as a table", "--series-1: #2a78d6", "--series-1: #3987e5", "usual-line", "hollow", "quiet today"]:
+        assert part in health, part
+    assert 'href="/health#usual"' in (static / "alerts.html").read_text(encoding="utf-8")
+    assert _client(db, tmp_path).get("/health").status_code == 200
+
+
 def test_viewers_may_read_it(db, camera, tmp_path):
     watch, cam, clock = _setup(db, camera)
     db.add_user("vic", accounts.hash_password("correct horse battery"), "viewer")

@@ -149,6 +149,7 @@ async function loadRules() {
     <div class="rule" data-id="${r.id}">
       <input type="checkbox" class="r-on" ${r.enabled ? "checked" : ""} title="Enabled">
       <div class="what"><b>${esc(r.name)}</b><small>${esc(describe(r.conditions))} · ${esc(r.camera || (r.conditions.some(([n]) => n === "quiet" || n === "unusual") ? "kiosk cameras" : "any camera"))}</small>
+        ${r.conditions.some(([n]) => n === "unusual") ? '<small><a href="/health#usual">see the usual day</a></small>' : ""}
         ${flags.rules[r.id] ? `<small class="often">${esc(flags.rules[r.id])}</small>` : ""}</div>
       <button class="r-del danger-quiet">Delete</button>
     </div>`).join("") : '<div class="empty">No rules yet.</div>';
