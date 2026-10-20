@@ -174,6 +174,13 @@ mivia.unisa.it/datasets/video-analysis-datasets/fire-detection-dataset/ and it i
 1. **A small fire/smoke detector**: find one (a YOLO trained on D-Fire or similar; license checked before any
    download, which needs the user's OK) or train YOLO11n on D-Fire here; every second on safety cameras at 640 px.
    Flames inside a cooking area are normal unless they grow past it; smoke counts everywhere outside it.
+   **Done 2026-10-20**: D-Fire downloaded with the user's OK through the browser pane (OneDrive refuses scripts:
+   3.04 GB, 21,527 pictures + labels, no unsafe paths; moved from Downloads to data/datasets/dfire/download).
+   `tools/train_fire.py` (prepare: D-Fire's train/test, a tenth of train kept apart to choose the best round; train:
+   from yolo11s.pt already here, 640 px, 40 rounds in 1 h 11 min, Ultralytics' half-precision check skipped as it would
+   download yolo11n.pt; test once). Test part (4,302 pictures, 4 with broken labels skipped): mAP50 0.767 (smoke 0.827,
+   P 0.81 R 0.77; fire 0.706, P 0.71 R 0.64), 9.5 ms a picture. Model: data/models/fire/fire_smoke.pt (git-ignored;
+   tools/models.py packs it in step 2).
 2. **Confirm and measure**: the vision model on 3 frames over 10 s (smoke spreads, flames flicker). False alarms on
    things that look like fire: stoves, candles, sunsets, red lights, steam, a TV (COCO kitchens, MOT16, UR Fall);
    found / late on fire videos. Compare with a plain scene question ("Is there fire or smoke?") every 5 minutes.

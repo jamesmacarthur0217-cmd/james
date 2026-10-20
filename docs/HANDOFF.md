@@ -31,7 +31,8 @@ Phase 45 (people: down/slumped, children, crowding). Step 0 (`3e28566`, `tools/i
 (falls checked by the vision model with a fail-safe, lying still / slumped / not moved: `labeler/safety.py`) done
 2026-10-20; step 2 (children: alone, cooking area, climbing; child by label or size) done 2026-10-20 (only false
 alarms measurable: no video with children here); step 3 (crowding) done: **Phase 45 is done 2026-10-20**; next
-Phase 46 (fire and smoke: a model download needs the user's OK). MOT20 is in data/datasets/mot20 (zip 5 GB +
+Phase 46 (fire and smoke): step 1 done 2026-10-20 (own model trained on D-Fire, CC0: data/models/fire/fire_smoke.pt,
+test mAP50 0.767, 9.5 ms; `tools/train_fire.py`); the user requests the MIVIA videos for step 3. MOT20 is in data/datasets/mot20 (zip 5 GB +
 unpacked train + videos; the user may want the zip deleted). Measure falls at 30 pictures a second.
 Measured: a check 1.4 s with 3 pictures; **4 pictures exceed Ollama's 4096-token context** (refused with 400);
 6 checks a minute on a very busy camera double people's label wait (3.6 -> 7.7 s), 3 a minute hardly matter. Still waiting for them: restart their own app (stop.bat, start.bat), the
