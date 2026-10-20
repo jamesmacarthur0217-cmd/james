@@ -1,4 +1,4 @@
-# Phases 41-43 plan: safe-update test, recordings kept around alerts, the usual day as a chart (approved 2026-10-19; Phases 41-42 done)
+# Phases 41-43 plan: safe-update test, recordings kept around alerts, the usual day as a chart (approved 2026-10-19; finished 2026-10-20)
 
 ## Context
 
@@ -85,6 +85,10 @@ bar chart (`labeler/static/reports.html` `drawBars`, `.viz` tokens, "Show as a t
    and run on an empty picture; browser check (admin and the viewer path, dark and light, phone width); README
    "Unusual quiet" section; HANDOFF; What's new entry `p43` (and fill in `p42`'s commit `6d7fe99`); this plan and the
    roadmap: "Phase 43 done; the 41-43 plan is finished".
+   **Done 2026-10-20**: test copy with 56 days of made-up people (Away 13:00-17:00 on most weekdays) on an empty room
+   photo: 56 days summed up at start, the chart as expected (14:00 hollow, 5 of 5 days), today's quiet from the app's
+   start; viewer: the page shows the chart, the API answers 401 to a remote request without login (a logged-in viewer
+   is in the tests); dark, light, phone width; no errors in the log. **Phase 43 is done; the 41-43 plan is finished.**
 
 ## Way of working (unchanged)
 

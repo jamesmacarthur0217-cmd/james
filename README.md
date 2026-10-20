@@ -841,6 +841,18 @@ later) gave weekdays 07, 08, 12, 18-21 and Saturdays 09, 10, 18-21; an irregular
 usual hour; 10 days of history gave "still learning". The user's own webcam has only a few days of people so far.
 (The usual hours at 80% are shown on the Health page; the alert itself uses whole quiet stretches, above.)
 
+**The usual day as a chart** (Phase 43; Health page, "The usual day", `/health#usual`, viewers too; the Alerts page's
+"Unusual quiet" rule links to it): for each kiosk camera two small charts of the 24 hours, weekdays and weekends
+(today's kind first). Each bar is the share of counted days on which someone was seen in that hour; the dashed line is
+the "usual" share (80%); an hour with fewer counted days than half of that kind's days (Away on most of them) is drawn
+hollow ("too few days to judge"); today's quiet stretch, in the whole hours the alert judges, is a gray band. Hover an
+hour for "08:00-09:00: seen on 40 of 40 weekdays"; "Show as a table" lists every hour. While a camera is still learning
+it says "still learning (5 of 14 days with people)" instead. The data: `GET /api/routine` (`Routine.chart`,
+`UnusualWatch.today`: since when it is quiet, its whole hours, on how many history days someone was seen in them,
+whether it is unusual, Away, and whether the alert fired today). Checked on a test copy with 56 days of made-up people
+(Away 13:00-17:00 on most weekdays): at start 56 days were summed up, the chart showed weekdays 07, 08, 12, 18-21 and
+14:00 hollow (5 of 5 days); today's quiet counts from the app's start (12:45), as the alert does.
+
 ## Help sign
 
 A silent call for help: **one hand held above the head for 3 seconds** (`labeler/gestures.py`; the user's choice). From

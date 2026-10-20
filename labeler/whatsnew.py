@@ -117,10 +117,14 @@ ENTRIES: list[Entry] = [
     Entry("p41", 41, "6546920", "Safe updates",
           "Update now first lets the new version open a copy of your database; if that fails, the version running now "
           "stays. By hand: tools\\upgrade_check.py. The Health page shows the last result.", "/health", "admin"),
-    Entry("p42", 42, "", "Recordings kept around alerts",
+    Entry("p42", 42, "6d7fe99", "Recordings kept around alerts",
           "When old recordings are deleted, the minutes around each alert are kept 30 days (1 minute before to 2 "
           "after; Settings page). They show on the Recordings page in their own color. Also: the time written on "
           "recordings is clean again (it looked doubled).", "/recordings"),
+    Entry("p43", 43, "", "The usual day as a chart",
+          "Health page, \"The usual day\": for each kiosk camera, on how many days someone was seen in each hour "
+          "(weekdays and weekends), the line above which an hour counts as usual, and today's quiet time. The "
+          "\"Unusual quiet\" rule on the Alerts page links to it.", "/health"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

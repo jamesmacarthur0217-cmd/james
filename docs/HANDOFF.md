@@ -16,7 +16,15 @@ Roadmap Phase 1 (licenses) is deferred until they say otherwise. Under Malaysia'
 household use is generally outside the Act; their filled-in camera sign and data-protection summary are in
 `data/privacy/` (git-ignored, contains their email); the blank templates are in `docs/`.
 
-## 2. Current state (2026-10-19)
+## 2. Current state (2026-10-20)
+
+**Latest (2026-10-20): Phase 43 is done; the Phases 41-43 plan is finished** (`7fe5538` `GET /api/routine`, `c2a556d`
+chart on the Health page `#usual`, then docs + What's new `p43`; 892 tests + 1 PostgreSQL test skipped without
+`VL_TEST_POSTGRES_URL`). Checked on a test copy filled with 56 days of made-up people (script in the session scratchpad,
+not kept: tracks per day + Away spans via `db.add_arming`, then run.py on an empty COCO room photo, 000000000632.jpg).
+**Next: ask the user** what comes next. Still waiting for them: restart their own app (stop.bat, start.bat), the
+First-run check, then Phase 26 (real-camera week). Ideas offered 2026-10-19 and not chosen yet (ask before offering
+again): PC history chart, weekly report saved by itself, a week in one minute.
 
 **Latest (2026-10-19, end of the session; last commit `6d7fe99` + this handoff, 884 tests + 1 PostgreSQL test that is
 skipped without `VL_TEST_POSTGRES_URL`, GitHub green).** Done since 2026-10-17, newest last: Phase 36 What's new +
@@ -223,6 +231,7 @@ labeler/whatsnew.py  What's new (Phase 36): ENTRIES in the order phases were fin
                      added_columns (Entry.marker); Live banner (index.html whatsNew, localStorage whatsNewSeen), /whats-new
 labeler/routine.py   the usual day (Phase 39): per kiosk camera, weekday/weekend x hour, share of counted days with
                      someone seen (8 weeks; days with nobody and Away hours left out; learning below 14 days)
+labeler/unusual.py   (+ Phase 43: UnusualWatch.today, Routine.chart -> GET /api/routine, Health chart #usual)
 labeler/unusual.py   unusual quiet (Phase 39): built-in rule "Unusual quiet" (unusual = yes, armed = home); fires when
                      today's quiet stretch (>= 3 whole hours) had someone on >= 97% of history days; once a day
 labeler/pcwatch.py   PC watch (Phase 38): nvidia-smi each minute, Get-PhysicalDisk hourly, heartbeat file (pcwatch.
@@ -659,5 +668,5 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE41-43-PLAN.md
-> (Phase 43, the usual day as a chart); ask me before each phase and each step starts, and do it step by step.
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then ask me what comes next (the Phases 41-43
+> plan is finished); ask me before each phase and each step starts, and do it step by step.
