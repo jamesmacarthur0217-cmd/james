@@ -167,13 +167,29 @@ class Routine:
     def usual_hours(self, camera: str, day: date) -> list[int]:
         """The hours of that kind of day in which someone is usually seen (none while still learning). An hour
         needs at least half the counted days of its kind behind it, so a rare Away hour does not decide alone."""
+        return self.usual_for(camera, kind_of(day))
+
+    @staticmethod
+    def need(r: dict, kind: str) -> int:
+        """Counted days an hour needs behind it to be judged (fewer: drawn hollow on the chart)."""
+        return max(1, r["days"][kind] // 2)
+
+    def usual_for(self, camera: str, kind: str) -> list[int]:
         r = self.get(camera)
         if r["learning"]:
             return []
-        k = kind_of(day)
-        need = max(1, r["days"][k] // 2)
-        return [h for h, s in enumerate(r["share"][k])
-                if s is not None and s >= self.usual_share and r["asked"][k][h] >= need]
+        need = self.need(r, kind)
+        return [h for h, s in enumerate(r["share"][kind])
+                if s is not None and s >= self.usual_share and r["asked"][kind][h] >= need]
+
+    def chart(self, camera: str) -> dict:
+        """For the usual-day chart (Phase 43): per kind of day, the share and the counted days of each hour, the
+        days needed behind an hour, and the usual hours. JSON-ready (no per-day detail)."""
+        r = self.get(camera)
+        return {"camera": camera, "learning": r["learning"], "days": r["days"], "total_days": r["total_days"],
+                "min_days": r["min_days"], "since": r["since"], "share": r["share"], "asked": r["asked"],
+                "need": {k: self.need(r, k) for k in KINDS},
+                "usual_hours": {k: self.usual_for(camera, k) for k in KINDS}}
 
     def stretch(self, camera: str, day: date, h1: int, h2: int) -> tuple[int, int] | None:
         """For the hours h1 .. h2-1 of that kind of day: (days on which someone was seen in them, days that count:

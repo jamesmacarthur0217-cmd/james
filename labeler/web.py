@@ -945,6 +945,25 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return {"period": name, **summary.build(db, s, e, admin=admin,
                                                clip_for=lambda i: _clip_for(i) if admin else None)}
 
+    @app.get("/api/routine")
+    def routine_api():
+        """The usual day of each kiosk camera (Phase 43, the Health page chart): per kind of day and hour the share of
+        days someone was seen (labeler/routine.py), today's quiet stretch and whether "Unusual quiet" fired
+        (labeler/unusual.py). No cameras when unusual quiet is off or there is no kiosk camera. Viewers too."""
+        from .routine import kind_of
+        routine, unusual = getattr(app.state, "routine", None), getattr(app.state, "unusual", None)
+        if routine is None or not cfg["unusual"]["enabled"]:
+            return {"cameras": []}
+        today = routine.clock().date()
+        r = cfg["routine"]
+        cameras = []
+        for cam in routine.cameras:
+            item = routine.chart(cam)
+            item["today"] = unusual.today(cam) if unusual is not None else None
+            cameras.append(item)
+        return {"date": today.isoformat(), "kind": kind_of(today), "usual_share": float(r["usual_share"]),
+                "quiet_share": float(r["quiet_share"]), "min_quiet_h": int(r["min_quiet_h"]), "cameras": cameras}
+
     @app.get("/api/today")
     def today_summary(request: Request):
         """Today at a glance (labeler/today.py); viewers get the people numbers only."""

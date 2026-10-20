@@ -66,6 +66,8 @@ bar chart (`labeler/static/reports.html` `drawBars`, `.viz` tokens, "Show as a t
    hours so far, the history share for it via `Routine.stretch`), and whether "Unusual quiet" fired today
    (`UnusualWatch.fired`). `{"cameras": []}` without kiosk cameras or with `unusual.enabled` off. Tests with the
    made-up households of `tests/test_routine.py` (`_regular`, `_people`).
+   **Done 2026-10-20**: `Routine.chart` (also `need` and `usual_hours` per kind), `UnusualWatch.today` (since, whole
+   hours, seen on n of m days, `unusual`, `watched` (Home/Away), `fired`); `tests/test_usual_day.py`; 891 tests.
 2. **Chart on the Health page** (`labeler/static/health.html`, under the "usual day" line, anchor `#usual`); read the
    dataviz skill first (its validator runs from a copy named `validate_palette.js` in a folder with
    `{"type":"module"}` in package.json): per camera two small 24-bar charts (weekday, weekend; today's kind first),

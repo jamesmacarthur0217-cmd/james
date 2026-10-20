@@ -81,18 +81,25 @@ class UnusualWatch:
             starts.append(seen)
         return max(starts)
 
+    @staticmethod
+    def whole_hours(since: datetime, now: datetime) -> tuple[int, int]:
+        """The whole hours h1 .. h2-1 of a quiet stretch since `since` (only those count)."""
+        return since.hour + (since.minute > 0 or since.second > 0), now.hour
+
+    def is_unusual(self, yes: int, days: int) -> bool:
+        return days >= max(1, self.routine.min_days // 2) and yes / days >= self.share
+
     def check_one(self, rule: dict, p, now: datetime, armed, mode_since) -> str | None:
         """The alert's message if the quiet stretch on this camera is unusual now, else None."""
         since = self.quiet_since(p, now, armed, mode_since)
-        h1 = since.hour + (since.minute > 0 or since.second > 0)   # whole hours only
-        h2 = now.hour
+        h1, h2 = self.whole_hours(since, now)
         if h2 - h1 < self.min_hours:
             return None
         got = self.routine.stretch(p.name, now.date(), h1, h2)
         if got is None:
             return None   # still learning
         yes, days = got
-        if days < max(1, self.routine.min_days // 2) or yes / days < self.share:
+        if not self.is_unusual(yes, days):
             return None
         k = kind_of(now.date())
         return (f"{rule['name']}: nobody seen on {p.name} since {since:%H:%M}; on "
@@ -138,6 +145,27 @@ class UnusualWatch:
                         log.warning("ALERT [%s] %s", p.name, message)
                         made.append(event)
         return made
+
+    def today(self, name: str) -> dict | None:
+        """For the usual-day chart (Phase 43): today's quiet stretch on this camera as the check sees it (since when,
+        its whole hours, on how many history days someone was seen in them) and whether the alert fired today."""
+        p = next((p for p in self.pipelines if p.name == name), None)
+        if p is None:
+            return None
+        now = self.clock()
+        armed = next((a for r in self.alerts.unusual_rules() if self.applies(r, p) and (a := _value(r, ARMED))), None)
+        mode, mode_since = self._armed()
+        with self._lock:
+            since = self.quiet_since(p, now, armed, mode_since)
+            fired = any(cam == name and day == now.date() for (_, cam), day in self.fired.items())
+        h1, h2 = self.whole_hours(since, now)
+        got = self.routine.stretch(name, now.date(), h1, h2) if h2 > h1 else None
+        yes, days = got if got else (None, None)
+        return {"since": since.isoformat(timespec="minutes"), "from_h": h1, "to_h": max(h1, h2),
+                "hours": max(0, h2 - h1), "seen_days": yes, "days": days,
+                "share": round(yes / days, 3) if days else None,
+                "unusual": bool(days) and h2 - h1 >= self.min_hours and self.is_unusual(yes, days),
+                "watched": not armed or armed == mode, "fired": fired}
 
     def loop(self, stop: threading.Event, every_s: float = 60.0) -> None:
         while not stop.wait(every_s):
