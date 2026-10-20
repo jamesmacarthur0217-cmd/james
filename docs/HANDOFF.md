@@ -22,7 +22,10 @@ household use is generally outside the Act; their filled-in camera sign and data
 chart on the Health page `#usual`, then docs + What's new `p43`; 892 tests + 1 PostgreSQL test skipped without
 `VL_TEST_POSTGRES_URL`). Checked on a test copy filled with 56 days of made-up people (script in the session scratchpad,
 not kept: tracks per day + Away spans via `db.add_arming`, then run.py on an empty COCO room photo, 000000000632.jpg).
-**Next: ask the user** what comes next. Still waiting for them: restart their own app (stop.bat, start.bat), the
+**Next: [PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)** (2026-10-20): safety incidents (11 kinds the user listed) and
+suspicious behaviour (behaviour only, never looks) on security cameras; the user agreed the architecture (fast checks then
+the vision model confirms; new columns on alert_events; a role per drawn area; extra models decided per phase) and
+wants **any further architecture discussed with them before it is built**. No phase started. Still waiting for them: restart their own app (stop.bat, start.bat), the
 First-run check, then Phase 26 (real-camera week). Ideas offered 2026-10-19 and not chosen yet (ask before offering
 again): PC history chart, weekly report saved by itself, a week in one minute.
 
@@ -668,5 +671,6 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then ask me what comes next (the Phases 41-43
-> plan is finished); ask me before each phase and each step starts, and do it step by step.
+> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE44-49-PLAN.md
+> (Phase 44, the safety base); ask me before each phase and each step starts, discuss any architecture with me first,
+> and do it step by step.

@@ -1,11 +1,15 @@
 # VisionLabeler: next improvements roadmap
 
-## Status (2026-10-19)
+## Status (2026-10-20)
 
 Latest: Phases 36-43 and 28 are done (2026-10-17 to 2026-10-20; 892 tests); the
 [PHASE41-43-PLAN.md](PHASE41-43-PLAN.md) plan is finished (43: the usual day as a chart on the Health page). Next: ask
 the user. Phase 26 waits for the user's app to run the new version (the
 safe-update test passed on their database), Phase 29 for more cameras.
+**Next plan: [PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)** (2026-10-20): safety incidents and suspicious behaviour on
+security cameras (44 safety base, 45 people, 46 fire and smoke, 47 objects and places, 48 aggression, 49 suspicious
+behaviour). Architecture agreed with the user; no phase started; ask before each phase and step, and discuss any new
+architecture first.
 
 Earlier (2026-10-15): Phases 16, 27, 28 (steps 2-4) and 30-35 done (795 tests).
 
