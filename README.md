@@ -815,6 +815,36 @@ and became a red pop-up; 3 MOT16 street pictures asked about fire were answered 
 check raises suspects yet, so no kind is measured; each later phase measures its own (found, false alarms per hour,
 late).
 
+### People: falls, lying still, slumped (Phase 45 step 1)
+
+On safety cameras the quick checks for people (`labeler/safety.py`, one SafetyWatch per camera, every frame) raise
+"person needing help" when someone is **lying still** 20 s (`safety.down_s`), **slumped** (the head below the
+shoulders, not moving) 30 s (`slumped_s`), or has **not moved at all** for 5 min (`still_s`: the slow round for
+distress, checked after people's labels with its own question). Never in an area with the role "bed"; once per still
+period. The vision model sees the part of the picture around the person (a far person is too small in the whole
+picture).
+
+**Falls are checked by the vision model too** (the user's choice): when the fall check (above) confirms a fall on a
+safety camera, the vision model is asked "Is a person lying or sitting on the floor (not on a bed, sofa or chair)?";
+only a clear "no" stops the alert; no answer (no vision model, a failed check, one that waited too long, or one just
+checked) alerts as before, so a fall is never lost to Ollama. On a camera without safety checks (kiosk) a fall alerts at
+once as before. A fall is not checked again as "lying still". Tuning (`tools/incident_check.py`, UR Fall camera 0,
+held 30 s): asked "does this person need help?", the model called one real fall "exercising" (1 of 15 lost); asked what
+is visible, 15 of 15.
+
+Report half (falls 16-30, everyday clips 21-40, 30 pictures a second, not looked at while tuning):
+
+| | falls with an alert | false alerts (20 everyday clips) |
+|---|---|---|
+| Before (fall alerts at once) | 13 of 15 | 1 |
+| Now (vision model + lying still / slumped) | **14 of 15** (13 falls, all confirmed; 1 more by lying still) | **3** |
+
+The vision model stopped no real fall and no false one: the one false fall (adl-30) really had someone on the floor
+("person on floor"). The 2 new false alerts are people sitting slumped on the floor (adl-33, adl-34) whose last
+picture the measurement holds for 30 s; one person lying on a bed was answered "no" (a "bed" area skips it). MOT16
+street videos (7, 3.5 min): no suspect. At 10 pictures a second the fall check caught only 9 of 15 there: measure
+falls at the camera's own rate.
+
 ## No movement
 
 For someone living alone (an elderly parent): an alert when nobody has been seen on the camera for a long time while

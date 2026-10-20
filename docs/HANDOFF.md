@@ -27,7 +27,9 @@ suspicious behaviour (behaviour only, never looks) on security cameras; the user
 the vision model confirms; new columns on alert_events; a role per drawn area; extra models decided per phase) and
 wants **any further architecture discussed with them before it is built**. **Phase 44 done 2026-10-20** (`55a60c3`
 area roles, `2e6bca2` confirm queue + one priority queue for the vision model, then safety alerts; 916 tests): next
-Phase 45 (people: down/slumped, children, crowding; its step 0 is the measuring tool `tools/incident_check.py`).
+Phase 45 (people: down/slumped, children, crowding). Step 0 (`3e28566`, `tools/incident_check.py`) and step 1
+(falls checked by the vision model with a fail-safe, lying still / slumped / not moved: `labeler/safety.py`) done
+2026-10-20; next step 2 (child safety). Measure falls at 30 pictures a second (at 10 the fall check misses more).
 Measured: a check 1.4 s with 3 pictures; **4 pictures exceed Ollama's 4096-token context** (refused with 400);
 6 checks a minute on a very busy camera double people's label wait (3.6 -> 7.7 s), 3 a minute hardly matter. Still waiting for them: restart their own app (stop.bat, start.bat), the
 First-run check, then Phase 26 (real-camera week). Ideas offered 2026-10-19 and not chosen yet (ask before offering

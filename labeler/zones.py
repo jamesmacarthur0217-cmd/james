@@ -33,6 +33,12 @@ ROLES = {"walkway": "walkway or aisle", "exit": "exit or emergency exit", "cooki
          "restricted": "restricted (staff or no entry)", BED: "bed or sofa (lying is normal here)"}
 
 
+def role_at(zones: list[dict], pt: tuple[float, float]) -> str:
+    """The role of the first area with a role that this point is in ("" when none)."""
+    return next((z.get("role") or "" for z in zones
+                 if z["kind"] == AREA and z.get("role") and inside(pt, z["points"])), "")
+
+
 def check_role(kind: str, role: str | None) -> str:
     """A valid role for a zone ("" for none); only areas have one."""
     role = (role or "").strip()

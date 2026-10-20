@@ -118,7 +118,10 @@ DEFAULTS: dict = {
     # seconds; at most confirm_per_min checks a minute; a suspect waiting longer than max_wait_s is dropped; the same
     # camera, kind and area is not checked again within cooldown_s.
     "safety": {"enabled": True, "memory_s": 10, "memory_every_s": 1.0, "memory_side": 960, "frames": 3,
-               "frames_span_s": 4, "confirm_per_min": 6, "max_wait_s": 30, "cooldown_s": 60},
+               "frames_span_s": 4, "confirm_per_min": 6, "max_wait_s": 30, "cooldown_s": 60,
+               # Quick checks for people (labeler/safety.py): lying still, slumped, not moved at all (the slow round
+               # for distress), in seconds; "not moved" = within still_move of the person's height.
+               "down_s": 20, "slumped_s": 30, "still_s": 300, "still_move": 0.08},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,
               "low_ratio": 0.5, "lost_s": 0.5, "min_width": 1.25},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored
     "embeddings": {"enabled": True, "model": "google/siglip2-base-patch16-224", "device": "cuda"},

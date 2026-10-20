@@ -33,6 +33,7 @@ import copy
 import csv
 import json
 import logging
+import re
 import statistics
 import sys
 import tempfile
@@ -73,8 +74,8 @@ def score(truth: dict[str, dict], results: dict[str, dict], kinds: list[str], la
         for video, res in results.items():
             mine = [(a, b) for k, a, b in truth.get(video, {"spans": []})["spans"] if k == kind]
             sus = [t for t, k in res["suspects"] if k == kind]
-            yes = [t for t, k, ans in res["answers"] if k == kind and ans == "yes"]
-            for _, k, ans in res["answers"]:
+            yes = [t for t, k, ans, *_ in res["answers"] if k == kind and ans == "yes"]
+            for _, k, ans, *_ in res["answers"]:
                 if k == kind:
                     answers[ans] = answers.get(ans, 0) + 1
             inside = lambda t: any(a - SLACK_S <= t <= b + late_s for a, b in mine)   # noqa: E731
@@ -156,7 +157,8 @@ def run_video(video: Path, cfg: dict, embedder, fps: float, half: str, hold_s: f
         return got
 
     q.suspect = suspect
-    q.listeners.append(lambda s, a: answers.append((round(p.clock.t, 2), s.category, a["answer"])))
+    q.listeners.append(lambda s, a: answers.append((round(p.clock.t, 2), s.category, a["answer"], s.reason,
+                                                    a.get("what", ""))))
     p.incidents = q   # the quick checks (Phase 45+) raise suspects through this
     t = 0.0
     for frame, t in frames(video, fps, half, hold_s):
@@ -212,12 +214,22 @@ def main() -> int:
     ap.add_argument("--late-s", type=float, default=30.0, help="an alert this long after a span still finds it")
     ap.add_argument("--no-vlm", action="store_true", help="answer every check yes (the quick checks alone)")
     ap.add_argument("--limit", type=int, help="only the first N videos")
+    ap.add_argument("--match", help="only videos whose path matches this regular expression (a tuning half)")
     ap.add_argument("--json", type=Path)
-    ap.add_argument("--make-truth", choices=["urfd"])
+    ap.add_argument("--make-truth", choices=["urfd", "mot16"])
     args = ap.parse_args()
-    if args.make_truth:
+    if args.make_truth == "urfd":
         out = ROOT / "data" / "datasets" / "urfd" / "incidents_truth.csv"
         print(f"{make_truth_urfd(out)} rows -> {out}")
+        return 0
+    if args.make_truth == "mot16":   # people walking and standing in streets and a mall: no incident
+        out = ROOT / "data" / "datasets" / "mot16" / "incidents_truth.csv"
+        videos = sorted((ROOT / "data" / "datasets" / "mot16" / "train_videos").glob("*.mp4"))
+        with open(out, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["video", "kind", "start_s", "end_s", "half"])
+            w.writerows([[v.relative_to(ROOT).as_posix(), "", "", "", ""] for v in videos])
+        print(f"{len(videos)} rows -> {out}")
         return 0
     if not args.config or not args.truth:
         ap.error("--config and --truth are needed (or --make-truth)")
@@ -239,13 +251,14 @@ def main() -> int:
     from labeler.embed import Embedder
     embedder = Embedder(cfg["embeddings"])
     results = {}
-    videos = list(truth)[: args.limit] if args.limit else list(truth)
+    videos = [v for v in truth if not args.match or re.search(args.match, v)]
+    videos = videos[: args.limit] if args.limit else videos
     for i, video in enumerate(videos, 1):
         started = time.monotonic()
         results[video] = run_video(ROOT / video, cfg, embedder, args.fps, truth[video]["half"], args.hold_s, client)
         r = results[video]
         print(f"[{i}/{len(videos)}] {Path(video).name}: {r['seconds']:.0f} s, {len(r['suspects'])} suspects, "
-              f"{sum(a == 'yes' for *_, a in r['answers'])} confirmed ({time.monotonic() - started:.0f} s)", flush=True)
+              f"{sum(a[2] == 'yes' for a in r['answers'])} confirmed ({time.monotonic() - started:.0f} s)", flush=True)
     rows = score(truth, results, kinds, args.late_s)
     print(f"\n{len(videos)} videos, {rows[0]['hours'] if rows else 0} h" + (" (no vision model: every check yes)"
                                                                           if args.no_vlm else ""))

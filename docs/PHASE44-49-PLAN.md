@@ -129,6 +129,13 @@ checked).
    "wheelchair" + lying). Confirm: "Does this person need help (collapsed, slumped, in distress)?". Distress has no fast
    sign: a slow round over people who have not moved for long. Measured with UR Fall (have it) and normal sitting
    (MOT16, COCO).
+   **Done 2026-10-20**: `labeler/safety.py` SafetyWatch (lying still 20 s, slumped 30 s, not moved 5 min = slow round
+   with a distress question), `zones.role_at`; Pipeline `_raise` (a crop around the person), `_on_fall` through the
+   queue with the fail-safe (Suspect.on_done; only a clear "no" stops it; cooldown, no pictures, failed, dropped: alert);
+   `incidents.FALL_QUESTION` (what is visible: "need help?" called a real fall "exercising"); a fall marks lying still
+   as handled. Measured with `tools/incident_check.py` (README "People: falls, lying still, slumped"): report half
+   14 of 15 falls with an alert (before 13), 3 false alerts on 20 everyday clips (before 1); MOT16 none. Not done:
+   overturned wheelchair (lying still covers the person). 931 tests.
 2. **Child safety**: age group child (age model / vision model) and rules: a child with no adult within a distance
    (scaled by body height) for 60 s; a child in a cooking, food-prep or restricted area; climbing (hips above the
    child's own standing height, or on a table box). Confirm before alerting.

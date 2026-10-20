@@ -230,10 +230,14 @@ class Pipeline:
         # Safety incidents (labeler/incidents.py): the last seconds of pictures, for the vision model's checks.
         scfg = self.cfg.get("safety") or {}
         self.memory = None
+        self.safety_watch = None   # the quick checks for people (labeler/safety.py)
+        self.incidents = None      # the confirm queue (labeler/incidents.py), set by run.py
         if scfg.get("enabled") and cam.get("safety", self.mode == "security"):
             from .incidents import FrameMemory
+            from .safety import SafetyWatch
             self.memory = FrameMemory(scfg.get("memory_s", 10), scfg.get("memory_every_s", 1.0),
                                       scfg.get("memory_side", 960))
+            self.safety_watch = SafetyWatch(scfg)
         # Areas with a loitering rule (people, vehicles): the live picture shows how long someone is in them.
         self._stay_areas: frozenset[str] = frozenset()
         self._stay_areas_v: frozenset[str] = frozenset()
@@ -468,7 +472,10 @@ class Pipeline:
                 if self.falls is not None:
                     ok = zones_mod.lying_ok(self.zone_counter.zones, zones_mod.anchor(st.box, frame.shape, self.mode))
                     if self.falls.update(tid, now, st.box, kpts, ok, frame.shape[0]):
-                        self._on_fall(tid)
+                        self._on_fall(tid, frame.shape)
+                if self.safety_watch is not None:
+                    role = zones_mod.role_at(self.zone_counter.zones, zones_mod.anchor(st.box, frame.shape, self.mode))
+                    self.safety_watch.update(tid, now, st.box, kpts, role)
                 if getattr(self, "gestures", None) is not None:
                     sign = self.gestures.update(tid, now, kpts)
                     if sign:
@@ -481,7 +488,10 @@ class Pipeline:
             test["holding"] = round(self.gestures.holding(now), 1)   # for the page: how long a hand is up now
         if self.falls is not None:
             for tid, _ in self.falls.tick(now):   # falls confirmed although the person is no longer seen
-                self._on_fall(tid)
+                self._on_fall(tid, frame.shape)
+        if self.safety_watch is not None and self.incidents is not None:
+            for tid, category, reason, level, question in self.safety_watch.tick(now):
+                self._raise(tid, category, reason, frame.shape, level=level, question=question)
         if ((self.vehicles is not None or self.animals is not None)
                 and self.frames % max(1, int(self.vehicle_cfg["every_n_frames"])) == 0):
             self._update_vehicles(frame, now)
@@ -493,6 +503,8 @@ class Pipeline:
             if tid not in seen and now - st.last_seen > tcfg["lost_after_s"]:
                 if self.falls is not None and st.db_id is not None:
                     self._fall_db[tid] = st.db_id
+                if self.safety_watch is not None:
+                    self.safety_watch.forget(tid)
                 self._finish(tid, lost_at=st.last_seen)
         if self._fall_db and self.frames % 100 == 0:
             self._fall_db = {k: v for k, v in self._fall_db.items() if k in self.falls.tracks}
@@ -668,14 +680,51 @@ class Pipeline:
         log.warning("HELP SIGN [%s] person #%s held a hand up for %g s", self.name, st.db_id, self.gestures.hold_s)
         self._check_alerts(st.db_id, helped=True)
 
-    def _on_fall(self, tid: int) -> None:
-        """A fall is confirmed: the person was down for falls.after_s (labeler/falls.py)."""
+    def _on_fall(self, tid: int, shape: tuple | None = None) -> None:
+        """A fall is confirmed: the person was down for falls.after_s (labeler/falls.py). On a safety camera the
+        vision model checks it first (the user's choice, Phase 45): only a clear "no" stops the alert; no answer
+        (no vision model, failed, waited too long, checked just before) alerts as before."""
         st = self.tracks.get(tid)
         if st is not None:
             self._ensure_db(st)
         db_id = st.db_id if st is not None else self._fall_db.get(tid)
         log.warning("FALL [%s] person #%s has been down for %d s", self.name, db_id, self.falls.after_s)
-        self._check_alerts(db_id, fallen=True)
+
+        def done(answer):
+            if answer is not None and answer.get("answer") == "no":
+                log.warning("FALL [%s] person #%s: the vision model sees nobody down (%s): no alert", self.name,
+                            db_id, answer.get("what", ""))
+                return
+            self._check_alerts(db_id, fallen=True)
+
+        from .incidents import FALL_QUESTION
+        if getattr(self, "safety_watch", None) is not None:
+            self.safety_watch.mark(tid)   # one fall, one check: not again as "lying still"
+        if self._raise(tid, "fall", f"down for {int(self.falls.after_s)} s after a fall", shape, db_id=db_id,
+                       question=FALL_QUESTION, on_done=done) != "queued":
+            done(None)
+
+    def _raise(self, tid: int, category: str, reason: str, shape: tuple | None, db_id: int | None = None,
+               level: str | None = None, question: str | None = None, on_done=None) -> str:
+        """A quick check saw something about this person: ask the confirm queue (labeler/incidents.py), with the
+        part of the picture around them. Returns the queue's answer ("queued", ...) or "off"."""
+        if getattr(self, "incidents", None) is None or getattr(self, "memory", None) is None:
+            return "off"
+        st = self.tracks.get(tid)
+        if st is not None and db_id is None:
+            self._ensure_db(st)
+            db_id = st.db_id
+        crop = None
+        if st is not None and shape is not None:
+            h, w = shape[:2]
+            x1, y1, x2, y2 = st.box[:4]
+            crop = (x1 / w, y1 / h, x2 / w, y2 / h)
+        try:
+            return self.incidents.suspect(self.name, category, reason, people=[db_id] if db_id is not None else [],
+                                          crop=crop, level=level, question=question, on_done=on_done)
+        except Exception:
+            log.exception("[%s] raising a safety check failed", self.name)
+            return "failed"
 
     def _should_ignore(self, box: tuple, shape: tuple) -> bool:
         """Skip detections that cannot be a person we care about: inside an ignore zone (a monitor,

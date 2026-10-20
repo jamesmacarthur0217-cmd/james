@@ -76,6 +76,11 @@ CATEGORIES = {
 }
 
 
+# A fall the fall check saw (labeler/falls.py) is checked for what is visible, not for need: asked "does this person
+# need help?", the model called a real fall "exercising" (UR Fall fall-15, Phase 45 tuning half).
+FALL_QUESTION = "Is a person lying or sitting on the floor (not on a bed, sofa or chair)?"
+
+
 def job_id(n: int) -> int:
     return -(INCIDENT_BASE + n)
 
@@ -145,22 +150,48 @@ class Suspect:
     at: datetime = field(default_factory=datetime.now)
     queued: float = 0.0                  # monotonic time it was queued
     number: int = 0
+    crop: tuple | None = None            # (x1, y1, x2, y2) fractions: the person it is about, cut out with context
+    question: str | None = None          # instead of the category's own question
+    level_as: str | None = None          # instead of the category's level ("round": a slow round, after people)
+    on_done: object = None               # called with the answer, or None when no answer came (failed, dropped):
+                                         # the caller alerts itself (falls: only a clear "no" stops the alert)
 
     @property
     def level(self) -> str:
-        return CATEGORIES[self.category][0]
+        return self.level_as or CATEGORIES[self.category][0]
 
     @property
     def key(self) -> tuple:
-        return self.camera, self.category, (self.area or {}).get("id")
+        """Checked again only after the cooldown: the same camera, kind, area and (for a person's check) person."""
+        return self.camera, self.category, (self.area or {}).get("id"), tuple(self.people[:1])
 
 
 def prompt_for(s: Suspect, gap_s: float) -> str:
-    return incident_prompt(len(s.pictures), gap_s, (s.area or {}).get("name", ""), CATEGORIES[s.category][2])
+    return incident_prompt(len(s.pictures), gap_s, (s.area or {}).get("name", ""),
+                           s.question or CATEGORIES[s.category][2])
+
+
+CROP_MARGIN = 0.75   # around a person: this share of their box's width and height on each side (the floor, a chair)
+CROP_MIN = 0.35      # at least this share of the picture's width and height: enough of the room to judge
+
+
+def person_crop(pic: np.ndarray, crop: tuple) -> np.ndarray:
+    """The part of the picture around a person: a far person is too small for the vision model in the whole picture."""
+    h, w = pic.shape[:2]
+    x1, y1, x2, y2 = crop
+    bw, bh = max(x2 - x1, CROP_MIN / (1 + 2 * CROP_MARGIN)), max(y2 - y1, CROP_MIN / (1 + 2 * CROP_MARGIN))
+    cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+    half_w, half_h = bw * (0.5 + CROP_MARGIN), bh * (0.5 + CROP_MARGIN)
+    a, b = max(0, int((cx - half_w) * w)), max(0, int((cy - half_h) * h))
+    c, d = min(w, int((cx + half_w) * w)), min(h, int((cy + half_h) * h))
+    return pic[b:d, a:c] if c - a > 8 and d - b > 8 else pic
 
 
 def pictures_for(s: Suspect) -> list[np.ndarray]:
-    """What the vision model sees: each picture, cut out around the area when there is one (labeler/scene.py)."""
+    """What the vision model sees: each picture, cut out around the person (crop) or the area when there is one
+    (labeler/scene.py), else whole."""
+    if s.crop:
+        return [person_crop(p[1], s.crop) for p in s.pictures]
     if not s.area:
         return [p[1] for p in s.pictures]
     from .scene import area_picture
@@ -193,12 +224,15 @@ class ConfirmQueue:
         return number_of(job) is not None
 
     def suspect(self, camera: str, category: str, reason: str, area: dict | None = None, people=(),
-                pictures: list | None = None) -> str:
-        """A fast check saw something. Returns "queued", "cooldown" (checked just now) or "no pictures"."""
+                pictures: list | None = None, crop: tuple | None = None, question: str | None = None,
+                level: str | None = None, on_done=None) -> str:
+        """A fast check saw something. Returns "queued", "cooldown" (checked just now) or "no pictures"; only
+        when "queued" will on_done be called (with the answer, or None when none came)."""
         if category not in CATEGORIES:
             raise ValueError(f"unknown incident category {category!r}")
         now = self.clock()
-        s = Suspect(camera, category, reason, area, list(people), queued=now)
+        s = Suspect(camera, category, reason, area, list(people), queued=now, crop=crop, question=question,
+                    level_as=level, on_done=on_done)
         with self._lock:
             self.counts["suspects"] += 1
             if now - self.last_sent.get(s.key, -1e9) < self.cooldown_s or any(w.key == s.key for w in self.waiting):
@@ -225,6 +259,9 @@ class ConfirmQueue:
                 self.counts["dropped_old"] += 1
                 log.warning("[%s] safety check dropped after %.0f s waiting: %s (%s)", s.camera, now - s.queued,
                             s.category, s.reason)
+        for s in old:
+            self._done(s, None)
+        with self._lock:
             while self.sent_at and now - self.sent_at[0] >= 60:
                 self.sent_at.popleft()
             if not self.waiting or self.sent or len(self.sent_at) >= self.per_min:
@@ -251,10 +288,14 @@ class ConfirmQueue:
             s = self.sent.pop(n, None)
             if s is None:
                 return
-            if not results:
+            failed = not results
+            if failed:
                 self.counts["failed"] += 1
                 log.warning("[%s] safety check failed (vision model): %s", s.camera, s.category)
-                return
+        if failed:
+            self._done(s, None)
+            return
+        with self._lock:
             answer = results[0]
             self.counts[answer["answer"]] += 1
             self.recent.append({"camera": s.camera, "category": s.category, "level": s.level, "reason": s.reason,
@@ -268,6 +309,15 @@ class ConfirmQueue:
                 listener(s, answer)
             except Exception:
                 log.exception("a safety check listener failed")
+        self._done(s, answer)
+
+    @staticmethod
+    def _done(s: Suspect, answer: dict | None) -> None:
+        if s.on_done is not None:
+            try:
+                s.on_done(answer)
+            except Exception:
+                log.exception("[%s] handling a safety check's answer failed", s.camera)
 
     def state(self) -> dict:
         with self._lock:
@@ -320,7 +370,7 @@ class IncidentAlerts:
             return None
 
     def __call__(self, s: Suspect, answer: dict) -> list[dict]:
-        if answer.get("answer") != "yes":
+        if answer.get("answer") != "yes" or s.on_done is not None:   # on_done: the caller alerts itself (falls)
             return []
         area = (s.area or {}).get("name")
         rules = self.alerts.check_incident(s.camera, s.category, area)
