@@ -33,7 +33,9 @@ Phase 45 (people: down/slumped, children, crowding). Step 0 (`3e28566`, `tools/i
 alarms measurable: no video with children here); step 3 (crowding) done: **Phase 45 is done 2026-10-20**; next
 Phase 46 (fire and smoke): step 1 done 2026-10-20 (own model trained on D-Fire, CC0: data/models/fire/fire_smoke.pt,
 test mAP50 0.767, 9.5 ms; `tools/train_fire.py`); step 2 done (`labeler/fire.py`, once a second on safety cameras);
-next step 3 (measure on fire videos; the user requests the MIVIA videos). MOT20 is in data/datasets/mot20 (zip 5 GB +
+step 3 done (D-Fire's 100 videos: 38 of 50 fires found, median 3 s, 5 of 50 false): **Phase 46 is done
+2026-10-20**; the MIVIA videos (requested by the user) are measured when they arrive. Next: Phase 47 (objects and
+places: weapons, blocked exits, floor hazards, equipment, pests); discuss its design first. MOT20 is in data/datasets/mot20 (zip 5 GB +
 unpacked train + videos; the user may want the zip deleted). Measure falls at 30 pictures a second.
 Measured: a check 1.4 s with 3 pictures; **4 pictures exceed Ollama's 4096-token context** (refused with 400);
 6 checks a minute on a very busy camera double people's label wait (3.6 -> 7.7 s), 3 a minute hardly matter. Still waiting for them: restart their own app (stop.bat, start.bat), the
@@ -693,5 +695,5 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE44-49-PLAN.md
-> (Phase 46, fire and smoke); ask me before each phase and each step starts, discuss any architecture with me first,
-> and do it step by step.
+> (Phase 47, objects and places); ask me before each phase and each step starts, discuss any architecture with me
+> first, and do it step by step.

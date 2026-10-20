@@ -10,7 +10,8 @@ safe-update test passed on their database), Phase 29 for more cameras.
 security cameras (44 safety base, 45 people, 46 fire and smoke, 47 objects and places, 48 aggression, 49 suspicious
 behaviour). Architecture agreed with the user; **Phase 44 (the safety base) done 2026-10-20** (area roles, confirm
 queue, safety alerts; 916 tests); **Phase 45 (people: falls checked by the vision model, lying still, slumped,
-children, crowding) done 2026-10-20**; next: Phase 46 (fire and smoke). Ask before each phase and step, and discuss any new
+children, crowding) done 2026-10-20**; **Phase 46 (fire and smoke: our own model trained on D-Fire) done
+2026-10-20**; next: Phase 47 (objects and places). Ask before each phase and step, and discuss any new
 architecture first.
 
 Earlier (2026-10-15): Phases 16, 27, 28 (steps 2-4) and 30-35 done (795 tests).

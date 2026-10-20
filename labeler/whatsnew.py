@@ -131,11 +131,15 @@ ENTRIES: list[Entry] = [
           "seconds and an alert comes only if it confirms; critical ones pop up red with a beep. 12 kinds, each a rule "
           "on the Alerts page. The quick checks for each kind come in the next phases.", "/alerts",
           marker="alert_events.category"),
-    Entry("p45", 45, "", "Safety checks for people",
+    Entry("p45", 45, "85da519", "Safety checks for people",
           "On security cameras: falls are checked by the vision model too (only a clear \"no\" stops the alert), and "
           "new checks for someone lying still, slumped or not moving for long, a child alone, in a cooking area or "
           "climbing, and crowding: give an area \"at most N people\" on the Live page (it shows how many are there "
           "now).", "/", marker="zones.max_people"),
+    Entry("p46", 46, "", "Fire and smoke",
+          "On security cameras our own fire and smoke detector looks once a second; when it keeps seeing fire or smoke, "
+          "the vision model checks the last seconds and a red alert with a beep comes if it confirms. Flames and steam "
+          "inside an area marked \"cooking area\" are normal. Needs data/models/fire/fire_smoke.pt.", "/alerts"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

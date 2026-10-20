@@ -897,8 +897,25 @@ log says so.
 The model on D-Fire's test part (4,302 pictures it never saw, single photos): mAP50 0.767, smoke 0.83 (precision
 0.81, recall 0.77), fire 0.71 (0.71, 0.64). Real run on a test copy: a D-Fire test picture of a fire at night was seen
 within 2 s and confirmed "yes: large fire with smoke" (10.5 s: the first request after start loads the model); a
-daytime picture of the same kind of camera with no fire raised nothing in 40 s. Fire videos and false alarms on
-videos: Phase 46 step 3.
+daytime picture of the same kind of camera with no fire raised nothing in 40 s.
+
+**On videos** (`tools/incident_check.py`, the real camera code and the vision model; D-Fire's sample surveillance
+videos, downloaded with the user's OK, 0.44 GB): 50 with fire ("VP": mostly distant wildfire smoke on hillsides seen by
+city cameras, 30 s each; marked as fire for the whole clip) and 50 without ("FP": fog and low clouds over hills, dust,
+car headlights and city lights at night, a Christmas tree, red lights, sunset glare):
+
+| | fire videos with an alert | how fast | no-fire videos with a false alert |
+|---|---|---|---|
+| Our detector + the vision model (the app) | **38 of 50** (43 raised; the vision model said no to 5) | median 3 s, worst 28 s | **5 of 50** (21 min; 15 raised, 10 stopped by the vision model) |
+| The vision model alone, one picture per video ("Is there fire or smoke?", 0.6 s) | 36 of 50 | only as often as it is asked (a scene question: every 5 min) | 5 of 50 |
+
+The false ones: a small orange spot at the end of a road taken for flames twice (FP13, FP29, the same camera), clouds
+over hills taken for smoke (FP4, FP8, FP19). Missed: faint smoke at the edge of a hazy picture (VP7: "no visible
+smoke"), 7 never raised by the detector. Everyday videos (MOT16 7, UR Fall 70, 10 min): nothing raised. Single photos
+(COCO): 2.6% / 1.7% of 115 kitchens with an oven got a smoke / flame box and 3.4% / 1.8% of 500 other photos (a pizza
+in an oven, a sandwich, a fridge, ceiling lights, a breaking wave): on a camera such a thing must be seen 3 of 5
+seconds and pass the vision model, and a "cooking" area excuses stoves. Not measured yet: fires indoors (D-Fire's
+videos are outdoor smoke), and the MIVIA videos (requested by the user; to add when they arrive).
 
 ## No movement
 

@@ -190,6 +190,11 @@ mivia.unisa.it/datasets/video-analysis-datasets/fire-detection-dataset/ and it i
    things that look like fire: stoves, candles, sunsets, red lights, steam, a TV (COCO kitchens, MOT16, UR Fall);
    found / late on fire videos. Compare with a plain scene question ("Is there fire or smoke?") every 5 minutes.
 3. Pages, Settings, README; critical level with a beep.
+   **Steps 2-3 measured 2026-10-20** (D-Fire's 100 sample videos, 0.44 GB, downloaded with the user's OK through the
+   browser; truth `data/datasets/dfire/videos_truth.csv`): the app found 38 of 50 fire videos (median 3 s), 5 false of
+   50 tricky no-fire videos; the vision model alone on one picture each: 36 and 5 (README "Fire and smoke"). Everyday
+   videos: nothing. Pages and the beep came from Phase 44 (critical level). **Phase 46 is done**; to add when the user
+   has them: the MIVIA videos (requested by the user).
 
 ## Phase 47: Objects and places (weapons, blocked exits, floor hazards, equipment, pests)
 
