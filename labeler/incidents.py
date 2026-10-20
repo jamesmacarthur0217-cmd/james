@@ -210,6 +210,7 @@ class ConfirmQueue:
             with self._lock:
                 self.counts["no_pictures"] += 1
             return "no pictures"
+        s.at = s.pictures[-1][0]   # the camera's own time (a video's when measuring or importing)
         with self._lock:
             self.waiting.append(s)
         return "queued"

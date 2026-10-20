@@ -114,6 +114,15 @@ checked).
 
 0. (from Phase 44) `tools/incident_check.py`: videos with true time spans per kind -> found / false alarms per hour /
    late, through the real quick checks and the vision model.
+   **Done 2026-10-20**: the app's own Pipeline on each video's clock (VideoClock, scratch database, security camera,
+   safety on), the confirm queue on the video's clock too, the video waiting while the vision model answers (quality,
+   not speed); truth CSV `video,kind,start_s,end_s,half`; `--make-truth urfd` writes
+   `data/datasets/urfd/incidents_truth.csv` (30 falls: "fall" over the falling frames, "person_down" from lying to the
+   end + 60 s; 40 everyday clips as negatives; the color half); `--hold-s`, `--no-vlm` (quick checks alone), `--json`.
+   Reports spans, raised (suspects), found (confirmed), false per hour at both stages, late, answers. Checked: 3 videos
+   run (0 suspects: no quick check yet); a stand-in suspect through the real vision model on fall-01 counted as found
+   (8.3 s after lying began) and a stand-in fire as a false suspect, not a false alert. Also: a suspect's time is now
+   the camera's own (the newest picture's), right for videos. 921 tests.
 
 1. **Person down or slumped**: today's lying from body points works for side views; add *slumped* (sitting, head below
    the shoulders, still for 20 s) and *down after a fall* on security views; overturned wheelchair (mobility aid
