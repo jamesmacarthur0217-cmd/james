@@ -253,6 +253,7 @@ class Zone(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     lying_ok: Mapped[bool | None] = mapped_column(Boolean, default=False)   # a bed or sofa: no fall alerts here
     role: Mapped[str | None] = mapped_column(String(20))   # what the area is (labeler/zones.py ROLES); "bed" = lying_ok
+    max_people: Mapped[int | None] = mapped_column(Integer)   # "at most N people" (labeler/safety.py crowding); none
 
 
 class ZoneEvent(Base):
@@ -468,7 +469,7 @@ NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT", "video_path
                           "source_offset_s": "FLOAT"},
                "cameras": {"retention_days": "INTEGER"},
                "recordings": {"kept": "VARCHAR(20)"},
-               "zones": {"lying_ok": "BOOLEAN", "role": "VARCHAR(20)"},
+               "zones": {"lying_ok": "BOOLEAN", "role": "VARCHAR(20)", "max_people": "INTEGER"},
                "scene_questions": {"zone_id": "INTEGER", "only_away": "BOOLEAN", "hours": "VARCHAR(5)"},
                "alert_events": {"vehicle_id": "INTEGER", "animal_id": "INTEGER", "scene_id": "INTEGER",
                                 "picture": "TEXT", "category": "VARCHAR(20)", "level": "VARCHAR(10)",
@@ -1451,7 +1452,8 @@ class Database:
         from .zones import BED
         return {"id": z.id, "camera": z.camera, "name": z.name, "kind": z.kind,
                 "points": [tuple(p) for p in json.loads(z.points)], "lying_ok": bool(z.lying_ok),
-                "role": z.role or (BED if z.lying_ok else "")}   # areas marked before roles existed: a bed
+                "role": z.role or (BED if z.lying_ok else ""),   # areas marked before roles existed: a bed
+                "max_people": z.max_people}
 
     def list_zones(self, camera: str | None = None) -> list[dict]:
         q = select(Zone).order_by(Zone.camera, Zone.name)
@@ -1460,12 +1462,14 @@ class Database:
         with self.Session() as s:
             return [self._zone_dict(z) for z in s.scalars(q)]
 
-    def add_zone(self, camera: str, name: str, kind: str, points: list, lying_ok: bool = False, role: str = "") -> dict:
+    def add_zone(self, camera: str, name: str, kind: str, points: list, lying_ok: bool = False, role: str = "",
+                 max_people: int | None = None) -> dict:
         """A new area or counting line. An area's role (labeler/zones.py ROLES) wins over lying_ok; lying_ok alone
         (the page before roles) makes it a bed."""
-        from .zones import AREA, BED, check_points, check_role
+        from .zones import AREA, BED, check_limit, check_points, check_role
         pts = check_points(kind, points)
         role = check_role(kind, role)
+        max_people = check_limit(kind, max_people)
         if kind == AREA and lying_ok and not role:
             role = BED
         name = name.strip()[:100]
@@ -1475,20 +1479,29 @@ class Database:
             if s.scalars(select(Zone).where(Zone.camera == camera, Zone.name == name)).first():
                 raise ValueError(f"camera {camera} already has a zone named {name!r}")
             z = Zone(camera=camera, name=name, kind=kind, points=json.dumps([list(p) for p in pts]),
-                     lying_ok=role == BED, role=role or None)
+                     lying_ok=role == BED, role=role or None, max_people=max_people)
             s.add(z)
             s.flush()
             return self._zone_dict(z)
 
     def set_zone_role(self, zone_id: int, role: str) -> dict | None:
         """Change an area's role ("" = none); lying_ok follows it ("bed"). None when there is no such zone."""
-        from .zones import BED, check_role
+        return self.update_zone(zone_id, role=role)
+
+    _UNSET = object()
+
+    def update_zone(self, zone_id: int, role=_UNSET, max_people=_UNSET) -> dict | None:
+        """Change an area's role ("" = none; lying_ok follows it) and/or its people limit (None or 0 = none)."""
+        from .zones import BED, check_limit, check_role
         with self.Session.begin() as s:
             z = s.get(Zone, zone_id)
             if z is None:
                 return None
-            role = check_role(z.kind, role)
-            z.role, z.lying_ok = role or None, role == BED
+            if role is not self._UNSET:
+                role = check_role(z.kind, role)
+                z.role, z.lying_ok = role or None, role == BED
+            if max_people is not self._UNSET:
+                z.max_people = check_limit(z.kind, max_people)
             s.flush()
             return self._zone_dict(z)
 

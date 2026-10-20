@@ -279,8 +279,9 @@ Job = tuple[int, list[tuple[np.ndarray, np.ndarray | None]], str | None]
 ResultCallback = Callable[[int, list[dict[str, str]]], None]
 
 # Who goes first (Phase 44): one queue, lowest number first, in arrival order within a number. Critical safety
-# checks jump ahead of people's labels; warnings and slow rounds wait behind them.
-CRITICAL, PEOPLE, WARNING, ROUND = 0, 10, 20, 30
+# checks first, then warnings (crowding, spills: few, and behind a busy camera's labels they were refused or starved,
+# Phase 45; the user's choice), then people's labels, then the slow rounds.
+CRITICAL, WARNING, PEOPLE, ROUND = 0, 5, 10, 30
 _STOP = 99
 
 
@@ -290,7 +291,7 @@ class VLMWorker:
     Up to `workers` frames are sent to Ollama at once (Ollama needs OLLAMA_NUM_PARALLEL >= workers).
     Measured on an RTX 4070 SUPER: 2 at once labels people 1.9x faster than 1; 3 or 4 add nothing.
     Jobs wait in one priority queue (CRITICAL .. ROUND); `max_queue` limits the jobs waiting at PEOPLE and below, so a
-    busy camera never fills the queue for a critical safety check."""
+    busy camera never fills the queue for a safety check (critical or warning)."""
 
     def __init__(self, client: VLMClient, on_result: ResultCallback, max_queue: int = 32, workers: int = 1):
         self.client = client

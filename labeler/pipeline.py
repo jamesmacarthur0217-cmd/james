@@ -232,6 +232,11 @@ class Pipeline:
         self.memory = None
         self.safety_watch = None   # the quick checks for people (labeler/safety.py)
         self.incidents = None      # the confirm queue (labeler/incidents.py), set by run.py
+        # Crowding (Phase 45 step 3, the user's choice): people in areas with a limit are counted once a second by a
+        # copy of the plain detector at a large size; the pose detector finds 0-40% of people in a crowd, this one
+        # 75-90% (tools/crowd_check.py). Its own copy: sharing the vehicle tracker's would reset that tracker.
+        self.counter_model = None
+        self._crowd_counted, self._crowd_counts = -1e9, None
         if scfg.get("enabled") and cam.get("safety", self.mode == "security"):
             from .incidents import FrameMemory
             from .safety import SafetyWatch
@@ -474,8 +479,9 @@ class Pipeline:
                     if self.falls.update(tid, now, st.box, kpts, ok, frame.shape[0]):
                         self._on_fall(tid, frame.shape)
                 if self.safety_watch is not None:
-                    role = zones_mod.role_at(self.zone_counter.zones, zones_mod.anchor(st.box, frame.shape, self.mode))
-                    self.safety_watch.update(tid, now, st.box, kpts, role, self._age_of(st))
+                    where = zones_mod.anchor(st.box, frame.shape, self.mode)
+                    role = zones_mod.role_at(self.zone_counter.zones, where)
+                    self.safety_watch.update(tid, now, st.box, kpts, role, self._age_of(st), where)
                 if getattr(self, "gestures", None) is not None:
                     sign = self.gestures.update(tid, now, kpts)
                     if sign:
@@ -492,6 +498,18 @@ class Pipeline:
         if self.safety_watch is not None and self.incidents is not None:
             for tid, category, reason, level, question in self.safety_watch.tick(now):
                 self._raise(tid, category, reason, frame.shape, level=level, question=question)
+            areas = [z for z in self.zone_counter.zones if z["kind"] == zones_mod.AREA]
+            limited = [z for z in areas if z.get("max_people")]
+            scfg = self.cfg.get("safety") or {}
+            # Every area is counted (the Live page shows "now N people" to set a limit by); 14 ms at 1280 px.
+            if areas and now - self._crowd_counted >= float(scfg.get("crowd_every_s", 1.0)):
+                self._crowd_counted = now
+                self._crowd_counts = self._count_people(frame, areas)
+            for area, reason in self.safety_watch.crowd(now, limited, self._crowd_counts):
+                try:
+                    self.incidents.suspect(self.name, "crowd", reason, area=area)
+                except Exception:
+                    log.exception("[%s] raising a crowd check failed", self.name)
         if ((self.vehicles is not None or self.animals is not None)
                 and self.frames % max(1, int(self.vehicle_cfg["every_n_frames"])) == 0):
             self._update_vehicles(frame, now)
@@ -703,6 +721,25 @@ class Pipeline:
         if self._raise(tid, "fall", f"down for {int(self.falls.after_s)} s after a fall", shape, db_id=db_id,
                        question=FALL_QUESTION, on_done=done) != "queued":
             done(None)
+
+    def _count_people(self, frame: np.ndarray, areas: list[dict]) -> dict | None:
+        """{area id: people inside} from one pass of the plain detector (where their feet are, as for counting), or
+        None without it (the detector file missing: then the tracked people are counted)."""
+        scfg = self.cfg.get("safety") or {}
+        if self.counter_model is None:
+            path = resolve((self.cfg.get("vehicles") or {}).get("model", "yolo11s.pt"))
+            if not path.is_file():
+                return None
+            self.counter_model = YOLO(str(path))
+        try:
+            r = self.counter_model.predict(frame, classes=[0], conf=float(scfg.get("crowd_conf", 0.25)),
+                                           imgsz=int(scfg.get("crowd_imgsz", 1280)), device=self.det_cfg["device"],
+                                           verbose=False)[0]
+        except Exception:
+            log.exception("[%s] counting people failed", self.name)
+            return None
+        spots = [zones_mod.anchor(tuple(float(v) for v in b), frame.shape, self.mode) for b in r.boxes.xyxy.tolist()]
+        return {z["id"]: sum(zones_mod.inside(pt, z["points"]) for pt in spots) for z in areas}
 
     def _age_of(self, st: TrackState) -> str | None:
         """For the safety checks: "child", "adult" (any other known age) or None (no age label yet)."""

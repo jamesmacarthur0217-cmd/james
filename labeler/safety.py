@@ -26,6 +26,16 @@ Children (Phase 45 step 2), each raising "child in danger":
 - climbing: the feet `child_climb` x the child's height above where they were (median of the last 10 s) while the
   body did not get smaller (walking away from the camera also lifts the feet in the picture, but shrinks the body),
   for 2 s.
+
+Crowding (Phase 45 step 3), raising "unusual crowding" about an area or the whole picture:
+- too many: more people inside an area than its limit ("at most N people", set on the Live page; where a person's
+  feet are, as for counting) for `crowd_s`; once until the count is back within the limit for `crowd_s`. The count
+  comes from the camera's once-a-second count with the plain detector (Pipeline._count_people), else the people
+  tracked here;
+- running together: at least `rush_min` people in view, most of them (`rush_share`) moving at `rush_speed` body
+  heights a second or more, the same way (their directions agree: `rush_agree`), for 2 s: people pushing or fleeing.
+  Walking is about half a body height a second. Once until it calms down.
+Someone pressed against a barrier has no quick sign: only the vision model can see it, when it checks a crowd.
 """
 from __future__ import annotations
 
@@ -44,6 +54,8 @@ CHILD_AREAS = ("cooking", "food_prep", "restricted")
 CHILD_WINDOW_S = 3.0    # "is a child" by size: on most frames of this long
 CLIMB_WINDOW_S = 10.0   # where the feet usually are: the median of this long
 CLIMB_HOLD_S = 2.0      # climbing: feet up this long
+RUSH_WINDOW_S = 1.0     # speed: from where a person was this long ago
+RUSH_HOLD_S = 2.0       # running together this long
 
 
 def head_low(kpts: np.ndarray | None) -> bool | None:
@@ -71,6 +83,7 @@ class _Person:
     alone_since: float | None = None
     area_since: float | None = None
     climb_since: float | None = None
+    anchor: tuple | None = None                   # where the person is (fractions of the picture: the feet)
 
 
 class SafetyWatch:
@@ -85,17 +98,26 @@ class SafetyWatch:
         self.child_alone_s = float(cfg.get("child_alone_s", 120))
         self.child_area_s = float(cfg.get("child_area_s", 3))
         self.child_climb = float(cfg.get("child_climb", 0.25))
+        self.crowd_s = float(cfg.get("crowd_s", 30))
+        self.rush_min = int(cfg.get("rush_min", 6))
+        self.rush_share = float(cfg.get("rush_share", 0.6))
+        self.rush_speed = float(cfg.get("rush_speed", 1.2))
+        self.rush_agree = float(cfg.get("rush_agree", 0.8))
         self.people: dict = {}
+        self.areas: dict = {}   # area id -> {"over_since", "calm_since", "fired"}
+        self.rush = {"since": None, "fired": False}
 
-    def update(self, key, t: float, box: tuple, kpts: np.ndarray | None, role: str = "", age: str | None = None) -> None:
-        """age: "child", "adult" (any other known age) or None (no label yet)."""
+    def update(self, key, t: float, box: tuple, kpts: np.ndarray | None, role: str = "", age: str | None = None,
+               anchor: tuple | None = None) -> None:
+        """age: "child", "adult" (any other known age) or None (no label yet); anchor: where the person is
+        (zones.anchor, fractions of the picture), for counting people inside areas."""
         p = self.people.setdefault(key, _Person())
         x1, y1, x2, y2 = box[:4]
         pose = posture(kpts, box)
         p.hist.append((t, (x1 + x2) / 2, (y1 + y2) / 2, max(y2 - y1, 1.0), pose == LYING, head_low(kpts)))
         while p.hist and t - p.hist[0][0] > self.keep_s:
             p.hist.popleft()
-        p.role, p.box, p.last, p.upright, p.age = role, tuple(box[:4]), t, pose == UPRIGHT, age
+        p.role, p.box, p.last, p.upright, p.age, p.anchor = role, tuple(box[:4]), t, pose == UPRIGHT, age, anchor
         p.feet.append((t, y2, max(y2 - y1, 1.0)))
         while p.feet and t - p.feet[0][0] > CLIMB_WINDOW_S:
             p.feet.popleft()
@@ -123,6 +145,60 @@ class SafetyWatch:
     def _share(p: _Person, since: float, index: int) -> float:
         frames = [f[index] for f in p.hist if f[0] >= since and f[index] is not None]
         return sum(bool(v) for v in frames) / len(frames) if frames else 0.0
+
+    def crowd(self, t: float, areas: list[dict], counts: dict | None = None) -> list[tuple]:
+        """(area or None for the whole picture, reason) for each crowding sign now. areas: the camera's areas with a
+        people limit (zones with "max_people"); counts: {area id: people} from the camera's own count, if any."""
+        from .zones import inside
+        out = []
+        present = [p for p in self.people.values() if p.hist and t - p.last <= 1.0]
+        for z in areas:
+            limit = z.get("max_people")
+            if not limit:
+                continue
+            n = counts[z["id"]] if counts is not None and z["id"] in counts else \
+                sum(p.anchor is not None and inside(p.anchor, z["points"]) for p in present)
+            a = self.areas.setdefault(z["id"], {"over_since": None, "calm_since": None, "fired": False})
+            if n > limit:
+                a["calm_since"] = None
+                a["over_since"] = t if a["over_since"] is None else a["over_since"]
+                if t - a["over_since"] >= self.crowd_s and not a["fired"]:
+                    a["fired"] = True
+                    out.append((z, f"{n} people in {z['name']} (at most {limit}) for {int(t - a['over_since'])} s"))
+            else:
+                a["over_since"] = None
+                a["calm_since"] = t if a["calm_since"] is None else a["calm_since"]
+                if t - a["calm_since"] >= self.crowd_s:
+                    a["fired"] = False
+        rushing = self._rushing(t, present)
+        if rushing:
+            self.rush["since"] = t if self.rush["since"] is None else self.rush["since"]
+            if t - self.rush["since"] >= RUSH_HOLD_S and not self.rush["fired"]:
+                self.rush["fired"] = True
+                out.append((None, f"{rushing} people moving fast the same way"))
+        else:
+            self.rush["since"] = None
+            self.rush["fired"] = False
+        return out
+
+    def _rushing(self, t: float, present: list) -> int:
+        """How many people are moving fast the same way now (0 when it is not most of at least rush_min people)."""
+        if len(present) < self.rush_min:
+            return 0
+        moves = []
+        for p in present:
+            old = next((f for f in p.hist if t - f[0] <= RUSH_WINDOW_S + 0.05), None)
+            now = p.hist[-1]
+            if old is None or now[0] - old[0] < 0.5 * RUSH_WINDOW_S:
+                continue
+            dx, dy, dt = now[1] - old[1], now[2] - old[2], now[0] - old[0]
+            speed = (dx * dx + dy * dy) ** 0.5 / now[3] / dt   # body heights a second
+            if speed >= self.rush_speed:
+                moves.append((dx, dy))
+        if len(moves) < max(self.rush_min, self.rush_share * len(present)):
+            return 0
+        units = np.array([(dx, dy) / np.hypot(dx, dy) for dx, dy in moves])
+        return len(moves) if float(np.linalg.norm(units.mean(axis=0))) >= self.rush_agree else 0
 
     def _children(self, t: float, present: dict) -> dict:
         """The people seen now who count as children (by label, else by size next to an adult)."""

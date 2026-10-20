@@ -193,6 +193,8 @@ safety:
   still_s: 300                # not moved at all this long -> checked last, after people's labels (distress)
   child_alone_s: 120          # a child with no adult near this long -> checked (0 = off: at home this can be often)
   child_area_s: 3             # a child in a cooking, food preparation or restricted area this long -> checked
+  crowd_s: 30                 # more people than an area's limit (Live page) this long -> checked
+  crowd_imgsz: 1280           # people in areas are counted once a second at this picture size
 
 # PC watch: the graphics card's temperature (hot from 85 °C), each disk's health as Windows sees it, and whether the
 # app or the PC stopped without warning last time (power cut, PC turned off without stop.bat).

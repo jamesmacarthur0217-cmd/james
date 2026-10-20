@@ -113,6 +113,73 @@ def test_a_child_climbing():
     assert feed_many(w2, {2: (away, "", "child")}, 4, t0=10) == []
 
 
+HALL = {"id": 5, "name": "hall", "max_people": 3, "points": [(0, 0), (0.5, 0), (0.5, 1), (0, 1)]}
+
+
+def crowd_run(w, n, seconds, t0=0.0, x_of=lambda k, i: 100 + 60 * k, inside=True):
+    """n people standing (or moving: x_of) for `seconds`; returns the crowd signs."""
+    out = []
+    for i in range(int(seconds * FPS)):
+        t = t0 + i / FPS
+        for k in range(n):
+            x = x_of(k, i)
+            box, kp = standing(x=x, top=100, h=300)
+            w.update(k, t, box, kp, anchor=((0.25 if inside else 0.75), 0.5))
+        out += [(round(t, 1), (a or {}).get("name"), r) for a, r in w.crowd(t, [HALL])]
+    return out
+
+
+def test_too_many_people_in_an_area():
+    w = SafetyWatch({"crowd_s": 30})
+    assert crowd_run(w, 3, 40) == []                                      # at the limit: fine
+    got = crowd_run(w, 5, 40, t0=40)
+    assert len(got) == 1 and got[0][1] == "hall" and got[0][2].startswith("5 people in hall (at most 3) for 30 s")
+    assert crowd_run(w, 5, 40, t0=80) == []                               # once
+    crowd_run(w, 2, 33, t0=120)                                            # calm again 30 s: re-armed
+    assert len(crowd_run(w, 5, 31, t0=153)) == 1
+    assert crowd_run(SafetyWatch({"crowd_s": 30}), 5, 40, inside=False) == []   # outside the area
+
+
+def test_the_cameras_own_count_wins():
+    w = SafetyWatch({"crowd_s": 5})
+    got = [r for i in range(40) for r in w.crowd(i / FPS, [HALL], {5: 9})]   # nobody tracked, 9 counted
+    assert len(got) == 1 and got[0][1].startswith("9 people in hall (at most 3)")
+    assert [r for i in range(40) for r in SafetyWatch({"crowd_s": 5}).crowd(i / FPS, [HALL], {5: 3})] == []
+
+
+def test_people_running_the_same_way():
+    fast = lambda k, i: 100 + 60 * k + i * 120   # noqa: E731  (2 body heights a second at 5 frames a second)
+    got = crowd_run(SafetyWatch({}), 8, 4, x_of=fast, inside=False)
+    assert [g[1:] for g in got] == [(None, "8 people moving fast the same way")] and got[0][0] >= 2.0
+    walking = lambda k, i: 100 + 60 * k + i * 30   # noqa: E731  (half a body height a second)
+    assert crowd_run(SafetyWatch({}), 8, 4, x_of=walking, inside=False) == []
+    both_ways = lambda k, i: 100 + 60 * k + (1 if k % 2 else -1) * i * 120   # noqa: E731
+    assert crowd_run(SafetyWatch({}), 8, 4, x_of=both_ways, inside=False) == []
+    assert crowd_run(SafetyWatch({}), 4, 4, x_of=fast, inside=False) == []    # too few people
+
+
+def test_the_people_limit_on_areas(db, tmp_path):
+    import copy
+
+    import pytest
+    from fastapi.testclient import TestClient
+
+    from labeler.config import DEFAULTS
+    from labeler.web import create_app
+    z = db.add_zone("cam1", "hall", "area", [(0, 0), (1, 0), (1, 1)], max_people=40)
+    assert z["max_people"] == 40
+    assert db.update_zone(z["id"], max_people=0)["max_people"] is None and db.update_zone(z["id"], role="exit")["role"] == "exit"
+    with pytest.raises(ValueError):
+        db.add_zone("cam1", "door", "line", [(0, 0.5), (1, 0.5)], max_people=3)
+    cfg = copy.deepcopy(DEFAULTS)
+    cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
+    client = TestClient(create_app(cfg, db, None), client=("127.0.0.1", 5000))
+    r = client.patch(f"/api/zones/{z['id']}", json={"max_people": 12})
+    assert r.status_code == 200 and r.json()["max_people"] == 12 and r.json()["role"] == "exit"   # the role kept
+    assert client.patch(f"/api/zones/{z['id']}", json={"max_people": -1}).status_code == 400
+    assert "at most 12 people" in client.get("/api/audit").json()["entries"][0]["detail"]
+
+
 def test_role_at():
     zones = [{"kind": "area", "role": "", "points": [(0, 0), (1, 0), (1, 1), (0, 1)]},
              {"kind": "area", "role": "bed", "points": [(0, 0), (0.5, 0), (0.5, 0.5), (0, 0.5)]}]

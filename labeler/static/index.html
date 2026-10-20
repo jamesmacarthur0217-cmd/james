@@ -40,6 +40,8 @@
         <input id="zone-name" placeholder="Name, e.g. door" maxlength="100">
         <label id="zone-role-label" title="What the place is, so the safety checks know what is normal there (a bed or
           sofa: someone lying there is not a fall)">Role <select id="zone-role"><option value="">none</option></select></label>
+        <label id="zone-max-label" title="Too crowded: a safety check when more people than this stay in the area 30 s
+          (empty: no limit)">At most <input type="number" id="zone-max" min="1" max="10000" step="1" style="width:5em"> people</label>
         <button id="zone-undo">Undo point</button>
         <button id="zone-save" class="primary" disabled>Save</button>
         <span class="muted" id="zone-msg"></span>
@@ -537,7 +539,7 @@ function drawZonePreview() {
   const enough = kind === "area" ? zoneDraw.points.length >= 3 : zoneDraw.points.length === 2;
   $("zone-save").disabled = !enough || !$("zone-name").value.trim();
   $("zone-hint").textContent = ZONE_HINT[kind];
-  $("zone-role-label").hidden = kind !== "area";
+  $("zone-role-label").hidden = $("zone-max-label").hidden = kind !== "area";
 }
 
 $("zone-draw").addEventListener("click", (e) => {
@@ -576,7 +578,10 @@ async function loadZoneList() {
   $("zone-list").innerHTML = zones.length
     ? zones.map(z => `<div class="zone-item"><span><b>${esc(z.name)}</b> <span class="muted">${z.kind === "line"
         ? "counting line" : "area"}</span>${z.kind === "area" ? ` <select class="zone-role-edit" data-zone="${z.id}"
-        title="What the place is (safety checks)">${roleOptions(z.role)}</select>` : ""}</span><button class="danger-quiet"
+        title="What the place is (safety checks)">${roleOptions(z.role)}</select> <label class="muted">at most
+        <input type="number" class="zone-max-edit" data-zone="${z.id}" min="1" max="10000" step="1" style="width:4.5em"
+        value="${z.max_people ?? ""}" placeholder="any" title="Too crowded above this many people (empty: no limit)">
+        people${z.people_now != null ? ` · now ${z.people_now}` : ""}</label>` : ""}</span><button class="danger-quiet"
         data-id="${z.id}" data-name="${esc(z.name)}">Delete</button></div>`).join("")
     : '<div class="muted">No zones on this camera yet.</div>';
 }
@@ -589,12 +594,15 @@ $("zone-list").onclick = async (e) => {
 };
 
 $("zone-list").onchange = async (e) => {
-  if (!e.target.matches(".zone-role-edit")) return;
+  const role = e.target.matches(".zone-role-edit"), max = e.target.matches(".zone-max-edit");
+  if (!role && !max) return;
+  const body = role ? { role: e.target.value } : { max_people: +e.target.value || 0 };
   const r = await fetch(`/api/zones/${e.target.dataset.zone}`, { method: "PATCH",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: e.target.value }) });
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await r.json().catch(() => ({}));
-  $("zone-msg").textContent = r.ok ? `"${data.name}": ${data.role ? e.target.selectedOptions[0].text : "no role"}.`
-                                   : data.detail || "Could not change it.";
+  $("zone-msg").textContent = !r.ok ? data.detail || "Could not change it."
+    : role ? `"${data.name}": ${data.role ? e.target.selectedOptions[0].text : "no role"}.`
+    : `"${data.name}": ${data.max_people ? `at most ${data.max_people} people` : "no people limit"}.`;
   if (!r.ok) loadZoneList();
 };
 
@@ -602,13 +610,15 @@ $("zone-save").onclick = async () => {
   const r = await fetch("/api/zones", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ camera: zoneCamera(), name: $("zone-name").value.trim(),
                            kind: $("zone-kind").value, points: zoneDraw.points,
-                           role: $("zone-kind").value === "area" ? $("zone-role").value : "" }) });
+                           role: $("zone-kind").value === "area" ? $("zone-role").value : "",
+                           max_people: $("zone-kind").value === "area" ? (+$("zone-max").value || null) : null }) });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) { $("zone-msg").textContent = data.detail || "Could not save."; return; }
   $("zone-msg").textContent = `Saved "${data.name}".`;
   zoneDraw.points = [];
   $("zone-name").value = "";
   $("zone-role").value = "";
+  $("zone-max").value = "";
   drawZonePreview();
   loadZoneList();
 };

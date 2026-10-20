@@ -39,6 +39,21 @@ def role_at(zones: list[dict], pt: tuple[float, float]) -> str:
                  if z["kind"] == AREA and z.get("role") and inside(pt, z["points"])), "")
 
 
+MAX_LIMIT = 10000
+
+
+def check_limit(kind: str, max_people) -> int | None:
+    """A valid "at most N people" for a zone (None = no limit; 0 counts as none); only areas have one."""
+    if max_people in (None, "", 0):
+        return None
+    n = int(max_people)
+    if not 1 <= n <= MAX_LIMIT:
+        raise ValueError(f"at most 1 to {MAX_LIMIT} people")
+    if kind != AREA:
+        raise ValueError("only areas have a people limit, not counting lines")
+    return n
+
+
 def check_role(kind: str, role: str | None) -> str:
     """A valid role for a zone ("" for none); only areas have one."""
     role = (role or "").strip()

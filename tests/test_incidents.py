@@ -83,7 +83,7 @@ def test_critical_first_one_at_a_time_and_answers_to_listeners():
 def test_limit_per_minute_too_old_and_cooldown():
     worker = Worker()
     q, clock = _queue(worker, confirm_per_min=2, max_wait_s=30, cooldown_s=60)
-    for cat in ("fire", "fight", "weapon"):
+    for cat in ("floor", "exit", "crowd"):   # warnings: the per-minute limit holds them back
         q.suspect("cam1", cat, "test")
     for _ in range(3):
         s = q.tick()
@@ -92,12 +92,27 @@ def test_limit_per_minute_too_old_and_cooldown():
     assert len(worker.jobs) == 2 and q.state()["waiting"] == 1   # the limit: 2 a minute
     clock[0] += 31
     assert q.tick() is None and q.state()["dropped_old"] == 1     # waited too long
-    assert q.suspect("cam1", "fire", "again") == "cooldown"       # checked 31 s ago
-    assert q.suspect("cam1", "fire", "other area", area={"id": 4, "name": "kitchen", "points": [(0, 0), (1, 0), (1, 1)]}) == "queued"
-    assert q.suspect("cam1", "fire", "other area", area={"id": 4, "name": "kitchen", "points": []}) == "cooldown"   # already waiting
+    assert q.suspect("cam1", "floor", "again") == "cooldown"      # checked 31 s ago
+    assert q.suspect("cam1", "floor", "other area", area={"id": 4, "name": "kitchen", "points": [(0, 0), (1, 0), (1, 1)]}) == "queued"
+    assert q.suspect("cam1", "floor", "other area", area={"id": 4, "name": "kitchen", "points": []}) == "cooldown"   # already waiting
+    q.suspect("cam1", "fire", "smoke")                             # critical: not held back by the limit
+    assert q.tick().category == "fire" and worker.jobs[-1][3] == vlm.CRITICAL
     assert q.suspect("cam2", "fire", "no memory") == "no pictures"
     with pytest.raises(ValueError):
         q.suspect("cam1", "aliens", "x")
+
+
+def test_a_critical_check_does_not_wait_for_a_warning():
+    worker = Worker()
+    q, clock = _queue(worker)
+    q.suspect("cam1", "crowd", "40 people in the hall")
+    assert q.tick().category == "crowd"                        # a warning being checked
+    q.suspect("cam1", "floor", "a patch on the walkway")
+    assert q.tick() is None                                    # another warning waits for it
+    q.suspect("cam1", "person_down", "lying still 20 s")
+    assert q.tick().category == "person_down"                  # a critical one does not
+    q.suspect("cam1", "fight", "two people hitting")
+    assert q.tick() is None                                    # but one critical at a time
 
 
 def test_a_full_vision_model_queue_counts_as_failed():
@@ -162,9 +177,10 @@ def test_the_vision_model_queue_puts_critical_checks_before_people():
     assert client.started.wait(5)   # the first is being labeled now; the next job is taken only when it ends
     assert worker.submit(2, [(pic, None)], "person a") and worker.submit(3, [(pic, None)], "person b")
     assert not worker.submit(4, [(pic, None)], "person c")              # people: the queue is full
-    assert worker.submit(5, [(pic, None)], "warning", priority=vlm.WARNING) is False   # also behind people
-    assert worker.submit(6, [(pic, None)], "critical", priority=vlm.CRITICAL)        # never refused
+    assert not worker.submit(7, [(pic, None)], "round", priority=vlm.ROUND)   # the slow round: behind people, refused
+    assert worker.submit(5, [(pic, None)], "warning", priority=vlm.WARNING)   # safety checks: never refused
+    assert worker.submit(6, [(pic, None)], "critical", priority=vlm.CRITICAL)
     assert worker.waiting(vlm.PEOPLE) == 2 and worker.waiting(vlm.CRITICAL) == 1
     client.release.set()
     assert worker.close(5)
-    assert client.order == ["first", "critical", "person a", "person b"] and done == [1, 6, 2, 3]
+    assert client.order == ["first", "critical", "warning", "person a", "person b"] and done == [1, 6, 5, 2, 3]

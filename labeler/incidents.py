@@ -12,8 +12,9 @@ pictures from the last seconds and answers yes / no / unsure with a few words. T
   alerts.ensure_incident_rules), with the newest picture (and a face-blurred copy for viewers) and a clip; "no" and
   "unsure" alert nothing and only show on the Health page.
 - ConfirmQueue: suspects wait here (critical first, then oldest); one is sent to the vision model at a time, at most
-  `confirm_per_min` a minute, in the shared priority queue (labeler/vlm.py: critical checks before people's labels,
-  warnings after them). A suspect older than `max_wait_s` is dropped and counted; the same camera, category and area is
+  `confirm_per_min` a minute, in the shared priority queue (labeler/vlm.py: critical checks, then warnings, then
+  people's labels, then the slow rounds). A critical check never waits for a lower one: it goes even while a warning
+  is being checked, and the per-minute limit does not hold it back. A suspect older than `max_wait_s` is dropped and counted; the same camera, category and area is
   not checked again within `cooldown_s` of being sent. The answer goes to the listeners (step 3: alerts) and stays in
   `recent` for the Health page.
 
@@ -264,9 +265,15 @@ class ConfirmQueue:
         with self._lock:
             while self.sent_at and now - self.sent_at[0] >= 60:
                 self.sent_at.popleft()
-            if not self.waiting or self.sent or len(self.sent_at) >= self.per_min:
+            if not self.waiting:
                 return None
             s = min(self.waiting, key=lambda w: (LEVELS[w.level], w.queued))
+            critical = s.level == "critical"
+            if critical:   # never behind a lower one, nor held back by the per-minute limit
+                if any(x.level == "critical" for x in self.sent.values()):
+                    return None
+            elif self.sent or len(self.sent_at) >= self.per_min:
+                return None
             self.waiting.remove(s)
             s.number = next(self._numbers)
             self.sent[s.number] = s

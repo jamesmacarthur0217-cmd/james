@@ -37,8 +37,8 @@ changes to the vision model queue) is discussed with the user before it is built
      with that category's question and answers yes / no / unsure plus a few words on what it sees. An alert comes only
      on yes (twice in a row for things that stay, like a spill or a blocked exit).
    - One queue with priorities: critical suspects first (fire, weapon, fight, person down, child in danger), then
-     people's labels, then warnings, then slow rounds over each area for things with no fast sign (cables, a broken
-     chair). A limit per minute keeps people's labels going; a suspect that waited too long is dropped and counted.
+     warnings (moved ahead of people's labels in Phase 45, the user's choice), then people's labels, then slow rounds
+     over each area for things with no fast sign (cables, a broken chair). A limit per minute keeps people's labels going; a suspect that waited too long is dropped and counted.
 3. **One incident record.** Category, level (*critical*: fire, weapon, fight, person down, child in danger, climbing
    in at night; *warning*: spill, blocked exit, crowding, pests, equipment, suspicious behaviour), area, picture and
    clip, the vision model's answer and words. Stored in `alert_events` (new columns), shown with today's pop-ups (critical:
@@ -149,6 +149,14 @@ checked).
    picture), held 30 s; *pushing*: many people in an area speeding up the same way, bodies overlapping; "someone trapped
    against a barrier" only through the vision model. Measured on MOT16 and, with the user's OK to download, MOT20 (crowds,
    non-commercial).
+   **Done 2026-10-20** (MOT20 downloaded with the user's OK, 5.0 GB, train part unpacked, videos made):
+   `zones.max_people` (Live page "at most N people", "now N"; PATCH `/api/zones/{id}` role and/or limit; checked on a
+   scratch PostgreSQL database built by the old code), SafetyWatch `crowd` (over the limit `crowd_s` 30, running
+   together), the vision model decides (the user's choice). Found and changed with the user: the pose detector finds
+   0-40% of people in a crowd, so a copy of the plain detector counts every area once a second at 1280 px (14 ms;
+   75-90% found, 25% in the densest MOT20-05); warnings were refused behind a busy camera's labels, so the queue is
+   now critical, warning, people, round, and a critical check never waits for a lower one. `tools/crowd_check.py`.
+   **Phase 45 is done.**
 
 ## Phase 46: Fire and smoke
 

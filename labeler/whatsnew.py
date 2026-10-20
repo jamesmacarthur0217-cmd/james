@@ -125,12 +125,17 @@ ENTRIES: list[Entry] = [
           "Health page, \"The usual day\": for each kiosk camera, on how many days someone was seen in each hour "
           "(weekdays and weekends), the line above which an hour counts as usual, and today's quiet time. The "
           "\"Unusual quiet\" rule on the Alerts page links to it.", "/health"),
-    Entry("p44", 44, "", "Safety checks (the base)",
+    Entry("p44", 44, "3132c2e", "Safety checks (the base)",
           "Areas drawn on the Live page get a role (walkway, exit, cooking, dining, bed...). On security cameras, when a "
           "quick check sees a possible incident (a person down, fire, a fight...), the vision model looks at the last "
           "seconds and an alert comes only if it confirms; critical ones pop up red with a beep. 12 kinds, each a rule "
           "on the Alerts page. The quick checks for each kind come in the next phases.", "/alerts",
           marker="alert_events.category"),
+    Entry("p45", 45, "", "Safety checks for people",
+          "On security cameras: falls are checked by the vision model too (only a clear \"no\" stops the alert), and "
+          "new checks for someone lying still, slumped or not moving for long, a child alone, in a cooking area or "
+          "climbing, and crowding: give an area \"at most N people\" on the Live page (it shows how many are there "
+          "now).", "/", marker="zones.max_people"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

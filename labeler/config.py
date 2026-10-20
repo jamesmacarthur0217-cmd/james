@@ -125,7 +125,12 @@ DEFAULTS: dict = {
                # Children (labeler/safety.py): small next to an adult = at most child_size of their height; alone =
                # no adult within child_near x height for child_alone_s (0 = off); in a cooking / food preparation /
                # restricted area for child_area_s; climbing = feet up child_climb x height.
-               "child_size": 0.65, "child_near": 2.5, "child_alone_s": 120, "child_area_s": 3, "child_climb": 0.25},
+               "child_size": 0.65, "child_near": 2.5, "child_alone_s": 120, "child_area_s": 3, "child_climb": 0.25,
+               # Crowding (labeler/safety.py): over an area's people limit for crowd_s; running together = at least
+               # rush_min people in view, rush_share of them at rush_speed body heights a second, the same way.
+               "crowd_s": 30, "rush_min": 6, "rush_share": 0.6, "rush_speed": 1.2, "rush_agree": 0.8,
+               # People in areas with a limit are counted every crowd_every_s by the plain detector at crowd_imgsz.
+               "crowd_every_s": 1.0, "crowd_imgsz": 1280, "crowd_conf": 0.25},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,
               "low_ratio": 0.5, "lost_s": 0.5, "min_width": 1.25},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored
     "embeddings": {"enabled": True, "model": "google/siglip2-base-patch16-224", "device": "cuda"},

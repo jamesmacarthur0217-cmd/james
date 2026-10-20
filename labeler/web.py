@@ -91,10 +91,12 @@ class ZoneIn(BaseModel):
     points: list[list[float]]
     lying_ok: bool = False        # an area where lying is normal (a bed, a sofa): no fall alerts there
     role: str = ""                # what the area is (labeler/zones.py ROLES); "bed" = lying_ok
+    max_people: int | None = None  # "at most N people" (crowding, labeler/safety.py)
 
 
-class ZoneRoleIn(BaseModel):
-    role: str                     # "" = no role
+class ZoneUpdate(BaseModel):
+    role: str | None = None       # "" = no role; left out = unchanged
+    max_people: int | None = None  # 0 = no limit; left out = unchanged
 
 
 class AnswerIn(BaseModel):
@@ -689,7 +691,14 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
 
     @app.get("/api/zones")
     def list_zones(camera: str | None = None):
-        return db.list_zones(camera)
+        """The zones; areas on a safety camera also say how many people are in them now ("people_now", the camera's
+        once-a-second count, labeler/pipeline.py _count_people), to set a people limit by."""
+        zones = db.list_zones(camera)
+        for z in zones:
+            counts = getattr(by_name.get(z["camera"]), "_crowd_counts", None)
+            if counts is not None and z["id"] in counts:
+                z["people_now"] = counts[z["id"]]
+        return zones
 
     @app.get("/api/zones/roles")
     def zone_roles():
@@ -699,18 +708,24 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         return [{"role": r, "words": ROLES[r]} for r in offered if r in ROLES]
 
     @app.patch("/api/zones/{zone_id}")
-    def set_zone_role(zone_id: int, body: ZoneRoleIn, request: Request):
+    def update_zone(zone_id: int, body: ZoneUpdate, request: Request):
+        """An area's role and/or people limit (only the fields sent change)."""
         from .zones import ROLES
+        fields = {k: getattr(body, k) for k in body.model_fields_set}
         try:
-            zone = db.set_zone_role(zone_id, body.role)
+            zone = db.update_zone(zone_id, **fields)
         except ValueError as e:
             raise HTTPException(400, str(e))
         if zone is None:
             raise HTTPException(404, "zone not found")
         if zone["camera"] in by_name:
             by_name[zone["camera"]].reload_zones()
-        audit(request, "zone changed", f"area {zone['name']!r} on camera {zone['camera']}: "
-                                       + (ROLES[zone["role"]] if zone["role"] else "no role"))
+        what = []
+        if "role" in fields:
+            what.append(ROLES[zone["role"]] if zone["role"] else "no role")
+        if "max_people" in fields:
+            what.append(f"at most {zone['max_people']} people" if zone["max_people"] else "no people limit")
+        audit(request, "zone changed", f"area {zone['name']!r} on camera {zone['camera']}: " + ", ".join(what))
         return zone
 
     @app.post("/api/zones")
@@ -718,14 +733,15 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         if pipelines and body.camera not in by_name:
             raise HTTPException(404, f"no camera named {body.camera!r}")
         try:
-            zone = db.add_zone(body.camera, body.name, body.kind, body.points, body.lying_ok, body.role)
+            zone = db.add_zone(body.camera, body.name, body.kind, body.points, body.lying_ok, body.role, body.max_people)
         except ValueError as e:
             raise HTTPException(400, str(e))
         if body.camera in by_name:
             by_name[body.camera].reload_zones()
         from .zones import ROLES
         audit(request, "zone added", f"{zone['kind']} {zone['name']!r} on camera {zone['camera']}"
-                                     + (f" ({ROLES[zone['role']]})" if zone["role"] else ""))
+                                     + (f" ({ROLES[zone['role']]})" if zone["role"] else "")
+                                     + (f", at most {zone['max_people']} people" if zone["max_people"] else ""))
         return zone
 
     @app.delete("/api/zones/{zone_id}")

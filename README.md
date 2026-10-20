@@ -795,9 +795,11 @@ last seconds (`labeler/incidents.py`) and answers yes / no / unsure with a few w
   which are offered. The same thing is normal in one area and an alarm in another (a knife in the cooking area).
 - **Pictures from memory**: each safety camera (`cameras[].safety`, Settings column "Safety"; security cameras by
   default) keeps one picture a second for 10 s, shrunk to 960 px (~1.5 MB each).
-- **One queue**: the vision model's work is one priority queue: critical checks first, then people's labels, then
-  warnings. At most `safety.confirm_per_min` (6) checks a minute, one at a time; a check waiting over 30 s is dropped
-  and counted; the same camera, kind and area is not checked again within 60 s.
+- **One queue**: the vision model's work is one priority queue: critical checks first, then warnings, then people's
+  labels, then the slow round (Phase 45: warnings behind a busy camera's labels were refused; the user moved them
+  ahead). At most `safety.confirm_per_min` (6) checks a minute, one at a time; a critical check never waits for a lower
+  one and is not held back by that limit; a check waiting over 30 s is dropped and counted; the same camera, kind, area
+  and person is not checked again within 60 s.
 - **Alerts**: one built-in rule per kind (turn off or limit by area, hours, Home / Away on the Alerts page; deleted, it
   comes back). Critical kinds (person needing help, fall, fire, aggression, dangerous object, child in danger) pop up
   red with a beep like a fall; the others as a plain pop-up. The alert keeps the newest picture (the area outlined;
@@ -861,6 +863,25 @@ with age labels): no child suspect. The size rule alone took 17 people for a chi
 children (a toddler with a woman in MOT16-09, a child in MOT16-05) and 14 adults (half hidden in a crowd, reflections
 in glass, one seen from high up) of roughly 500 people, all in the first seconds before their labels came. Whether a
 real child is found in a kitchen or climbing needs footage with children (the user's own cameras).
+
+### Crowding (Phase 45 step 3)
+
+Give an area a people limit on the Live page (Zones: "at most N people"; each area's row shows "now N", the app's own
+count, to set it by). More people than that for 30 s (`safety.crowd_s`) raises "unusual crowding"; **the vision model
+decides** (the user's choice) whether it is dangerously crowded (packed, pushing, someone pressed against a barrier): a
+busy but orderly area gives no alert. Also raised, for the whole picture: **running together**, at least 6 people in
+view, most of them moving 1.2 body heights a second or faster the same way, for 2 s (walking is about half a body
+height a second). Measured on a test copy (MOT16-04, a limit of 8): 16 people for 30 s, checked in 2.0 s, answer "no:
+people walking with space between them".
+
+**Counting** (`tools/crowd_check.py`, against the true markings of MOT16 and MOT20, a dense-crowd set downloaded with
+the user's OK, non-commercial): the person detector with body points finds only 0-40% of the people in a crowd (none
+in MOT20-03 at 640 px), so people in areas are counted once a second by a copy of the plain detector at 1280 px
+(`safety.crowd_imgsz`; 14 ms a pass; its own copy: sharing the vehicle tracker's would reset it; the user's choice).
+Median share counted: MOT16-02 94%, MOT16-04 82%, MOT20-01 88%, MOT20-02 85%, MOT20-03 58% (night, about 120 people),
+MOT20-05 25% (about 180 people: too dense), MOT16-09 157% (it counts the reflections in the shop windows). Running
+together: no false alarm on the 7 videos. Because the app counts fewer people than there are in dense crowds, set
+the limit from the count it shows, not from a head count.
 
 ## No movement
 
