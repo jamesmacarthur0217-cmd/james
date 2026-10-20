@@ -86,14 +86,28 @@
 
   // Who or what an alert is about (also used by the Alerts page).
   window.VL = window.VL || {};
-  window.VL.alertWho = (e) => e.unusual ? "unusual quiet" : e.quiet ? "no movement" : e.help ? `help sign · person #${e.track_id}` : e.scene_id ? "scene question" : e.animal_id ? `animal #${e.animal_id}`
+  window.VL.alertWho = (e) => e.category ? `safety: ${e.words || e.category}` : e.unusual ? "unusual quiet" : e.quiet ? "no movement" : e.help ? `help sign · person #${e.track_id}` : e.scene_id ? "scene question" : e.animal_id ? `animal #${e.animal_id}`
     : e.vehicle_id ? `vehicle #${e.vehicle_id}` : `person #${e.track_id}`;
 
   function showAlert(e, admin) {
     const t = document.createElement("div");
     const picture = e.crop ? `<img src="/crops/${encodeURIComponent(e.crop)}" alt="">` : "";
     const time = new Date(e.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    if (e.help) {   // the help sign (labeler/gestures.py): red with the beep, like a fall
+    if (e.category && e.level === "critical") {   // a critical safety incident (labeler/incidents.py): red, beeps
+      t.className = "toast fall incident";
+      t.setAttribute("role", "alertdialog");
+      t.innerHTML = `${picture}<div><b>${escHtml((e.words || e.category).toUpperCase())}</b> · ${escHtml(e.camera)} · ${time}<br>
+        ${escHtml(e.confirm || e.message)}${admin ? ' <a href="/alerts">See the clip</a>' : ""}<br>
+        <small class="sound-off">Click anywhere on this page to hear the alarm.</small><br>
+        <button class="primary">OK</button></div>`;
+      t.querySelector("button").addEventListener("click", () => { t.remove(); updateAlarm(); });
+    } else if (e.category) {   // a safety warning (spill, blocked exit, ...): a plain pop-up with its kind
+      t.className = "toast";
+      t.innerHTML = `${picture}<div><b>${escHtml(e.words || e.category)}</b> · ${escHtml(e.camera)} · ${time}<br>
+        ${escHtml(e.confirm || e.message)}</div>`;
+      t.addEventListener("click", () => t.remove());
+      setTimeout(() => t.remove(), 20000);
+    } else if (e.help) {   // the help sign (labeler/gestures.py): red with the beep, like a fall
       t.className = "toast fall help";
       t.setAttribute("role", "alertdialog");
       t.innerHTML = `${picture}<div><b>HELP SIGN</b> · ${escHtml(e.camera)} · ${time}<br>Someone held a hand above

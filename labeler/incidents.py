@@ -8,6 +8,9 @@ pictures from the last seconds and answers yes / no / unsure with a few words. T
   px, ~1.5 MB each at 960 px), so a check sees what happened just before, also when recording is off.
 - CATEGORIES: what each kind of incident is called, its level (critical / warning) and the question asked. The first
   wording; each later phase measures its category and may change it.
+- IncidentAlerts (step 3): a "yes" becomes an alert for each enabled rule of that kind (built-in: one per kind,
+  alerts.ensure_incident_rules), with the newest picture (and a face-blurred copy for viewers) and a clip; "no" and
+  "unsure" alert nothing and only show on the Health page.
 - ConfirmQueue: suspects wait here (critical first, then oldest); one is sent to the vision model at a time, at most
   `confirm_per_min` a minute, in the shared priority queue (labeler/vlm.py: critical checks before people's labels,
   warnings after them). A suspect older than `max_wait_s` is dropped and counted; the same camera, category and area is
@@ -26,6 +29,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -85,26 +89,33 @@ class FrameMemory:
 
     def __init__(self, keep_s: float = 10.0, every_s: float = 1.0, side: int = 960):
         self.keep_s, self.every_s, self.side = float(keep_s), float(every_s), int(side)
-        self._frames: deque = deque()   # (monotonic time, wall time, picture)
+        self._frames: deque = deque()   # (monotonic time, wall time, picture, head boxes in the picture)
         self._lock = threading.Lock()
 
-    def add(self, frame: np.ndarray, wall: datetime, now: float) -> bool:
-        """Keep this frame if one is due; True when kept."""
+    def due(self, now: float) -> bool:
         with self._lock:
-            if self._frames and now - self._frames[-1][0] < self.every_s:
-                return False
+            return not self._frames or now - self._frames[-1][0] >= self.every_s
+
+    def add(self, frame: np.ndarray, wall: datetime, now: float, heads=()) -> bool:
+        """Keep this frame if one is due; True when kept. heads: people's head boxes in the frame (for the viewers'
+        blurred copy of an alert's picture)."""
+        if not self.due(now):
+            return False
         h, w = frame.shape[:2]
         scale = self.side / max(h, w)
         pic = cv2.resize(frame, (round(w * scale), round(h * scale)), interpolation=cv2.INTER_AREA) if scale < 1 \
             else frame.copy()
+        k = min(1.0, scale)
+        boxes = [tuple(round(v * k) for v in b[:4]) for b in heads]
         with self._lock:
-            self._frames.append((now, wall, pic))
+            self._frames.append((now, wall, pic, boxes))
             while self._frames and now - self._frames[0][0] > self.keep_s:
                 self._frames.popleft()
         return True
 
-    def pick(self, n: int, span_s: float) -> list[tuple[datetime, np.ndarray]]:
-        """n pictures spread over the last span_s seconds, oldest first, the newest always included."""
+    def pick(self, n: int, span_s: float) -> list[tuple[datetime, np.ndarray, list]]:
+        """n pictures (wall time, picture, head boxes) spread over the last span_s seconds, oldest first, the newest
+        always included."""
         with self._lock:
             frames = list(self._frames)
         if not frames:
@@ -116,7 +127,7 @@ class FrameMemory:
         else:
             idx = sorted({round(i * (len(inside) - 1) / (n - 1)) for i in range(n)}) if n > 1 else [len(inside) - 1]
             chosen = [inside[i] for i in idx]
-        return [(wall, pic) for _, wall, pic in chosen]
+        return [(wall, pic, heads) for _, wall, pic, heads in chosen]
 
     def __len__(self) -> int:
         with self._lock:
@@ -130,7 +141,7 @@ class Suspect:
     reason: str                          # what the fast check saw ("lying still 20 s")
     area: dict | None = None             # the zone it is about (cut out for the vision model), or the whole picture
     people: list = field(default_factory=list)   # track ids involved
-    pictures: list = field(default_factory=list)  # [(wall time, picture)], oldest first
+    pictures: list = field(default_factory=list)  # [(wall time, picture, head boxes)], oldest first
     at: datetime = field(default_factory=datetime.now)
     queued: float = 0.0                  # monotonic time it was queued
     number: int = 0
@@ -151,9 +162,9 @@ def prompt_for(s: Suspect, gap_s: float) -> str:
 def pictures_for(s: Suspect) -> list[np.ndarray]:
     """What the vision model sees: each picture, cut out around the area when there is one (labeler/scene.py)."""
     if not s.area:
-        return [pic for _, pic in s.pictures]
+        return [p[1] for p in s.pictures]
     from .scene import area_picture
-    return [area_picture(pic, s.area["points"], "part") for _, pic in s.pictures]
+    return [area_picture(p[1], s.area["points"], "part") for p in s.pictures]
 
 
 class ConfirmQueue:
@@ -225,7 +236,7 @@ class ConfirmQueue:
             self.last_sent[s.key] = now
             self.counts["sent"] += 1
             self.waits.append(now - s.queued)
-        times = [w for w, _ in s.pictures]
+        times = [p[0] for p in s.pictures]
         gap = (times[-1] - times[0]).total_seconds() / (len(times) - 1) if len(times) > 1 else 0
         ok = self.worker.submit(job_id(s.number), [(pictures_for(s), None)], ("incident", prompt_for(s, gap)),
                                 priority=LEVELS[s.level])
@@ -260,7 +271,8 @@ class ConfirmQueue:
     def state(self) -> dict:
         with self._lock:
             waits = sorted(self.waits)
-            return {**self.counts, "waiting": len(self.waiting), "checking": len(self.sent),
+            return {**self.counts, "cameras": sorted(self.memories), "waiting": len(self.waiting),
+                    "checking": len(self.sent),
                     "per_min": self.per_min, "last_minute": len(self.sent_at),
                     "wait_median_s": round(waits[len(waits) // 2], 1) if waits else None,
                     "recent": list(self.recent)[-10:]}
@@ -271,3 +283,62 @@ class ConfirmQueue:
                 self.tick()
             except Exception:
                 log.exception("safety checks: sending failed")
+
+
+def picture_name(s: Suspect) -> str:
+    return f"incident_{s.camera}_{s.at:%Y%m%d%H%M%S}_{s.number}.jpg"
+
+
+class IncidentAlerts:
+    """A ConfirmQueue listener: a confirmed incident (the vision model said "yes") becomes an alert."""
+
+    def __init__(self, db, alerts, pipelines: list, crop_dir: Path, clips_on: bool = True):
+        self.db, self.alerts, self.crop_dir, self.clips_on = db, alerts, Path(crop_dir), clips_on
+        self.by_name = {p.name: p for p in pipelines}
+
+    def _save_picture(self, s: Suspect) -> str | None:
+        """The newest picture, whole (the area outlined when there is one), and a copy with faces blurred."""
+        from . import privacy
+        if not s.pictures:
+            return None
+        _, pic, heads = s.pictures[-1]
+        if s.area:
+            from .scene import area_picture
+            show = lambda f: area_picture(f, s.area["points"], "outline")   # noqa: E731
+        else:
+            show = lambda f: f   # noqa: E731
+        name = picture_name(s)
+        try:
+            cv2.imwrite(str(self.crop_dir / name), show(pic), [cv2.IMWRITE_JPEG_QUALITY, 85])
+            path = privacy.blurred_path(self.crop_dir, name)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(path), show(privacy.blur_boxes(pic, heads)), [cv2.IMWRITE_JPEG_QUALITY, 85])
+            return name
+        except Exception:
+            log.exception("safety alert: could not save the picture")
+            return None
+
+    def __call__(self, s: Suspect, answer: dict) -> list[dict]:
+        if answer.get("answer") != "yes":
+            return []
+        area = (s.area or {}).get("name")
+        rules = self.alerts.check_incident(s.camera, s.category, area)
+        if not rules:
+            return []
+        level, words, _ = CATEGORIES[s.category]
+        picture = self._save_picture(s)
+        made = []
+        for rule in rules:
+            what = answer.get("what") or s.reason
+            message = f"{rule['name']}: {what}" + (f" (in {area})" if area else "") + f"; seen first: {s.reason}"
+            event = self.db.record_incident_alert(rule["id"], s.camera, message, s.category, level,
+                                                  answer.get("what", ""), picture)
+            if event is None:
+                continue
+            log.warning("ALERT [%s] %s: %s", s.camera, words, what)
+            p = self.by_name.get(s.camera)
+            clips = getattr(p, "clips", None)
+            if clips is not None and self.clips_on:
+                clips.request(event["id"])
+            made.append(event)
+        return made

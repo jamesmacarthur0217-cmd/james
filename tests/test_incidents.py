@@ -30,8 +30,8 @@ def test_the_memory_keeps_one_picture_a_second_for_the_last_seconds():
     assert pic.shape == (540, 960, 3)          # shrunk to 960 px
     m = _memory()
     got = m.pick(3, 4)
-    assert [int(p[0, 0, 0]) for _, p in got] == [5, 7, 9]   # spread over the last 4 s, the newest included
-    assert [int(p[0, 0, 0]) for _, p in m.pick(5, 2)] == [7, 8, 9]   # fewer there: all of them
+    assert [int(p[0, 0, 0]) for _, p, _ in got] == [5, 7, 9]   # spread over the last 4 s, the newest included
+    assert [int(p[0, 0, 0]) for _, p, _ in m.pick(5, 2)] == [7, 8, 9]   # fewer there: all of them
     assert FrameMemory().pick(3, 4) == []
 
 

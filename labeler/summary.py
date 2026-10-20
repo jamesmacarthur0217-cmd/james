@@ -20,7 +20,7 @@ from collections import Counter
 from datetime import datetime, time, timedelta
 
 PERIODS = ("away", "night", "today", "week")
-LISTED = ("fall", "help", "quiet", "unusual")   # alerts the week lists one by one
+LISTED = ("fall", "help", "quiet", "unusual", "incident")   # alerts the week lists one by one
 NIGHT_FROM, NIGHT_UNTIL = 18, 8
 PEOPLE_SHOWN = 12
 TIMELINE_MAX = 300
@@ -60,7 +60,10 @@ def week_period(now: datetime, day=None) -> tuple[datetime, datetime]:
 
 
 def alert_kind(e: dict) -> str:
-    """fall, help, quiet (no movement), unusual (unusual quiet), scene, vehicle, animal or person."""
+    """incident (safety, Phase 44), fall, help, quiet (no movement), unusual (unusual quiet), scene, vehicle, animal or
+    person."""
+    if e.get("category"):
+        return "incident"
     for k in LISTED:
         if e.get(k):
             return k

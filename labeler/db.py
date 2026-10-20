@@ -201,6 +201,10 @@ class AlertEvent(Base):
     vehicle_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
     animal_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)   # an animal's (labeler/animals.py)
     scene_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)    # a scene question's
+    # A safety incident (labeler/incidents.py): its kind, critical / warning, and the vision model's few words.
+    category: Mapped[str | None] = mapped_column(String(20))
+    level: Mapped[str | None] = mapped_column(String(10))
+    confirm: Mapped[str | None] = mapped_column(String(200))
     picture: Mapped[str | None] = mapped_column(String(300))                           # its picture (scene alerts)
     camera: Mapped[str] = mapped_column(String(100))
     message: Mapped[str] = mapped_column(String(300))
@@ -467,11 +471,20 @@ NEW_COLUMNS = {"tracks": {"in_view_s": "FLOAT", "facing_s": "FLOAT", "video_path
                "zones": {"lying_ok": "BOOLEAN", "role": "VARCHAR(20)"},
                "scene_questions": {"zone_id": "INTEGER", "only_away": "BOOLEAN", "hours": "VARCHAR(5)"},
                "alert_events": {"vehicle_id": "INTEGER", "animal_id": "INTEGER", "scene_id": "INTEGER",
-                                "picture": "TEXT"}}
+                                "picture": "TEXT", "category": "VARCHAR(20)", "level": "VARCHAR(10)",
+                                "confirm": "VARCHAR(200)"}}
 # Columns that may be empty now (table, column): an alert can be about a vehicle instead of a person.
 NULLABLE_NOW = [("alert_events", "track_id"), ("alert_events", "rule_id")]
 # Uniqueness rules taken off existing tables at start (table, columns): falls alert again for the same person.
 DROPPED_UNIQUE = [("alert_events", ("rule_id", "track_id"))]
+
+
+def incident_words(category: str | None) -> str | None:
+    """What a safety incident's kind is called ("fire or smoke"), for the pages."""
+    if not category:
+        return None
+    from .incidents import CATEGORIES
+    return CATEGORIES[category][1] if category in CATEGORIES else category
 
 
 def _zone_stats(camera: str, zone: str) -> dict:
@@ -1290,6 +1303,22 @@ class Database:
                     "animal_id": animal_id, "camera": camera, "message": message,
                     "created_at": e.created_at.isoformat(timespec="seconds")}
 
+    def record_incident_alert(self, rule_id: int, camera: str, message: str, category: str, level: str,
+                              confirm: str, picture: str | None) -> dict | None:
+        """A safety incident the vision model confirmed (labeler/incidents.py; the confirm queue decides how often)."""
+        with self.Session.begin() as s:
+            e = AlertEvent(rule_id=rule_id, camera=camera, message=message[:300], category=category, level=level,
+                           confirm=(confirm or "")[:200], picture=picture)
+            s.add(e)
+            try:
+                s.flush()
+            except IntegrityError:   # an old SQLite database: PostgreSQL ones are updated at start
+                log.warning("a safety alert was not stored (old database rule)")
+                return None
+            return {"id": e.id, "rule_id": rule_id, "track_id": None, "vehicle_id": None, "animal_id": None,
+                    "camera": camera, "message": e.message, "crop": picture, "category": category, "level": level,
+                    "confirm": e.confirm, "created_at": e.created_at.isoformat(timespec="seconds")}
+
     def list_alerts(self, since_id: int = 0, limit: int = 50, start: datetime | None = None,
                     end: datetime | None = None) -> list[dict]:
         """Newest first; start/end: only alerts made in [start, end) (the summary, labeler/summary.py)."""
@@ -1313,7 +1342,9 @@ class Database:
                      "fall": any(n == "fallen" for n, _ in json.loads(conds or "[]")),
                      "quiet": any(n == "quiet" for n, _ in json.loads(conds or "[]")),
                      "unusual": any(n == "unusual" for n, _ in json.loads(conds or "[]")),
-                     "help": any(n == "help" for n, _ in json.loads(conds or "[]"))}
+                     "help": any(n == "help" for n, _ in json.loads(conds or "[]")),
+                     "category": e.category, "level": e.level, "confirm": e.confirm,
+                     "words": incident_words(e.category)}
                     for e, tcrop, vcrop, acrop, conds in rows]
 
     def update_alert_message(self, event_id: int, message: str) -> None:

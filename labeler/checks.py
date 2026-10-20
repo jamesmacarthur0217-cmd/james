@@ -22,10 +22,14 @@ CORRECTIONS = {"vehicle": ["not a vehicle", *VEHICLE_KINDS], "animal": ["not an 
 
 
 def alert_what(event: dict, conditions: list) -> str:
-    """Which kind of alert: fall, help sign, no movement, loitering, scene, vehicle, animal or person."""
+    """Which kind of alert: safety incident, fall, help sign, no movement, loitering, scene, vehicle, animal or
+    person."""
     names = {n for n, _ in conditions}
     if event.get("scene_id"):
         return "scene"
+    if event.get("category") or "incident" in names:   # each kind measured on its own: "safety: fire or smoke"
+        from .db import incident_words
+        return f"safety: {incident_words(event.get('category') or dict(conditions).get('incident'))}"
     if event.get("fall") or "fallen" in names:
         return "fall"
     if event.get("help") or "help" in names:
@@ -72,7 +76,8 @@ def candidates(db, kind: str, now: datetime | None = None, clip_for=None) -> lis
                 what = alert_what(e, rules.get(e["rule_id"], []))
                 out.append({"kind": kind, "id": e["id"], "camera": e["camera"], "at": e["created_at"], "what": what,
                             "picture": e["crop"], "clip": clip_for(e["id"]) if clip_for else None,
-                            "question": f"Was this {what} alert right? “{e['message']}”", "corrections": []})
+                            "question": f"Was this {what.removeprefix('safety: ')} alert right? “{e['message']}”",
+                            "corrections": []})
     elif kind == "scene":
         for a in db.latest_scene_answers():
             if a["answer_id"] not in done and a["picture"] and _recent(a["at"], now):
@@ -96,6 +101,8 @@ ORDER = ["vehicles", "animals", "scene answers", *ALERT_LABELS.values()]
 def label(check: dict) -> str:
     """What a check measures, in words: "vehicles", "animals", "scene answers", "fall alerts", ..."""
     if check["kind"] == "alert":
+        if check["what"].startswith("safety: "):
+            return f"{check['what'][8:]} alerts"
         return ALERT_LABELS.get(check["what"], "alerts")
     return {"vehicle": "vehicles", "animal": "animals", "scene": "scene answers"}[check["kind"]]
 

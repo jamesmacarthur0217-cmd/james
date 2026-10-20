@@ -72,7 +72,8 @@
         <thead><tr><th>Name</th><th>Source</th><th>Mode</th><th>Keep days</th><th>Detector size</th>
           <th title="Off for a camera that never sees the floor">Fall alerts</th>
           <th title="Look for cars, motorbikes, bicycles, buses and lorries (default: security cameras)">Vehicles</th>
-          <th title="Look for dogs, cats and birds (default: security cameras)">Animals</th><th></th></tr></thead>
+          <th title="Look for dogs, cats and birds (default: security cameras)">Animals</th>
+          <th title="Safety checks: falls, fire, fights... confirmed by the vision model (default: security cameras)">Safety</th><th></th></tr></thead>
         <tbody id="cams"></tbody>
       </table>
     </div>
@@ -180,6 +181,15 @@
       <div><input type="checkbox" id="quiet_enabled"> <span class="hint">An alert when nobody was seen on a kiosk camera
         for a long time while someone should be in (the built-in rule "No movement": 4 hours, 08:00-22:00, only when the
         house is set to Home). Change the hours or the time on the <a href="/alerts">Alerts</a> page.</span></div>
+      <label for="safety_enabled">Safety checks</label>
+      <div><input type="checkbox" id="safety_enabled"> <span class="hint">On cameras with "Safety" ticked (security
+        cameras by default): when a quick check sees a possible incident (a person down, fire, a fight...), the vision
+        model looks at the last seconds and an alert comes only if it confirms. Each kind is a rule on the
+        <a href="/alerts">Alerts</a> page (turn off or limit there).</span></div>
+      <label for="safety_confirm_per_min">Safety checks a minute (at most)</label>
+      <div><input type="number" id="safety_confirm_per_min" min="1" max="30" step="1"> <span class="hint">Each takes
+        the vision model about 1.5 s. Measured on a very busy camera: at 3 a minute people's labels were hardly slower,
+        at 6 they took about twice as long.</span></div>
     </div>
   </section>
 
@@ -298,7 +308,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const SIMPLE = ["retention_days", "audit_retention_days", "blur_faces", "blur_faces_for_viewers", "https", "retrain_enabled",
-                "backup_enabled", "backup_copy_to", "person_videos", "mobility_aids", "falls_enabled", "fall_after_s", "help_enabled", "help_hold_s", "vehicles_enabled", "vehicle_parked_after_s", "animals_enabled", "scene_enabled", "scene_answers_in_a_row", "quiet_enabled", "idle_enabled", "idle_after_s",
+                "backup_enabled", "backup_copy_to", "person_videos", "mobility_aids", "falls_enabled", "fall_after_s", "help_enabled", "help_hold_s", "vehicles_enabled", "vehicle_parked_after_s", "animals_enabled", "scene_enabled", "scene_answers_in_a_row", "quiet_enabled", "safety_enabled", "safety_confirm_per_min", "idle_enabled", "idle_after_s",
                 "recording_enabled", "recording_when", "recording_keep_days", "recording_max_gb",
                 "recording_alert_keep_days", "recording_alert_before_s", "recording_alert_after_s"];
 let loaded = null;        // values as saved (what the next start uses)
@@ -319,6 +329,7 @@ function camRow(c, isNew) {
     <td><input type="checkbox" class="fall"${c.fall_alert === false ? "" : " checked"} title="Fall alerts on this camera"></td>
     <td><input type="checkbox" class="veh"${(c.vehicles ?? c.mode === "security") ? " checked" : ""} title="Vehicles on this camera"></td>
     <td><input type="checkbox" class="ani"${(c.animals ?? c.mode === "security") ? " checked" : ""} title="Animals on this camera"></td>
+    <td><input type="checkbox" class="saf"${(c.safety ?? c.mode === "security") ? " checked" : ""} title="Safety checks on this camera"></td>
     <td><span class="row-actions">${isNew ? "" : '<button class="check-pic" title="Check this camera\'s picture now: too dark, blurry, light from behind, faces">Check the picture</button>'}
       <button class="danger-quiet remove">Remove</button></span></td>`;
   const check = tr.querySelector(".check-pic");
@@ -372,7 +383,8 @@ function readForm() {
     return { name: tr.querySelector(".name").value.trim(), source: /^\d+$/.test(source) ? Number(source) : source,
              mode: tr.querySelector(".mode").value, retention_days: days === "" ? null : Number(days),
              imgsz: size === "" ? null : Number(size), fall_alert: tr.querySelector(".fall").checked,
-             vehicles: tr.querySelector(".veh").checked, animals: tr.querySelector(".ani").checked };
+             vehicles: tr.querySelector(".veh").checked, animals: tr.querySelector(".ani").checked,
+             safety: tr.querySelector(".saf").checked };
   });
   v.vehicle_kinds = [...document.querySelectorAll("#vehicle_kinds input:checked")].map(b => b.value);
   v.animal_kinds = [...document.querySelectorAll("#animal_kinds input:checked")].map(b => b.value);

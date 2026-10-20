@@ -7,6 +7,9 @@
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/session.js"></script>
 <style>
+  .filters { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+  .crit { color: #c9372c; font-weight: 600; }   /* the word says it too, not only the color */
+  @media (prefers-color-scheme: dark) { .crit { color: #f97066; } }
   .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
   @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
   .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
@@ -82,6 +85,8 @@
   </div>
   <section class="panel">
     <h2>Recent alerts</h2>
+    <p class="filters"><label>Show <select id="ev-filter"><option value="">all alerts</option>
+      <option value="safety">safety incidents</option><option value="critical">critical safety incidents</option></select></label></p>
     <div id="events"><div class="empty">No alerts yet.</div></div>
   </section>
 </main>
@@ -97,12 +102,14 @@ function condRow() {
   const NICE = { zone: "entered zone", fallen: "fell", help: "made the help sign", vehicle: "vehicle (a rule about vehicles)", vehicle_color: "vehicle color",
                  hours: "time of day", armed: "Home / Away", stayed: "stayed in area (loitering)",
                  animal: "animal (a rule about animals)", quiet: "no movement (nobody seen for)",
-                 unusual: "unusual quiet (nobody when someone usually is)" };
+                 unusual: "unusual quiet (nobody when someone usually is)",
+                 incident: "safety incident (checked by the vision model)" };
   div.innerHTML = `<select class="c-name">${names.map(n => `<option value="${n}">${NICE[n] || n.replace(/_/g, " ")}</option>`).join("")}</select>
     <select class="c-value"></select><button class="c-del" title="Remove">✕</button>`;
   const fill = () => {
     const vals = fields[div.querySelector(".c-name").value].filter(v => v !== "unknown");
     const show = (n, v) => n === "quiet" ? niceSeconds(v * 60) : n === "stayed" ? stayText(v, " · ") : n === "armed" ? `only when ${v === "away" ? "Away" : "Home"}` : n === "hours" ? `${v.split("-")[0].padStart(2, "0")}:00 to ${(+v.split("-")[1] % 24 + "").padStart(2, "0")}:00`
+                                         : n === "incident" ? (KINDS[v]?.words || v)
                                          : n === "animal" && v === "any" ? "any animal"
                                          : n === "vehicle" && v === "any" ? "any vehicle" : n === "vehicle" && v === "car" ? "car (with SUVs, vans, pickups)" : v;
     const n = div.querySelector(".c-name").value;
@@ -122,10 +129,14 @@ function stayText(v, sep) {
   return `${v.slice(0, i)}${sep}${niceSeconds(+v.slice(i + 1))}`;
 }
 
+// Safety incidents (labeler/incidents.py): category -> {level, words}, from /api/safety.
+let KINDS = {};
+
 function describe(conds) {
   return conds.length ? conds.map(([n, v]) => n === "zone" ? `in zone ${v}` : n === "fallen" ? "fell"
                                               : n === "quiet" ? `nobody seen for ${niceSeconds(v * 60)}`
                                               : n === "unusual" ? "nobody seen when someone usually is (learned)"
+                                              : n === "incident" ? `${KINDS[v]?.words || v} (checked by the vision model)`
                                               : n === "help" ? "made the help sign"
                                               : n === "armed" ? `only when ${v === "away" ? "Away" : "Home"}`
                                               : n === "stayed" ? `stayed in ${stayText(v, " ")}`
@@ -253,14 +264,16 @@ $("sq-add").onclick = async () => {
 
 async function loadEvents() {
   const data = await (await fetch("/api/alerts/events?limit=50")).json();
+  const show = $("ev-filter").value;
+  const events = data.events.filter(e => !show || (show === "safety" ? e.category : e.level === "critical"));
   // Keep an open clip playing: only redraw when the list changed.
-  const html = data.events.length ? data.events.map(e => `
+  const html = events.length ? events.map(e => `
     <div class="event">${e.crop ? `<img src="/crops/${encodeURIComponent(e.crop)}" alt="">` : '<img alt="">'}
-      <div><b>${esc(e.message)}</b><br><small>${window.VL.alertWho(e)} · ${esc(e.camera)} · ${esc(e.created_at.replace("T", " "))}</small>
+      <div><b>${esc(e.message)}</b><br><small>${e.level === "critical" ? '<span class="crit">critical</span> · ' : ""}${esc(window.VL.alertWho(e))} · ${esc(e.camera)} · ${esc(e.created_at.replace("T", " "))}</small>
         ${e.clip ? `<br><button class="link play" data-clip="${esc(e.clip)}">▶ Play clip</button>` : "<br>"}
         <a class="link" href="/recordings?camera=${encodeURIComponent(e.camera)}&amp;at=${encodeURIComponent(e.created_at)}">▶ Recording</a>
         <div class="clip-box"></div></div>
-    </div>`).join("") : '<div class="empty">No alerts yet.</div>';
+    </div>`).join("") : `<div class="empty">${show ? "No safety incidents among the latest alerts." : "No alerts yet."}</div>`;
   if ($("events").dataset.html !== html) { $("events").innerHTML = html; $("events").dataset.html = html; }
 }
 
@@ -300,6 +313,10 @@ async function init() {
              quiet: ["60", "120", "180", "240", "360", "480", "720"],   // no movement, minutes (labeler/quiet.py)
              unusual: ["yes"],   // unusual quiet: the hours are learned (labeler/routine.py, labeler/unusual.py)
              animal: ["any", "dog", "cat", "bird"] };   // animals (labeler/animals.py)
+  const safety = await (await fetch("/api/safety")).json();   // safety incidents (labeler/incidents.py)
+  KINDS = Object.fromEntries(safety.kinds.map(k => [k.category, k]));
+  if (safety.on) fields = { ...fields, incident: safety.kinds.map(k => k.category) };
+  $("ev-filter").onchange = loadEvents;
   for (const c of await (await fetch("/api/cameras")).json()) {
     $("camera").add(new Option(c.name, c.name));
     if (c.live) $("sq-camera").add(new Option(c.name, c.name));

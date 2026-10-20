@@ -289,7 +289,10 @@ def main() -> int:
     memories = {p.name: p.memory for p in pipelines if getattr(p, "memory", None) is not None}
     if worker is not None and cfg["safety"]["enabled"] and memories:   # safety checks (labeler/incidents.py)
         from labeler.incidents import ConfirmQueue
+        from labeler.incidents import IncidentAlerts
+        alerts.ensure_incident_rules()   # only with a safety camera: a kiosk-only home gets no rules that never fire
         incident_box.append(ConfirmQueue(cfg, worker, memories))
+        incident_box[0].listeners.append(IncidentAlerts(db, alerts, pipelines, crop_dir, bool(cfg["clips"]["enabled"])))
         app.state.incidents = incident_box[0]
         threading.Thread(target=incident_box[0].loop, args=(app.state.stopping,), name="incidents",
                          daemon=True).start()

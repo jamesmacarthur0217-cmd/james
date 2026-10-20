@@ -516,8 +516,9 @@ class Pipeline:
             heads = [geometry.head_box(self.tracks[t].kpts, self.tracks[t].box) for t in seen]
             self.scene_frame = (frame.copy(), self.clock.wall(), heads)
             self.scene_people = [tuple(self.tracks[t].box[:4]) for t in seen]   # for "Check the picture"
-        if self.memory is not None:
-            self.memory.add(frame, self.clock.wall(), now)
+        if self.memory is not None and self.memory.due(now):
+            self.memory.add(frame, self.clock.wall(), now,
+                            [geometry.head_box(self.tracks[t].kpts, self.tracks[t].box) for t in seen])
         if seen:
             self.person_seen_wall = self.clock.wall()
         if self.picture is not None and not self.blank and self.picture.due():

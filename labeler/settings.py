@@ -46,6 +46,7 @@ class CameraIn(BaseModel):
     fall_alert: bool = True       # off for a camera that never sees the floor
     vehicles: bool | None = None  # look for vehicles; None = the default (security cameras yes, kiosk no)
     animals: bool | None = None   # look for animals; None = the default (security cameras yes, kiosk no)
+    safety: bool | None = None    # safety checks (labeler/incidents.py); None = the default (security cameras yes)
 
     @field_validator("name")
     @classmethod
@@ -93,6 +94,8 @@ class SettingsIn(BaseModel):
     scene_enabled: bool
     scene_answers_in_a_row: int = Field(ge=1, le=5)
     quiet_enabled: bool
+    safety_enabled: bool
+    safety_confirm_per_min: int = Field(ge=1, le=30)
 
     @field_validator("animal_kinds")
     @classmethod
@@ -170,6 +173,8 @@ SIMPLE = {
     "scene_enabled": ("scene", "enabled"),
     "scene_answers_in_a_row": ("scene", "answers_in_a_row"),
     "quiet_enabled": ("quiet", "enabled"),
+    "safety_enabled": ("safety", "enabled"),
+    "safety_confirm_per_min": ("safety", "confirm_per_min"),
     "backup_copy_to": ("backup", "copy_to"),
     "idle_enabled": ("idle", "enabled"),
     "idle_after_s": ("idle", "after_s"),
@@ -182,7 +187,7 @@ SIMPLE = {
     "recording_alert_keep_days": ("recording", "alert_keep_days"),
     "away_schedule": ("arming", "schedule"),
 }
-CAMERA_FIELDS = ("name", "source", "mode", "retention_days", "imgsz", "fall_alert", "vehicles", "animals")
+CAMERA_FIELDS = ("name", "source", "mode", "retention_days", "imgsz", "fall_alert", "vehicles", "animals", "safety")
 
 
 def settings_path(cfg: dict) -> Path | None:
@@ -243,7 +248,8 @@ def current(cfg: dict) -> dict:
                        "retention_days": c.get("retention_days"), "imgsz": c.get("imgsz"),
                        "fall_alert": c.get("fall_alert", True),
                        "vehicles": c.get("vehicles", c.get("mode", cfg["mode"]) == "security"),
-                       "animals": c.get("animals", c.get("mode", cfg["mode"]) == "security")} for c in cfg["cameras"]]
+                       "animals": c.get("animals", c.get("mode", cfg["mode"]) == "security"),
+                       "safety": c.get("safety", c.get("mode", cfg["mode"]) == "security")} for c in cfg["cameras"]]
     return out
 
 
@@ -311,7 +317,7 @@ def build(body: SettingsIn, base: dict, effective: dict, new_passwords: dict | N
             c.pop("fall_alert", None)   # on is the default: not written
         else:
             c["fall_alert"] = False
-        for key in ("vehicles", "animals"):
+        for key in ("vehicles", "animals", "safety"):
             value = getattr(cam, key)
             if value is None or value == (cam.mode == "security"):
                 c.pop(key, None)        # the default for its mode: not written (follows a mode change)

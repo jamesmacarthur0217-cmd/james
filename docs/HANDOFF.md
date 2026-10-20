@@ -25,7 +25,11 @@ not kept: tracks per day + Away spans via `db.add_arming`, then run.py on an emp
 **Next: [PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)** (2026-10-20): safety incidents (11 kinds the user listed) and
 suspicious behaviour (behaviour only, never looks) on security cameras; the user agreed the architecture (fast checks then
 the vision model confirms; new columns on alert_events; a role per drawn area; extra models decided per phase) and
-wants **any further architecture discussed with them before it is built**. No phase started. Still waiting for them: restart their own app (stop.bat, start.bat), the
+wants **any further architecture discussed with them before it is built**. **Phase 44 done 2026-10-20** (`55a60c3`
+area roles, `2e6bca2` confirm queue + one priority queue for the vision model, then safety alerts; 916 tests): next
+Phase 45 (people: down/slumped, children, crowding; its step 0 is the measuring tool `tools/incident_check.py`).
+Measured: a check 1.4 s with 3 pictures; **4 pictures exceed Ollama's 4096-token context** (refused with 400);
+6 checks a minute on a very busy camera double people's label wait (3.6 -> 7.7 s), 3 a minute hardly matter. Still waiting for them: restart their own app (stop.bat, start.bat), the
 First-run check, then Phase 26 (real-camera week). Ideas offered 2026-10-19 and not chosen yet (ask before offering
 again): PC history chart, weekly report saved by itself, a week in one minute.
 
@@ -234,6 +238,11 @@ labeler/whatsnew.py  What's new (Phase 36): ENTRIES in the order phases were fin
                      added_columns (Entry.marker); Live banner (index.html whatsNew, localStorage whatsNewSeen), /whats-new
 labeler/routine.py   the usual day (Phase 39): per kiosk camera, weekday/weekend x hour, share of counted days with
                      someone seen (8 weeks; days with nobody and Away hours left out; learning below 14 days)
+labeler/incidents.py safety incidents (Phase 44): FrameMemory (Pipeline.memory, 1 picture/s for 10 s on safety cameras),
+                     CATEGORIES (12 kinds: level, words, question), ConfirmQueue (run.py thread "incidents", job ids
+                     -(1e9 + n), critical first, confirm_per_min, max_wait_s, cooldown_s), IncidentAlerts (a "yes" ->
+                     alert_events.category/level/confirm, picture, clip); vlm.VLMWorker is one priority queue (CRITICAL,
+                     PEOPLE, WARNING, ROUND; slot first, then the job); zones.role (zones.ROLES); GET /api/safety
 labeler/unusual.py   (+ Phase 43: UnusualWatch.today, Routine.chart -> GET /api/routine, Health chart #usual)
 labeler/unusual.py   unusual quiet (Phase 39): built-in rule "Unusual quiet" (unusual = yes, armed = home); fires when
                      today's quiet stretch (>= 3 whole hours) had someone on >= 97% of history days; once a day
@@ -672,5 +681,5 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE44-49-PLAN.md
-> (Phase 44, the safety base); ask me before each phase and each step starts, discuss any architecture with me first,
-> and do it step by step.
+> (Phase 45, people); ask me before each phase and each step starts, discuss any architecture with me first, and do it
+> step by step.

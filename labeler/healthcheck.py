@@ -470,6 +470,25 @@ def check_routine(routine) -> dict | None:
     return _check("usual day", "ok", "; ".join(parts))
 
 
+def check_safety(incidents) -> dict | None:
+    """Phase 44: the safety checks (labeler/incidents.py): how many the vision model checked since the start, its
+    answers, the dropped ones (waited too long: a warning), and the latest answers, "no" and "unsure" too."""
+    if incidents is None:
+        return None
+    s = incidents.state()
+    parts = [f"on {', '.join(s['cameras'])}: {s['sent']} checked since the start ({s['yes']} yes, {s['no']} no, "
+             f"{s['unsure']} unsure" + (f", {s['failed']} failed" if s["failed"] else "") + ")"]
+    if s["wait_median_s"] is not None:
+        parts.append(f"waited {s['wait_median_s']} s")
+    if s["dropped_old"]:
+        parts.append(f"{s['dropped_old']} dropped (waited over the limit: the vision model is busy)")
+    latest = [f"{r['at'][11:16]} {r['category'].replace('_', ' ')} {r['answer']}" + (f" ({r['what']})" if r["what"] else "")
+              for r in s["recent"][-3:]]
+    if latest:
+        parts.append("latest: " + "; ".join(reversed(latest)))
+    return _check("safety checks", "warning" if s["dropped_old"] or s["failed"] else "ok", "; ".join(parts))
+
+
 def check_quiet(quiet) -> dict | None:
     """Phase 31: the "no movement" watch (labeler/quiet.py): how long each watched camera has been quiet."""
     if quiet is None:
@@ -524,7 +543,8 @@ def check_errors(now: float) -> tuple[dict, list[dict]]:
 
 
 def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: float | None = None,
-               detail: str = "full", arming=None, quiet=None, updater=None, pcwatch=None, routine=None) -> dict:
+               detail: str = "full", arming=None, quiet=None, updater=None, pcwatch=None, routine=None,
+               incidents=None) -> dict:
     """detail: "full" (admins), "viewer" (no log messages) or "status" (monitoring token: problems only)."""
     now_mono, now = time.monotonic(), time.time()
     errors_check, latest_errors = check_errors(now)
@@ -577,6 +597,12 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
             checks.insert(-1, line)
     except Exception as e:
         checks.insert(-1, _check("usual day", "warning", f"could not be read ({e.__class__.__name__})"))
+    try:
+        line = check_safety(incidents)
+        if line is not None:
+            checks.insert(-1, line)
+    except Exception as e:
+        checks.insert(-1, _check("safety checks", "warning", f"could not be read ({e.__class__.__name__})"))
     try:
         line = check_quiet(quiet)
         if line is not None:

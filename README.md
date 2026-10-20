@@ -780,6 +780,41 @@ Measured 2026-10-13 (`tools/mobility_check.py`; answers checked by eye):
 - People counted as "no aid" when no aid box touched them and the model said none; people too cut-off or
   blurry to tell were left out (69 of 793).
 
+## Safety incidents (Phase 44: the base)
+
+Twelve kinds of safety incident on security cameras (the user's list, 2026-10-20; plan:
+[docs/PHASE44-49-PLAN.md](docs/PHASE44-49-PLAN.md)): a person needing help, a fall or collision, fire or smoke,
+aggression, a dangerous object, a child in danger, a floor hazard, a blocked exit or aisle, unsafe equipment, animals or
+pests, unusual crowding, suspicious behaviour (judged only by what a person does, never by how they look). The way it
+works (the user's choices): **quick checks** every frame or second (body points, YOLO objects, simple rules: one phase
+per group of kinds, from Phase 45) only raise a *suspect*; the **vision model confirms** it from up to 3 pictures of the
+last seconds (`labeler/incidents.py`) and answers yes / no / unsure with a few words; only **yes** alerts.
+
+- **Area roles** (Live page, Zones): walkway, exit, cooking, food preparation, dining, children's play area,
+  restricted, bed or sofa (the old "lying is normal here"); changeable in the list. `zones.roles` in config.yaml limits
+  which are offered. The same thing is normal in one area and an alarm in another (a knife in the cooking area).
+- **Pictures from memory**: each safety camera (`cameras[].safety`, Settings column "Safety"; security cameras by
+  default) keeps one picture a second for 10 s, shrunk to 960 px (~1.5 MB each).
+- **One queue**: the vision model's work is one priority queue: critical checks first, then people's labels, then
+  warnings. At most `safety.confirm_per_min` (6) checks a minute, one at a time; a check waiting over 30 s is dropped
+  and counted; the same camera, kind and area is not checked again within 60 s.
+- **Alerts**: one built-in rule per kind (turn off or limit by area, hours, Home / Away on the Alerts page; deleted, it
+  comes back). Critical kinds (person needing help, fall, fire, aggression, dangerous object, child in danger) pop up
+  red with a beep like a fall; the others as a plain pop-up. The alert keeps the newest picture (the area outlined;
+  faces blurred for viewers) and a clip. Alerts page: "Show critical safety incidents"; the Check page measures each
+  kind on its own ("fire or smoke alerts: 9 of 10 right"); Health line "safety checks" (checked since the start,
+  yes / no / unsure, dropped, the latest answers).
+
+Measured (`tools/incident_bench.py`, MOT16-09, qwen3-vl 4B, one request at a time): a check takes 0.6 s with 1 picture
+and 1.4 s with 3; 4 pictures at 768 px are refused (4263 tokens, over Ollama's 4096; a bigger context per request
+would reload the model between checks and labels), so at most 3. On a very busy camera (a new person every 4 s) people's
+labels waited 3.6 s without checks, 3.9 s with 3 critical checks a minute and 7.7 s with 6 (the ceiling: checks come
+only when a quick check sees something); a critical check waited ~3.7 s for the label being made. Real run on a test
+copy: a stand-in suspect with 3 UR Fall pictures of a person lying was answered "yes, person lying on floor" in 1.8 s
+and became a red pop-up; 3 MOT16 street pictures asked about fire were answered "no fire or smoke visible". No quick
+check raises suspects yet, so no kind is measured; each later phase measures its own (found, false alarms per hour,
+late).
+
 ## No movement
 
 For someone living alone (an elderly parent): an alert when nobody has been seen on the camera for a long time while

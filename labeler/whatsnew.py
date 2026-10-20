@@ -121,10 +121,16 @@ ENTRIES: list[Entry] = [
           "When old recordings are deleted, the minutes around each alert are kept 30 days (1 minute before to 2 "
           "after; Settings page). They show on the Recordings page in their own color. Also: the time written on "
           "recordings is clean again (it looked doubled).", "/recordings"),
-    Entry("p43", 43, "", "The usual day as a chart",
+    Entry("p43", 43, "d33e188", "The usual day as a chart",
           "Health page, \"The usual day\": for each kiosk camera, on how many days someone was seen in each hour "
           "(weekdays and weekends), the line above which an hour counts as usual, and today's quiet time. The "
           "\"Unusual quiet\" rule on the Alerts page links to it.", "/health"),
+    Entry("p44", 44, "", "Safety checks (the base)",
+          "Areas drawn on the Live page get a role (walkway, exit, cooking, dining, bed...). On security cameras, when a "
+          "quick check sees a possible incident (a person down, fire, a fight...), the vision model looks at the last "
+          "seconds and an alert comes only if it confirms; critical ones pop up red with a beep. 12 kinds, each a rule "
+          "on the Alerts page. The quick checks for each kind come in the next phases.", "/alerts",
+          marker="alert_events.category"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

@@ -61,6 +61,7 @@ QUIET = "quiet"     # minutes with nobody seen (labeler/quiet.py)
 QUIET_RULE = [[QUIET, "240"], ["hours", "08-22"], ["armed", "home"]]
 UNUSUAL = "unusual"   # nobody seen at a time someone usually is (labeler/unusual.py)
 UNUSUAL_RULE = [[UNUSUAL, "yes"], ["armed", "home"]]
+INCIDENT = "incident"   # a safety incident the vision model confirmed (labeler/incidents.py): "incident = fire"
 CAR_GROUP = {"car", "SUV", "van", "pickup"}   # "car" in a rule, like in the Ask box
 HOUR_PRESETS = ["22-06", "20-06", "00-06", "18-24", "06-18", "08-18", "09-17"]
 
@@ -81,10 +82,21 @@ def is_unusual_rule(conditions: list[list[str]]) -> bool:
     return any(name == UNUSUAL for name, _ in conditions)
 
 
+def is_incident_rule(conditions: list[list[str]]) -> bool:
+    return any(name == INCIDENT for name, _ in conditions)
+
+
+def incident_of(conditions: list[list[str]]) -> str | None:
+    return next((v for n, v in conditions if n == INCIDENT), None)
+
+
 def rule_kind(conditions: list[list[str]]) -> str:
-    """Who a rule is about: "person", "vehicle", "animal" or "quiet" (nobody: no movement, unusual quiet)."""
+    """Who a rule is about: "person", "vehicle", "animal", "quiet" (nobody: no movement, unusual quiet) or
+    "incident" (a safety incident, Phase 44)."""
     if is_quiet_rule(conditions) or is_unusual_rule(conditions):
         return "quiet"
+    if is_incident_rule(conditions):
+        return "incident"
     return "vehicle" if is_vehicle_rule(conditions) else "animal" if is_animal_rule(conditions) else "person"
 
 
@@ -173,6 +185,9 @@ def describe(conditions: list[list[str]]) -> str:
             return f"nobody seen for {nice_seconds(int(v) * 60)}"
         if n == UNUSUAL:
             return "nobody seen when someone usually is"
+        if n == INCIDENT:
+            from .incidents import CATEGORIES
+            return f"{CATEGORIES[v][1] if v in CATEGORIES else v} (checked by the vision model)"
         if n == STAYED:
             zone, secs = parse_stayed(v)
             return f"stayed in {zone} {nice_seconds(secs)}"
@@ -239,6 +254,31 @@ class AlertEngine:
 
     def unusual_rules(self) -> list[dict]:
         return [r for r in self._enabled_rules() if is_unusual_rule(r["conditions"])]
+
+    def ensure_incident_rules(self) -> None:
+        """One built-in rule per kind of safety incident (labeler/incidents.py CATEGORIES; the user's choice), unless
+        a rule already asks for that kind (deleted, it comes back; turned off, it stays off)."""
+        from .incidents import CATEGORIES
+        have = {incident_of(r["conditions"]) for r in self.db.list_rules()}
+        added = []
+        for cat, (_, words, _) in CATEGORIES.items():
+            if cat not in have:
+                self.db.add_rule(words[0].upper() + words[1:], [[INCIDENT, cat]])
+                added.append(words)
+        if added:
+            self.invalidate()
+            log.info("safety alert rules added: %s (Alerts page to turn off or limit)", ", ".join(added))
+
+    def check_incident(self, camera: str, category: str, area: str | None) -> list[dict]:
+        """The enabled rules a confirmed incident of this kind on this camera (in this area, if any) matches now."""
+        rules = [r for r in self._enabled_rules() if (not r["camera"] or r["camera"] == camera)
+                 and incident_of(r["conditions"]) == category]
+        if not rules:
+            return []
+        attrs = {INCIDENT: category, ZONE: area or "", "hour": datetime.now().hour}
+        if _asks_armed(rules):
+            attrs[ARMED] = self._armed()
+        return [r for r in rules if matches(r["conditions"], attrs)]
 
     def _armed(self) -> str:
         from .arming import HOME

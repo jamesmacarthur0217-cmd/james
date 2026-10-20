@@ -438,12 +438,14 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     @app.post("/api/alerts/rules")
     def add_rule(body: RuleIn, request: Request):
         from .alerts import parse_stayed, valid_hours
+        from .incidents import CATEGORIES
         from .vlm import VEHICLE_COLORS
         allowed = {**schema.FIELDS, **{n: v + ["none"] for n, v in schema.LIST_FIELDS.items()},
                    "zone": sorted({z["name"] for z in db.list_zones()}), "fallen": ["yes"], "help": ["yes"],
                    "vehicle": ["any", "car", "SUV", "van", "pickup", "lorry", "bus", "motorbike", "bicycle"],
                    "vehicle_color": [c for c in VEHICLE_COLORS if c != "unknown"], "armed": ["away", "home"], "unusual": ["yes"],
-                   "animal": ["any", "dog", "cat", "bird", "horse", "sheep", "cow"]}
+                   "animal": ["any", "dog", "cat", "bird", "horse", "sheep", "cow"],
+                   "incident": list(CATEGORIES)}
         areas = {z["name"] for z in db.list_zones() if z["kind"] == "area"}
         for cond in body.conditions:
             if len(cond) == 2 and cond[0] == "hours":
@@ -474,6 +476,9 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
                                      "and Home / Away")
         if "quiet" in names and set(names) - {"quiet", "hours", "armed"}:
             raise HTTPException(400, "a no-movement rule can ask only for the time, the hours and Home / Away")
+        if "incident" in names and (set(names) - {"incident", "zone", "hours", "armed"} or names.count("incident") > 1):
+            raise HTTPException(400, "a safety rule can ask only for one kind of incident, an area, the hours and "
+                                     "Home / Away")
         if "unusual" in names and set(names) - {"unusual", "armed"}:
             raise HTTPException(400, "an unusual-quiet rule can ask only for Home / Away (it learns its own hours)")
         if "fallen" in names and "help" in names:
@@ -651,6 +656,17 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         if changed:
             audit(request, "home/away", f"set to {body.mode.capitalize()}")
         return arming.state()
+
+    @app.get("/api/safety")
+    def safety_state():
+        """Safety incidents (labeler/incidents.py, admins): the kinds with their level and words, and the confirm
+        queue's counts and latest answers (yes, no, unsure) since the app started; "on": False without a safety
+        camera or the vision model."""
+        from .incidents import CATEGORIES
+        queue = getattr(app.state, "incidents", None)
+        return {"on": queue is not None,
+                "kinds": [{"category": k, "level": lv, "words": w} for k, (lv, w, _) in CATEGORIES.items()],
+                "state": queue.state() if queue is not None else None}
 
     @app.get("/api/alerts/events")
     def alert_events(since_id: int = 0, limit: int = 50):
@@ -850,7 +866,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
         detail = {"admin": "full", "monitor": "status"}.get(role, "viewer")
         result = healthcheck.run_checks(cfg, db, pipelines, health, app.state.started_at, detail, arming,
                                         getattr(app.state, "quiet", None), getattr(app.state, "updater", None),
-                                        getattr(app.state, "pcwatch", None), getattr(app.state, "routine", None))
+                                        getattr(app.state, "pcwatch", None), getattr(app.state, "routine", None),
+                                        getattr(app.state, "incidents", None))
         return JSONResponse(result, status_code=200 if result["ok"] else 503, headers={"Cache-Control": "no-store"})
 
     @app.get("/stream")

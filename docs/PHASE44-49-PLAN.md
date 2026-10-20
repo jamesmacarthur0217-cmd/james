@@ -1,4 +1,4 @@
-# Phases 44-49 plan: safety incidents and suspicious behaviour on security cameras (architecture agreed with the user 2026-10-20; no phase started)
+# Phases 44-49 plan: safety incidents and suspicious behaviour on security cameras (architecture agreed with the user 2026-10-20; Phase 44 done)
 
 ## Context
 
@@ -86,8 +86,24 @@ normal in Malaysia). No face recognition, no automatic action: an alert shows th
    Alerts page filter; Check page kind "incident"; Health line "safety checks" (suspects and confirms per hour, the
    queue's wait, dropped ones); Settings box (each category on/off). `tools/incident_check.py`: runs videos with true
    time spans per category and reports found / false / late (the base for every later phase's measuring).
+   **Done 2026-10-20** (the user chose: a built-in rule per kind, alert only on yes, critical red with a beep):
+   `alert_events.category` / `level` / `confirm` (checked on a scratch PostgreSQL database built by the step 2 code:
+   0.2 s, 3 columns added, the old alert kept); `alerts.ensure_incident_rules` (12 rules, made only when a safety camera
+   and the vision model are there, so a kiosk-only home gets none), `AlertEngine.check_incident` (camera, area, hours,
+   Home / Away), `incidents.IncidentAlerts` (newest picture with the area outlined + blurred copy, clip);
+   `db.record_incident_alert`, list_alerts `category` / `level` / `confirm` / `words`; session.js critical = red with a
+   beep, warning = plain; Alerts page "Show" filter, `critical` mark, rule picker "safety incident"; GET `/api/safety`;
+   Check page kind per safety kind ("fire or smoke alerts"); summary `incident` listed in the week; Health
+   `check_safety`; Settings `safety_enabled`, `safety_confirm_per_min`, camera column "Safety". Real run: two stand-in
+   suspects through the real vision model into a running test copy: UR Fall lying -> "yes" (1.8 s), red pop-up, alert,
+   Check page item; MOT16 street asked about fire -> "no", no alert. **Moved to Phase 45 step 1**: the measuring tool
+   `tools/incident_check.py` (nothing raises suspects before Phase 45, so it would measure nothing yet).
+   **Phase 44 is done** (916 tests).
 
 ## Phase 45: People (help, falls, children, crowding)
+
+0. (from Phase 44) `tools/incident_check.py`: videos with true time spans per kind -> found / false alarms per hour /
+   late, through the real quick checks and the vision model.
 
 1. **Person down or slumped**: today's lying from body points works for side views; add *slumped* (sitting, head below
    the shoulders, still for 20 s) and *down after a fall* on security views; overturned wheelchair (mobility aid
