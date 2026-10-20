@@ -54,6 +54,12 @@ normal in Malaysia). No face recognition, no automatic action: an alert shows th
 1. **Area roles**: `zones.role` (in `db.NEW_COLUMNS`, checked on a scratch PostgreSQL database built by the old code,
    pitfall 30); `lying_ok` becomes role "bed" (kept in sync for old rules); the Live page's area tool gets a role
    picker; `safety.roles` in the config; `cameras[].safety` (on by default for security cameras). Tests.
+   **Done 2026-10-20**: roles fixed in `zones.ROLES` (later checks depend on their meaning); the config option is
+   `zones.roles` (which ones the page offers; all by default); `zones.role` + `db.set_zone_role`, PATCH
+   `/api/zones/{id}` (admins, audited), GET `/api/zones/roles`; the Live page picks a role when drawing and changes it in
+   the list. An old area with lying_ok reads as "bed". PostgreSQL: a database built by the old code opened in 0.2 s with
+   `zones.role` added and the old bed area read as "bed". Browser: drawn, saved as bed, changed to walkway (audited),
+   phone width fits (a zone row wraps). `cameras[].safety` moves to step 2, where something uses it. 899 tests.
 2. **Suspects and the confirm queue**: `labeler/incidents.py`: `Suspect` (category, camera, area, people, frames from a
    short ring kept by the Pipeline, reason), `ConfirmQueue` (priorities, per-minute limit, a cooldown per category and
    area, drop when too old), `vlm.PROMPT_INCIDENT` per category with several pictures (JSON: answer, what), job numbers

@@ -59,6 +59,8 @@ tracking:
 # Areas and counting lines are drawn on the Live page (admin) and stored in the database.
 zones:
   min_frames: 3               # a person must be in/out (or across a line) this many frames in a row to count
+  # Area roles offered on the Live page (what the place is, for the safety checks); all when not set:
+  # roles: [walkway, exit, cooking, food_prep, dining, play, restricted, bed]
 
 # "Timeline" on the Live page: where a person was seen, from look-alikes on all cameras in time order.
 timeline:

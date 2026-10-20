@@ -20,7 +20,8 @@ DEFAULTS: dict = {
         "tracker": "labeler/trackers/people.yaml",
         "min_box_area": {"kiosk": 0.03, "security": 0.0},
     },
-    "zones": {"min_frames": 3},
+    # roles: which area roles the Live page offers (labeler/zones.py ROLES); None = all of them.
+    "zones": {"min_frames": 3, "roles": None},
     "engagement": {"facing_min": 0.6, "looked_s": 3.0},
     "timeline": {"min_similarity": 0.8, "window_h": 24},
     "clips": {"enabled": True, "before_s": 5, "after_s": 5, "fps": 10, "max_width": 960},

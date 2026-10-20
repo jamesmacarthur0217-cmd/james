@@ -38,8 +38,8 @@
           <option value="line">Counting line: click 2 points</option>
         </select>
         <input id="zone-name" placeholder="Name, e.g. door" maxlength="100">
-        <label id="zone-lying-label" title="A bed or sofa: someone lying here is not a fall"><input type="checkbox"
-          id="zone-lying"> Lying is normal here</label>
+        <label id="zone-role-label" title="What the place is, so the safety checks know what is normal there (a bed or
+          sofa: someone lying there is not a fall)">Role <select id="zone-role"><option value="">none</option></select></label>
         <button id="zone-undo">Undo point</button>
         <button id="zone-save" class="primary" disabled>Save</button>
         <span class="muted" id="zone-msg"></span>
@@ -537,7 +537,7 @@ function drawZonePreview() {
   const enough = kind === "area" ? zoneDraw.points.length >= 3 : zoneDraw.points.length === 2;
   $("zone-save").disabled = !enough || !$("zone-name").value.trim();
   $("zone-hint").textContent = ZONE_HINT[kind];
-  $("zone-lying-label").hidden = kind !== "area";
+  $("zone-role-label").hidden = kind !== "area";
 }
 
 $("zone-draw").addEventListener("click", (e) => {
@@ -556,33 +556,59 @@ document.addEventListener("keydown", (e) => {
 });
 new ResizeObserver(() => { if (zoneDraw.on) drawZonePreview(); }).observe($("live"));
 
+// Area roles (Phase 44): what the place is, for the safety checks; offered from /api/zones/roles.
+let zoneRoles = null;
+async function loadZoneRoles() {
+  if (zoneRoles) return;
+  zoneRoles = await (await fetch("/api/zones/roles")).json();
+  for (const r of zoneRoles) $("zone-role").add(new Option(r.words, r.role));
+}
+function roleOptions(current) {
+  const roles = zoneRoles.some(r => r.role === current) || !current ? zoneRoles
+    : [...zoneRoles, { role: current, words: current }];   // a role set before the list was narrowed
+  return '<option value="">no role</option>' + roles.map(r =>
+    `<option value="${esc(r.role)}"${r.role === current ? " selected" : ""}>${esc(r.words)}</option>`).join("");
+}
+
 async function loadZoneList() {
+  await loadZoneRoles();
   const zones = await (await fetch("/api/zones?camera=" + encodeURIComponent(zoneCamera()))).json();
   $("zone-list").innerHTML = zones.length
     ? zones.map(z => `<div class="zone-item"><span><b>${esc(z.name)}</b> <span class="muted">${z.kind === "line"
-        ? "counting line" : z.lying_ok ? "area, lying is normal here" : "area"}</span></span><button class="danger-quiet" data-id="${z.id}"
-        data-name="${esc(z.name)}">Delete</button></div>`).join("")
+        ? "counting line" : "area"}</span>${z.kind === "area" ? ` <select class="zone-role-edit" data-zone="${z.id}"
+        title="What the place is (safety checks)">${roleOptions(z.role)}</select>` : ""}</span><button class="danger-quiet"
+        data-id="${z.id}" data-name="${esc(z.name)}">Delete</button></div>`).join("")
     : '<div class="muted">No zones on this camera yet.</div>';
 }
 
 $("zone-list").onclick = async (e) => {
-  const id = e.target.dataset.id;
-  if (!id || !confirm(`Delete "${e.target.dataset.name}"? Counts already made stay in Reports.`)) return;
-  await fetch(`/api/zones/${id}`, { method: "DELETE" });
+  const b = e.target.closest("button[data-id]");
+  if (!b || !confirm(`Delete "${b.dataset.name}"? Counts already made stay in Reports.`)) return;
+  await fetch(`/api/zones/${b.dataset.id}`, { method: "DELETE" });
   loadZoneList();
+};
+
+$("zone-list").onchange = async (e) => {
+  if (!e.target.matches(".zone-role-edit")) return;
+  const r = await fetch(`/api/zones/${e.target.dataset.zone}`, { method: "PATCH",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: e.target.value }) });
+  const data = await r.json().catch(() => ({}));
+  $("zone-msg").textContent = r.ok ? `"${data.name}": ${data.role ? e.target.selectedOptions[0].text : "no role"}.`
+                                   : data.detail || "Could not change it.";
+  if (!r.ok) loadZoneList();
 };
 
 $("zone-save").onclick = async () => {
   const r = await fetch("/api/zones", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ camera: zoneCamera(), name: $("zone-name").value.trim(),
                            kind: $("zone-kind").value, points: zoneDraw.points,
-                           lying_ok: $("zone-kind").value === "area" && $("zone-lying").checked }) });
+                           role: $("zone-kind").value === "area" ? $("zone-role").value : "" }) });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) { $("zone-msg").textContent = data.detail || "Could not save."; return; }
   $("zone-msg").textContent = `Saved "${data.name}".`;
   zoneDraw.points = [];
   $("zone-name").value = "";
-  $("zone-lying").checked = false;
+  $("zone-role").value = "";
   drawZonePreview();
   loadZoneList();
 };

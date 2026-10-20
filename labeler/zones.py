@@ -10,6 +10,11 @@ Points are fractions of the frame (0..1), so they still fit after a change of ca
 Requiring a few frames in a row keeps someone standing on a border from being counted again and again.
 A person's anchor is the middle of their box on kiosk cameras (feet are usually out of view) and their feet
 (the bottom middle) on security cameras.
+
+Area roles (Phase 44): an area can say what the place is, so the safety checks know what is normal there (a knife or
+a flame in the cooking area; someone lying on the bed). The roles are fixed here because later checks depend on their
+meaning; `safety.roles` in the config picks which ones the Live page offers. "bed" is the old "lying is normal here"
+(zones.lying_ok is kept the same, so fall checks and old databases work unchanged).
 """
 from __future__ import annotations
 
@@ -21,6 +26,21 @@ import numpy as np
 
 AREA, LINE = "area", "line"
 LINE_MARGIN = 0.05   # a crossing counts slightly beyond the line's ends too
+BED = "bed"
+# role -> what the Live page calls it ("" = no role: a plain area for counting).
+ROLES = {"walkway": "walkway or aisle", "exit": "exit or emergency exit", "cooking": "cooking area",
+         "food_prep": "food preparation", "dining": "dining or seating", "play": "children's play area",
+         "restricted": "restricted (staff or no entry)", BED: "bed or sofa (lying is normal here)"}
+
+
+def check_role(kind: str, role: str | None) -> str:
+    """A valid role for a zone ("" for none); only areas have one."""
+    role = (role or "").strip()
+    if role and role not in ROLES:
+        raise ValueError(f"unknown area role {role!r} (one of: {', '.join(ROLES)})")
+    if role and kind != AREA:
+        raise ValueError("only areas have a role, not counting lines")
+    return role
 
 
 def anchor(box: tuple, shape: tuple, mode: str) -> tuple[float, float]:

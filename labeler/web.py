@@ -90,6 +90,11 @@ class ZoneIn(BaseModel):
     kind: str                     # area | line
     points: list[list[float]]
     lying_ok: bool = False        # an area where lying is normal (a bed, a sofa): no fall alerts there
+    role: str = ""                # what the area is (labeler/zones.py ROLES); "bed" = lying_ok
+
+
+class ZoneRoleIn(BaseModel):
+    role: str                     # "" = no role
 
 
 class AnswerIn(BaseModel):
@@ -670,18 +675,41 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     def list_zones(camera: str | None = None):
         return db.list_zones(camera)
 
+    @app.get("/api/zones/roles")
+    def zone_roles():
+        """The area roles the Live page offers (config zones.roles, else all), with their words."""
+        from .zones import ROLES
+        offered = cfg["zones"].get("roles") or list(ROLES)
+        return [{"role": r, "words": ROLES[r]} for r in offered if r in ROLES]
+
+    @app.patch("/api/zones/{zone_id}")
+    def set_zone_role(zone_id: int, body: ZoneRoleIn, request: Request):
+        from .zones import ROLES
+        try:
+            zone = db.set_zone_role(zone_id, body.role)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        if zone is None:
+            raise HTTPException(404, "zone not found")
+        if zone["camera"] in by_name:
+            by_name[zone["camera"]].reload_zones()
+        audit(request, "zone changed", f"area {zone['name']!r} on camera {zone['camera']}: "
+                                       + (ROLES[zone["role"]] if zone["role"] else "no role"))
+        return zone
+
     @app.post("/api/zones")
     def add_zone(body: ZoneIn, request: Request):
         if pipelines and body.camera not in by_name:
             raise HTTPException(404, f"no camera named {body.camera!r}")
         try:
-            zone = db.add_zone(body.camera, body.name, body.kind, body.points, body.lying_ok)
+            zone = db.add_zone(body.camera, body.name, body.kind, body.points, body.lying_ok, body.role)
         except ValueError as e:
             raise HTTPException(400, str(e))
         if body.camera in by_name:
             by_name[body.camera].reload_zones()
+        from .zones import ROLES
         audit(request, "zone added", f"{zone['kind']} {zone['name']!r} on camera {zone['camera']}"
-                                     + (" (lying is normal here)" if zone["lying_ok"] else ""))
+                                     + (f" ({ROLES[zone['role']]})" if zone["role"] else ""))
         return zone
 
     @app.delete("/api/zones/{zone_id}")
