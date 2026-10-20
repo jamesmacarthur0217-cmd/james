@@ -1,0 +1,273 @@
+"""Safety incidents (Phase 44): fast checks raise a *suspect*; the vision model confirms it before anything alerts.
+
+The user's choice (2026-10-20, docs/PHASE44-49-PLAN.md): fast checks every frame or second (body points, YOLO
+objects, simple rules: later phases) only say "this may be a fall / fire / fight"; the vision model then looks at a few
+pictures from the last seconds and answers yes / no / unsure with a few words. Three parts here:
+
+- FrameMemory: each safety camera keeps one picture a second for the last `memory_s` seconds (shrunk to `memory_side`
+  px, ~1.5 MB each at 960 px), so a check sees what happened just before, also when recording is off.
+- CATEGORIES: what each kind of incident is called, its level (critical / warning) and the question asked. The first
+  wording; each later phase measures its category and may change it.
+- ConfirmQueue: suspects wait here (critical first, then oldest); one is sent to the vision model at a time, at most
+  `confirm_per_min` a minute, in the shared priority queue (labeler/vlm.py: critical checks before people's labels,
+  warnings after them). A suspect older than `max_wait_s` is dropped and counted; the same camera, category and area is
+  not checked again within `cooldown_s` of being sent. The answer goes to the listeners (step 3: alerts) and stays in
+  `recent` for the Health page.
+
+Vision model jobs for incidents use their own numbers, -(INCIDENT_BASE + n), between the vehicles' (minus the vehicle's
+number) and the scene questions' (below -2e9), so run.py routes the answers by number.
+"""
+from __future__ import annotations
+
+import itertools
+import logging
+import threading
+import time
+from collections import deque
+from dataclasses import dataclass, field
+from datetime import datetime
+
+import cv2
+import numpy as np
+
+from .vlm import CRITICAL, ROUND, WARNING, incident_prompt
+
+log = logging.getLogger(__name__)
+
+INCIDENT_BASE = 1_000_000_000
+MAX_FRAMES = 3
+LEVELS = {"critical": CRITICAL, "warning": WARNING, "round": ROUND}   # level -> vision model priority
+
+# category -> (level, words, question). Questions ask about what is there and what people do, never how they look.
+CATEGORIES = {
+    "person_down": ("critical", "person needing help",
+                    "Is a person lying on the floor, collapsed, slumped or in distress, who may need help?"),
+    "fall": ("critical", "fall or collision",
+             "Did a person fall, or did a person collide with something or someone (a wheelchair or trolley tipping "
+             "over counts)?"),
+    "fire": ("critical", "fire or smoke",
+             "Is there fire (flames) or smoke in a place where it should not be, not a normal stove, candle or "
+             "fireplace?"),
+    "fight": ("critical", "aggression",
+              "Are people fighting, hitting, pushing someone hard, throwing things at someone, or threatening "
+              "someone with gestures?"),
+    "weapon": ("critical", "dangerous object",
+               "Is a person holding a knife, gun or other weapon in a threatening way (not using a knife for food or "
+               "work)?"),
+    "child": ("critical", "child in danger",
+              "Is a young child alone without an adult nearby, climbing furniture, or in a kitchen or cooking area?"),
+    "floor": ("warning", "floor hazard",
+              "Is there something dangerous on the floor where people walk: a spill, broken glass, dropped food or an "
+              "object in the way?"),
+    "exit": ("warning", "blocked exit or aisle", "Is the exit, door or aisle blocked by objects, furniture or people?"),
+    "equipment": ("warning", "unsafe equipment",
+                  "Is there unsafe equipment: an overturned table or chair, a broken chair, cables across the floor, or "
+                  "something hanging loose?"),
+    "pests": ("warning", "animals or pests", "Is there a rat, mouse, cockroach or bird near food or where food is made?"),
+    "crowd": ("warning", "unusual crowding",
+              "Is the place dangerously crowded: people packed tightly, pushing, or someone pressed against a barrier?"),
+    "suspicious": ("warning", "suspicious behaviour",
+                   "Is a person doing something suspicious: trying doors or car doors, looking into windows or cars, "
+                   "climbing a fence or wall, or hiding something? Judge only what they do."),
+}
+
+
+def job_id(n: int) -> int:
+    return -(INCIDENT_BASE + n)
+
+
+def number_of(job: int) -> int | None:
+    return -job - INCIDENT_BASE if -2 * INCIDENT_BASE < job <= -INCIDENT_BASE else None
+
+
+class FrameMemory:
+    """The last few seconds of one camera, one picture every `every_s`, shrunk to at most `side` px."""
+
+    def __init__(self, keep_s: float = 10.0, every_s: float = 1.0, side: int = 960):
+        self.keep_s, self.every_s, self.side = float(keep_s), float(every_s), int(side)
+        self._frames: deque = deque()   # (monotonic time, wall time, picture)
+        self._lock = threading.Lock()
+
+    def add(self, frame: np.ndarray, wall: datetime, now: float) -> bool:
+        """Keep this frame if one is due; True when kept."""
+        with self._lock:
+            if self._frames and now - self._frames[-1][0] < self.every_s:
+                return False
+        h, w = frame.shape[:2]
+        scale = self.side / max(h, w)
+        pic = cv2.resize(frame, (round(w * scale), round(h * scale)), interpolation=cv2.INTER_AREA) if scale < 1 \
+            else frame.copy()
+        with self._lock:
+            self._frames.append((now, wall, pic))
+            while self._frames and now - self._frames[0][0] > self.keep_s:
+                self._frames.popleft()
+        return True
+
+    def pick(self, n: int, span_s: float) -> list[tuple[datetime, np.ndarray]]:
+        """n pictures spread over the last span_s seconds, oldest first, the newest always included."""
+        with self._lock:
+            frames = list(self._frames)
+        if not frames:
+            return []
+        newest = frames[-1][0]
+        inside = [f for f in frames if newest - f[0] <= span_s] or frames[-1:]
+        if len(inside) <= n:
+            chosen = inside
+        else:
+            idx = sorted({round(i * (len(inside) - 1) / (n - 1)) for i in range(n)}) if n > 1 else [len(inside) - 1]
+            chosen = [inside[i] for i in idx]
+        return [(wall, pic) for _, wall, pic in chosen]
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._frames)
+
+
+@dataclass
+class Suspect:
+    camera: str
+    category: str
+    reason: str                          # what the fast check saw ("lying still 20 s")
+    area: dict | None = None             # the zone it is about (cut out for the vision model), or the whole picture
+    people: list = field(default_factory=list)   # track ids involved
+    pictures: list = field(default_factory=list)  # [(wall time, picture)], oldest first
+    at: datetime = field(default_factory=datetime.now)
+    queued: float = 0.0                  # monotonic time it was queued
+    number: int = 0
+
+    @property
+    def level(self) -> str:
+        return CATEGORIES[self.category][0]
+
+    @property
+    def key(self) -> tuple:
+        return self.camera, self.category, (self.area or {}).get("id")
+
+
+def prompt_for(s: Suspect, gap_s: float) -> str:
+    return incident_prompt(len(s.pictures), gap_s, (s.area or {}).get("name", ""), CATEGORIES[s.category][2])
+
+
+def pictures_for(s: Suspect) -> list[np.ndarray]:
+    """What the vision model sees: each picture, cut out around the area when there is one (labeler/scene.py)."""
+    if not s.area:
+        return [pic for _, pic in s.pictures]
+    from .scene import area_picture
+    return [area_picture(pic, s.area["points"], "part") for _, pic in s.pictures]
+
+
+class ConfirmQueue:
+    def __init__(self, cfg: dict, worker, memories: dict[str, FrameMemory], clock=time.monotonic):
+        c = cfg["safety"]
+        self.per_min, self.max_wait_s = int(c["confirm_per_min"]), float(c["max_wait_s"])
+        self.cooldown_s, self.span_s = float(c["cooldown_s"]), float(c["frames_span_s"])
+        # At most 3: Ollama's context is 4096 tokens and 4 pictures at 768 px need ~4263 (refused, measured with
+        # tools/incident_bench.py). A larger context per request would make Ollama reload the model between checks
+        # and people's labels.
+        self.frames = max(1, min(MAX_FRAMES, int(c["frames"])))
+        self.worker, self.memories, self.clock = worker, memories, clock
+        self.waiting: list[Suspect] = []
+        self.sent: dict[int, Suspect] = {}         # number -> the suspect being checked
+        self.sent_at: deque = deque()              # monotonic times of the last minute's checks
+        self.last_sent: dict[tuple, float] = {}    # (camera, category, area id) -> when last sent
+        self.recent: deque = deque(maxlen=50)      # the latest answers, newest last
+        self.listeners: list = []                  # called with (suspect, answer dict)
+        self.counts = {"suspects": 0, "sent": 0, "yes": 0, "no": 0, "unsure": 0, "failed": 0, "dropped_old": 0,
+                       "cooldown": 0, "no_pictures": 0}
+        self.waits: deque = deque(maxlen=200)      # seconds each sent suspect waited
+        self._numbers = itertools.count(1)
+        self._lock = threading.Lock()
+
+    def owns(self, job: int) -> bool:
+        return number_of(job) is not None
+
+    def suspect(self, camera: str, category: str, reason: str, area: dict | None = None, people=(),
+                pictures: list | None = None) -> str:
+        """A fast check saw something. Returns "queued", "cooldown" (checked just now) or "no pictures"."""
+        if category not in CATEGORIES:
+            raise ValueError(f"unknown incident category {category!r}")
+        now = self.clock()
+        s = Suspect(camera, category, reason, area, list(people), queued=now)
+        with self._lock:
+            self.counts["suspects"] += 1
+            if now - self.last_sent.get(s.key, -1e9) < self.cooldown_s or any(w.key == s.key for w in self.waiting):
+                self.counts["cooldown"] += 1
+                return "cooldown"
+        memory = self.memories.get(camera)
+        s.pictures = pictures if pictures is not None else (memory.pick(self.frames, self.span_s) if memory else [])
+        if not s.pictures:
+            with self._lock:
+                self.counts["no_pictures"] += 1
+            return "no pictures"
+        with self._lock:
+            self.waiting.append(s)
+        return "queued"
+
+    def tick(self) -> Suspect | None:
+        """Drop suspects that waited too long; send the next one when allowed. Returns the one sent."""
+        now = self.clock()
+        with self._lock:
+            old = [s for s in self.waiting if now - s.queued > self.max_wait_s]
+            for s in old:
+                self.waiting.remove(s)
+                self.counts["dropped_old"] += 1
+                log.warning("[%s] safety check dropped after %.0f s waiting: %s (%s)", s.camera, now - s.queued,
+                            s.category, s.reason)
+            while self.sent_at and now - self.sent_at[0] >= 60:
+                self.sent_at.popleft()
+            if not self.waiting or self.sent or len(self.sent_at) >= self.per_min:
+                return None
+            s = min(self.waiting, key=lambda w: (LEVELS[w.level], w.queued))
+            self.waiting.remove(s)
+            s.number = next(self._numbers)
+            self.sent[s.number] = s
+            self.sent_at.append(now)
+            self.last_sent[s.key] = now
+            self.counts["sent"] += 1
+            self.waits.append(now - s.queued)
+        times = [w for w, _ in s.pictures]
+        gap = (times[-1] - times[0]).total_seconds() / (len(times) - 1) if len(times) > 1 else 0
+        ok = self.worker.submit(job_id(s.number), [(pictures_for(s), None)], ("incident", prompt_for(s, gap)),
+                                priority=LEVELS[s.level])
+        if not ok:
+            self.on_result(job_id(s.number), [])
+        return s
+
+    def on_result(self, job: int, results: list[dict]) -> None:
+        n = number_of(job)
+        with self._lock:
+            s = self.sent.pop(n, None)
+            if s is None:
+                return
+            if not results:
+                self.counts["failed"] += 1
+                log.warning("[%s] safety check failed (vision model): %s", s.camera, s.category)
+                return
+            answer = results[0]
+            self.counts[answer["answer"]] += 1
+            self.recent.append({"camera": s.camera, "category": s.category, "level": s.level, "reason": s.reason,
+                                "area": (s.area or {}).get("name"), "at": s.at.isoformat(timespec="seconds"),
+                                "answer": answer["answer"], "what": answer.get("what", ""),
+                                "seconds": float(answer.get("seconds", 0) or 0)})
+        log.info("[%s] safety check %s (%s): %s - %s", s.camera, s.category, s.reason, answer["answer"],
+                 answer.get("what", ""))
+        for listener in self.listeners:
+            try:
+                listener(s, answer)
+            except Exception:
+                log.exception("a safety check listener failed")
+
+    def state(self) -> dict:
+        with self._lock:
+            waits = sorted(self.waits)
+            return {**self.counts, "waiting": len(self.waiting), "checking": len(self.sent),
+                    "per_min": self.per_min, "last_minute": len(self.sent_at),
+                    "wait_median_s": round(waits[len(waits) // 2], 1) if waits else None,
+                    "recent": list(self.recent)[-10:]}
+
+    def loop(self, stop: threading.Event, every_s: float = 0.5) -> None:
+        while not stop.wait(every_s):
+            try:
+                self.tick()
+            except Exception:
+                log.exception("safety checks: sending failed")

@@ -227,6 +227,13 @@ class Pipeline:
             from .picture_check import PictureWatch
             self.picture = PictureWatch({"every_s": 30.0, "window_s": 600.0, "lasting_share": 0.8, **pcfg})
         self._scene_frame_at = -1e9
+        # Safety incidents (labeler/incidents.py): the last seconds of pictures, for the vision model's checks.
+        scfg = self.cfg.get("safety") or {}
+        self.memory = None
+        if scfg.get("enabled") and cam.get("safety", self.mode == "security"):
+            from .incidents import FrameMemory
+            self.memory = FrameMemory(scfg.get("memory_s", 10), scfg.get("memory_every_s", 1.0),
+                                      scfg.get("memory_side", 960))
         # Areas with a loitering rule (people, vehicles): the live picture shows how long someone is in them.
         self._stay_areas: frozenset[str] = frozenset()
         self._stay_areas_v: frozenset[str] = frozenset()
@@ -509,6 +516,8 @@ class Pipeline:
             heads = [geometry.head_box(self.tracks[t].kpts, self.tracks[t].box) for t in seen]
             self.scene_frame = (frame.copy(), self.clock.wall(), heads)
             self.scene_people = [tuple(self.tracks[t].box[:4]) for t in seen]   # for "Check the picture"
+        if self.memory is not None:
+            self.memory.add(frame, self.clock.wall(), now)
         if seen:
             self.person_seen_wall = self.clock.wall()
         if self.picture is not None and not self.blank and self.picture.due():

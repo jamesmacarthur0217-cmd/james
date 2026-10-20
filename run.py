@@ -110,11 +110,15 @@ def main() -> int:
     imports: list[Pipeline] = []   # pipelines of the Import page (labeler/importer.py), while they run
 
     scene_box: list = []   # the scene question runner, once made (labeler/scene.py)
+    incident_box: list = []   # the safety checks' confirm queue, once made (labeler/incidents.py)
 
     def route_result(track_id: int, results: list) -> None:
         """Send a VLM answer to the camera (or video import) that owns this person, or to the scene questions."""
         if scene_box and scene_box[0].owns(track_id):
             scene_box[0].on_result(track_id, results)
+            return
+        if incident_box and incident_box[0].owns(track_id):
+            incident_box[0].on_result(track_id, results)
             return
         for p in pipelines + imports:
             if track_id in p.owned_ids:
@@ -282,6 +286,14 @@ def main() -> int:
         from labeler.scene import SceneRunner
         scene_box.append(SceneRunner(db, pipelines, worker, crop_dir, cfg, arming=arming))
         threading.Thread(target=scene_box[0].loop, args=(app.state.stopping,), name="scene", daemon=True).start()
+    memories = {p.name: p.memory for p in pipelines if getattr(p, "memory", None) is not None}
+    if worker is not None and cfg["safety"]["enabled"] and memories:   # safety checks (labeler/incidents.py)
+        from labeler.incidents import ConfirmQueue
+        incident_box.append(ConfirmQueue(cfg, worker, memories))
+        app.state.incidents = incident_box[0]
+        threading.Thread(target=incident_box[0].loop, args=(app.state.stopping,), name="incidents",
+                         daemon=True).start()
+        log.info("safety checks on: %s", ", ".join(memories))
     if health is not None:
         from labeler.health import health_loop
         threading.Thread(target=health_loop, args=(health, pipelines, app.state.stopping),

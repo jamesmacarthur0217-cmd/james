@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import itertools
 import json
 import logging
 import queue
@@ -123,6 +124,36 @@ def clean_scene(raw: dict) -> str:
     return answer if answer in SCENE_ANSWERS else "unsure"
 
 
+# Safety incidents (labeler/incidents.py, Phase 44): a fast check saw something; the vision model looks at a few
+# pictures from the last seconds (oldest first) and confirms. "what" is its few words, shown with the alert.
+INCIDENT_ANSWERS = SCENE_ANSWERS
+INCIDENT_SIDE = 768   # each of several pictures; several at 1024 px would slow every answer
+PROMPT_INCIDENT = """{pictures} from a security camera{area}.
+Answer the question about what they show with "yes" or "no". Say "unsure" only if the pictures do not show enough to
+tell (too dark, blurred, hidden). Judge only what is there and what people do, never how a person looks.
+Then say in a few words (at most 12) what you see that decided your answer.
+Question: {question}"""
+
+
+def incident_prompt(n: int, gap_s: float, area: str, question: str) -> str:
+    """The check's prompt: n pictures about gap_s apart; area: the area's name when the pictures are cut out."""
+    pictures = (f"These are {n} pictures, oldest first, about {max(1, round(gap_s))} seconds apart," if n > 1
+                else "This is a picture")
+    return PROMPT_INCIDENT.format(pictures=pictures, area=f', cut out around the area "{area}"' if area else "",
+                                  question=question)
+
+
+def incident_schema() -> dict:
+    props = {"answer": {"type": "string", "enum": INCIDENT_ANSWERS}, "what": {"type": "string"}}
+    return {"type": "object", "properties": props, "required": list(props)}
+
+
+def clean_incident(raw: dict) -> dict[str, str]:
+    answer = str(raw.get("answer", "")).strip().lower()
+    what = " ".join(str(raw.get("what", "")).split())[:120]
+    return {"answer": answer if answer in INCIDENT_ANSWERS else "unsure", "what": what}
+
+
 def _b64(image: np.ndarray, max_side: int) -> str:
     h, w = image.shape[:2]
     scale = max_side / max(h, w)
@@ -170,6 +201,8 @@ class VLMClient:
         if isinstance(mode, tuple) and mode[0] == "scene":
             way = mode[2] if len(mode) > 2 else "whole"
             return self._retry(lambda: self._ask_scene(person, mode[1], way))
+        if isinstance(mode, tuple) and mode[0] == "incident":   # person: the list of pictures; mode[1]: the prompt
+            return self._retry(lambda: self._ask_incident(person, mode[1]))
         return self._retry(lambda: self._label(person, face, mode or self.mode))
 
     def _retry(self, call):
@@ -202,6 +235,12 @@ class VLMClient:
         answer = clean_scene(self._chat(SCENE_PROMPTS[way].format(question=question), [_b64(picture, SCENE_SIDE)],
                                         scene_schema()))
         return {"answer": answer, "seconds": f"{time.monotonic() - started:.2f}"}
+
+    def _ask_incident(self, pictures: list, prompt: str) -> dict[str, str]:
+        started = time.monotonic()
+        out = clean_incident(self._chat(prompt, [_b64(p, INCIDENT_SIDE) for p in pictures], incident_schema()))
+        out["seconds"] = f"{time.monotonic() - started:.2f}"
+        return out
 
     def _label_vehicle(self, picture: np.ndarray) -> dict[str, str]:
         return clean_vehicle(self._chat(PROMPT_VEHICLE, [_b64(picture, 512)], vehicle_schema()))
@@ -239,18 +278,29 @@ class VLMClient:
 Job = tuple[int, list[tuple[np.ndarray, np.ndarray | None]], str | None]
 ResultCallback = Callable[[int, list[dict[str, str]]], None]
 
+# Who goes first (Phase 44): one queue, lowest number first, in arrival order within a number. Critical safety
+# checks jump ahead of people's labels; warnings and slow rounds wait behind them.
+CRITICAL, PEOPLE, WARNING, ROUND = 0, 10, 20, 30
+_STOP = 99
+
 
 class VLMWorker:
     """Runs VLM calls in the background so the camera loop never waits.
 
     Up to `workers` frames are sent to Ollama at once (Ollama needs OLLAMA_NUM_PARALLEL >= workers).
-    Measured on an RTX 4070 SUPER: 2 at once labels people 1.9x faster than 1; 3 or 4 add nothing."""
+    Measured on an RTX 4070 SUPER: 2 at once labels people 1.9x faster than 1; 3 or 4 add nothing.
+    Jobs wait in one priority queue (CRITICAL .. ROUND); `max_queue` limits the jobs waiting at PEOPLE and below, so a
+    busy camera never fills the queue for a critical safety check."""
 
     def __init__(self, client: VLMClient, on_result: ResultCallback, max_queue: int = 32, workers: int = 1):
         self.client = client
         self.on_result = on_result
         self.workers = max(1, workers)
-        self.jobs: queue.Queue[Job | None] = queue.Queue(maxsize=max_queue)
+        self.max_queue = max_queue
+        self.jobs: queue.PriorityQueue = queue.PriorityQueue()   # (priority, order, job or None)
+        self._order = itertools.count()
+        self._waiting: dict[int, int] = {}   # priority -> jobs waiting
+        self._count_lock = threading.Lock()
         self._pool = ThreadPoolExecutor(self.workers, thread_name_prefix="vlm")
         self._slots = threading.Semaphore(self.workers)   # frames in flight
         self._idle = threading.Condition()
@@ -269,29 +319,43 @@ class VLMWorker:
         with self._idle:
             return self.jobs.qsize() == 0 and self._jobs_in_flight == 0
 
+    def waiting(self, priority: int) -> int:
+        """Jobs waiting at this priority."""
+        with self._count_lock:
+            return self._waiting.get(priority, 0)
+
     def submit(self, track_id: int, frames: list[tuple[np.ndarray, np.ndarray | None]],
-               mode: str | None = None) -> bool:
-        try:
-            self.jobs.put_nowait((track_id, frames, mode))
-            return True
-        except queue.Full:
-            log.warning("VLM queue full; track %s will only get color labels", track_id)
-            return False
+               mode: str | None = None, priority: int = PEOPLE) -> bool:
+        with self._count_lock:
+            if priority >= PEOPLE and sum(n for p, n in self._waiting.items() if p >= PEOPLE) >= self.max_queue:
+                log.warning("VLM queue full; job %s is dropped (people: only color labels)", track_id)
+                return False
+            self._waiting[priority] = self._waiting.get(priority, 0) + 1
+        self.jobs.put((priority, next(self._order), (track_id, frames, mode)))
+        return True
 
     def _dispatch(self) -> None:
         while True:
-            job = self.jobs.get()
+            # A free slot first, then the job: so the job taken is the most urgent one waiting at that moment (taken
+            # first, it would sit here while all slots are busy, and a critical check sent meanwhile would wait).
+            self._slots.acquire()
+            priority, _, job = self.jobs.get()
             if job is None:
+                self._slots.release()
                 return
+            with self._count_lock:
+                self._waiting[priority] -= 1
             track_id, frames, mode = job
             if not frames:
+                self._slots.release()
                 self._deliver(track_id, [])
                 continue
             state = {"results": [None] * len(frames), "left": len(frames), "lock": threading.Lock()}
             with self._idle:
                 self._jobs_in_flight += 1
             for i, (person, face) in enumerate(frames):
-                self._slots.acquire()   # waits here while all slots are busy, so the queue stays meaningful
+                if i:
+                    self._slots.acquire()   # the first frame has its slot already
                 self._pool.submit(self._label_one, track_id, i, person, face, mode, state)
 
     def _label_one(self, track_id: int, i: int, person, face, mode, state: dict) -> None:
@@ -321,10 +385,7 @@ class VLMWorker:
         """Stop after the queued jobs finish, waiting at most wait_s.
         Returns False if jobs were still running when the wait ran out."""
         deadline = time.monotonic() + max(wait_s, 0.1)
-        try:
-            self.jobs.put(None, timeout=max(wait_s, 1))
-        except queue.Full:
-            return False
+        self.jobs.put((_STOP, next(self._order), None))   # after every job already waiting
         self.thread.join(timeout=max(0.0, deadline - time.monotonic()))
         with self._idle:
             while self._jobs_in_flight and time.monotonic() < deadline:

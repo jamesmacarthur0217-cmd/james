@@ -179,6 +179,16 @@ quiet:
 unusual:
   enabled: true
 
+# Safety incidents (Phase 44): fast checks raise a suspect, the vision model confirms it with a few pictures from the
+# last seconds before anything alerts. On security cameras by default (cameras[].safety: true/false to choose).
+safety:
+  enabled: true
+  confirm_per_min: 6          # at most this many checks a minute, so people's labels keep up
+  max_wait_s: 30              # a check that waited longer is dropped (and counted on the Health page)
+  cooldown_s: 60              # the same camera, kind and area is not checked again sooner
+  frames: 3                   # pictures per check (at most 3: Ollama's context), from the last frames_span_s s
+  frames_span_s: 4
+
 # PC watch: the graphics card's temperature (hot from 85 °C), each disk's health as Windows sees it, and whether the
 # app or the PC stopped without warning last time (power cut, PC turned off without stop.bat).
 pcwatch:

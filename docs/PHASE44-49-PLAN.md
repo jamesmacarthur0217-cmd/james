@@ -65,6 +65,22 @@ normal in Malaysia). No face recognition, no automatic action: an alert shows th
    area, drop when too old), `vlm.PROMPT_INCIDENT` per category with several pictures (JSON: answer, what), job numbers
    in their own range (like scene questions, routed in run.py). Measure the vision model's time with 1, 3 and 4 frames
    on this PC and how many confirms per minute leave people's labels on time.
+   **Done 2026-10-20** (the user chose: one priority queue, pictures from memory, a per-minute limit):
+   `vlm.VLMWorker` is one priority queue (CRITICAL 0, PEOPLE 10, WARNING 20, ROUND 30; `max_queue` counts PEOPLE and
+   below, so critical checks are never refused; the dispatcher takes a free slot first, then the most urgent job: found
+   by a test, it used to hold the next job while waiting, so one label could still jump ahead); `labeler/incidents.py`
+   (FrameMemory, CATEGORIES with the first questions, Suspect, ConfirmQueue: critical first, one at a time,
+   `confirm_per_min` 6, `max_wait_s` 30, `cooldown_s` 60, recent answers and counts); `vlm.incident_prompt` /
+   `clean_incident` (yes / no / unsure + a few words); Pipeline.memory on safety cameras (`cameras[].safety`, security
+   by default); run.py routes job numbers -(1e9 + n). Measured with `tools/incident_bench.py` (MOT16-09, qwen3-vl 4B,
+   one at a time): a check takes 0.6 s with 1 picture, 1.4 s with 3; **4 pictures are refused** (4263 tokens over
+   Ollama's 4096 context; a bigger context per request would reload the model), so at most 3 (`MAX_FRAMES`). A very
+   busy camera (a new person every 4 s, 2 pictures each): people's labels waited 3.6 s without checks, 3.9 s with 3
+   critical checks a minute, 7.7 s (90%: 12.5 s, a small backlog) with 6; a critical check waited ~3.7 s (the label
+   being made finishes first). 6 stays the ceiling (checks come only when a fast check sees something). Real run on a
+   test copy with a security camera (MOT16-09): "safety checks on: cam1", labels as before, no errors. Nothing raises
+   suspects yet (Phase 45+), so the whole way from a suspect to an answer inside the app is tested with stand-ins and
+   the tool, not yet live. 909 tests.
 3. **Incidents on the pages**: `alert_events.category` / `level` / `confirm` (+ PostgreSQL check); built-in rules per
    category (condition `incident = <category>`, with zone, hours, Home / Away like other rules); pop-ups by level;
    Alerts page filter; Check page kind "incident"; Health line "safety checks" (suspects and confirms per hour, the
