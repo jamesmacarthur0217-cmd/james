@@ -15,7 +15,9 @@ clock (labeler/pipeline.py VideoClock), every --fps frames a second. The confirm
 on the video's clock (its per-minute limit, cooldown and waiting limit in video seconds), and the video pauses while
 the vision model answers: this measures what is found, not how fast the PC is (tools/incident_bench.py measures that).
 --hold-s repeats each video's last picture that long (UR Fall clips end a few seconds after the fall). --no-vlm answers
-every check "yes": the quick checks alone.
+every check "yes": the quick checks alone. --labels: people also get their labels from the vision model, as in the app
+(the age group decides who is a child; the video waits for them too). --areas: a JSON file {video: [{"name", "role",
+"points"}]} with areas drawn on that video's picture (fractions), e.g. a cooking area.
 
 Per kind it prints:
   spans      true incident spans in the videos (kind given)
@@ -127,7 +129,8 @@ class Yes:
         return True
 
 
-def run_video(video: Path, cfg: dict, embedder, fps: float, half: str, hold_s: float, client) -> dict:
+def run_video(video: Path, cfg: dict, embedder, fps: float, half: str, hold_s: float, client, labels: bool = False,
+              areas: list | None = None) -> dict:
     """One video through the Pipeline and the confirm queue; returns its seconds, suspects and answers."""
     from labeler.db import Database
     from labeler.incidents import ConfirmQueue
@@ -135,6 +138,8 @@ def run_video(video: Path, cfg: dict, embedder, fps: float, half: str, hold_s: f
     from labeler.vlm import VLMWorker
 
     db = Database("sqlite:///" + (Path(tempfile.mkdtemp(prefix="incident_check_")) / "check.db").as_posix())
+    for a in areas or []:
+        db.add_zone("check", a["name"], "area", a["points"], role=a.get("role", ""))
     cam = {"name": "check", "source": "imported videos", "mode": "security", "loop_files": False, "ignore_zones": [],
            "vehicles": False, "animals": False, "safety": True}
     cfg = copy.deepcopy(cfg)
@@ -148,7 +153,11 @@ def run_video(video: Path, cfg: dict, embedder, fps: float, half: str, hold_s: f
     if client is None:
         worker.queue = q
     else:
-        q.worker = VLMWorker(client, q.on_result)
+        def route(job, results):   # as run.py: the checks' answers to the queue, people's labels to the camera
+            (q.on_result if q.owns(job) else p.on_vlm_result)(job, results)
+        q.worker = VLMWorker(client, route)
+        if labels:
+            p.vlm = q.worker
     plain = q.suspect
 
     def suspect(camera, category, reason, *a, **k):
@@ -167,6 +176,9 @@ def run_video(video: Path, cfg: dict, embedder, fps: float, half: str, hold_s: f
         p.frames += 1
         if q.tick() is not None:
             while q.sent:   # the video waits for the answer (see the module text)
+                time.sleep(0.05)
+        if labels and client is not None:
+            while not q.worker.idle:   # and for people's labels
                 time.sleep(0.05)
     for tid in list(p.tracks):
         p._finish(tid)
@@ -213,6 +225,8 @@ def main() -> int:
     ap.add_argument("--hold-s", type=float, default=0.0)
     ap.add_argument("--late-s", type=float, default=30.0, help="an alert this long after a span still finds it")
     ap.add_argument("--no-vlm", action="store_true", help="answer every check yes (the quick checks alone)")
+    ap.add_argument("--labels", action="store_true", help="people get labels from the vision model (their age)")
+    ap.add_argument("--areas", type=Path, help="JSON {video: [{name, role, points}]}")
     ap.add_argument("--limit", type=int, help="only the first N videos")
     ap.add_argument("--match", help="only videos whose path matches this regular expression (a tuning half)")
     ap.add_argument("--json", type=Path)
@@ -251,11 +265,15 @@ def main() -> int:
     from labeler.embed import Embedder
     embedder = Embedder(cfg["embeddings"])
     results = {}
+    areas = json.loads(args.areas.read_text(encoding="utf-8")) if args.areas else {}
+    if args.labels and args.no_vlm:
+        ap.error("--labels needs the vision model")
     videos = [v for v in truth if not args.match or re.search(args.match, v)]
     videos = videos[: args.limit] if args.limit else videos
     for i, video in enumerate(videos, 1):
         started = time.monotonic()
-        results[video] = run_video(ROOT / video, cfg, embedder, args.fps, truth[video]["half"], args.hold_s, client)
+        results[video] = run_video(ROOT / video, cfg, embedder, args.fps, truth[video]["half"], args.hold_s, client,
+                                   args.labels, areas.get(video))
         r = results[video]
         print(f"[{i}/{len(videos)}] {Path(video).name}: {r['seconds']:.0f} s, {len(r['suspects'])} suspects, "
               f"{sum(a[2] == 'yes' for a in r['answers'])} confirmed ({time.monotonic() - started:.0f} s)", flush=True)

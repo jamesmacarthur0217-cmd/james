@@ -475,7 +475,7 @@ class Pipeline:
                         self._on_fall(tid, frame.shape)
                 if self.safety_watch is not None:
                     role = zones_mod.role_at(self.zone_counter.zones, zones_mod.anchor(st.box, frame.shape, self.mode))
-                    self.safety_watch.update(tid, now, st.box, kpts, role)
+                    self.safety_watch.update(tid, now, st.box, kpts, role, self._age_of(st))
                 if getattr(self, "gestures", None) is not None:
                     sign = self.gestures.update(tid, now, kpts)
                     if sign:
@@ -703,6 +703,14 @@ class Pipeline:
         if self._raise(tid, "fall", f"down for {int(self.falls.after_s)} s after a fall", shape, db_id=db_id,
                        question=FALL_QUESTION, on_done=done) != "queued":
             done(None)
+
+    def _age_of(self, st: TrackState) -> str | None:
+        """For the safety checks: "child", "adult" (any other known age) or None (no age label yet)."""
+        labels = self._current_labels(st)
+        group = labels.get("age_group", ("unknown",))[0]
+        if group == "unknown":
+            group = schema.AGE_RANGE_TO_GROUP.get(labels.get("age_range", ("unknown",))[0], "unknown")
+        return None if group == "unknown" else "child" if group == "child" else "adult"
 
     def _raise(self, tid: int, category: str, reason: str, shape: tuple | None, db_id: int | None = None,
                level: str | None = None, question: str | None = None, on_done=None) -> str:

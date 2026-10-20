@@ -135,6 +135,25 @@ class SlowClient:
         return {"answer": "no"}
 
 
+def test_closing_with_jobs_left_answers_them_empty():
+    """close() gave up waiting: the jobs still queued get no answer (an empty one), not an error in the thread."""
+    client, done, errors = SlowClient(), [], []
+    old_hook = threading.excepthook
+    threading.excepthook = lambda args: errors.append(args.exc_value)
+    try:
+        worker = vlm.VLMWorker(client, lambda job, results: done.append((job, results)), max_queue=5)
+        pic = np.zeros((8, 8, 3), np.uint8)
+        worker.submit(1, [(pic, None)], "first")
+        assert client.started.wait(5)
+        worker.submit(2, [(pic, None)], "second")
+        assert worker.close(0.1) is False    # the first is still being labeled
+        client.release.set()
+        worker.thread.join(5)
+    finally:
+        threading.excepthook = old_hook
+    assert errors == [] and (2, []) in done and done[0][0] == 1
+
+
 def test_the_vision_model_queue_puts_critical_checks_before_people():
     client, done = SlowClient(), []
     worker = vlm.VLMWorker(client, lambda job, results: done.append(job), max_queue=2)

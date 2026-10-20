@@ -121,7 +121,11 @@ DEFAULTS: dict = {
                "frames_span_s": 4, "confirm_per_min": 6, "max_wait_s": 30, "cooldown_s": 60,
                # Quick checks for people (labeler/safety.py): lying still, slumped, not moved at all (the slow round
                # for distress), in seconds; "not moved" = within still_move of the person's height.
-               "down_s": 20, "slumped_s": 30, "still_s": 300, "still_move": 0.08},
+               "down_s": 20, "slumped_s": 30, "still_s": 300, "still_move": 0.08,
+               # Children (labeler/safety.py): small next to an adult = at most child_size of their height; alone =
+               # no adult within child_near x height for child_alone_s (0 = off); in a cooking / food preparation /
+               # restricted area for child_area_s; climbing = feet up child_climb x height.
+               "child_size": 0.65, "child_near": 2.5, "child_alone_s": 120, "child_area_s": 3, "child_climb": 0.25},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,
               "low_ratio": 0.5, "lost_s": 0.5, "min_width": 1.25},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored
     "embeddings": {"enabled": True, "model": "google/siglip2-base-patch16-224", "device": "cuda"},

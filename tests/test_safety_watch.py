@@ -10,7 +10,7 @@ from labeler.geometry import L_EYE, L_HIP, L_SHOULDER, NOSE, R_EYE, R_HIP, R_SHO
 from labeler.pipeline import TrackState
 from labeler.safety import DISTRESS_QUESTION, SafetyWatch, head_low
 from labeler.zones import role_at
-from test_falls import CFG, lying
+from test_falls import CFG, lying, standing
 from test_pipeline_logic import make_pipeline
 
 FPS = 5
@@ -64,6 +64,53 @@ def test_slumped_and_the_slow_round():
     got = run(upright, sitting(), 130)
     assert len(got) == 1 and got[0][0] == 120.0 and got[0][2] == "not moved for 2 min"
     assert got[0][3] == "round" and got[0][4] == DISTRESS_QUESTION
+
+
+def feed_many(watch, people, seconds, t0=0.0):
+    """people: {key: (pose or callable(i) -> pose, role, age)}; returns every sign raised."""
+    out = []
+    for i in range(int(seconds * FPS)):
+        t = t0 + i / FPS
+        for key, (pose, role, age) in people.items():
+            box, k = pose(i) if callable(pose) else pose
+            watch.update(key, t, box, k, role, age)
+        out += [(round(t, 1), s[0], s[2]) for s in watch.tick(t)]
+    return out
+
+
+def test_a_child_alone():
+    w = SafetyWatch({"child_alone_s": 120})
+    adult, child = standing(x=300, top=100, h=300), standing(x=340, top=250, h=150)
+    assert feed_many(w, {1: (adult, "", "adult"), 2: (child, "", "child")}, 130) == []    # with an adult near
+    got = feed_many(w, {2: (child, "", "child")}, 125, t0=130)                            # the adult left
+    assert [g[1:] for g in got] == [(2, "child with no adult near for 120 s")]
+    far = standing(x=2000, top=100, h=300)                                                # an adult far away
+    assert len(feed_many(SafetyWatch({"child_alone_s": 120}), {1: (far, "", "adult"), 2: (child, "", "child")}, 125)) == 1
+    assert feed_many(SafetyWatch({"child_alone_s": 0}), {2: (child, "", "child")}, 125) == []   # off
+
+
+def test_a_small_body_next_to_an_adult_in_the_kitchen():
+    w = SafetyWatch({})
+    adult, child = standing(x=300, top=100, h=300), standing(x=420, top=250, h=150)   # same feet line, half as tall
+    got = feed_many(w, {1: (adult, "", None), 2: (child, "cooking", None)}, 10)
+    assert [g[1:] for g in got] == [(2, "child in the cooking area")] and got[0][0] <= 4.0
+    labeled = SafetyWatch({})   # the label wins: a short adult is no child
+    assert feed_many(labeled, {1: (adult, "", None), 2: (child, "cooking", "adult")}, 10) == []
+    deeper = SafetyWatch({})    # smaller because further away (feet higher in the picture): no child
+    assert feed_many(deeper, {1: (adult, "", None), 2: (standing(x=420, top=150, h=150), "cooking", None)}, 10) == []
+
+
+def test_a_child_climbing():
+    w = SafetyWatch({"child_alone_s": 0})
+    base = standing(x=300, top=250, h=150)
+    up = standing(x=300, top=190, h=150)         # the feet 60 px (40% of the height) higher, the same size
+    away = standing(x=300, top=200, h=110)       # feet higher but smaller: walking away
+    assert feed_many(w, {2: (base, "", "child")}, 10) == []
+    got = feed_many(w, {2: (up, "", "child")}, 4, t0=10)
+    assert [g[1:] for g in got] == [(2, "child climbing (feet raised)")]
+    w2 = SafetyWatch({"child_alone_s": 0})
+    feed_many(w2, {2: (base, "", "child")}, 10)
+    assert feed_many(w2, {2: (away, "", "child")}, 4, t0=10) == []
 
 
 def test_role_at():

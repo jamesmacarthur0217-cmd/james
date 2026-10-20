@@ -139,6 +139,12 @@ checked).
 2. **Child safety**: age group child (age model / vision model) and rules: a child with no adult within a distance
    (scaled by body height) for 60 s; a child in a cooking, food-prep or restricted area; climbing (hips above the
    child's own standing height, or on a table box). Confirm before alerting.
+   **Done 2026-10-20**: SafetyWatch `_children` (label, else small upright body next to an upright adult at the same
+   depth, 80% of 3 s), alone (`child_alone_s` 120, 0 = off), cooking / food prep / restricted area (`child_area_s` 3),
+   climbing (feet up 25% of the height, the body not smaller, 2 s); Pipeline `_age_of`. `tools/incident_check.py
+   --labels --areas`. Measured only false alarms (no video with children here): 77 videos, no child suspect; the size
+   rule took 17 of ~500 people for a child at some moment, 3 of them real children (README "Children"). Also fixed: a
+   vision model worker closed while jobs were left raised an error in its thread (now: empty answers). 935 tests.
 3. **Crowding**: people per area against the area's limit (a setting per area; density from the area's size in the
    picture), held 30 s; *pushing*: many people in an area speeding up the same way, bodies overlapping; "someone trapped
    against a barrier" only through the vision model. Measured on MOT16 and, with the user's OK to download, MOT20 (crowds,

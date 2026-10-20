@@ -845,6 +845,23 @@ picture the measurement holds for 30 s; one person lying on a bed was answered "
 street videos (7, 3.5 min): no suspect. At 10 pictures a second the fall check caught only 9 of 15 there: measure
 falls at the camera's own rate.
 
+### Children (Phase 45 step 2)
+
+"Child in danger" is raised for a child **alone** (no adult within 2.5 body heights) for 2 min (`safety.child_alone_s`;
+0 turns it off: at home a child playing alone in a room is normal), a child **in a cooking, food preparation or
+restricted area** for 3 s (`child_area_s`; draw the area and give it its role on the Live page), or a child
+**climbing** (the feet a quarter of their height above where they were, the body not smaller: walking away from the
+camera also lifts the feet in the picture but makes the body smaller). Who is a child: the age label "child" once
+the labels came; before that (the user's choice: sooner, more mistakes) a small upright body, at most 65% of the height
+of an upright person standing at the same depth (their feet on about the same line). A label "adult" wins.
+
+Measured (`tools/incident_check.py`): **only false alarms**, as there is no video with children here (UR Fall and
+MOT16 are adults; the 17 COCO photos with a labeled child have no kitchen). 77 videos (MOT16 7, UR Fall 70, 14 min,
+with age labels): no child suspect. The size rule alone took 17 people for a child at some moment, judged by eye: 3 real
+children (a toddler with a woman in MOT16-09, a child in MOT16-05) and 14 adults (half hidden in a crowd, reflections
+in glass, one seen from high up) of roughly 500 people, all in the first seconds before their labels came. Whether a
+real child is found in a kitchen or climbing needs footage with children (the user's own cameras).
+
 ## No movement
 
 For someone living alone (an elderly parent): an alert when nobody has been seen on the camera for a long time while

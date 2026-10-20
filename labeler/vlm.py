@@ -356,7 +356,15 @@ class VLMWorker:
             for i, (person, face) in enumerate(frames):
                 if i:
                     self._slots.acquire()   # the first frame has its slot already
-                self._pool.submit(self._label_one, track_id, i, person, face, mode, state)
+                try:
+                    self._pool.submit(self._label_one, track_id, i, person, face, mode, state)
+                except RuntimeError:   # closed meanwhile (close() waited long enough): no answer for the rest
+                    self._slots.release()
+                    with self._idle:
+                        self._jobs_in_flight -= 1
+                        self._idle.notify_all()
+                    self._deliver(track_id, [])
+                    return
 
     def _label_one(self, track_id: int, i: int, person, face, mode, state: dict) -> None:
         try:
