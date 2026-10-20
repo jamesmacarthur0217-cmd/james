@@ -102,6 +102,16 @@ normal in Malaysia). No face recognition, no automatic action: an alert shows th
 
 ## Phase 45: People (help, falls, children, crowding)
 
+**Design agreed with the user 2026-10-20**: (1) the quick checks run in each camera every frame (a small safety watch
+per Pipeline fed with the body points and boxes it already has, like FallWatch), not in a separate thread; (2) **falls
+are checked by the vision model too** (the user's choice, against the recommendation): a fall FallWatch confirms becomes
+a "fall" suspect; "yes" fires today's "Fall" rule (person, clip, FALL pop-up); a clear "no" stops it; **fail-safe**: no
+vision model, a failed check or one dropped for waiting too long still alerts, so a fall is never lost to Ollama; a
+camera without picture memory (kiosk, safety off) alerts at once as today. The help sign stays instant; (3) a child is
+the age group "child" from the labels **or a small body** next to adults nearby (the user's choice: sooner, more false
+alarms; the vision model confirms); (4) crowding: a limit per area ("at most N people", set when drawing; none = not
+checked).
+
 0. (from Phase 44) `tools/incident_check.py`: videos with true time spans per kind -> found / false alarms per hour /
    late, through the real quick checks and the vision model.
 
