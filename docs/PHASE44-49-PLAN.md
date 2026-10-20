@@ -160,6 +160,17 @@ checked).
 
 ## Phase 46: Fire and smoke
 
+**Design agreed with the user 2026-10-20**: (1) **our own model**: D-Fire (21,527 photos with fire and smoke boxes,
+GAIA; its GitHub license file: "made available to the public domain under the Creative Commons Zero v1.0 Universal
+license"; mirrors say CC BY 4.0, the original says CC0) downloaded (size checked first) and a small YOLO11 trained
+here, measured on D-Fire's own test part (trained with Ultralytics: AGPL-3.0 like the other YOLO models, Phase 1);
+not chosen: ready-made models (AGPL, training data unclear; Pyronear is for wildfires), the vision model alone;
+(2) once a second on safety cameras (like the crowd count), not every frame; (3) fire and smoke inside a "cooking"
+area are ignored unless they reach past it; (4) test videos: D-Fire's sample surveillance videos, the videos here for
+false alarms (MOT16, MOT20, UR Fall) and COCO kitchen photos, **and MIVIA** (31 videos, 14 with fire, 17 tricky
+without: red objects, clouds, smoke; no terms stated; the user requests it at
+mivia.unisa.it/datasets/video-analysis-datasets/fire-detection-dataset/ and it is used when it arrives).
+
 1. **A small fire/smoke detector**: find one (a YOLO trained on D-Fire or similar; license checked before any
    download, which needs the user's OK) or train YOLO11n on D-Fire here; every second on safety cameras at 640 px.
    Flames inside a cooking area are normal unless they grow past it; smoke counts everywhere outside it.
