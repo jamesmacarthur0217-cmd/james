@@ -195,6 +195,8 @@ safety:
   child_area_s: 3             # a child in a cooking, food preparation or restricted area this long -> checked
   crowd_s: 30                 # more people than an area's limit (Live page) this long -> checked
   crowd_imgsz: 1280           # people in areas are counted once a second at this picture size
+  fire_enabled: true          # fire and smoke: our own model (tools/train_fire.py) looks once a second
+  fire_hold: 3                # seen on this many of the last 5 looks -> checked by the vision model
 
 # PC watch: the graphics card's temperature (hot from 85 °C), each disk's health as Windows sees it, and whether the
 # app or the PC stopped without warning last time (power cut, PC turned off without stop.bat).

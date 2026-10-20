@@ -883,6 +883,23 @@ MOT20-05 25% (about 180 people: too dense), MOT16-09 157% (it counts the reflect
 together: no false alarm on the 7 videos. Because the app counts fewer people than there are in dense crowds, set
 the limit from the count it shows, not from a head count.
 
+### Fire and smoke (Phase 46)
+
+Our own detector, trained here on D-Fire (`tools/train_fire.py`: 21,527 pictures from surveillance cameras and the
+web, public domain under CC0 by its license file; downloaded with the user's OK), looks at each safety camera once a
+second (`safety.fire_every_s`; 9.5 ms a look). Fire or smoke on 3 of the last 5 looks (`fire_hold`) raises a critical
+"fire or smoke" check: the vision model sees 3 pictures over the last 8 s (smoke spreads, flames flicker), cut around
+what was found. A box mostly (80%) inside an area with the role "cooking" is normal (a stove, steam) and ignored; one
+reaching past the area counts and the alert says so. Nothing again until nothing was seen for 60 s. Without the model
+file (data/models/fire/fire_smoke.pt, git-ignored; `tools/models.py pack` copies it) the fire check is off and the
+log says so.
+
+The model on D-Fire's test part (4,302 pictures it never saw, single photos): mAP50 0.767, smoke 0.83 (precision
+0.81, recall 0.77), fire 0.71 (0.71, 0.64). Real run on a test copy: a D-Fire test picture of a fire at night was seen
+within 2 s and confirmed "yes: large fire with smoke" (10.5 s: the first request after start loads the model); a
+daytime picture of the same kind of camera with no fire raised nothing in 40 s. Fire videos and false alarms on
+videos: Phase 46 step 3.
+
 ## No movement
 
 For someone living alone (an elderly parent): an alert when nobody has been seen on the camera for a long time while

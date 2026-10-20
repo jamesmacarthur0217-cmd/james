@@ -6,7 +6,9 @@ offline package (for a PC without internet).
     python tools/models.py pack <folder>      # copies all of them into <folder>/models
     python tools/models.py unpack <folder>    # copies them from <folder>/models to where the app looks
 
-Model names come from config.yaml (detector.model, embeddings.model, age_model.model, vlm.model).
+Model names come from config.yaml (detector.model, embeddings.model, age_model.model, vlm.model). Models trained here
+(the fire and smoke detector, safety.fire_model: tools/train_fire.py) cannot be downloaded: pack copies them, and
+check lists them as optional (the app runs without them, with those checks off).
 """
 from __future__ import annotations
 
@@ -35,7 +37,10 @@ def names(config: Path = ROOT / "config.yaml") -> dict:
     return {"detector": cfg["detector"]["model"], "huggingface": [cfg["embeddings"]["model"], cfg["age_model"]["model"]],
             "ollama": cfg["vlm"]["model"],
             # The vehicle detector (labeler/vehicles.py; security cameras), when vehicles are on.
-            "vehicles": vehicles.get("model") if vehicles.get("enabled", True) else None}
+            "vehicles": vehicles.get("model") if vehicles.get("enabled", True) else None,
+            # Trained here (Phase 46): optional, packed but never downloaded.
+            "trained": [m for m in [(cfg.get("safety") or {}).get("fire_model")]
+                        if m and (cfg.get("safety") or {}).get("fire_enabled", True)]}
 
 
 def detectors(n: dict) -> list[str]:
@@ -106,6 +111,10 @@ def check(n: dict) -> list[tuple[str, bool]]:
     return out
 
 
+def check_trained(n: dict) -> list[tuple[str, bool]]:
+    return [(f"trained here {m} (optional: tools/train_fire.py)", (ROOT / m).is_file()) for m in n.get("trained", [])]
+
+
 def download(n: dict) -> None:
     for m in detectors(n):
         if not (ROOT / m).is_file():
@@ -140,6 +149,10 @@ def pack(n: dict, folder: Path, hf_root: Path | None = None, ollama_root: Path |
     out.mkdir(parents=True, exist_ok=True)
     for m in detectors(n):
         _copy_file(ROOT / m, out / Path(m).name)
+    for m in n.get("trained", []):
+        if (ROOT / m).is_file():
+            (out / "trained" / Path(m).parent).mkdir(parents=True, exist_ok=True)
+            _copy_file(ROOT / m, out / "trained" / m)
     for repo in n["huggingface"]:
         if not hf_present(repo, hf_root):
             raise SystemExit(f"{repo} is not on this PC; run: python tools/models.py download")
@@ -162,6 +175,10 @@ def unpack(n: dict, folder: Path, hf_root: Path | None = None, ollama_root: Path
     for m in detectors(n):
         if not (ROOT / m).is_file() and (src / Path(m).name).is_file():
             _copy_file(src / Path(m).name, ROOT / m)
+    for m in n.get("trained", []):
+        if not (ROOT / m).is_file() and (src / "trained" / m).is_file():
+            (ROOT / m).parent.mkdir(parents=True, exist_ok=True)
+            _copy_file(src / "trained" / m, ROOT / m)
     for repo in n["huggingface"]:
         if not hf_present(repo, hf_root):
             _copy_tree(src / "huggingface" / hf_folder(repo, hf_root).name, hf_folder(repo, hf_root))
@@ -185,7 +202,7 @@ def main() -> int:
     elif args.command == "unpack":
         unpack(n, args.folder.resolve())
     results = check(n)
-    for what, ok in results:
+    for what, ok in results + check_trained(n):
         print(f"  {'OK     ' if ok else 'MISSING'} {what}")
     return 0 if all(ok for _, ok in results) else 1
 

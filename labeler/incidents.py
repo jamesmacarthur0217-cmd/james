@@ -226,7 +226,7 @@ class ConfirmQueue:
 
     def suspect(self, camera: str, category: str, reason: str, area: dict | None = None, people=(),
                 pictures: list | None = None, crop: tuple | None = None, question: str | None = None,
-                level: str | None = None, on_done=None) -> str:
+                level: str | None = None, on_done=None, span_s: float | None = None) -> str:
         """A fast check saw something. Returns "queued", "cooldown" (checked just now) or "no pictures"; only
         when "queued" will on_done be called (with the answer, or None when none came)."""
         if category not in CATEGORIES:
@@ -240,7 +240,8 @@ class ConfirmQueue:
                 self.counts["cooldown"] += 1
                 return "cooldown"
         memory = self.memories.get(camera)
-        s.pictures = pictures if pictures is not None else (memory.pick(self.frames, self.span_s) if memory else [])
+        span = self.span_s if span_s is None else min(float(span_s), memory.keep_s if memory else span_s)
+        s.pictures = pictures if pictures is not None else (memory.pick(self.frames, span) if memory else [])
         if not s.pictures:
             with self._lock:
                 self.counts["no_pictures"] += 1

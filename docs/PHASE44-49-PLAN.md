@@ -181,6 +181,11 @@ mivia.unisa.it/datasets/video-analysis-datasets/fire-detection-dataset/ and it i
    download yolo11n.pt; test once). Test part (4,302 pictures, 4 with broken labels skipped): mAP50 0.767 (smoke 0.827,
    P 0.81 R 0.77; fire 0.706, P 0.71 R 0.64), 9.5 ms a picture. Model: data/models/fire/fire_smoke.pt (git-ignored;
    tools/models.py packs it in step 2).
+   **Step 2 (the check in the app) done 2026-10-20**: `labeler/fire.py` FireWatch (once a second, 3 of the last 5 looks,
+   cooking areas ignored unless reached past, again after 60 s of nothing), Pipeline `_look_for_fire` (own model,
+   640 px, conf 0.35), a critical "fire" suspect with a crop and pictures over 8 s (`suspect(span_s=)`); config
+   `safety.fire_*`; `tools/models.py` lists and packs the trained model (optional). Real run: a D-Fire fire picture
+   raised and confirmed ("large fire with smoke"), a clear one nothing. 954 tests.
 2. **Confirm and measure**: the vision model on 3 frames over 10 s (smoke spreads, flames flicker). False alarms on
    things that look like fire: stoves, candles, sunsets, red lights, steam, a TV (COCO kitchens, MOT16, UR Fall);
    found / late on fire videos. Compare with a plain scene question ("Is there fire or smoke?") every 5 minutes.

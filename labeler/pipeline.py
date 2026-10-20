@@ -237,12 +237,21 @@ class Pipeline:
         # 75-90% (tools/crowd_check.py). Its own copy: sharing the vehicle tracker's would reset that tracker.
         self.counter_model = None
         self._crowd_counted, self._crowd_counts = -1e9, None
+        # Fire and smoke (Phase 46, labeler/fire.py): our own detector, once a second, on safety cameras.
+        self.fire_watch, self.fire_model = None, None
         if scfg.get("enabled") and cam.get("safety", self.mode == "security"):
             from .incidents import FrameMemory
             from .safety import SafetyWatch
             self.memory = FrameMemory(scfg.get("memory_s", 10), scfg.get("memory_every_s", 1.0),
                                       scfg.get("memory_side", 960))
             self.safety_watch = SafetyWatch(scfg)
+            fire_path = resolve(scfg.get("fire_model", "data/models/fire/fire_smoke.pt"))
+            if scfg.get("fire_enabled", True) and fire_path.is_file():
+                from .fire import FireWatch
+                self.fire_watch, self._fire_path = FireWatch(scfg), fire_path
+            elif scfg.get("fire_enabled", True):
+                log.warning("[%s] fire and smoke checks are off: no model at %s (tools/train_fire.py)", self.name,
+                            fire_path)
         # Areas with a loitering rule (people, vehicles): the live picture shows how long someone is in them.
         self._stay_areas: frozenset[str] = frozenset()
         self._stay_areas_v: frozenset[str] = frozenset()
@@ -505,6 +514,8 @@ class Pipeline:
             if areas and now - self._crowd_counted >= float(scfg.get("crowd_every_s", 1.0)):
                 self._crowd_counted = now
                 self._crowd_counts = self._count_people(frame, areas)
+            if self.fire_watch is not None and self.fire_watch.due(now):
+                self._look_for_fire(frame, now)
             for area, reason in self.safety_watch.crowd(now, limited, self._crowd_counts):
                 try:
                     self.incidents.suspect(self.name, "crowd", reason, area=area)
@@ -721,6 +732,30 @@ class Pipeline:
         if self._raise(tid, "fall", f"down for {int(self.falls.after_s)} s after a fall", shape, db_id=db_id,
                        question=FALL_QUESTION, on_done=done) != "queued":
             done(None)
+
+    def _look_for_fire(self, frame: np.ndarray, now: float) -> None:
+        """One look of the fire and smoke detector; a critical suspect when fire or smoke stays (labeler/fire.py)."""
+        scfg = self.cfg.get("safety") or {}
+        try:
+            if self.fire_model is None:
+                self.fire_model = YOLO(str(self._fire_path))
+            r = self.fire_model.predict(frame, conf=float(scfg.get("fire_conf", 0.35)), imgsz=640,
+                                        device=self.det_cfg["device"], verbose=False)[0]
+            dets = [(int(c), float(p), tuple(b)) for c, p, b in
+                    zip(r.boxes.cls.tolist(), r.boxes.conf.tolist(), r.boxes.xyxy.tolist())]
+        except Exception:
+            log.exception("[%s] looking for fire failed", self.name)
+            self.fire_watch.last_look = now
+            return
+        got = self.fire_watch.update(now, dets, frame.shape, self.zone_counter.zones)
+        if got is not None:
+            reason, crop = got
+            log.warning("[%s] fire check: %s", self.name, reason)
+            try:
+                self.incidents.suspect(self.name, "fire", reason, crop=crop,
+                                       span_s=float(scfg.get("fire_span_s", 8)))
+            except Exception:
+                log.exception("[%s] raising a fire check failed", self.name)
 
     def _count_people(self, frame: np.ndarray, areas: list[dict]) -> dict | None:
         """{area id: people inside} from one pass of the plain detector (where their feet are, as for counting), or

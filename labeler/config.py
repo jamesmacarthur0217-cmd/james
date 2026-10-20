@@ -130,7 +130,13 @@ DEFAULTS: dict = {
                # rush_min people in view, rush_share of them at rush_speed body heights a second, the same way.
                "crowd_s": 30, "rush_min": 6, "rush_share": 0.6, "rush_speed": 1.2, "rush_agree": 0.8,
                # People in areas with a limit are counted every crowd_every_s by the plain detector at crowd_imgsz.
-               "crowd_every_s": 1.0, "crowd_imgsz": 1280, "crowd_conf": 0.25},
+               "crowd_every_s": 1.0, "crowd_imgsz": 1280, "crowd_conf": 0.25,
+               # Fire and smoke (labeler/fire.py): our own detector (tools/train_fire.py) every fire_every_s; seen on
+               # fire_hold of the last fire_window looks -> checked with pictures over fire_span_s; a box at least
+               # fire_inside inside a "cooking" area is ignored; again only after nothing seen for fire_rearm_s.
+               "fire_enabled": True, "fire_model": "data/models/fire/fire_smoke.pt", "fire_every_s": 1.0,
+               "fire_conf": 0.35, "fire_window": 5, "fire_hold": 3, "fire_inside": 0.8, "fire_rearm_s": 60,
+               "fire_span_s": 8},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,
               "low_ratio": 0.5, "lost_s": 0.5, "min_width": 1.25},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored
     "embeddings": {"enabled": True, "model": "google/siglip2-base-patch16-224", "device": "cuda"},
