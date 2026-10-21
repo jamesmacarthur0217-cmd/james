@@ -228,6 +228,15 @@ step comes.
    nobody stands there becomes a suspect: *blocked exit* (exit area, 2 min), *floor hazard* (walkway, 30 s: spill,
    glass, dropped food), *left object* (a bag; also used in Phase 49). Confirm: "What is on the floor / in the exit:
    spill, broken glass, bag, furniture, nothing?".
+   **Design agreed with the user 2026-10-21**: (1) one empty picture per safety camera, **saved as a file** in data/
+   (kept across restarts), made from many small frames with the parts where people stand left out, refreshed daily
+   and after a lighting change (the whole picture changed: made again, nothing raised); (2) compared once a second in
+   the camera's own loop at a small size, only inside walkway and exit areas; no new table, thread, model or download;
+   (3) the vision model sees **the empty picture and now** (picture 1 = the area empty, 2 = now: what changed?);
+   (4) an alert after **two "yes" about a minute apart**; a "no" (a chair moved) puts the change into the empty picture
+   so it is not asked again; (5) a left bag is a floor hazard (walkway) or blocked exit (exit) for now; Phase 49 adds
+   who left it; (6) measured with **made-up tests**: objects (bags, chairs, boxes, dark "spill" patches) pasted onto
+   the floor of still-camera videos here (MOT16, UR Fall), false alarms on the unchanged videos; no download.
 3. **Equipment and pests**: equipment through slow rounds of the vision model per area (an overturned table or chair,
    cables across the walkway, something hanging loose) and a table box that changed shape against the empty picture.
    Pests: no rodents in COCO; try YOLOE / YOLO-World (open-vocabulary, Ultralytics) with "rat, mouse, cockroach" in food
