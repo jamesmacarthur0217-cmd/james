@@ -16,34 +16,61 @@ Roadmap Phase 1 (licenses) is deferred until they say otherwise. Under Malaysia'
 household use is generally outside the Act; their filled-in camera sign and data-protection summary are in
 `data/privacy/` (git-ignored, contains their email); the blank templates are in `docs/`.
 
-## 2. Current state (2026-10-20)
+## 2. Current state (2026-10-21)
 
-**Latest (2026-10-20): Phase 43 is done; the Phases 41-43 plan is finished** (`7fe5538` `GET /api/routine`, `c2a556d`
-chart on the Health page `#usual`, then docs + What's new `p43`; 892 tests + 1 PostgreSQL test skipped without
-`VL_TEST_POSTGRES_URL`). Checked on a test copy filled with 56 days of made-up people (script in the session scratchpad,
-not kept: tracks per day + Away spans via `db.add_arming`, then run.py on an empty COCO room photo, 000000000632.jpg).
-**Next: [PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)** (2026-10-20): safety incidents (11 kinds the user listed) and
-suspicious behaviour (behaviour only, never looks) on security cameras; the user agreed the architecture (fast checks then
-the vision model confirms; new columns on alert_events; a role per drawn area; extra models decided per phase) and
-wants **any further architecture discussed with them before it is built**. **Phase 44 done 2026-10-20** (`55a60c3`
-area roles, `2e6bca2` confirm queue + one priority queue for the vision model, then safety alerts; 916 tests): next
-Phase 45 (people: down/slumped, children, crowding). Step 0 (`3e28566`, `tools/incident_check.py`) and step 1
-(falls checked by the vision model with a fail-safe, lying still / slumped / not moved: `labeler/safety.py`) done
-2026-10-20; step 2 (children: alone, cooking area, climbing; child by label or size) done 2026-10-20 (only false
-alarms measurable: no video with children here); step 3 (crowding) done: **Phase 45 is done 2026-10-20**; next
-Phase 46 (fire and smoke): step 1 done 2026-10-20 (own model trained on D-Fire, CC0: data/models/fire/fire_smoke.pt,
-test mAP50 0.767, 9.5 ms; `tools/train_fire.py`); step 2 done (`labeler/fire.py`, once a second on safety cameras);
-step 3 done (D-Fire's 100 videos: 38 of 50 fires found, median 3 s, 5 of 50 false): **Phase 46 is done
-2026-10-20**; the MIVIA videos (requested by the user) are measured when they arrive. Next: Phase 47 (objects and
-places: weapons, blocked exits, floor hazards, equipment, pests): design agreed 2026-10-21; step 1 (dangerous
-objects: `labeler/weapons.py`; our own gun detector data/models/guns/guns.pt trained on Open Images, YOLOE for
-machetes/swords; any real gun in hand alerts) done: 130 of 217 held guns alerted, 0 false on 389 everyday photos.
-Next: step 2 (floor hazards, blocked exits: compare with the empty area). MOT20 is in data/datasets/mot20 (zip 5 GB +
-unpacked train + videos; the user may want the zip deleted). Measure falls at 30 pictures a second.
-Measured: a check 1.4 s with 3 pictures; **4 pictures exceed Ollama's 4096-token context** (refused with 400);
-6 checks a minute on a very busy camera double people's label wait (3.6 -> 7.7 s), 3 a minute hardly matter. Still waiting for them: restart their own app (stop.bat, start.bat), the
-First-run check, then Phase 26 (real-camera week). Ideas offered 2026-10-19 and not chosen yet (ask before offering
-again): PC history chart, weekly report saved by itself, a week in one minute.
+**Latest (2026-10-21, end of the session; last commit `1d5ba2f` + this handoff; 963 tests + 1 PostgreSQL test that is
+skipped without `VL_TEST_POSTGRES_URL`; GitHub green).**
+
+**Plan in progress: [PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)**: safety incidents on **security cameras** (the 11 kinds
+the user listed + "suspicious behaviour", judged by what people do, never by looks). Each phase's design was agreed
+with the user first (their rule: **discuss any architecture before building it**; ask before each phase and step).
+- **Phase 44 done** (2026-10-20: `55a60c3` area roles, `2e6bca2` confirm queue, `3132c2e` safety alerts): quick checks
+  raise a *suspect*, the vision model confirms from up to 3 pictures of the last seconds, only "yes" alerts
+  (`labeler/incidents.py`); a role per drawn area (`zones.role`); 12 built-in rules (one per kind); critical kinds pop
+  up red with a beep.
+- **Phase 45 done** (`3e28566` tool, `0f22525` falls/lying/slumped, `3c95afa` children, `85da519` crowding):
+  `labeler/safety.py`. Falls on safety cameras are checked by the vision model too (user's choice) with a **fail-safe**
+  (only a clear "no" stops the alert); children by label or small body (user's choice); crowding: "at most N people"
+  per area (`zones.max_people`, Live page shows "now N"), counted once a second by a copy of the plain detector at
+  1280 px (the pose detector finds 0-40% in crowds); the vision model decides if it is dangerous (user's choice).
+  Vision-model queue order: **critical, warning, people's labels, slow round** (warnings were refused behind labels).
+- **Phase 46 done** (`059c8f8` model, `544f7db` check, `ad84a2a` measured): our own fire/smoke detector trained on
+  D-Fire (CC0; `tools/train_fire.py`, `data/models/fire/fire_smoke.pt`, test mAP50 0.77), once a second
+  (`labeler/fire.py`); D-Fire's 100 videos: 38 of 50 fires found (median 3 s), 5 of 50 tricky false. **MIVIA videos:
+  the user requests them; measure with `tools/incident_check.py` when they arrive.** Indoor fires not measured.
+- **Phase 47 step 1 done** (`9878bc1`, `1d5ba2f`): dangerous objects held at a wrist (`labeler/weapons.py`): knives,
+  scissors, bats from the plain detector; **our own gun detector** (`tools/train_guns.py`, Open Images, CC BY 2.0;
+  `data/models/guns/guns.pt`; 76% of guns found vs YOLOE's 10%); YOLOE prompt-free (27 MB) only for machetes/swords;
+  **any real gun in hand alerts** (user's choice; the vision model only checks it is a real gun). 130 of 217 held
+  guns alerted, 0 false on 389 everyday photos. Knives held as a threat: no photos to measure.
+- **Next: Phase 47 step 2** (floor hazards, blocked exits, left objects: compare walkway / exit areas with their empty
+  picture; agreed design in the plan), then step 3 (unsafe equipment: vision-model rounds every 10 min; pests: try
+  YOLOE's words rat / mouse / rodent / insect / bug, keep only if good), then Phases 48 (aggression) and 49
+  (suspicious behaviour); discuss each phase's design with the user first.
+
+**Measuring tools** (all on recorded videos / photos, the real camera code, the vision model):
+`tools/incident_check.py` (videos + truth CSV `video,kind,start_s,end_s,half`; `--labels`, `--areas`, `--hold-s`,
+`--fps`, `--match` for tuning halves), `tools/crowd_check.py`, `tools/incident_bench.py` (vision-model cost),
+`tools/weapon_check.py` (coco / people / guns / openimages / photos), `tools/train_fire.py`, `tools/train_guns.py`.
+Numbers and limits are in README sections "Safety incidents" ... "Dangerous objects".
+
+**Data downloaded this time (all with the user's OK, git-ignored, measuring/training only):** MOT20 (`data/datasets/
+mot20`: zip 4.7 GB + 3.2 GB unpacked + videos; the zip may be deleted), D-Fire (`data/datasets/dfire`: zip 3.0 GB +
+unpacked + 100 sample videos 0.44 GB), Open Images guns (`data/datasets/openimages_weapons` 127 MB test,
+`data/datasets/oi_guns` 1.03 GB training), YOLOE (`data/models/yoloe`, 27 MB). The user may want old zips deleted
+(ask; never delete without OK).
+
+**Models only on this PC** (not in git; `tools/models.py check / pack` lists them as optional): `data/models/fire/
+fire_smoke.pt`, `data/models/guns/guns.pt`, `data/models/yoloe/yoloe-11s-seg-pf.pt`. Without them those checks are off
+and the log says so.
+
+**Still waiting for the user:** restart their own app (stop.bat, start.bat) so it runs the new version (the
+safe-update test passed on their database 2026-10-19), then the First-run check, then Phase 26 (real-camera week);
+the MIVIA fire videos. Their own camera is one kiosk webcam: none of the safety checks run on it (security cameras
+only); real numbers need a security camera.
+
+**State at the end:** Docker Desktop running; no test copy running; Ollama has qwen3-vl:4b-instruct (used) and two
+unused models (the user decides).
 
 **Latest (2026-10-19, end of the session; last commit `6d7fe99` + this handoff, 884 tests + 1 PostgreSQL test that is
 skipped without `VL_TEST_POSTGRES_URL`, GitHub green).** Done since 2026-10-17, newest last: Phase 36 What's new +
@@ -250,6 +277,13 @@ labeler/whatsnew.py  What's new (Phase 36): ENTRIES in the order phases were fin
                      added_columns (Entry.marker); Live banner (index.html whatsNew, localStorage whatsNewSeen), /whats-new
 labeler/routine.py   the usual day (Phase 39): per kiosk camera, weekday/weekend x hour, share of counted days with
                      someone seen (8 weeks; days with nobody and Away hours left out; learning below 14 days)
+labeler/safety.py    quick checks for people (Phase 45): SafetyWatch per safety camera: lying still 20 s, slumped 30 s,
+                     not moved 5 min (slow round), children (alone 2 min / cooking area / climbing), crowding (over an
+                     area's limit 30 s, running together); Pipeline._raise (crop around the person), _on_fall via the
+                     queue with a fail-safe, _look_objects (plain detector 1280 px once a second: counts + knives etc.)
+labeler/fire.py      fire and smoke (Phase 46): FireWatch, our D-Fire model once a second, 3 of 5 looks, cooking areas
+labeler/weapons.py   dangerous objects (Phase 47): WeaponWatch (at a wrist on 2 of 3 looks), our gun model, YOLOE for
+                     machetes/swords, GUN_QUESTION (any real gun alerts)
 labeler/incidents.py safety incidents (Phase 44): FrameMemory (Pipeline.memory, 1 picture/s for 10 s on safety cameras),
                      CATEGORIES (12 kinds: level, words, question), ConfirmQueue (run.py thread "incidents", job ids
                      -(1e9 + n), critical first, confirm_per_min, max_wait_s, cooldown_s), IncidentAlerts (a "yes" ->
@@ -392,6 +426,23 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
    outline under thin white text drifts apart along the line (the recordings' clock looked doubled for weeks). Also:
    in Python edit scripts, code that contains "\n" goes into raw strings (r'''...'''), or it becomes a real line
    break in the file (Phase 42).
+33. **OneDrive refuses scripts** (403 / sign-in needed, 2026-10-20): D-Fire was downloaded through the built-in
+   browser pane (click Download; the file lands in the user's Downloads folder, may keep its final name while still
+   growing: wait until its size stops changing), then moved into data/datasets. Check the size on the page first.
+34. **Licences of "free" models**: YOLOE with your own words needs Apple's MobileCLIP, whose weights are **research
+   only** (LICENSE_MODELS: no product use). The prompt-free YOLOE (fixed 4,585 words) needs no text model. Read the
+   weights' licence, not only the code's.
+35. **Ultralytics training downloads yolo11n.pt** to test half precision (check_amp): set
+   `ultralytics.engine.trainer.check_amp = lambda model: True` (train_fire.py / train_guns.py) to avoid an unasked
+   download.
+36. **Ollama's context is 4096 tokens**: 4 pictures at 768 px are refused (400). A bigger num_ctx per request would
+   reload the model between requests. Keep incident checks at 3 pictures (incidents.MAX_FRAMES).
+37. **A shared vision-model queue starves low priorities** on a busy camera: warnings were refused behind people's
+   labels until they were moved ahead; a check that waits must never block a critical one (ConfirmQueue lets a
+   critical go while a lower one is out).
+38. **Measure with the camera's own frame rate**: the fall check caught 9 of 15 falls at 10 pictures a second and 13 at
+   30 (tools/incident_check.py --fps). And the person (pose) detector misses most people in crowds: count crowds with
+   the plain detector at 1280 px.
 
 ## 7. Conventions
 
@@ -698,5 +749,5 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE44-49-PLAN.md
-> (Phase 47, objects and places); ask me before each phase and each step starts, discuss any architecture with me
-> first, and do it step by step.
+> (Phase 47 step 2: floor hazards and blocked exits); ask me before each phase and each step starts, discuss any
+> architecture with me first, and do it step by step.

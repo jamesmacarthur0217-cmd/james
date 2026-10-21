@@ -1,6 +1,13 @@
 # VisionLabeler: next improvements roadmap
 
-## Status (2026-10-20)
+## Status (2026-10-21)
+
+Latest: Phases 44-46 done and Phase 47 step 1 done (2026-10-20/21; 963 tests): safety incidents on security cameras
+([PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)): the safety base, people (falls checked by the vision model, lying still,
+slumped, children, crowding), fire and smoke (own model on D-Fire), dangerous objects (own gun model on Open Images).
+Next: Phase 47 step 2 (floor hazards, blocked exits), step 3 (equipment, pests), then 48 and 49. MIVIA fire videos
+when the user has them.
+
 
 Latest: Phases 36-43 and 28 are done (2026-10-17 to 2026-10-20; 892 tests); the
 [PHASE41-43-PLAN.md](PHASE41-43-PLAN.md) plan is finished (43: the usual day as a chart on the Health page). Next: ask
