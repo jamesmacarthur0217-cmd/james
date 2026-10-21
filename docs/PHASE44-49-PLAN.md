@@ -198,6 +198,16 @@ mivia.unisa.it/datasets/video-analysis-datasets/fire-detection-dataset/ and it i
 
 ## Phase 47: Objects and places (weapons, blocked exits, floor hazards, equipment, pests)
 
+**Design agreed with the user 2026-10-21**: (1) dangerous objects: knives, scissors and bats from the plain detector's
+once-a-second pass (the crowd count's), held at a person's wrist outside a cooking / food-prep area, **and an
+open-vocabulary model, YOLOE (Ultralytics 8.4 has it; weights to download with the user's OK after checking size and
+license; AGPL), for guns** ("gun, pistol, rifle, machete"), kept only if it measures well; (2) floor hazards, blocked
+exits and left objects by comparing walkway / exit areas with their empty picture; (3) unsafe equipment by the vision
+model's slow round over each area with a role every 10 minutes; (4) pests: the same YOLOE asked for "rat, mouse,
+cockroach" in food areas, kept only if good when measured (else left out, said so). One YOLOE serves (1) and (4).
+Measuring guns and pests needs pictures of them (e.g. Open Images classes, CC BY 2.0): a download asked for when the
+step comes.
+
 1. **Dangerous objects**: the object pass already runs on security cameras (`Pipeline._object_classes`); add COCO knife,
    scissors and baseball bat; *held* = the object's box at a wrist for 1 s. Cooking and food-prep areas: ignored; dining,
    walkway, exit: a suspect. Confirm: "Is the person holding a knife or weapon in a threatening way, or using it for
