@@ -136,10 +136,15 @@ ENTRIES: list[Entry] = [
           "new checks for someone lying still, slumped or not moving for long, a child alone, in a cooking area or "
           "climbing, and crowding: give an area \"at most N people\" on the Live page (it shows how many are there "
           "now).", "/", marker="zones.max_people"),
-    Entry("p46", 46, "", "Fire and smoke",
+    Entry("p46", 46, "ad84a2a", "Fire and smoke",
           "On security cameras our own fire and smoke detector looks once a second; when it keeps seeing fire or smoke, "
           "the vision model checks the last seconds and a red alert with a beep comes if it confirms. Flames and steam "
           "inside an area marked \"cooking area\" are normal. Needs data/models/fire/fire_smoke.pt.", "/alerts"),
+    Entry("p47", 47, "", "Dangerous objects, floors and exits",
+          "On security cameras: a gun, knife, bat or machete held in someone's hand is checked by the vision model (any "
+          "real gun alerts). Areas marked \"walkway\" or \"exit\" are compared with the camera's empty picture: "
+          "something new on a walkway floor for 30 s (a spill, a bag) or in an exit for 2 minutes is checked, and two "
+          "\"yes\" a minute apart alert.", "/alerts"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

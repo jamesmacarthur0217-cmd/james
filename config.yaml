@@ -197,6 +197,9 @@ safety:
   crowd_imgsz: 1280           # people in areas are counted once a second at this picture size
   fire_enabled: true          # fire and smoke: our own model (tools/train_fire.py) looks once a second
   fire_hold: 3                # seen on this many of the last 5 looks -> checked by the vision model
+  floor_enabled: true         # walkway and exit areas against the camera's empty picture (Phase 47)
+  floor_hold_s: 30            # something new on a walkway floor this long -> checked (two "yes" a minute apart alert)
+  exit_hold_s: 120            # something new in an exit area this long -> checked
 
 # PC watch: the graphics card's temperature (hot from 85 °C), each disk's health as Windows sees it, and whether the
 # app or the PC stopped without warning last time (power cut, PC turned off without stop.bat).

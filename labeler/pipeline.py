@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+import re
 import threading
 import time
 from collections import Counter
@@ -242,6 +243,10 @@ class Pipeline:
         # Dangerous objects (Phase 47, labeler/weapons.py): COCO knives, scissors, bats in the counting pass, and YOLOE.
         self.weapon_watch, self.yoloe_model, self._yoloe_path = None, None, None
         self.gun_model, self._gun_path = None, None
+        # Floor hazards and blocked exits (Phase 47 step 2, labeler/floor.py): walkway and exit areas against the
+        # camera's empty picture, saved in <crop_dir>/empty (test copies keep their own).
+        self.floor_watch = None
+        self._counted_people: tuple = (-1e9, [])   # (when, people's boxes) from the plain detector's last pass
         if scfg.get("enabled") and cam.get("safety", self.mode == "security"):
             from .incidents import FrameMemory
             from .safety import SafetyWatch
@@ -268,6 +273,10 @@ class Pipeline:
                     self._gun_path = guns
                 else:
                     log.warning("[%s] guns are not looked for: no model at %s (tools/train_guns.py)", self.name, guns)
+            if scfg.get("floor_enabled", True):
+                from .floor import FloorWatch
+                name = re.sub(r"[^\w-]", "_", self.name) + ".png"
+                self.floor_watch = FloorWatch(scfg, self.crop_dir / "empty" / name)
         # Areas with a loitering rule (people, vehicles): the live picture shows how long someone is in them.
         self._stay_areas: frozenset[str] = frozenset()
         self._stay_areas_v: frozenset[str] = frozenset()
@@ -536,6 +545,8 @@ class Pipeline:
                     self._check_weapons(frame, now, objects + self._look_guns(frame) + self._look_yoloe(frame))
             if self.fire_watch is not None and self.fire_watch.due(now):
                 self._look_for_fire(frame, now)
+            if self.floor_watch is not None and self.floor_watch.due(now):
+                self._look_at_floor(frame, now, seen)
             for area, reason in self.safety_watch.crowd(now, limited, self._crowd_counts):
                 try:
                     self.incidents.suspect(self.name, "crowd", reason, area=area)
@@ -777,6 +788,40 @@ class Pipeline:
             except Exception:
                 log.exception("[%s] raising a fire check failed", self.name)
 
+    def _look_at_floor(self, frame: np.ndarray, now: float, seen: set) -> None:
+        """Walkway and exit areas against the empty picture (labeler/floor.py): a change that stays is a suspect, and
+        the vision model sees the area empty and now. A first look only notes a "yes"; the second one alerts."""
+        from .floor import CUT, QUESTIONS
+        people = [tuple(self.tracks[t].box[:4]) for t in seen]
+        at, counted = self._counted_people
+        if now - at <= 1.5:   # the plain detector finds people the pose detector misses (crowds, far away)
+            people += counted
+        try:
+            found = self.floor_watch.update(now, frame, people, self.zone_counter.zones, self.clock.wall())
+        except Exception:
+            log.exception("[%s] looking at the floor failed", self.name)
+            return
+        if not found:
+            return
+        empty = self.floor_watch.picture()
+        newest = self.memory.pick(1, 0) if self.memory is not None else []
+        for f in found:
+            zid = f["area"]["id"]
+            log.info("[%s] floor check: %s%s", self.name, f["reason"], " (first look)" if f["first_look"] else "")
+            got = "no pictures"
+            if newest and empty is not None:
+                pictures = [(f["before"] or newest[-1][0], empty, []), newest[-1]]
+                try:
+                    got = self.incidents.suspect(
+                        self.name, f["category"], f["reason"], area=f["area"], crop=f["crop"], pictures=pictures,
+                        question=QUESTIONS[f["category"]], alert_if_yes=not f["first_look"], cut=CUT,
+                        on_done=lambda answer, zid=zid: self.floor_watch.answered(zid, answer))
+                except Exception:
+                    log.exception("[%s] raising a floor check failed", self.name)
+                    got = "failed"
+            if got != "queued":
+                self.floor_watch.answered(zid, None)
+
     def _look_objects(self, frame: np.ndarray, areas: list[dict], weapons: bool) -> tuple[dict | None, list]:
         """One pass of the plain detector: ({area id: people inside} (where their feet are, as for counting), or None
         without the detector file (then the tracked people are counted); [(word, confidence, box)] knives, scissors
@@ -798,6 +843,7 @@ class Pipeline:
             return None, []
         boxes = [(int(c), float(p), tuple(b)) for c, p, b in
                  zip(r.boxes.cls.tolist(), r.boxes.conf.tolist(), r.boxes.xyxy.tolist())]
+        self._counted_people = (self.clock.mono(), [b for c, _, b in boxes if c == 0])
         spots = [zones_mod.anchor(b, frame.shape, self.mode) for c, _, b in boxes if c == 0]
         counts = {z["id"]: sum(zones_mod.inside(pt, z["points"]) for pt in spots) for z in areas}
         objects = [(COCO_WEAPONS[c], p, b) for c, p, b in boxes

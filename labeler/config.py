@@ -141,7 +141,19 @@ DEFAULTS: dict = {
                # swords (YOLOE prompt-free, weapon_model) at a wrist on weapon_hold of the last weapon_looks looks.
                "weapons_enabled": True, "weapon_model": "data/models/yoloe/yoloe-11s-seg-pf.pt", "weapon_conf": 0.35,
                "gun_model": "data/models/guns/guns.pt", "gun_conf": 0.35,
-               "weapon_looks": 3, "weapon_hold": 2, "weapon_reach": 0.15, "weapon_rearm_s": 30},
+               "weapon_looks": 3, "weapon_hold": 2, "weapon_reach": 0.15, "weapon_rearm_s": 30,
+               # Floor hazards and blocked exits (labeler/floor.py): walkway and exit areas against the empty picture
+               # every floor_every_s at floor_side px; a spot differs by more than floor_diff (0-255); held
+               # floor_hold_s (walkway) / exit_hold_s (exit) over floor_min_size of the picture -> checked; two "yes"
+               # floor_again_s apart alert. The empty picture: each spot's median over floor_learn_n looks
+               # floor_learn_every_s apart, leaving out people (boxes widened by floor_margin; at least floor_learn_min
+               # looks without one), then follows by floor_alpha while it matches; most of the picture
+               # changed (floor_light_share) for floor_light_s = learned again; a reported change still there after
+               # floor_keep_h hours joins it; saved every floor_save_s.
+               "floor_enabled": True, "floor_every_s": 1.0, "floor_side": 480, "floor_diff": 30,
+               "floor_min_size": 0.0004, "floor_hold_s": 30, "exit_hold_s": 120, "floor_again_s": 60,
+               "floor_learn_n": 15, "floor_learn_every_s": 2.0, "floor_learn_min": 5, "floor_margin": 0.2, "floor_alpha": 0.02, "floor_light_share": 0.4,
+               "floor_light_s": 10, "floor_keep_h": 24, "floor_save_s": 600},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,
               "low_ratio": 0.5, "lost_s": 0.5, "min_width": 1.25},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored
     "embeddings": {"enabled": True, "model": "google/siglip2-base-patch16-224", "device": "cuda"},

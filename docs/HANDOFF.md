@@ -18,7 +18,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-21)
 
-**Latest (2026-10-21, end of the session; last commit `1d5ba2f` + this handoff; 963 tests + 1 PostgreSQL test that is
+**Latest (2026-10-21, end of the session; Phase 47 step 2 committed after `1d5ba2f`; 979 tests + 1 PostgreSQL test that is
 skipped without `VL_TEST_POSTGRES_URL`; GitHub green).**
 
 **Plan in progress: [PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)**: safety incidents on **security cameras** (the 11 kinds
@@ -43,8 +43,14 @@ with the user first (their rule: **discuss any architecture before building it**
   `data/models/guns/guns.pt`; 76% of guns found vs YOLOE's 10%); YOLOE prompt-free (27 MB) only for machetes/swords;
   **any real gun in hand alerts** (user's choice; the vision model only checks it is a real gun). 130 of 217 held
   guns alerted, 0 false on 389 everyday photos. Knives held as a threat: no photos to measure.
-- **Next: Phase 47 step 2** (floor hazards, blocked exits, left objects: compare walkway / exit areas with their empty
-  picture; agreed design in the plan), then step 3 (unsafe equipment: vision-model rounds every 10 min; pests: try
+- **Phase 47 step 2 done** (2026-10-21; design agreed with the user first, plan `2ea1e80`): floor hazards and blocked
+  exits (`labeler/floor.py`): walkway / exit areas against each safety camera's empty picture (saved in
+  `<crop_dir>/empty/<camera>.png`); the vision model sees the empty picture and now; two "yes" a minute apart alert, a
+  "no" puts the change into the empty picture. Measured with made-up videos (`tools/make_floor_videos.py`,
+  `data/datasets/floor_made`, 1.1 GB, git-ignored): objects 5 of 6, spills 1 of 3, 0 false alerts (README "Floor
+  hazards and blocked exits"). Seen while measuring: on the moving MOT20 cameras the fall check (Phase 45) raised
+  23-30 fall suspects per 4-minute video; not looked into (safety cameras are normally still).
+- **Next: Phase 47 step 3** (unsafe equipment: vision-model rounds every 10 min; pests: try
   YOLOE's words rat / mouse / rodent / insect / bug, keep only if good), then Phases 48 (aggression) and 49
   (suspicious behaviour); discuss each phase's design with the user first.
 
@@ -284,6 +290,10 @@ labeler/safety.py    quick checks for people (Phase 45): SafetyWatch per safety 
 labeler/fire.py      fire and smoke (Phase 46): FireWatch, our D-Fire model once a second, 3 of 5 looks, cooking areas
 labeler/weapons.py   dangerous objects (Phase 47): WeaponWatch (at a wrist on 2 of 3 looks), our gun model, YOLOE for
                      machetes/swords, GUN_QUESTION (any real gun alerts)
+labeler/floor.py     floor hazards and blocked exits (Phase 47 step 2): FloorWatch per safety camera (empty picture =
+                     median of 15 looks without people, saved <crop_dir>/empty/<camera>.png; a change held 30 s on a
+                     walkway / 2 min in an exit; the lights = learned again); Pipeline._look_at_floor sends the empty
+                     picture + now (Suspect.cut tighter, alert_if_yes False on the first look, True on the second)
 labeler/incidents.py safety incidents (Phase 44): FrameMemory (Pipeline.memory, 1 picture/s for 10 s on safety cameras),
                      CATEGORIES (12 kinds: level, words, question), ConfirmQueue (run.py thread "incidents", job ids
                      -(1e9 + n), critical first, confirm_per_min, max_wait_s, cooldown_s), IncidentAlerts (a "yes" ->
@@ -443,6 +453,10 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
 38. **Measure with the camera's own frame rate**: the fall check caught 9 of 15 falls at 10 pictures a second and 13 at
    30 (tools/incident_check.py --fps). And the person (pose) detector misses most people in crowds: count crowds with
    the plain detector at 1280 px.
+39. **Check that a "still" test video really is still** (Phase 47 step 2): all four MOT20 cameras pan and zoom, and
+   most of D-Fire's sample videos come from turning cameras that visit preset views ("Preset 5" on screen). Compare a
+   few frames across the video (median gray difference, `cv2.phaseCorrelate`) before using one as a fixed view.
+   Still here: MOT16-02, -04, -09; D-Fire FP1-5, 7-10, 15, 19-22 (FP9/FP10 have paths, the rest hills).
 
 ## 7. Conventions
 
@@ -749,5 +763,5 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE44-49-PLAN.md
-> (Phase 47 step 2: floor hazards and blocked exits); ask me before each phase and each step starts, discuss any
+> (Phase 47 step 3: unsafe equipment and pests); ask me before each phase and each step starts, discuss any
 > architecture with me first, and do it step by step.

@@ -156,6 +156,9 @@ class Suspect:
     level_as: str | None = None          # instead of the category's level ("round": a slow round, after people)
     on_done: object = None               # called with the answer, or None when no answer came (failed, dropped):
                                          # the caller alerts itself (falls: only a clear "no" stops the alert)
+    alert_if_yes: bool | None = None     # None: "yes" alerts unless on_done is set; False: a first look (floor
+                                         # hazards: noted, the second "yes" alerts); True: alerts, on_done too
+    cut: tuple | None = None             # (margin, smallest share) around crop instead of a person's (floor: tighter)
 
     @property
     def level(self) -> str:
@@ -176,13 +179,14 @@ CROP_MARGIN = 0.75   # around a person: this share of their box's width and heig
 CROP_MIN = 0.35      # at least this share of the picture's width and height: enough of the room to judge
 
 
-def person_crop(pic: np.ndarray, crop: tuple) -> np.ndarray:
-    """The part of the picture around a person: a far person is too small for the vision model in the whole picture."""
+def person_crop(pic: np.ndarray, crop: tuple, margin: float = CROP_MARGIN, minimum: float = CROP_MIN) -> np.ndarray:
+    """The part of the picture around a person: a far person is too small for the vision model in the whole picture.
+    margin: this share of the box on each side; minimum: at least this share of the picture's width and height."""
     h, w = pic.shape[:2]
     x1, y1, x2, y2 = crop
-    bw, bh = max(x2 - x1, CROP_MIN / (1 + 2 * CROP_MARGIN)), max(y2 - y1, CROP_MIN / (1 + 2 * CROP_MARGIN))
+    bw, bh = max(x2 - x1, minimum / (1 + 2 * margin)), max(y2 - y1, minimum / (1 + 2 * margin))
     cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-    half_w, half_h = bw * (0.5 + CROP_MARGIN), bh * (0.5 + CROP_MARGIN)
+    half_w, half_h = bw * (0.5 + margin), bh * (0.5 + margin)
     a, b = max(0, int((cx - half_w) * w)), max(0, int((cy - half_h) * h))
     c, d = min(w, int((cx + half_w) * w)), min(h, int((cy + half_h) * h))
     return pic[b:d, a:c] if c - a > 8 and d - b > 8 else pic
@@ -192,7 +196,7 @@ def pictures_for(s: Suspect) -> list[np.ndarray]:
     """What the vision model sees: each picture, cut out around the person (crop) or the area when there is one
     (labeler/scene.py), else whole."""
     if s.crop:
-        return [person_crop(p[1], s.crop) for p in s.pictures]
+        return [person_crop(p[1], s.crop, *(s.cut or ())) for p in s.pictures]
     if not s.area:
         return [p[1] for p in s.pictures]
     from .scene import area_picture
@@ -226,14 +230,15 @@ class ConfirmQueue:
 
     def suspect(self, camera: str, category: str, reason: str, area: dict | None = None, people=(),
                 pictures: list | None = None, crop: tuple | None = None, question: str | None = None,
-                level: str | None = None, on_done=None, span_s: float | None = None) -> str:
+                level: str | None = None, on_done=None, span_s: float | None = None,
+                alert_if_yes: bool | None = None, cut: tuple | None = None) -> str:
         """A fast check saw something. Returns "queued", "cooldown" (checked just now) or "no pictures"; only
         when "queued" will on_done be called (with the answer, or None when none came)."""
         if category not in CATEGORIES:
             raise ValueError(f"unknown incident category {category!r}")
         now = self.clock()
         s = Suspect(camera, category, reason, area, list(people), queued=now, crop=crop, question=question,
-                    level_as=level, on_done=on_done)
+                    level_as=level, on_done=on_done, alert_if_yes=alert_if_yes, cut=cut)
         with self._lock:
             self.counts["suspects"] += 1
             if now - self.last_sent.get(s.key, -1e9) < self.cooldown_s or any(w.key == s.key for w in self.waiting):
@@ -378,7 +383,8 @@ class IncidentAlerts:
             return None
 
     def __call__(self, s: Suspect, answer: dict) -> list[dict]:
-        if answer.get("answer") != "yes" or s.on_done is not None:   # on_done: the caller alerts itself (falls)
+        alert = s.on_done is None if s.alert_if_yes is None else s.alert_if_yes   # on_done: the caller alerts (falls)
+        if answer.get("answer") != "yes" or not alert:
             return []
         area = (s.area or {}).get("name")
         rules = self.alerts.check_incident(s.camera, s.category, area)

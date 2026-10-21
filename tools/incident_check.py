@@ -147,6 +147,8 @@ def run_video(video: Path, cfg: dict, embedder, fps: float, half: str, hold_s: f
     cfg["person_videos"]["enabled"] = False
     p = Pipeline(cfg, db, None, embedder, None, camera=cam)
     p.clock = VideoClock(datetime(2026, 1, 1))
+    if p.floor_watch is not None:
+        p.floor_watch.path = None   # each video learns its own empty picture, and nothing is saved
     suspects, answers = [], []
     worker = Yes() if client is None else None
     q = ConfirmQueue(cfg, worker, {"check": p.memory}, clock=p.clock.mono)
@@ -166,8 +168,10 @@ def run_video(video: Path, cfg: dict, embedder, fps: float, half: str, hold_s: f
         return got
 
     q.suspect = suspect
-    q.listeners.append(lambda s, a: answers.append((round(p.clock.t, 2), s.category, a["answer"], s.reason,
-                                                    a.get("what", ""))))
+    # A first look (floor hazards: two "yes" alert) is listed, but its "yes" is no alert.
+    q.listeners.append(lambda s, a: answers.append((round(p.clock.t, 2), s.category,
+                                                    a["answer"] + (" (first look)" if s.alert_if_yes is False else ""),
+                                                    s.reason, a.get("what", ""))))
     p.incidents = q   # the quick checks (Phase 45+) raise suspects through this
     t = 0.0
     for frame, t in frames(video, fps, half, hold_s):

@@ -237,6 +237,17 @@ step comes.
    so it is not asked again; (5) a left bag is a floor hazard (walkway) or blocked exit (exit) for now; Phase 49 adds
    who left it; (6) measured with **made-up tests**: objects (bags, chairs, boxes, dark "spill" patches) pasted onto
    the floor of still-camera videos here (MOT16, UR Fall), false alarms on the unchanged videos; no download.
+   **Done 2026-10-21**: `labeler/floor.py` FloorWatch (empty picture from the median of 15 looks 2 s apart, people
+   left out: an average smeared missed passers-by in; a spot next to a change does not follow either; the lights /
+   a moved camera = learned again), Pipeline `_look_at_floor` (tracked people + the plain detector's boxes),
+   `Suspect.alert_if_yes` (a first look notes "yes", the second alerts) and `Suspect.cut` (a tighter cut-out),
+   config `safety.floor_*`, Health line "floor and exits", What's new entry p47. The question asks to compare the two
+   pictures (tune half: 11 of 13 changes instead of 9). `tools/make_floor_videos.py`: UR Fall clips are too short and
+   the MOT20 cameras and most of D-Fire's move, so MOT16-02/-04/-09 and D-Fire's still guard booth (FP9, FP10).
+   Report half: objects 5 of 6 alerted (exits 3 of 3), spills 1 of 3 (dark ones look like shadows), 0 false alerts,
+   1.5 min on a walkway, 3 min in an exit. The real run on a test copy found the same suitcase asked about again
+   (spots hidden by a passer-by began to differ later): an alert or a "no" now covers the whole connected change;
+   the report half was run again after it (same numbers). README "Floor hazards and blocked exits". **Step 2 done.**
 3. **Equipment and pests**: equipment through slow rounds of the vision model per area (an overturned table or chair,
    cables across the walkway, something hanging loose) and a table box that changed shape against the empty picture.
    Pests: no rodents in COCO; try YOLOE / YOLO-World (open-vocabulary, Ultralytics) with "rat, mouse, cockroach" in food

@@ -489,6 +489,37 @@ def check_safety(incidents) -> dict | None:
     return _check("safety checks", "warning" if s["dropped_old"] or s["failed"] else "ok", "; ".join(parts))
 
 
+def check_floor(pipelines: list) -> dict | None:
+    """Phase 47 step 2: floor hazards and blocked exits (labeler/floor.py): which walkway and exit areas each safety
+    camera watches, and whether its empty picture is learned yet."""
+    watches = [(p.name, p.floor_watch) for p in pipelines if getattr(p, "floor_watch", None) is not None]
+    if not watches:
+        return None
+    parts = []
+    for name, w in watches:
+        s = w.state()
+        if not s["areas"]:
+            continue
+        if s["learning"]:
+            parts.append(f"{name}: learning the empty picture ({s['learning']})")
+            continue
+        if s["ready"] < 0.95:
+            parts.append(f"{name}: {s['ready']:.0%} of the empty picture known (spots with people on them wait)")
+            continue
+        line = f"{name}: {', '.join(s['areas'])} watched" + (f" (empty picture saved {s['saved'][11:16]})"
+                                                             if s["saved"] else "")
+        if s["checking"]:
+            line += f", {s['checking']} change{'s' if s['checking'] > 1 else ''} being checked"
+        if s["reported"]:
+            line += ", a reported change still there"
+        if s["relearned"]:
+            line += f", learned again {s['relearned']}x since the start (the light changed)"
+        parts.append(line)
+    if not parts:
+        return _check("floor and exits", "off", "no area with the role walkway or exit (draw one on the Live page)")
+    return _check("floor and exits", "ok", "; ".join(parts))
+
+
 def check_quiet(quiet) -> dict | None:
     """Phase 31: the "no movement" watch (labeler/quiet.py): how long each watched camera has been quiet."""
     if quiet is None:
@@ -603,6 +634,12 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
             checks.insert(-1, line)
     except Exception as e:
         checks.insert(-1, _check("safety checks", "warning", f"could not be read ({e.__class__.__name__})"))
+    try:
+        line = check_floor(pipelines)
+        if line is not None:
+            checks.insert(-1, line)
+    except Exception as e:
+        checks.insert(-1, _check("floor and exits", "warning", f"could not be read ({e.__class__.__name__})"))
     try:
         line = check_quiet(quiet)
         if line is not None:

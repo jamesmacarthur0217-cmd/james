@@ -948,6 +948,54 @@ Many of the vision model's "no" were right: paintball guns, Lego toys, a gun on 
 "threatening?" (before the user's choice) gave 14 alerts of 63 held guns. Everyday videos (MOT16, UR Fall): nothing
 raised. Not measured: knives held as a threat (no such photos here), real camera footage.
 
+### Floor hazards and blocked exits (Phase 47 step 2)
+
+Draw an area on the Live page and give it the role **walkway** or **exit**. Each safety camera keeps an **empty
+picture** (how it looks with nobody in it; saved as `<crop_dir>/empty/<camera>.png`, so it survives a restart) and
+compares those areas with it once a second (`labeler/floor.py`, about 10 ms at 1080p):
+
+- **Learning** (about 30 s): 15 looks 2 s apart; where people stand is left out, and each spot takes its middle value,
+  so passers-by the detectors miss drop out. After that the picture follows slow light changes, but a spot that
+  changed is held as it was, so a bag never fades into it. The Health page line "floor and exits" shows the progress.
+- **Something new** that stays where nobody stands: **30 s on a walkway** = a "floor hazard" check, **2 minutes in an
+  exit** = a "blocked exit or aisle" check. Someone standing on it does not reset the time.
+- The vision model sees **the empty picture and now**, cut out closely around the change, and is asked to compare
+  them. **Two "yes" about a minute apart** make the alert (the user's choice); a **"no"** (a chair moved, a shadow)
+  puts the change into the empty picture so it is not asked again. After an alert the change is "reported" and not
+  raised again while it stays; after 24 h it becomes part of the empty picture.
+- **The lights** (most of the picture changes at once for 10 s): the empty picture is learned again, nothing is raised.
+  A camera that **moves** (pans, zooms, turns between preset views) is handled the same way, again and again: this
+  check is for still cameras only.
+- A left bag counts as a floor hazard (walkway) or a blocked exit (exit) for now; who left it comes in Phase 49.
+
+Measured with made-up videos (the user's choice, no download; `tools/make_floor_videos.py`): still-camera videos here
+(MOT16-02, -04, -09; D-Fire's guard booth FP9 and FP10) looped to 4-5 minutes, and at 60 s a bag, a suitcase or a chair
+(cut out of COCO photos with YOLOE, sized to the people there, with a soft shadow) or a spill (a dark or light blob) is
+put down and stays. The MOT20 cameras and most of D-Fire's move, so they could not be used. Settings were chosen on
+MOT16-02 and FP9 (the question "compare them" and the tight cut-out: 11 of 13 changes seen instead of 9), and the
+numbers are from the other scenes (FP10 is the same booth as FP9 on another day). `tools/incident_check.py`, the
+real camera code and the vision model:
+
+| report half (MOT16-04, MOT16-09, FP10; 0.85 h of video) | put down | checked | **alerted** | alert after |
+|---|---|---|---|---|
+| bag or suitcase on a walkway | 3 | 3 | **2** | 1.5 min |
+| suitcase or chair in an exit | 3 | 3 | **3** | 3 min |
+| spill on a walkway (1 light, 2 dark) | 3 | 3 | **1** (the light one) | 1.5 min |
+| nothing put down (3 videos, people walking) | 0 | 0 | **0** | |
+
+On the tune half (MOT16-02, FP9), whole runs with the first question: 4 of 4 objects alerted, 0 of 2 spills, no false
+alert; then each check alone with the final question and cut-out: objects 8 of 8 "yes", spills 3 of 5 (the dark one on
+MOT16-02's dark stones 1 of 3), 0 of 8 spots people had walked over. On the report half the two dark spills were called
+"shadow" on the first look and "no visible change" on the second; the missed bag got "yes, black bag" and then "no
+objects added", so it was put into the empty picture (the agreed rule: a "no" ends it). A real run on a test copy
+(MOT16-09 with a suitcase put down, a walkway drawn through the API) gave the alert 1 min 56 s after the suitcase
+appeared, with the area outlined in the alert's picture; it also showed the same suitcase asked about again (spots a
+passer-by had hidden began to differ later), so an alert or a "no" now covers the whole connected change, and the
+report half was run again after that fix (the same numbers, one check pair per object).
+
+Not measured: real spills (water is nearly invisible to a camera; these blobs are easier), broken glass, night or
+infrared pictures, the user's own cameras.
+
 ## No movement
 
 For someone living alone (an elderly parent): an alert when nobody has been seen on the camera for a long time while
