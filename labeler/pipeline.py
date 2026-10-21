@@ -241,6 +241,7 @@ class Pipeline:
         self.fire_watch, self.fire_model = None, None
         # Dangerous objects (Phase 47, labeler/weapons.py): COCO knives, scissors, bats in the counting pass, and YOLOE.
         self.weapon_watch, self.yoloe_model, self._yoloe_path = None, None, None
+        self.gun_model, self._gun_path = None, None
         if scfg.get("enabled") and cam.get("safety", self.mode == "security"):
             from .incidents import FrameMemory
             from .safety import SafetyWatch
@@ -261,8 +262,12 @@ class Pipeline:
                 if yoloe.is_file():
                     self._yoloe_path = yoloe
                 else:
-                    log.warning("[%s] guns, machetes and swords are not looked for: no model at %s (knives, scissors "
-                                "and bats are)", self.name, yoloe)
+                    log.warning("[%s] machetes and swords are not looked for: no model at %s", self.name, yoloe)
+                guns = resolve(scfg.get("gun_model", "data/models/guns/guns.pt"))
+                if guns.is_file():
+                    self._gun_path = guns
+                else:
+                    log.warning("[%s] guns are not looked for: no model at %s (tools/train_guns.py)", self.name, guns)
         # Areas with a loitering rule (people, vehicles): the live picture shows how long someone is in them.
         self._stay_areas: frozenset[str] = frozenset()
         self._stay_areas_v: frozenset[str] = frozenset()
@@ -528,7 +533,7 @@ class Pipeline:
                 counts, objects = self._look_objects(frame, areas, self.weapon_watch is not None)
                 self._crowd_counts = counts if areas else None
                 if self.weapon_watch is not None:
-                    self._check_weapons(frame, now, objects + self._look_yoloe(frame))
+                    self._check_weapons(frame, now, objects + self._look_guns(frame) + self._look_yoloe(frame))
             if self.fire_watch is not None and self.fire_watch.due(now):
                 self._look_for_fire(frame, now)
             for area, reason in self.safety_watch.crowd(now, limited, self._crowd_counts):
@@ -799,8 +804,25 @@ class Pipeline:
                    if weapons and c in COCO_WEAPONS and p >= float(scfg.get("weapon_conf", 0.35))]
         return counts, objects
 
+    def _look_guns(self, frame: np.ndarray) -> list:
+        """Handguns, rifles and shotguns from our own gun detector (labeler/weapons.py)."""
+        if self._gun_path is None:
+            return []
+        from .weapons import GUN_CLASSES
+        scfg = self.cfg.get("safety") or {}
+        try:
+            if self.gun_model is None:
+                self.gun_model = YOLO(str(self._gun_path))
+            r = self.gun_model.predict(frame, conf=float(scfg.get("gun_conf", 0.35)), imgsz=640,
+                                       device=self.det_cfg["device"], verbose=False)[0]
+        except Exception:
+            log.exception("[%s] looking for guns failed", self.name)
+            return []
+        return [(GUN_CLASSES.get(int(c), "gun"), float(p), tuple(b))
+                for c, p, b in zip(r.boxes.cls.tolist(), r.boxes.conf.tolist(), r.boxes.xyxy.tolist())]
+
     def _look_yoloe(self, frame: np.ndarray) -> list:
-        """Guns, rifles, shotguns, machetes and swords from YOLOE prompt-free (labeler/weapons.py)."""
+        """Machetes and swords from YOLOE prompt-free (labeler/weapons.py)."""
         if self._yoloe_path is None:
             return []
         from .weapons import YOLOE_WORDS
@@ -825,9 +847,10 @@ class Pipeline:
             if st.last_seen == now and not st.deleted:
                 role = zones_mod.role_at(self.zone_counter.zones, zones_mod.anchor(st.box, frame.shape, self.mode))
                 people[tid] = (tuple(st.box[:4]), st.kpts, role)
+        from .weapons import GUN_QUESTION, GUNS
         for tid, word in self.weapon_watch.update(now, objects, people):
             log.warning("[%s] weapon check: a %s at the wrist of person %s", self.name, word, tid)
-            self._raise(tid, "weapon", f"{word} held", frame.shape)
+            self._raise(tid, "weapon", f"{word} held", frame.shape, question=GUN_QUESTION if word in GUNS else None)
 
     def _age_of(self, st: TrackState) -> str | None:
         """For the safety checks: "child", "adult" (any other known age) or None (no age label yet)."""

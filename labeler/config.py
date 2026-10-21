@@ -140,6 +140,7 @@ DEFAULTS: dict = {
                # Dangerous objects (labeler/weapons.py): knives, scissors, bats (plain detector) and guns, machetes,
                # swords (YOLOE prompt-free, weapon_model) at a wrist on weapon_hold of the last weapon_looks looks.
                "weapons_enabled": True, "weapon_model": "data/models/yoloe/yoloe-11s-seg-pf.pt", "weapon_conf": 0.35,
+               "gun_model": "data/models/guns/guns.pt", "gun_conf": 0.35,
                "weapon_looks": 3, "weapon_hold": 2, "weapon_reach": 0.15, "weapon_rearm_s": 30},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,
               "low_ratio": 0.5, "lost_s": 0.5, "min_width": 1.25},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored

@@ -920,18 +920,33 @@ videos are outdoor smoke), and the MIVIA videos (requested by the user; to add w
 ### Dangerous objects (Phase 47 step 1)
 
 On safety cameras, once a second: the plain detector's pass (the crowd count's) also looks for knives, scissors and
-bats, and **YOLOE prompt-free** (`data/models/yoloe/yoloe-11s-seg-pf.pt`, 27 MB from Ultralytics' release v8.4.0,
-AGPL-3.0, downloaded with the user's OK; a fixed list of 4,585 things including gun, handgun, rifle, shotgun, machete,
-sword: no text model, as the one YOLOE needs for your own words, Apple's MobileCLIP, is licensed for research only)
-for guns, machetes and swords. One held at a person's wrist (`weapon_reach`: 15% of their height) on 2 of the last 3
-looks raises a critical "dangerous object" check; the vision model decides whether it is held in a threatening way or
-used for food or work. Not in an area with the role "cooking" or "food_prep". Again for the same person after 30 s
-without one.
+bats; **our own gun detector** (`tools/train_guns.py`, `data/models/guns/guns.pt`) for handguns, rifles and shotguns;
+and **YOLOE prompt-free** (`data/models/yoloe/yoloe-11s-seg-pf.pt`, 27 MB from Ultralytics' release v8.4.0, AGPL-3.0,
+downloaded with the user's OK; a fixed list of 4,585 things, so no text model: the one YOLOE needs for your own words,
+Apple's MobileCLIP, is licensed for research only) for machetes and swords. One held at a person's wrist
+(`weapon_reach`: 15% of their height) on 2 of the last 3 looks raises a critical "dangerous object" check. **Any real
+gun in someone's hands alerts** (the user's choice): the vision model is only asked whether it is a real gun (not a
+toy, a drawing or a screen); for knives, scissors and bats it decides whether they are held as a threat or used for
+food or work. Not in an area with the role "cooking" or "food_prep". Again for the same person after 30 s without one.
 
-Measured (`tools/weapon_check.py`, `tools/incident_check.py`): 205 COCO photos with a person and a knife, scissors or a
-bat (cooking, eating, crafts, baseball): one at a wrist in 87 (70 bats), and the vision model answered "no" to all 87;
-YOLOE saw a gun-like thing on 1 of 500 ordinary COCO photos (a "sword"); everyday videos (MOT16, UR Fall): nothing
-raised. Not measured yet: real threats (photos of guns and knives held as weapons).
+Guns: YOLOE found only 10% of the true guns on Open Images' validation and test photos (439 photos, 827 guns; 36% at a
+threshold of 0.05, with 4% of ordinary COCO photos then getting a gun box), so the user chose to train our own: Open
+Images V6 training photos (2,236 with a handgun, rifle or shotgun and 1,000 people without; CC BY 2.0; 2.26 GB box list
+read and not kept, 1.03 GB photos; downloaded with the user's OK), YOLO11s, 50 rounds in 19 min. On the 439 test photos
+(never trained on): mAP50 0.64 (handgun 0.75, rifle 0.69, shotgun 0.47: confused with rifles), 76% of the guns found at
+0.35, 11 ms a picture.
+
+The whole check (`tools/weapon_check.py`, detectors + wrists + the vision model):
+
+| | at a wrist | the vision model said yes (an alert) |
+|---|---|---|
+| Open Images: a person really holds a gun (217 photos) | 192 (88%) | **130** (60% of the 217) |
+| COCO: everyday knives, scissors, bats (205 photos) | 89 | **0** |
+| COCO: ordinary photos of people, no weapon (300) | 9 (false gun boxes) | **0** (8 no, 1 unsure) |
+
+Many of the vision model's "no" were right: paintball guns, Lego toys, a gun on a tripod or a shelf. Questions asked
+"threatening?" (before the user's choice) gave 14 alerts of 63 held guns. Everyday videos (MOT16, UR Fall): nothing
+raised. Not measured: knives held as a threat (no such photos here), real camera footage.
 
 ## No movement
 

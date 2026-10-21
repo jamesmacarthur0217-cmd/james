@@ -42,6 +42,8 @@ def names(config: Path = ROOT / "config.yaml") -> dict:
             "trained": [m for m, on in [((cfg.get("safety") or {}).get("fire_model"),
                                          (cfg.get("safety") or {}).get("fire_enabled", True)),
                                         ((cfg.get("safety") or {}).get("weapon_model"),
+                                         (cfg.get("safety") or {}).get("weapons_enabled", True)),
+                                        ((cfg.get("safety") or {}).get("gun_model"),
                                          (cfg.get("safety") or {}).get("weapons_enabled", True))] if m and on]}
 
 
@@ -114,7 +116,8 @@ def check(n: dict) -> list[tuple[str, bool]]:
 
 
 def check_trained(n: dict) -> list[tuple[str, bool]]:
-    why = {"fire": "trained here: tools/train_fire.py", "yoloe": "YOLOE prompt-free, Ultralytics release v8.4.0"}
+    why = {"fire": "trained here: tools/train_fire.py", "yoloe": "YOLOE prompt-free, Ultralytics release v8.4.0",
+           "guns": "trained here: tools/train_guns.py"}
     return [(f"optional {m} ({next((w for k, w in why.items() if k in m), 'optional')})", (ROOT / m).is_file())
             for m in n.get("trained", [])]
 

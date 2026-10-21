@@ -217,7 +217,12 @@ step comes.
    `labeler/weapons.py` (WeaponWatch, at_wrist), Pipeline `_look_objects` (counts + knives / scissors / bats in one
    pass), `_look_yoloe`, `_check_weapons`; config `safety.weapon_*`; `tools/models.py` lists YOLOE as optional;
    `tools/weapon_check.py`. False alarms: 0 of 87 everyday knives / scissors / bats at a wrist confirmed (COCO),
-   YOLOE 1 of 500 ordinary photos, everyday videos nothing. Real threats not measured yet (needs photos).
+   YOLOE 1 of 500 ordinary photos, everyday videos nothing. Then (the user's choices, 2026-10-21): Open Images gun
+   photos downloaded for testing (439, 127 MB); YOLOE found only 10% of the guns, so **our own gun detector** was
+   trained on Open Images' training photos (2,236 + 1,000 without guns, 1.03 GB; `tools/get_gun_training.py`,
+   `tools/train_guns.py`): 76% of the guns found; YOLOE kept for machetes and swords only; **any real gun in hand
+   alerts** (GUN_QUESTION). Whole check: 130 of 217 held guns alerted, 0 of 89 everyday knives / bats, 0 of 300
+   ordinary people photos (README "Dangerous objects"). **Step 1 done.**
 2. **The empty picture of an area**: for walkway and exit areas, a picture of the area with nobody in it (a median of
    recent empty frames, refreshed daily and after lighting changes). A patch that changed and stays changed while
    nobody stands there becomes a suspect: *blocked exit* (exit area, 2 min), *floor hazard* (walkway, 30 s: spill,

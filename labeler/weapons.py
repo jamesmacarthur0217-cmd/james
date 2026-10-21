@@ -2,12 +2,15 @@
 wrist, outside a cooking or food preparation area, raises a critical "dangerous object" suspect; the vision model
 then decides whether it is held in a threatening way or used for food or work.
 
-Two looks a second on safety cameras (the user's choices, 2026-10-21):
-- the plain detector's once-a-second pass (Pipeline._look_objects, the crowd count's) also asks for COCO's knife,
-  scissors and baseball bat;
+Looks once a second on safety cameras (the user's choices, 2026-10-21):
+- the plain detector's pass (Pipeline._look_objects, the crowd count's) also asks for COCO's knife, scissors and bat;
+- our own gun detector (tools/train_guns.py: Open Images handgun / rifle / shotgun photos; data/models/guns/guns.pt)
+  for guns: YOLOE found only 10% of the true guns on Open Images' test photos (36% at a threshold of 0.05), ours 76%;
 - YOLOE prompt-free (yoloe-11s-seg-pf.pt, Ultralytics, AGPL-3.0; 27 MB, a fixed list of 4,585 things, so no text
-  model: MobileCLIP's weights are for research only) for guns, rifles, shotguns, machetes and swords, which COCO does
-  not have.
+  model: MobileCLIP's weights are for research only) for machetes and swords, which neither of the others knows.
+
+For guns (the user's choice) any real gun in someone's hands alerts: the vision model is only asked whether it is a
+real gun (GUN_QUESTION); knives, scissors and bats keep the question whether they are used as a threat.
 
 "Held": a wrist point (body points 9, 10) inside the object's box grown by `weapon_reach` of the person's height, on
 `weapon_hold` of the last `weapon_looks` looks. A person in an area with the role "cooking" or "food_prep" is left
@@ -22,7 +25,12 @@ import numpy as np
 from .falls import MIN_CONF
 
 COCO_WEAPONS = {34: "baseball bat", 43: "knife", 76: "scissors"}
-YOLOE_WORDS = ("gun", "handgun", "rifle", "shotgun", "machete", "sword", "weapon")
+GUNS = ("gun", "handgun", "rifle", "shotgun")
+# The user's choice (2026-10-21): any real gun in someone's hands alerts; the vision model only checks that it is one.
+# Asked "in a threatening way?", it called 49 of 63 people calmly holding a rifle "not threatening" (Open Images).
+GUN_QUESTION = "Is a person holding a real gun, rifle or shotgun (not a toy, a drawing, a picture or a screen)?"
+YOLOE_WORDS = ("machete", "sword")
+GUN_CLASSES = {0: "handgun", 1: "rifle", 2: "shotgun"}   # our gun detector's classes
 L_WRIST, R_WRIST = 9, 10
 SAFE_ROLES = ("cooking", "food_prep")
 

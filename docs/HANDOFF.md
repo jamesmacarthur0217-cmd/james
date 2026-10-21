@@ -36,7 +36,9 @@ test mAP50 0.767, 9.5 ms; `tools/train_fire.py`); step 2 done (`labeler/fire.py`
 step 3 done (D-Fire's 100 videos: 38 of 50 fires found, median 3 s, 5 of 50 false): **Phase 46 is done
 2026-10-20**; the MIVIA videos (requested by the user) are measured when they arrive. Next: Phase 47 (objects and
 places: weapons, blocked exits, floor hazards, equipment, pests): design agreed 2026-10-21; step 1 (dangerous
-objects: `labeler/weapons.py`, YOLOE prompt-free in data/models/yoloe) done; real-threat photos not measured yet. MOT20 is in data/datasets/mot20 (zip 5 GB +
+objects: `labeler/weapons.py`; our own gun detector data/models/guns/guns.pt trained on Open Images, YOLOE for
+machetes/swords; any real gun in hand alerts) done: 130 of 217 held guns alerted, 0 false on 389 everyday photos.
+Next: step 2 (floor hazards, blocked exits: compare with the empty area). MOT20 is in data/datasets/mot20 (zip 5 GB +
 unpacked train + videos; the user may want the zip deleted). Measure falls at 30 pictures a second.
 Measured: a check 1.4 s with 3 pictures; **4 pictures exceed Ollama's 4096-token context** (refused with 400);
 6 checks a minute on a very busy camera double people's label wait (3.6 -> 7.7 s), 3 a minute hardly matter. Still waiting for them: restart their own app (stop.bat, start.bat), the

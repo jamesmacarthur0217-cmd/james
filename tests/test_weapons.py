@@ -73,7 +73,7 @@ class Queue:
         self.raised = []
 
     def suspect(self, camera, category, reason, **kw):
-        self.raised.append((category, reason, kw.get("people")))
+        self.raised.append((category, reason, kw.get("people"), kw.get("question")))
         return "queued"
 
 
@@ -95,4 +95,10 @@ def test_the_camera_looks_and_checks(db, camera):
     for t in (1.0, 2.0):
         st.last_seen = t
         p._check_weapons(frame, t, objects)
-    assert p.incidents.raised == [("weapon", "knife held", [st.db_id])]
+    assert p.incidents.raised == [("weapon", "knife held", [st.db_id], None)]   # knives: "threatening or food/work?"
+    p.weapon_watch = WeaponWatch({})
+    for t in (40.0, 41.0):
+        st.last_seen = t
+        p._check_weapons(frame, t, [("rifle", 0.5, KNIFE_AT_HAND)])
+    from labeler.weapons import GUN_QUESTION
+    assert p.incidents.raised[-1] == ("weapon", "rifle held", [st.db_id], GUN_QUESTION)   # guns: only "a real gun?"
