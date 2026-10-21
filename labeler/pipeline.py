@@ -239,6 +239,8 @@ class Pipeline:
         self._crowd_counted, self._crowd_counts = -1e9, None
         # Fire and smoke (Phase 46, labeler/fire.py): our own detector, once a second, on safety cameras.
         self.fire_watch, self.fire_model = None, None
+        # Dangerous objects (Phase 47, labeler/weapons.py): COCO knives, scissors, bats in the counting pass, and YOLOE.
+        self.weapon_watch, self.yoloe_model, self._yoloe_path = None, None, None
         if scfg.get("enabled") and cam.get("safety", self.mode == "security"):
             from .incidents import FrameMemory
             from .safety import SafetyWatch
@@ -252,6 +254,15 @@ class Pipeline:
             elif scfg.get("fire_enabled", True):
                 log.warning("[%s] fire and smoke checks are off: no model at %s (tools/train_fire.py)", self.name,
                             fire_path)
+            if scfg.get("weapons_enabled", True):
+                from .weapons import WeaponWatch
+                self.weapon_watch = WeaponWatch(scfg)
+                yoloe = resolve(scfg.get("weapon_model", "data/models/yoloe/yoloe-11s-seg-pf.pt"))
+                if yoloe.is_file():
+                    self._yoloe_path = yoloe
+                else:
+                    log.warning("[%s] guns, machetes and swords are not looked for: no model at %s (knives, scissors "
+                                "and bats are)", self.name, yoloe)
         # Areas with a loitering rule (people, vehicles): the live picture shows how long someone is in them.
         self._stay_areas: frozenset[str] = frozenset()
         self._stay_areas_v: frozenset[str] = frozenset()
@@ -510,10 +521,14 @@ class Pipeline:
             areas = [z for z in self.zone_counter.zones if z["kind"] == zones_mod.AREA]
             limited = [z for z in areas if z.get("max_people")]
             scfg = self.cfg.get("safety") or {}
-            # Every area is counted (the Live page shows "now N people" to set a limit by); 14 ms at 1280 px.
-            if areas and now - self._crowd_counted >= float(scfg.get("crowd_every_s", 1.0)):
+            # Every area is counted (the Live page shows "now N people" to set a limit by); 14 ms at 1280 px. The same
+            # pass looks for knives, scissors and bats (Phase 47), and YOLOE for guns, machetes and swords.
+            if (areas or self.weapon_watch is not None) and now - self._crowd_counted >= float(scfg.get("crowd_every_s", 1.0)):
                 self._crowd_counted = now
-                self._crowd_counts = self._count_people(frame, areas)
+                counts, objects = self._look_objects(frame, areas, self.weapon_watch is not None)
+                self._crowd_counts = counts if areas else None
+                if self.weapon_watch is not None:
+                    self._check_weapons(frame, now, objects + self._look_yoloe(frame))
             if self.fire_watch is not None and self.fire_watch.due(now):
                 self._look_for_fire(frame, now)
             for area, reason in self.safety_watch.crowd(now, limited, self._crowd_counts):
@@ -757,24 +772,62 @@ class Pipeline:
             except Exception:
                 log.exception("[%s] raising a fire check failed", self.name)
 
-    def _count_people(self, frame: np.ndarray, areas: list[dict]) -> dict | None:
-        """{area id: people inside} from one pass of the plain detector (where their feet are, as for counting), or
-        None without it (the detector file missing: then the tracked people are counted)."""
+    def _look_objects(self, frame: np.ndarray, areas: list[dict], weapons: bool) -> tuple[dict | None, list]:
+        """One pass of the plain detector: ({area id: people inside} (where their feet are, as for counting), or None
+        without the detector file (then the tracked people are counted); [(word, confidence, box)] knives, scissors
+        and bats when weapons are looked for)."""
+        from .weapons import COCO_WEAPONS
         scfg = self.cfg.get("safety") or {}
         if self.counter_model is None:
             path = resolve((self.cfg.get("vehicles") or {}).get("model", "yolo11s.pt"))
             if not path.is_file():
-                return None
+                return None, []
             self.counter_model = YOLO(str(path))
         try:
-            r = self.counter_model.predict(frame, classes=[0], conf=float(scfg.get("crowd_conf", 0.25)),
+            r = self.counter_model.predict(frame, classes=[0] + (list(COCO_WEAPONS) if weapons else []),
+                                           conf=float(scfg.get("crowd_conf", 0.25)),
                                            imgsz=int(scfg.get("crowd_imgsz", 1280)), device=self.det_cfg["device"],
                                            verbose=False)[0]
         except Exception:
             log.exception("[%s] counting people failed", self.name)
-            return None
-        spots = [zones_mod.anchor(tuple(float(v) for v in b), frame.shape, self.mode) for b in r.boxes.xyxy.tolist()]
-        return {z["id"]: sum(zones_mod.inside(pt, z["points"]) for pt in spots) for z in areas}
+            return None, []
+        boxes = [(int(c), float(p), tuple(b)) for c, p, b in
+                 zip(r.boxes.cls.tolist(), r.boxes.conf.tolist(), r.boxes.xyxy.tolist())]
+        spots = [zones_mod.anchor(b, frame.shape, self.mode) for c, _, b in boxes if c == 0]
+        counts = {z["id"]: sum(zones_mod.inside(pt, z["points"]) for pt in spots) for z in areas}
+        objects = [(COCO_WEAPONS[c], p, b) for c, p, b in boxes
+                   if weapons and c in COCO_WEAPONS and p >= float(scfg.get("weapon_conf", 0.35))]
+        return counts, objects
+
+    def _look_yoloe(self, frame: np.ndarray) -> list:
+        """Guns, rifles, shotguns, machetes and swords from YOLOE prompt-free (labeler/weapons.py)."""
+        if self._yoloe_path is None:
+            return []
+        from .weapons import YOLOE_WORDS
+        scfg = self.cfg.get("safety") or {}
+        try:
+            if self.yoloe_model is None:
+                from ultralytics import YOLOE
+                self.yoloe_model = YOLOE(str(self._yoloe_path))
+                self._yoloe_ids = [i for i, n in self.yoloe_model.names.items() if n.lower() in YOLOE_WORDS]
+            r = self.yoloe_model.predict(frame, classes=self._yoloe_ids, conf=float(scfg.get("weapon_conf", 0.35)),
+                                         imgsz=640, device=self.det_cfg["device"], verbose=False)[0]
+        except Exception:
+            log.exception("[%s] looking for weapons failed", self.name)
+            return []
+        return [(self.yoloe_model.names[int(c)].lower(), float(p), tuple(b))
+                for c, p, b in zip(r.boxes.cls.tolist(), r.boxes.conf.tolist(), r.boxes.xyxy.tolist())]
+
+    def _check_weapons(self, frame: np.ndarray, now: float, objects: list) -> None:
+        """A dangerous object at someone's wrist on most of the last looks: a critical check (labeler/weapons.py)."""
+        people = {}
+        for tid, st in self.tracks.items():
+            if st.last_seen == now and not st.deleted:
+                role = zones_mod.role_at(self.zone_counter.zones, zones_mod.anchor(st.box, frame.shape, self.mode))
+                people[tid] = (tuple(st.box[:4]), st.kpts, role)
+        for tid, word in self.weapon_watch.update(now, objects, people):
+            log.warning("[%s] weapon check: a %s at the wrist of person %s", self.name, word, tid)
+            self._raise(tid, "weapon", f"{word} held", frame.shape)
 
     def _age_of(self, st: TrackState) -> str | None:
         """For the safety checks: "child", "adult" (any other known age) or None (no age label yet)."""

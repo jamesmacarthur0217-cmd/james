@@ -136,7 +136,11 @@ DEFAULTS: dict = {
                # fire_inside inside a "cooking" area is ignored; again only after nothing seen for fire_rearm_s.
                "fire_enabled": True, "fire_model": "data/models/fire/fire_smoke.pt", "fire_every_s": 1.0,
                "fire_conf": 0.35, "fire_window": 5, "fire_hold": 3, "fire_inside": 0.8, "fire_rearm_s": 60,
-               "fire_span_s": 8},
+               "fire_span_s": 8,
+               # Dangerous objects (labeler/weapons.py): knives, scissors, bats (plain detector) and guns, machetes,
+               # swords (YOLOE prompt-free, weapon_model) at a wrist on weapon_hold of the last weapon_looks looks.
+               "weapons_enabled": True, "weapon_model": "data/models/yoloe/yoloe-11s-seg-pf.pt", "weapon_conf": 0.35,
+               "weapon_looks": 3, "weapon_hold": 2, "weapon_reach": 0.15, "weapon_rearm_s": 30},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,
               "low_ratio": 0.5, "lost_s": 0.5, "min_width": 1.25},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored
     "embeddings": {"enabled": True, "model": "google/siglip2-base-patch16-224", "device": "cuda"},

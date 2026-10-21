@@ -30,7 +30,7 @@ Children (Phase 45 step 2), each raising "child in danger":
 Crowding (Phase 45 step 3), raising "unusual crowding" about an area or the whole picture:
 - too many: more people inside an area than its limit ("at most N people", set on the Live page; where a person's
   feet are, as for counting) for `crowd_s`; once until the count is back within the limit for `crowd_s`. The count
-  comes from the camera's once-a-second count with the plain detector (Pipeline._count_people), else the people
+  comes from the camera's once-a-second count with the plain detector (Pipeline._look_objects), else the people
   tracked here;
 - running together: at least `rush_min` people in view, most of them (`rush_share`) moving at `rush_speed` body
   heights a second or more, the same way (their directions agree: `rush_agree`), for 2 s: people pushing or fleeing.

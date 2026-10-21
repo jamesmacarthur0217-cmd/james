@@ -39,8 +39,10 @@ def names(config: Path = ROOT / "config.yaml") -> dict:
             # The vehicle detector (labeler/vehicles.py; security cameras), when vehicles are on.
             "vehicles": vehicles.get("model") if vehicles.get("enabled", True) else None,
             # Trained here (Phase 46): optional, packed but never downloaded.
-            "trained": [m for m in [(cfg.get("safety") or {}).get("fire_model")]
-                        if m and (cfg.get("safety") or {}).get("fire_enabled", True)]}
+            "trained": [m for m, on in [((cfg.get("safety") or {}).get("fire_model"),
+                                         (cfg.get("safety") or {}).get("fire_enabled", True)),
+                                        ((cfg.get("safety") or {}).get("weapon_model"),
+                                         (cfg.get("safety") or {}).get("weapons_enabled", True))] if m and on]}
 
 
 def detectors(n: dict) -> list[str]:
@@ -112,7 +114,9 @@ def check(n: dict) -> list[tuple[str, bool]]:
 
 
 def check_trained(n: dict) -> list[tuple[str, bool]]:
-    return [(f"trained here {m} (optional: tools/train_fire.py)", (ROOT / m).is_file()) for m in n.get("trained", [])]
+    why = {"fire": "trained here: tools/train_fire.py", "yoloe": "YOLOE prompt-free, Ultralytics release v8.4.0"}
+    return [(f"optional {m} ({next((w for k, w in why.items() if k in m), 'optional')})", (ROOT / m).is_file())
+            for m in n.get("trained", [])]
 
 
 def download(n: dict) -> None:

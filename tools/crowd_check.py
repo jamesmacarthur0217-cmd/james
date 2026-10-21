@@ -135,7 +135,7 @@ def run(video: Path, cfg: dict, embedder, fps: float, limit: int, crowd_s: float
         p.process(frame)
         p.frames += 1
         q.tick()
-        if p._crowd_counts is not None:   # the camera's own count (the plain detector, once a second)
+        if p._crowd_counts:   # the camera's own count (the plain detector, once a second)
             n = next(iter(p._crowd_counts.values()))
         else:                             # without it: the people tracked
             n = sum(1 for x in p.safety_watch.people.values() if x.hist and t - x.last <= 1e-6

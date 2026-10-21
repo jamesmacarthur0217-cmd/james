@@ -213,6 +213,11 @@ step comes.
    walkway, exit: a suspect. Confirm: "Is the person holding a knife or weapon in a threatening way, or using it for
    food or work?". Guns are not in COCO: only an open-vocabulary detector (step 3) or the vision model can see them;
    measured separately and said honestly.
+   **Done 2026-10-21** (the user chose YOLOE prompt-free, 27 MB, after MobileCLIP's research-only license came up):
+   `labeler/weapons.py` (WeaponWatch, at_wrist), Pipeline `_look_objects` (counts + knives / scissors / bats in one
+   pass), `_look_yoloe`, `_check_weapons`; config `safety.weapon_*`; `tools/models.py` lists YOLOE as optional;
+   `tools/weapon_check.py`. False alarms: 0 of 87 everyday knives / scissors / bats at a wrist confirmed (COCO),
+   YOLOE 1 of 500 ordinary photos, everyday videos nothing. Real threats not measured yet (needs photos).
 2. **The empty picture of an area**: for walkway and exit areas, a picture of the area with nobody in it (a median of
    recent empty frames, refreshed daily and after lighting changes). A patch that changed and stays changed while
    nobody stands there becomes a suspect: *blocked exit* (exit area, 2 min), *floor hazard* (walkway, 30 s: spill,

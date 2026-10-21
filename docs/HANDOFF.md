@@ -35,7 +35,8 @@ Phase 46 (fire and smoke): step 1 done 2026-10-20 (own model trained on D-Fire, 
 test mAP50 0.767, 9.5 ms; `tools/train_fire.py`); step 2 done (`labeler/fire.py`, once a second on safety cameras);
 step 3 done (D-Fire's 100 videos: 38 of 50 fires found, median 3 s, 5 of 50 false): **Phase 46 is done
 2026-10-20**; the MIVIA videos (requested by the user) are measured when they arrive. Next: Phase 47 (objects and
-places: weapons, blocked exits, floor hazards, equipment, pests); discuss its design first. MOT20 is in data/datasets/mot20 (zip 5 GB +
+places: weapons, blocked exits, floor hazards, equipment, pests): design agreed 2026-10-21; step 1 (dangerous
+objects: `labeler/weapons.py`, YOLOE prompt-free in data/models/yoloe) done; real-threat photos not measured yet. MOT20 is in data/datasets/mot20 (zip 5 GB +
 unpacked train + videos; the user may want the zip deleted). Measure falls at 30 pictures a second.
 Measured: a check 1.4 s with 3 pictures; **4 pictures exceed Ollama's 4096-token context** (refused with 400);
 6 checks a minute on a very busy camera double people's label wait (3.6 -> 7.7 s), 3 a minute hardly matter. Still waiting for them: restart their own app (stop.bat, start.bat), the

@@ -917,6 +917,22 @@ in an oven, a sandwich, a fridge, ceiling lights, a breaking wave): on a camera 
 seconds and pass the vision model, and a "cooking" area excuses stoves. Not measured yet: fires indoors (D-Fire's
 videos are outdoor smoke), and the MIVIA videos (requested by the user; to add when they arrive).
 
+### Dangerous objects (Phase 47 step 1)
+
+On safety cameras, once a second: the plain detector's pass (the crowd count's) also looks for knives, scissors and
+bats, and **YOLOE prompt-free** (`data/models/yoloe/yoloe-11s-seg-pf.pt`, 27 MB from Ultralytics' release v8.4.0,
+AGPL-3.0, downloaded with the user's OK; a fixed list of 4,585 things including gun, handgun, rifle, shotgun, machete,
+sword: no text model, as the one YOLOE needs for your own words, Apple's MobileCLIP, is licensed for research only)
+for guns, machetes and swords. One held at a person's wrist (`weapon_reach`: 15% of their height) on 2 of the last 3
+looks raises a critical "dangerous object" check; the vision model decides whether it is held in a threatening way or
+used for food or work. Not in an area with the role "cooking" or "food_prep". Again for the same person after 30 s
+without one.
+
+Measured (`tools/weapon_check.py`, `tools/incident_check.py`): 205 COCO photos with a person and a knife, scissors or a
+bat (cooking, eating, crafts, baseball): one at a wrist in 87 (70 bats), and the vision model answered "no" to all 87;
+YOLOE saw a gun-like thing on 1 of 500 ordinary COCO photos (a "sword"); everyday videos (MOT16, UR Fall): nothing
+raised. Not measured yet: real threats (photos of guns and knives held as weapons).
+
 ## No movement
 
 For someone living alone (an elderly parent): an alert when nobody has been seen on the camera for a long time while

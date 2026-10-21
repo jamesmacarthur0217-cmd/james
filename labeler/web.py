@@ -692,7 +692,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     @app.get("/api/zones")
     def list_zones(camera: str | None = None):
         """The zones; areas on a safety camera also say how many people are in them now ("people_now", the camera's
-        once-a-second count, labeler/pipeline.py _count_people), to set a people limit by."""
+        once-a-second count, labeler/pipeline.py _look_objects), to set a people limit by."""
         zones = db.list_zones(camera)
         for z in zones:
             counts = getattr(by_name.get(z["camera"]), "_crowd_counts", None)
