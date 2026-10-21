@@ -18,7 +18,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-21)
 
-**Latest (2026-10-21, end of the session; Phase 47 step 2 committed after `1d5ba2f`; 979 tests + 1 PostgreSQL test that is
+**Latest (2026-10-21, end of the session; Phase 47 done; 988 tests + 1 PostgreSQL test that is
 skipped without `VL_TEST_POSTGRES_URL`; GitHub green).**
 
 **Plan in progress: [PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)**: safety incidents on **security cameras** (the 11 kinds
@@ -50,14 +50,22 @@ with the user first (their rule: **discuss any architecture before building it**
   `data/datasets/floor_made`, 1.1 GB, git-ignored): objects 5 of 6, spills 1 of 3, 0 false alerts (README "Floor
   hazards and blocked exits"). Seen while measuring: on the moving MOT20 cameras the fall check (Phase 45) raised
   23-30 fall suspects per 4-minute video; not looked into (safety cameras are normally still).
-- **Next: Phase 47 step 3** (unsafe equipment: vision-model rounds every 10 min; pests: try
-  YOLOE's words rat / mouse / rodent / insect / bug, keep only if good), then Phases 48 (aggression) and 49
-  (suspicious behaviour); discuss each phase's design with the user first.
+- **Phase 47 step 3 done; Phase 47 is done** (2026-10-21; design agreed first, plan `3803356`): unsafe equipment by
+  10-minute rounds over every area with a role (`labeler/equipment.py`; two "yes" a minute apart alert; README
+  "Unsafe equipment; pests left out"): a chair on its side 6 of 9, a cable 4 of 9, COCO rooms 2 of 150 false. **Pests
+  left out** (the user's choice after measuring): YOLOE found 3% of 251 Open Images rodent photos
+  (`data/datasets/openimages_pests`, 74 MB, downloaded with OK) and takes computer mice for mice;
+  `tools/pest_check.py` kept for a better model (our own, as for guns, if the user asks).
+- **Next: Phase 48** (aggression and collisions), then 49 (suspicious behaviour); discuss each phase's design with the
+  user first. Open for the user (offer, don't change unasked): a floor check's "yes" then "no" puts a real bag into
+  the empty picture (the agreed rule); a third look could decide instead.
 
 **Measuring tools** (all on recorded videos / photos, the real camera code, the vision model):
 `tools/incident_check.py` (videos + truth CSV `video,kind,start_s,end_s,half`; `--labels`, `--areas`, `--hold-s`,
 `--fps`, `--match` for tuning halves), `tools/crowd_check.py`, `tools/incident_bench.py` (vision-model cost),
-`tools/weapon_check.py` (coco / people / guns / openimages / photos), `tools/train_fire.py`, `tools/train_guns.py`.
+`tools/weapon_check.py` (coco / people / guns / openimages / photos), `tools/train_fire.py`, `tools/train_guns.py`,
+`tools/make_floor_videos.py` (made-up floor videos from still scenes), `tools/equipment_check.py`,
+`tools/pest_check.py`.
 Numbers and limits are in README sections "Safety incidents" ... "Dangerous objects".
 
 **Data downloaded this time (all with the user's OK, git-ignored, measuring/training only):** MOT20 (`data/datasets/
@@ -294,6 +302,8 @@ labeler/floor.py     floor hazards and blocked exits (Phase 47 step 2): FloorWat
                      median of 15 looks without people, saved <crop_dir>/empty/<camera>.png; a change held 30 s on a
                      walkway / 2 min in an exit; the lights = learned again); Pipeline._look_at_floor sends the empty
                      picture + now (Suspect.cut tighter, alert_if_yes False on the first look, True on the second)
+labeler/equipment.py unsafe equipment (Phase 47 step 3): EquipmentRounds, every area with a role to the vision model
+                     every 10 min (Pipeline._round_equipment, level round; two "yes" a minute apart; "reported")
 labeler/incidents.py safety incidents (Phase 44): FrameMemory (Pipeline.memory, 1 picture/s for 10 s on safety cameras),
                      CATEGORIES (12 kinds: level, words, question), ConfirmQueue (run.py thread "incidents", job ids
                      -(1e9 + n), critical first, confirm_per_min, max_wait_s, cooldown_s), IncidentAlerts (a "yes" ->
@@ -763,5 +773,5 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE44-49-PLAN.md
-> (Phase 47 step 3: unsafe equipment and pests); ask me before each phase and each step starts, discuss any
+> (Phase 48: aggression and collisions; discuss its design with me first); ask me before each phase and each step starts, discuss any
 > architecture with me first, and do it step by step.

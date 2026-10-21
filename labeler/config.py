@@ -153,7 +153,12 @@ DEFAULTS: dict = {
                "floor_enabled": True, "floor_every_s": 1.0, "floor_side": 480, "floor_diff": 30,
                "floor_min_size": 0.0004, "floor_hold_s": 30, "exit_hold_s": 120, "floor_again_s": 60,
                "floor_learn_n": 15, "floor_learn_every_s": 2.0, "floor_learn_min": 5, "floor_margin": 0.2, "floor_alpha": 0.02, "floor_light_share": 0.4,
-               "floor_light_s": 10, "floor_keep_h": 24, "floor_save_s": 600},
+               "floor_light_s": 10, "floor_keep_h": 24, "floor_save_s": 600,
+               # Unsafe equipment (labeler/equipment.py): every area with a role shown to the vision model every
+               # equipment_every_s; a "yes" looked at again after equipment_again_s, the second alerts. The first round
+               # equipment_first_s after the start, the areas equipment_gap_s apart.
+               "equipment_enabled": True, "equipment_every_s": 600, "equipment_again_s": 60, "equipment_first_s": 60,
+               "equipment_gap_s": 20},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,
               "low_ratio": 0.5, "lost_s": 0.5, "min_width": 1.25},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored
     "embeddings": {"enabled": True, "model": "google/siglip2-base-patch16-224", "device": "cuda"},

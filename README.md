@@ -996,6 +996,37 @@ report half was run again after that fix (the same numbers, one check pair per o
 Not measured: real spills (water is nearly invisible to a camera; these blobs are easier), broken glass, night or
 infrared pictures, the user's own cameras.
 
+### Unsafe equipment; pests left out (Phase 47 step 3)
+
+**Unsafe equipment** (an overturned table or chair, a broken chair, cables across the floor, something hanging loose)
+has no quick sign, so every 10 minutes each safety camera shows **every area with a role** to the vision model (the
+newest picture, the area cut out; `labeler/equipment.py`, config `safety.equipment_every_s`). These checks come last
+in the queue, after people's labels. A "yes" is looked at again a minute later, and the second "yes" alerts (the user's
+choices). After an alert the area is "reported": the rounds go on but alert again only after a "no". The Health page
+line "unsafe equipment" lists the areas.
+
+Measured with `tools/equipment_check.py` (one picture per check, as the rounds send; the question as it was, not
+tuned; the halves of the floor test):
+
+| report half | "yes" |
+|---|---|
+| a chair put down on its side or upside down on a walkway (MOT16-04, -09, FP10; 9) | **6** |
+| a cable drawn across a walkway (9) | **4** |
+| ordinary scenes, whole and their areas (9), UR Fall offices with desks and chairs (20) | **0** |
+| COCO photos of rooms (chair, couch, bed or dining table; 150) | **2** ("cables across floor") |
+
+Tune half: chairs 5 of 6, cables 2 of 6, 3 of 150 COCO rooms. A real run on a test copy (a still picture of MOT16-04
+with a chair on its side, rounds every 2 minutes): "yes, overturned chair" at the first round and again a minute later,
+then the alert. Not measured: real broken or overturned furniture, cables on the user's floors, night pictures.
+
+**Pests were left out** (the user's choice after measuring; the plan said: keep only if good). YOLOE prompt-free's
+fixed word list has rat, mouse, rodent and roach, but on Open Images' 251 photos of mice and other small rodents
+(validation and test, CC BY 2.0, 74 MB, downloaded with the user's OK; `tools/get_weapon_photos.py --kind pests`) it
+found 3% (close-ups; at room distance 0-1%), mostly calling them "persian cat" or "raccoon", and its "mouse" is a
+computer mouse: 34 of 46 COCO photos with one got a pest box. `tools/pest_check.py` and the photos are kept to try a
+better model later (our own, as for guns). Open Images has no rat or cockroach class. The built-in "animals or pests"
+rule stays; nothing raises it now.
+
 ## No movement
 
 For someone living alone (an elderly parent): an alert when nobody has been seen on the camera for a long time while

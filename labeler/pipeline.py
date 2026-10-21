@@ -247,6 +247,9 @@ class Pipeline:
         # camera's empty picture, saved in <crop_dir>/empty (test copies keep their own).
         self.floor_watch = None
         self._counted_people: tuple = (-1e9, [])   # (when, people's boxes) from the plain detector's last pass
+        # The 10-minute equipment rounds (labeler/equipment.py), Phase 47 step 3. (Pests were measured with YOLOE and
+        # left out: tools/pest_check.py, README "Unsafe equipment; pests left out".)
+        self.equipment = None
         if scfg.get("enabled") and cam.get("safety", self.mode == "security"):
             from .incidents import FrameMemory
             from .safety import SafetyWatch
@@ -277,6 +280,9 @@ class Pipeline:
                 from .floor import FloorWatch
                 name = re.sub(r"[^\w-]", "_", self.name) + ".png"
                 self.floor_watch = FloorWatch(scfg, self.crop_dir / "empty" / name)
+            if scfg.get("equipment_enabled", True):
+                from .equipment import EquipmentRounds
+                self.equipment = EquipmentRounds(scfg)
         # Areas with a loitering rule (people, vehicles): the live picture shows how long someone is in them.
         self._stay_areas: frozenset[str] = frozenset()
         self._stay_areas_v: frozenset[str] = frozenset()
@@ -547,6 +553,8 @@ class Pipeline:
                 self._look_for_fire(frame, now)
             if self.floor_watch is not None and self.floor_watch.due(now):
                 self._look_at_floor(frame, now, seen)
+            if self.equipment is not None and areas:
+                self._round_equipment(now)
             for area, reason in self.safety_watch.crowd(now, limited, self._crowd_counts):
                 try:
                     self.incidents.suspect(self.name, "crowd", reason, area=area)
@@ -885,6 +893,26 @@ class Pipeline:
             return []
         return [(self.yoloe_model.names[int(c)].lower(), float(p), tuple(b))
                 for c, p, b in zip(r.boxes.cls.tolist(), r.boxes.conf.tolist(), r.boxes.xyxy.tolist())]
+
+    def _round_equipment(self, now: float) -> None:
+        """The 10-minute round: each area with a role to the vision model, the newest picture (labeler/equipment.py).
+        Last in the queue; the second look after a "yes" as a warning, so it is not left behind."""
+        due = self.equipment.due(now, self.zone_counter.zones)
+        if not due:
+            return
+        newest = self.memory.pick(1, 0) if self.memory is not None else []
+        for area, alert, reason in due:
+            got = "no pictures"
+            if newest:
+                try:
+                    got = self.incidents.suspect(
+                        self.name, "equipment", reason, area=area, pictures=newest, level=None if alert else "round",
+                        alert_if_yes=alert, on_done=lambda answer, zid=area["id"]: self.equipment.answered(zid, answer))
+                except Exception:
+                    log.exception("[%s] raising an equipment round failed", self.name)
+                    got = "failed"
+            if got != "queued":
+                self.equipment.answered(area["id"], None)
 
     def _check_weapons(self, frame: np.ndarray, now: float, objects: list) -> None:
         """A dangerous object at someone's wrist on most of the last looks: a critical check (labeler/weapons.py)."""

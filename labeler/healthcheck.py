@@ -520,6 +520,27 @@ def check_floor(pipelines: list) -> dict | None:
     return _check("floor and exits", "ok", "; ".join(parts))
 
 
+def check_rounds(pipelines: list) -> dict | None:
+    """Phase 47 step 3: the 10-minute equipment rounds (labeler/equipment.py) on each safety camera."""
+    from .zones import AREA
+    cams = [p for p in pipelines if getattr(p, "equipment", None) is not None]
+    if not cams:
+        return None
+    parts = []
+    for p in cams:
+        s = p.equipment.state()
+        n = len([z for z in getattr(getattr(p, "zone_counter", None), "zones", [])
+                 if z.get("kind") == AREA and z.get("role")])
+        mine = [f"rounds over {n} area{'s' if n != 1 else ''} with a role every "
+                f"{round(p.equipment.every_s / 60)} min" if n else "no area with a role (Live page) to look at"]
+        if s["checking"]:
+            mine.append(f"{s['checking']} being looked at again")
+        if s["reported"]:
+            mine.append(f"{s['reported']} reported unsafe")
+        parts.append(f"{p.name}: " + ", ".join(mine))
+    return _check("unsafe equipment", "ok", "; ".join(parts))
+
+
 def check_quiet(quiet) -> dict | None:
     """Phase 31: the "no movement" watch (labeler/quiet.py): how long each watched camera has been quiet."""
     if quiet is None:
@@ -640,6 +661,12 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
             checks.insert(-1, line)
     except Exception as e:
         checks.insert(-1, _check("floor and exits", "warning", f"could not be read ({e.__class__.__name__})"))
+    try:
+        line = check_rounds(pipelines)
+        if line is not None:
+            checks.insert(-1, line)
+    except Exception as e:
+        checks.insert(-1, _check("unsafe equipment", "warning", f"could not be read ({e.__class__.__name__})"))
     try:
         line = check_quiet(quiet)
         if line is not None:

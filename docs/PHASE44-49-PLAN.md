@@ -262,6 +262,14 @@ step comes.
    (size and licence checked, downloaded only with the user's OK), false alarms on COCO computer mice and kitchens
    (here) and the everyday videos; equipment: false alarms on everyday videos and made-up cases (e.g. an overturned
    chair pasted in); (4) no new table, thread or model.
+   **Done 2026-10-21**: `labeler/equipment.py` EquipmentRounds (first round 1 min after the start, areas 20 s apart;
+   "reported" after an alert until a "no"; an unanswered or dropped round again in a minute), Pipeline
+   `_round_equipment` (level round; the second look as a warning so it is not left behind), config
+   `safety.equipment_*`, Health line "unsafe equipment". `tools/equipment_check.py` (report half): a chair on its side
+   6 of 9 "yes", a cable across 4 of 9, ordinary scenes and offices 0 of 29, COCO rooms 2 of 150. Real run on a test
+   copy: the alert at the second look. **Pests left out** (the user's choice after measuring): YOLOE found 3% of 251
+   Open Images rodent photos (downloaded with OK, 74 MB) and took computer mice for mice (34 of 46);
+   `tools/pest_check.py` kept for a better model. **Step 3 done; Phase 47 is done.**
 
 ## Phase 48: Aggression and collisions
 

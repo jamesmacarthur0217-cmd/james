@@ -144,7 +144,8 @@ ENTRIES: list[Entry] = [
           "On security cameras: a gun, knife, bat or machete held in someone's hand is checked by the vision model (any "
           "real gun alerts). Areas marked \"walkway\" or \"exit\" are compared with the camera's empty picture: "
           "something new on a walkway floor for 30 s (a spill, a bag) or in an exit for 2 minutes is checked, and two "
-          "\"yes\" a minute apart alert.", "/alerts"),
+          "\"yes\" a minute apart alert. Every 10 minutes each area with a role is also checked for unsafe equipment "
+          "(an overturned chair, cables across the floor).", "/alerts"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 
