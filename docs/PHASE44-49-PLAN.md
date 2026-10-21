@@ -252,6 +252,16 @@ step comes.
    cables across the walkway, something hanging loose) and a table box that changed shape against the empty picture.
    Pests: no rodents in COCO; try YOLOE / YOLO-World (open-vocabulary, Ultralytics) with "rat, mouse, cockroach" in food
    areas, often at night (black-and-white pictures). If it is poor when measured, leave pests out and say so.
+   **Design agreed with the user 2026-10-21**: (1) equipment: every 10 minutes each safety camera asks the vision
+   model about **every area with a role**, from the newest picture with the area cut out, at the lowest priority
+   (round, after people's labels); an alert after **two "yes" a minute apart** (as for floors); (2) pests: YOLOE
+   prompt-free (already here, its fixed word list has rat, mouse, rodent, roach; gecko and lizard, the harmless cicak,
+   never count; insects too small for a room-wide camera) in the same once-a-second YOLOE pass as machetes and swords,
+   **only inside cooking, food prep and dining areas**; seen on 2 of the last 3 looks, the vision model checks the last
+   seconds and **one "yes" alerts** (a mouse runs away); (3) measured with **Open Images photos of real mice / rats**
+   (size and licence checked, downloaded only with the user's OK), false alarms on COCO computer mice and kitchens
+   (here) and the everyday videos; equipment: false alarms on everyday videos and made-up cases (e.g. an overturned
+   chair pasted in); (4) no new table, thread or model.
 
 ## Phase 48: Aggression and collisions
 
