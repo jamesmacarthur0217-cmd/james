@@ -302,6 +302,20 @@ done.**
 
 ## Phase 49: Suspicious behaviour (behaviour only)
 
+**Design agreed with the user 2026-10-23**: (1) a behaviour watch per camera (`labeler/behaviour.py`, fed like the
+other checks; people followed across visits by the existing re-linking; history in memory: no new table or thread);
+alerts in the "suspicious behaviour" kind, the message naming the behaviour; (2) **four signs** (the user's choice of
+the ten below): **climbing a fence or wall** (hips rising along the edge of an area with a **new role "fence or
+wall"**), **in a restricted area when Away or at night**, **the camera covered or turned**, **pacing back and forth**
+across an area; not built now: came back again and again, bag left by someone who walked away, at parked cars,
+following through a door; (3) **moments confirmed, patterns direct**: climbing alerts on the vision model's "yes"
+(critical at night or when Away, a warning in the day at Home); restricted area and pacing alert directly at night or
+when Away, with the vision model's words on what the person does (it cannot see a pattern in a few seconds); the
+camera covered or moved alerts at any time when a person was seen in the 30 s before (else it stays a camera
+problem, as today); (4) night = **22:00-06:00** (`behaviour.night_hours`); (5) measured on the videos here (false
+alarms on MOT16, MOT20, UR Fall, the floor videos: target none to a few an hour) and made-up cases on a test copy for
+each sign; no download.
+
 1. **Behaviour signs** (rules, each with its own setting): came back to the same area 3 times in 30 minutes (re-linked
    person); pacing back and forth across an area; stopping at several doors or vehicles in a row; a hand at a parked
    vehicle's door or window for 5 s; climbing a fence or wall (hips rising along an area's edge); in a restricted
