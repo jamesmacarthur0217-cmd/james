@@ -5,6 +5,7 @@ confirmed (alerts) with the truth.
     python tools/incident_check.py --config <test_config.yaml> --truth <truth.csv> [--kinds person_down,fall]
            [--fps 10] [--hold-s 0] [--no-vlm] [--json <file>]
     python tools/incident_check.py --make-truth urfd      # writes data/datasets/urfd/incidents_truth.csv
+    python tools/incident_check.py --make-truth survfight # data/datasets/survfight/incidents_truth.csv (Phase 48)
 
 The truth file (CSV, header video,kind,start_s,end_s,half): one row per incident span, seconds into the video; a video
 with no incident has one row with an empty kind (it only counts for false alarms). half: "right" for the UR Fall
@@ -234,8 +235,25 @@ def main() -> int:
     ap.add_argument("--limit", type=int, help="only the first N videos")
     ap.add_argument("--match", help="only videos whose path matches this regular expression (a tuning half)")
     ap.add_argument("--json", type=Path)
-    ap.add_argument("--make-truth", choices=["urfd", "mot16"])
+    ap.add_argument("--make-truth", choices=["urfd", "mot16", "survfight"])
     args = ap.parse_args()
+    if args.make_truth == "survfight":   # Surveillance Camera Fight Dataset (Phase 48): a fight over each whole fight clip
+        import cv2
+        folder = ROOT / "data" / "datasets" / "survfight"
+        out = folder / "incidents_truth.csv"
+        rows = []
+        for kind, sub in (("fight", "fight"), ("", "noFight")):
+            for v in sorted((folder / sub).glob("*.mp4")):
+                cap = cv2.VideoCapture(str(v))
+                length = cap.get(cv2.CAP_PROP_FRAME_COUNT) / (cap.get(cv2.CAP_PROP_FPS) or 25)
+                rows.append([v.relative_to(ROOT).as_posix(), kind, 0 if kind else "",
+                             round(length, 2) if kind else "", ""])
+        with open(out, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["video", "kind", "start_s", "end_s", "half"])
+            w.writerows(rows)
+        print(f"{len(rows)} rows -> {out}  (tune: --match '[02468]\\.mp4$', report: --match '[13579]\\.mp4$')")
+        return 0
     if args.make_truth == "urfd":
         out = ROOT / "data" / "datasets" / "urfd" / "incidents_truth.csv"
         print(f"{make_truth_urfd(out)} rows -> {out}")

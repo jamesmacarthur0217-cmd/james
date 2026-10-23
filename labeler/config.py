@@ -131,6 +131,11 @@ DEFAULTS: dict = {
                "crowd_s": 30, "rush_min": 6, "rush_share": 0.6, "rush_speed": 1.2, "rush_agree": 0.8,
                # People in areas with a limit are counted every crowd_every_s by the plain detector at crowd_imgsz.
                "crowd_every_s": 1.0, "crowd_imgsz": 1280, "crowd_conf": 0.25,
+               # Fights (labeler/safety.py): two people within fight_near x height, a wrist at fight_speed body heights
+               # a second (against the body) touching or reaching the other, on fight_share of the frames of the last
+               # fight_window_s -> a critical check with pictures over fight_span_s; again after fight_rearm_s calm.
+               "fight_near": 1.0, "fight_speed": 2.5, "fight_window_s": 1.0, "fight_share": 0.5, "fight_rearm_s": 10,
+               "fight_span_s": 2,
                # Fire and smoke (labeler/fire.py): our own detector (tools/train_fire.py) every fire_every_s; seen on
                # fire_hold of the last fire_window looks -> checked with pictures over fire_span_s; a box at least
                # fire_inside inside a "cooking" area is ignored; again only after nothing seen for fire_rearm_s.

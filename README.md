@@ -1027,6 +1027,43 @@ computer mouse: 34 of 46 COCO photos with one got a pest box. `tools/pest_check.
 better model later (our own, as for guns). Open Images has no rat or cockroach class. The built-in "animals or pests"
 rule stays; nothing raises it now.
 
+### Fights and collisions (Phase 48)
+
+**Fights** (`labeler/safety.py` SafetyWatch.fights, every frame, from the body points the camera has anyway): two
+people close together (their middles within one body height) and a wrist moving fast against its own body (2.5 body
+heights a second: a punch, a push, a kick; walking and turning do not count) while they touch or the wrist reaches
+the other's head or upper body, on half the frames of the last second. Then the vision model sees 3 pictures of the
+last 2 s cut out around both, and **one "yes" alerts** (the user's choice), red with a beep ("aggression"). At most one
+fight check per camera a minute: a real run alerted twice for one fight when another pair of it raised it again.
+
+Measured (`tools/incident_check.py --make-truth survfight`) on the **Surveillance Camera Fight Dataset**
+(github.com/seymanurakti/fight-detection-surv-dataset: 150 fight and 150 no-fight surveillance clips of about 2 s,
+cafes, streets, buses; 87 MB, MIT licence on the repository, the clips are YouTube footage: measuring only;
+downloaded with the user's OK), every frame at the clip's own rate, with the vision model. The speed was chosen on the
+even-numbered clips and MOT16 (at 2.0 the check raised 64% of the fights but about 6 critical checks a minute on busy
+streets, ahead of people's labels; standing at the same depth, a minimum size or surer wrist points cost more fights
+than they saved); the numbers are from the odd-numbered clips and videos not used for choosing:
+
+| | clips / time | checked (quick sign) | **alerted** |
+|---|---|---|---|
+| fights (odd-numbered clips) | 75 | 40 | **39** (52%), 0.5 s into the clip (median) |
+| no-fight clips (odd-numbered) | 75 | 20 | **5** (some are the minutes around a fight: a "brutal beating" news clip is in the set) |
+| MOT20: dense crowds (moving cameras) | 6 min | 171/h | **0** |
+| UR Fall: daily life and falls indoors | 7 min (70 clips) | 55/h | **0** |
+| the made-up floor videos, nothing put down | 20 min | 54/h | **0** |
+| MOT16 streets (used for choosing the speed) | 3.5 min | 84/h | **0** |
+
+The vision model said "yes" to 39 of the 40 fights it was asked about and "no" to every check on the everyday videos;
+those checks cost about 1-3 critical checks a minute in a crowd (1.4 s each). A real run on a test copy (a fight clip
+looping): the alert 2 s after the first sign, then once a minute while it went on. About half the fights are not
+raised: people too small, hidden or blurred for the body points, or the clip too short to follow them. Not measured:
+hugs, dancing, children playing and sports (they would need another download), the user's own cameras, night.
+
+**Collisions** (the user's choice): no detector of their own. Any fall already alerts ("fall or collision"); the
+fall's message now also says whom the person touched just before ("Fall: fell; after touching person #12": another
+person's box touching theirs from 5 s before the fall to 2 s after; SafetyWatch.touched). A trolley or a car hitting
+someone is not named (not measurable here).
+
 ## No movement
 
 For someone living alone (an elderly parent): an alert when nobody has been seen on the camera for a long time while

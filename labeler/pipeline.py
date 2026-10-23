@@ -538,6 +538,8 @@ class Pipeline:
         if self.safety_watch is not None and self.incidents is not None:
             for tid, category, reason, level, question in self.safety_watch.tick(now):
                 self._raise(tid, category, reason, frame.shape, level=level, question=question)
+            for a, b, reason in self.safety_watch.fights(now):
+                self._raise_fight(a, b, reason, frame.shape)
             areas = [z for z in self.zone_counter.zones if z["kind"] == zones_mod.AREA]
             limited = [z for z in areas if z.get("max_people")]
             scfg = self.cfg.get("safety") or {}
@@ -756,21 +758,70 @@ class Pipeline:
         if st is not None:
             self._ensure_db(st)
         db_id = st.db_id if st is not None else self._fall_db.get(tid)
-        log.warning("FALL [%s] person #%s has been down for %d s", self.name, db_id, self.falls.after_s)
+        note = self._touched_before_fall(tid)
+        log.warning("FALL [%s] person #%s has been down for %d s%s", self.name, db_id, self.falls.after_s,
+                    f" ({note})" if note else "")
 
         def done(answer):
             if answer is not None and answer.get("answer") == "no":
                 log.warning("FALL [%s] person #%s: the vision model sees nobody down (%s): no alert", self.name,
                             db_id, answer.get("what", ""))
                 return
-            self._check_alerts(db_id, fallen=True)
+            self._check_alerts(db_id, fallen=True, note=note)
 
         from .incidents import FALL_QUESTION
         if getattr(self, "safety_watch", None) is not None:
             self.safety_watch.mark(tid)   # one fall, one check: not again as "lying still"
-        if self._raise(tid, "fall", f"down for {int(self.falls.after_s)} s after a fall", shape, db_id=db_id,
-                       question=FALL_QUESTION, on_done=done) != "queued":
+        reason = f"down for {int(self.falls.after_s)} s after a fall" + (f", {note}" if note else "")
+        if self._raise(tid, "fall", reason, shape, db_id=db_id, question=FALL_QUESTION, on_done=done) != "queued":
             done(None)
+
+    def _touched_before_fall(self, tid) -> str:
+        """Collisions (Phase 48, the user's choice: through the fall check): "after touching person #12" when someone
+        else's box touched the fallen person's from 5 s before the fall to 2 s after it (the fall was falls.after_s
+        ago); "" when nobody did or there is no safety watch."""
+        watch = getattr(self, "safety_watch", None)
+        if watch is None:
+            return ""
+        fell = self.clock.mono() - float(self.falls.after_s)
+        others = []
+        for key in watch.touched(tid, fell - 5.0, fell + 2.0):
+            st = self.tracks.get(key)
+            if st is not None:
+                self._ensure_db(st)
+            others.append(f"#{st.db_id}" if st is not None and st.db_id is not None else "someone who has left")
+        if not others:
+            return ""
+        return f"after touching person {others[0]}" if len(others) == 1 else \
+            f"after touching {len(others)} people ({', '.join(others)})"
+
+    def _raise_fight(self, a, b, reason: str, shape: tuple) -> None:
+        """Two people who look like fighting (labeler/safety.py fights): one critical check about both, the picture
+        cut out around the two of them, 3 pictures over the last fight_span_s."""
+        ids, boxes = [], []
+        for tid in (a, b):
+            st = self.tracks.get(tid)
+            if st is None:
+                continue
+            self._ensure_db(st)
+            boxes.append(st.box[:4])
+            if st.db_id is not None:
+                ids.append(st.db_id)
+        if not boxes:
+            return
+        h, w = shape[:2]
+        crop = (min(x[0] for x in boxes) / w, min(x[1] for x in boxes) / h,
+                max(x[2] for x in boxes) / w, max(x[3] for x in boxes) / h)
+        if ids:
+            reason += " (people " + " and ".join(f"#{i}" for i in ids) + ")"
+        try:   # no people for the queue: one fight check per camera a minute (a real run alerted twice for one fight
+            #    when another pair of the same fight raised it)
+            got = self.incidents.suspect(self.name, "fight", reason, people=[], crop=crop,
+                                         span_s=float((self.cfg.get("safety") or {}).get("fight_span_s", 2)))
+        except Exception:
+            log.exception("[%s] raising a fight check failed", self.name)
+            return
+        (log.warning if got == "queued" else log.debug)("[%s] fight check: %s (%s)", self.name, reason, got)
 
     def _look_for_fire(self, frame: np.ndarray, now: float) -> None:
         """One look of the fire and smoke detector; a critical suspect when fire or smoke stays (labeler/fire.py)."""
@@ -1060,10 +1111,11 @@ class Pipeline:
             self._check_alerts(st.db_id)   # rules can ask for "entered zone X"
 
     def _check_alerts(self, db_id: int | None, fallen: bool = False, stayed: dict | None = None,
-                      helped: bool = False) -> None:
+                      helped: bool = False, note: str = "") -> None:
         if self.alerts is not None and db_id is not None and db_id not in self.deleted_ids:
-            try:
-                fired = self.alerts.check(db_id, self.name, fallen=fallen, stayed=stayed, helped=helped)
+            try:   # note only when there is one: test stand-ins of check() predate it
+                fired = self.alerts.check(db_id, self.name, fallen=fallen, stayed=stayed, helped=helped,
+                                          **({"note": note} if note else {}))
             except Exception:
                 log.exception("checking alert rules failed")
                 return

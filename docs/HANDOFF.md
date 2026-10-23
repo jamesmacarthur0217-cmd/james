@@ -18,7 +18,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-21)
 
-**Latest (2026-10-21, end of the session; Phase 47 done; 988 tests + 1 PostgreSQL test that is
+**Latest (2026-10-23, end of the session; Phase 48 done; 998 tests + 1 PostgreSQL test that is
 skipped without `VL_TEST_POSTGRES_URL`; GitHub green).**
 
 **Plan in progress: [PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)**: safety incidents on **security cameras** (the 11 kinds
@@ -56,22 +56,29 @@ with the user first (their rule: **discuss any architecture before building it**
   left out** (the user's choice after measuring): YOLOE found 3% of 251 Open Images rodent photos
   (`data/datasets/openimages_pests`, 74 MB, downloaded with OK) and takes computer mice for mice;
   `tools/pest_check.py` kept for a better model (our own, as for guns, if the user asks).
-- **Next: Phase 48** (aggression and collisions), then 49 (suspicious behaviour); discuss each phase's design with the
-  user first. Open for the user (offer, don't change unasked): a floor check's "yes" then "no" puts a real bag into
-  the empty picture (the agreed rule); a third look could decide instead.
+- **Phase 48 done** (2026-10-23; design agreed first, plan `e81a2db`): fights from body points (SafetyWatch.fights:
+  two people close, a fast wrist touching or reaching the other; speed 2.5 body heights a second chosen on half the
+  clips + MOT16), one "yes" alerts (critical), one fight check per camera a minute; collisions through the fall check
+  ("after touching person #12"). Surveillance Camera Fight Dataset (`data/datasets/survfight`, 87 MB, downloaded with
+  OK): 39 of 75 fights alerted, 0 false alerts on the everyday videos (README "Fights and collisions").
+- **Next: Phase 49** (suspicious behaviour, behaviour only), the last of the plan; discuss its design with the user
+  first. Open for the user (offer, don't change unasked): a floor check's "yes" then "no" puts a real bag into the
+  empty picture (the agreed rule); a third look could decide instead.
 
 **Measuring tools** (all on recorded videos / photos, the real camera code, the vision model):
 `tools/incident_check.py` (videos + truth CSV `video,kind,start_s,end_s,half`; `--labels`, `--areas`, `--hold-s`,
 `--fps`, `--match` for tuning halves), `tools/crowd_check.py`, `tools/incident_bench.py` (vision-model cost),
 `tools/weapon_check.py` (coco / people / guns / openimages / photos), `tools/train_fire.py`, `tools/train_guns.py`,
 `tools/make_floor_videos.py` (made-up floor videos from still scenes), `tools/equipment_check.py`,
-`tools/pest_check.py`.
+`tools/pest_check.py`; `tools/incident_check.py --make-truth survfight` (fights; tune `--match '[02468]\.mp4$'`).
 Numbers and limits are in README sections "Safety incidents" ... "Dangerous objects".
 
 **Data downloaded this time (all with the user's OK, git-ignored, measuring/training only):** MOT20 (`data/datasets/
 mot20`: zip 4.7 GB + 3.2 GB unpacked + videos; the zip may be deleted), D-Fire (`data/datasets/dfire`: zip 3.0 GB +
 unpacked + 100 sample videos 0.44 GB), Open Images guns (`data/datasets/openimages_weapons` 127 MB test,
-`data/datasets/oi_guns` 1.03 GB training), YOLOE (`data/models/yoloe`, 27 MB). The user may want old zips deleted
+`data/datasets/oi_guns` 1.03 GB training), YOLOE (`data/models/yoloe`, 27 MB), Open Images rodents
+(`data/datasets/openimages_pests`, 74 MB), the fight clips (`data/datasets/survfight`, 87 MB, a git clone). Made here:
+`data/datasets/floor_made` (1.1 GB, `tools/make_floor_videos.py`). The user may want old zips deleted
 (ask; never delete without OK).
 
 **Models only on this PC** (not in git; `tools/models.py check / pack` lists them as optional): `data/models/fire/
@@ -304,6 +311,9 @@ labeler/floor.py     floor hazards and blocked exits (Phase 47 step 2): FloorWat
                      picture + now (Suspect.cut tighter, alert_if_yes False on the first look, True on the second)
 labeler/equipment.py unsafe equipment (Phase 47 step 3): EquipmentRounds, every area with a role to the vision model
                      every 10 min (Pipeline._round_equipment, level round; two "yes" a minute apart; "reported")
+labeler/safety.py    + fights (Phase 48): SafetyWatch.fights (pairs close together, a fast wrist touching / reaching the
+                     other) -> Pipeline._raise_fight (one check per camera a minute); touched() -> a fall's note
+                     ("after touching person #12", Pipeline._touched_before_fall, AlertEngine.check(note=))
 labeler/incidents.py safety incidents (Phase 44): FrameMemory (Pipeline.memory, 1 picture/s for 10 s on safety cameras),
                      CATEGORIES (12 kinds: level, words, question), ConfirmQueue (run.py thread "incidents", job ids
                      -(1e9 + n), critical first, confirm_per_min, max_wait_s, cooldown_s), IncidentAlerts (a "yes" ->
@@ -773,5 +783,5 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE44-49-PLAN.md
-> (Phase 48: aggression and collisions; discuss its design with me first); ask me before each phase and each step starts, discuss any
+> (Phase 49: suspicious behaviour; discuss its design with me first); ask me before each phase and each step starts, discuss any
 > architecture with me first, and do it step by step.

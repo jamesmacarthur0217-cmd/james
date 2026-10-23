@@ -140,12 +140,16 @@ ENTRIES: list[Entry] = [
           "On security cameras our own fire and smoke detector looks once a second; when it keeps seeing fire or smoke, "
           "the vision model checks the last seconds and a red alert with a beep comes if it confirms. Flames and steam "
           "inside an area marked \"cooking area\" are normal. Needs data/models/fire/fire_smoke.pt.", "/alerts"),
-    Entry("p47", 47, "", "Dangerous objects, floors and exits",
+    Entry("p47", 47, "f647856", "Dangerous objects, floors and exits",
           "On security cameras: a gun, knife, bat or machete held in someone's hand is checked by the vision model (any "
           "real gun alerts). Areas marked \"walkway\" or \"exit\" are compared with the camera's empty picture: "
           "something new on a walkway floor for 30 s (a spill, a bag) or in an exit for 2 minutes is checked, and two "
           "\"yes\" a minute apart alert. Every 10 minutes each area with a role is also checked for unsafe equipment "
           "(an overturned chair, cables across the floor).", "/alerts"),
+    Entry("p48", 48, "", "Fights",
+          "On security cameras: two people close together with a fast arm reaching the other are checked by the vision "
+          "model, and a \"yes\" alerts at once, red with a beep. A fall alert now also says whom the person touched "
+          "just before (a collision).", "/alerts"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

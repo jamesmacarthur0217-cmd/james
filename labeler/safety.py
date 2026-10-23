@@ -36,6 +36,22 @@ Crowding (Phase 45 step 3), raising "unusual crowding" about an area or the whol
   heights a second or more, the same way (their directions agree: `rush_agree`), for 2 s: people pushing or fleeing.
   Walking is about half a body height a second. Once until it calms down.
 Someone pressed against a barrier has no quick sign: only the vision model can see it, when it checks a crowd.
+
+Fights (Phase 48, the user's choices): for each two people close together (their middles within `fight_near` x the
+taller one's height), each frame is a sign when one of them has a wrist moving fast (`fight_speed` body heights a
+second, measured against their own body, so walking and turning do not count) while they touch (boxes overlapping) or
+that wrist reaches into the other's head or upper body. On `fight_share` of the frames of the last `fight_window_s`
+(at least 3 frames) the two raise one critical "aggression" suspect (fights(): both people, for a cut-out around
+them); the vision model decides from 3 pictures over the last 2 s, and one "yes" alerts. Again for the same two only
+after `fight_rearm_s` without a sign. Hugs and handshakes touch but are slow; a punch, a push or a kick is fast.
+`fight_speed` 2.5 was chosen on half of the Surveillance Camera Fight clips and MOT16 (README "Fights"): at 2.0 the
+check raised 64% of the fights but about 6 suspects a minute on busy streets (critical checks, ahead of people's
+labels); at 2.5, 52% and 0.8 a minute. Asking for the two to stand at the same depth, a minimum size or surer wrist
+points cost more fights than they saved and were left out.
+
+Collisions (Phase 48, the user's choice): no check of their own; any fall alerts already ("fall or collision"), and
+touched() tells who else's box touched the person's around the fall (each person's boxes are kept TOUCH_KEEP_S), so
+the fall's message can say "after touching person #12".
 """
 from __future__ import annotations
 
@@ -47,6 +63,9 @@ import numpy as np
 from .falls import LYING, MIN_CONF, UPRIGHT, posture
 from .geometry import L_EAR, L_EYE, L_SHOULDER, NOSE, R_EAR, R_EYE, R_SHOULDER
 
+L_WRIST, R_WRIST = 9, 10
+WRIST_GAP_S = (0.1, 0.4)   # a wrist's speed: from where it was this long ago (the newest look of at least 0.1 s)
+
 DISTRESS_QUESTION = ("Does this person look unwell, collapsed, unconscious or in distress (not simply resting, "
                      "reading, working or sleeping in a bed)?")
 SHARE = 0.8   # a sign must be there on this share of the frames of its time
@@ -56,6 +75,7 @@ CLIMB_WINDOW_S = 10.0   # where the feet usually are: the median of this long
 CLIMB_HOLD_S = 2.0      # climbing: feet up this long
 RUSH_WINDOW_S = 1.0     # speed: from where a person was this long ago
 RUSH_HOLD_S = 2.0       # running together this long
+TOUCH_KEEP_S = 30.0     # each person's boxes are kept this long, for touched() (a fall is confirmed ~10 s after it)
 
 
 def head_low(kpts: np.ndarray | None) -> bool | None:
@@ -84,6 +104,8 @@ class _Person:
     area_since: float | None = None
     climb_since: float | None = None
     anchor: tuple | None = None                   # where the person is (fractions of the picture: the feet)
+    wrists: deque = field(default_factory=deque)  # (t, centre x, centre y, height, left wrist, right wrist) for 1 s
+    boxes: deque = field(default_factory=deque)   # (t, box) for TOUCH_KEEP_S
 
 
 class SafetyWatch:
@@ -106,6 +128,12 @@ class SafetyWatch:
         self.people: dict = {}
         self.areas: dict = {}   # area id -> {"over_since", "calm_since", "fired"}
         self.rush = {"since": None, "fired": False}
+        self.fight_near = float(cfg.get("fight_near", 1.0))
+        self.fight_speed = float(cfg.get("fight_speed", 2.5))
+        self.fight_window_s = float(cfg.get("fight_window_s", 1.0))
+        self.fight_share = float(cfg.get("fight_share", 0.5))
+        self.fight_rearm_s = float(cfg.get("fight_rearm_s", 10))
+        self.pairs: dict = {}   # frozenset of two keys -> {"signs": deque of (t, bool), "last_sign", "fired"}
 
     def update(self, key, t: float, box: tuple, kpts: np.ndarray | None, role: str = "", age: str | None = None,
                anchor: tuple | None = None) -> None:
@@ -121,9 +149,19 @@ class SafetyWatch:
         p.feet.append((t, y2, max(y2 - y1, 1.0)))
         while p.feet and t - p.feet[0][0] > CLIMB_WINDOW_S:
             p.feet.popleft()
+        wrist = [(float(kpts[i, 0]), float(kpts[i, 1])) if kpts is not None and kpts[i, 2] >= MIN_CONF else None
+                 for i in (L_WRIST, R_WRIST)]
+        p.wrists.append((t, (x1 + x2) / 2, (y1 + y2) / 2, max(y2 - y1, 1.0), *wrist))
+        while p.wrists and t - p.wrists[0][0] > 1.0:
+            p.wrists.popleft()
+        p.boxes.append((t, tuple(box[:4])))
+        while p.boxes and t - p.boxes[0][0] > TOUCH_KEEP_S:
+            p.boxes.popleft()
 
     def forget(self, key) -> None:
         self.people.pop(key, None)
+        for pair in [k for k in self.pairs if key in k]:
+            del self.pairs[pair]
 
     def mark(self, key, sign: str = "down") -> None:
         """This sign is handled already for this still period (a fall: no second "lying still" check)."""
@@ -199,6 +237,94 @@ class SafetyWatch:
             return 0
         units = np.array([(dx, dy) / np.hypot(dx, dy) for dx, dy in moves])
         return len(moves) if float(np.linalg.norm(units.mean(axis=0))) >= self.rush_agree else 0
+
+    def touched(self, key, since: float, until: float) -> list:
+        """The other people whose box touched this person's in the same frame between since and until, the one
+        touched most first (for a fall's message: a collision with someone)."""
+        p = self.people.get(key)
+        if p is None:
+            return []
+        mine = {round(t, 3): b for t, b in p.boxes if since <= t <= until}
+        counts = {}
+        for other, q in self.people.items():
+            if other == key:
+                continue
+            n = 0
+            for t, b in q.boxes:
+                a = mine.get(round(t, 3))
+                if a is not None and min(a[2], b[2]) > max(a[0], b[0]) and min(a[3], b[3]) > max(a[1], b[1]):
+                    n += 1
+            if n:
+                counts[other] = n
+        return sorted(counts, key=lambda k: -counts[k])
+
+    @staticmethod
+    def _fast_wrists(p: _Person) -> list[tuple[float, float, float]]:
+        """(x, y now, speed) of each wrist seen now and 0.1-0.4 s ago; speed in body heights a second against the
+        body's own middle; [] when there is no look to measure from."""
+        t, cx, cy, h, *now = p.wrists[-1]
+        # The newest look at least 0.1 s ago: a punch goes out and back in 0.2-0.3 s, so a longer gap can find the
+        # fist where it started and see no movement (found by the tests at 10 frames a second).
+        old = max((f for f in p.wrists if WRIST_GAP_S[0] <= t - f[0] <= WRIST_GAP_S[1]), key=lambda f: f[0],
+                  default=None)
+        if old is None:
+            return []
+        out = []
+        for i in (0, 1):
+            w, w0 = now[i], old[4 + i]
+            if w is None or w0 is None:
+                continue
+            dx = (w[0] - cx) - (w0[0] - old[1])
+            dy = (w[1] - cy) - (w0[1] - old[2])
+            out.append((w[0], w[1], float(np.hypot(dx, dy)) / h / (t - old[0])))
+        return out
+
+    def _fight_sign(self, a: _Person, b: _Person) -> bool:
+        """This frame: are these two close, and does a fast wrist of one touch or reach the other?"""
+        ha, hb = a.box[3] - a.box[1], b.box[3] - b.box[1]
+        ax, ay = (a.box[0] + a.box[2]) / 2, (a.box[1] + a.box[3]) / 2
+        bx, by = (b.box[0] + b.box[2]) / 2, (b.box[1] + b.box[3]) / 2
+        if np.hypot(ax - bx, ay - by) > self.fight_near * max(ha, hb):
+            return False
+        touch = min(a.box[2], b.box[2]) > max(a.box[0], b.box[0]) and min(a.box[3], b.box[3]) > max(a.box[1], b.box[1])
+        for me, other in ((a, b), (b, a)):
+            oh = other.box[3] - other.box[1]
+            upper = (other.box[0], other.box[1], other.box[2], other.box[1] + 0.6 * oh)   # head and upper body
+            for x, y, speed in self._fast_wrists(me):
+                if speed < self.fight_speed:
+                    continue
+                if touch or (upper[0] <= x <= upper[2] and upper[1] <= y <= upper[3]):
+                    return True
+        return False
+
+    def fights(self, t: float) -> list[tuple]:
+        """(key, other key, reason) for each two people who look like fighting now (see the module text)."""
+        present = {k: p for k, p in self.people.items() if p.wrists and t - p.last <= 0.2}
+        keys = sorted(present, key=str)
+        out = []
+        for i, ka in enumerate(keys):
+            for kb in keys[i + 1:]:
+                pair = frozenset((ka, kb))
+                sign = self._fight_sign(present[ka], present[kb])
+                st = self.pairs.get(pair)
+                if st is None:
+                    if not sign:
+                        continue
+                    st = self.pairs[pair] = {"signs": deque(), "last_sign": t, "fired": False}
+                st["signs"].append((t, sign))
+                while st["signs"] and t - st["signs"][0][0] > self.fight_window_s:
+                    st["signs"].popleft()
+                if sign:
+                    st["last_sign"] = t
+                elif st["fired"] and t - st["last_sign"] >= self.fight_rearm_s:
+                    st["fired"] = False
+                n, hits = len(st["signs"]), sum(s for _, s in st["signs"])
+                if not st["fired"] and n >= 3 and hits >= self.fight_share * n:
+                    st["fired"] = True
+                    out.append((ka, kb, f"two people close, a fast arm reaching the other ({hits} of {n} frames)"))
+        for pair in [k for k, st in self.pairs.items() if t - st["last_sign"] > self.fight_rearm_s + 5]:
+            del self.pairs[pair]   # calm a while: forget
+        return out
 
     def _children(self, t: float, present: dict) -> dict:
         """The people seen now who count as children (by label, else by size next to an adult)."""

@@ -283,6 +283,14 @@ seymanurakti/fight-detection-surv-dataset: 150 fight + 150 non-fight surveillanc
 licence on the repository, the clips are YouTube footage: measuring only; downloaded with the user's OK), false alarms
 on its non-fight clips and the videos here (MOT16, MOT20, UR Fall, the made-up floor videos); hugs, dancing and sports
 not measured (they would need another download).
+**Done 2026-10-23 (all three steps within step 1)**: SafetyWatch `fights` (wrist speed against the body from the newest
+look at least 0.1 s old: a longer gap found a swinging fist back where it started), `touched`; Pipeline
+`_raise_fight` (one check per camera a minute: the queue gets no people; a real run alerted twice for one fight before
+that), `_touched_before_fall` and `AlertEngine.check(note=)`; config `safety.fight_*`; `incident_check.py
+--make-truth survfight`. Speed 2.5 chosen on the even clips + MOT16 (2.0: 64% raised but ~6 critical checks a minute
+on streets). Report: fights 39 of 75 alerted (52%), no-fight clips 5 of 75 (some around fights), 0 false alerts on
+MOT20, UR Fall and the floor videos (54-171 checks an hour, all "no"). README "Fights and collisions". **Phase 48 is
+done.**
 
 1. **Fast signs from body points between two people close together**: wrist speed against body size, an arm reaching the
    other's head or body, one falling right after contact, an object leaving a hand at speed (throwing). Collisions: a

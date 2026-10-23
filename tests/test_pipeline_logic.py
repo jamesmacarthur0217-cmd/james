@@ -8,7 +8,7 @@ import numpy as np
 
 from labeler import schema
 from labeler.config import DEFAULTS
-from labeler.pipeline import Candidate, Pipeline, TrackState, relink_settings
+from labeler.pipeline import Candidate, LiveClock, Pipeline, TrackState, relink_settings
 from labeler.vlm import VLMWorker
 
 
@@ -43,6 +43,7 @@ def make_pipeline(db, embedder=None):
     p.age_ids = set()
     p.clips = None
     p.night_ids = set()
+    p.clock = LiveClock()
     return p
 
 

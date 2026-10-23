@@ -299,11 +299,11 @@ class AlertEngine:
         return out
 
     def check(self, track_id: int, camera: str, fallen: bool = False, stayed: dict | None = None,
-              helped: bool = False) -> list[dict]:
+              helped: bool = False, note: str = "") -> list[dict]:
         """Fire every enabled rule this person now matches (once per rule and person). fallen: a fall was just
         confirmed: only the rules asking for a fall are checked, and they fire again for a later fall. helped: the
         same for a help sign. stayed: {area name: seconds inside} (the camera's once-a-second check of people inside
-        areas)."""
+        areas). note: added to the message (a fall: "after touching person #12")."""
         rules = [r for r in self._enabled_rules() if (not r["camera"] or r["camera"] == camera)
                  and is_fall_rule(r["conditions"]) == fallen and is_help_rule(r["conditions"]) == helped
                  and rule_kind(r["conditions"]) == "person"]
@@ -325,8 +325,8 @@ class AlertEngine:
         for rule in rules:
             if matches(rule["conditions"], attrs):
                 event = self.db.record_alert(rule["id"], track_id, camera,
-                                             f"{rule['name']}: {describe(rule['conditions'])}",
-                                             repeat=fallen or helped)
+                                             f"{rule['name']}: {describe(rule['conditions'])}"
+                                             + (f"; {note}" if note else ""), repeat=fallen or helped)
                 if event is not None:
                     log.warning("ALERT [%s] %s -> person #%s", camera, rule["name"], track_id)
                     fired.append(event)
