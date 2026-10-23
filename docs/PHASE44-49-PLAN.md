@@ -273,6 +273,17 @@ step comes.
 
 ## Phase 48: Aggression and collisions
 
+**Design agreed with the user 2026-10-23**: (1) the quick check is a new sign in SafetyWatch (per camera, every frame,
+the body points it already has; no new table, thread or model): two people close together and, on most frames of
+about 1.5 s, a wrist moving fast or reaching into the other's head or body, raises a "fight" suspect; (2) the vision
+model sees 3 pictures over the last 2 s cut out around both people; critical (red with a beep), **one "yes" alerts**;
+(3) **collisions through the fall check**: any fall already alerts ("fall or collision"); its message adds who the
+person touched just before; no new detector; (4) measured on the **Surveillance Camera Fight Dataset** (github.com/
+seymanurakti/fight-detection-surv-dataset: 150 fight + 150 non-fight surveillance clips of 2 s, about 92 MB, MIT
+licence on the repository, the clips are YouTube footage: measuring only; downloaded with the user's OK), false alarms
+on its non-fight clips and the videos here (MOT16, MOT20, UR Fall, the made-up floor videos); hugs, dancing and sports
+not measured (they would need another download).
+
 1. **Fast signs from body points between two people close together**: wrist speed against body size, an arm reaching the
    other's head or body, one falling right after contact, an object leaving a hand at speed (throwing). Collisions: a
    person falling right after touching a moving large object (trolley through the open-vocabulary detector).
