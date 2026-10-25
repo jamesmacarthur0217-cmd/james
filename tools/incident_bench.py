@@ -234,7 +234,8 @@ def busy(client: VLMClient, cfg: dict, frames: list, people: list, minutes: floa
             job = n + 1
             with lock:
                 labels["sent"][job] = now
-            if not worker.submit(job, [(crop, None)] * per_track, "security", priority=PEOPLE):
+            n = 1 if cfg["vlm"].get("one_when_busy", True) and worker.waiting(PEOPLE) > 0 else per_track
+            if not worker.submit(job, [(crop, None)] * n, "security", priority=PEOPLE):
                 with lock:
                     labels["sent"].pop(job, None)
                     labels["refused"] += 1
@@ -305,6 +306,8 @@ def main() -> None:
     ap.add_argument("--workers", type=int, help="--busy: requests at once (default: vlm.workers)")
     ap.add_argument("--stay-s", type=float, help="--busy: label only people who stay this long")
     ap.add_argument("--rates", default="1,6,2,1", help="--busy: critical,warning,round,words checks a minute")
+    ap.add_argument("--frames", type=int, help="--busy: pictures per person (default: vlm.frames_per_track)")
+    ap.add_argument("--always", action="store_true", help="--busy: --frames always, not one while labels wait")
     args = ap.parse_args()
     cfg = load_config(use_settings=False)
     client = VLMClient(cfg["vlm"], "security", cfg["labels"])
@@ -316,6 +319,10 @@ def main() -> None:
         rates = dict(zip(("critical", "warning", "round", "words"), (float(r) for r in args.rates.split(","))))
         coming = arrivals(args.video, args.minutes, args.share)
         workers = args.workers or int(cfg["vlm"]["workers"])
+        if args.frames:
+            cfg["vlm"]["frames_per_track"] = args.frames
+        if args.always:
+            cfg["vlm"]["one_when_busy"] = False
         client.label(people[0], None, "security")   # load the model first
         print(f"3. a busy camera: {args.video.name}, {args.share:g} of its people, {args.minutes:g} min, "
               f"checks a minute {rates}")

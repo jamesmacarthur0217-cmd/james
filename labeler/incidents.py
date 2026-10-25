@@ -19,7 +19,9 @@ pictures from the last seconds and answers yes / no / unsure with a few words. T
 - ConfirmQueue: suspects wait here (critical first, then oldest); one is sent to the vision model at a time, at most
   `confirm_per_min` a minute, in the shared priority queue (labeler/vlm.py: critical checks, then warnings, then
   people's labels, then the slow rounds). A critical check never waits for a lower one: it goes even while a warning
-  is being checked, and the per-minute limit does not hold it back. A suspect older than `max_wait_s` is dropped and counted; the same camera, category and area is
+  is being checked, and the per-minute limit does not hold it back. The per-minute limit holds only while people's
+  labels wait (the user's choice, Phase 50): when nothing waits, checks use the vision model's idle time. A suspect
+  older than `max_wait_s` is dropped and counted; the same camera, category and area is
   not checked again within `cooldown_s` of being sent. The answer goes to the listeners (step 3: alerts) and stays in
   `recent` for the Health page.
 
@@ -40,7 +42,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from .vlm import CRITICAL, ROUND, WARNING, incident_prompt
+from .vlm import CRITICAL, PEOPLE, ROUND, WARNING, incident_prompt
 
 log = logging.getLogger(__name__)
 
@@ -306,6 +308,11 @@ class ConfirmQueue:
                          alert_if_yes=False, on_done=words, cooldown=False)
         return made
 
+    def _labels_waiting(self) -> bool:
+        """People's labels wait in the vision model's queue (a stand-in worker without a queue: as if they did)."""
+        waiting = getattr(self.worker, "waiting", None)
+        return waiting is None or waiting(PEOPLE) > 0
+
     def tick(self) -> Suspect | None:
         """Drop suspects that waited too long; send the next one when allowed. Returns the one sent."""
         now = self.clock()
@@ -328,7 +335,7 @@ class ConfirmQueue:
             if critical:   # never behind a lower one, nor held back by the per-minute limit
                 if any(x.level == "critical" for x in self.sent.values()):
                     return None
-            elif self.sent or len(self.sent_at) >= self.per_min:
+            elif self.sent or (len(self.sent_at) >= self.per_min and self._labels_waiting()):
                 return None
             self.waiting.remove(s)
             s.number = next(self._numbers)

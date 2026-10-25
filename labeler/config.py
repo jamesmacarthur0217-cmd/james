@@ -65,6 +65,8 @@ DEFAULTS: dict = {
         "frames_per_track": 2,
         "workers": 1,
         "relabel_every_s": 15,
+        "label_after_s": 2.0,   # label only people in view this long (Phase 50: passers-by get colours only)
+        "one_when_busy": True,  # one picture per person while other labels wait (Phase 50), else frames_per_track
         "history_frames": 4,
         "timeout_s": 90,
         "max_queue": 32,

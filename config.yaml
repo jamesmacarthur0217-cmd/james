@@ -140,6 +140,8 @@ vlm:
                               # 2 at once is no faster (the GPU is the limit) and makes each person wait longer
   frames_per_track: 2         # frames labeled per person; disagreement lowers confidence
   relabel_every_s: 15         # re-analyze people who stay in view (0 = label once only)
+  label_after_s: 2            # label only people in view this long; passers-by get colours only (0 = everyone)
+  one_when_busy: true         # one picture per person while other labels wait (frees time for safety checks)
   history_frames: 4           # labels are a vote over this many recent answers per person
   timeout_s: 90
   max_queue: 32

@@ -261,7 +261,32 @@ Measured on this PC (RTX 4070 SUPER): a person is fully labeled about **1.8–2.
 detection and colors run every frame for everyone. Things that turned out to matter:
 
 - Ollama at `127.0.0.1`, not `localhost`: on Windows `localhost` added ~2 s to every request (4.4 s → 1.8 s).
-- One request at a time (`vlm.workers: 1`): with that delay gone, 2 at once is no faster.
+- One request at a time (`vlm.workers: 1`): with that delay gone, 2 at once is no faster (checked again 2026-10-25
+  with Ollama 0.40: 44 answers a minute against 42, and critical safety checks waited longer).
+
+**Sharing the vision model's time** (Phase 50): it gives about **42 answers a minute** on this PC, and people's labels,
+re-labels and the safety checks all share them. Measured with `tools/incident_bench.py --busy` (people coming and
+going as in MOT16-09's true marks, checks through the real confirm queue at 1 critical, 6 warnings, 2 rounds and 1
+words question a minute, 3 minutes each, the real model). The user's choices:
+- safety checks use the model's **idle time**: their limit (`safety.confirm_per_min`, 6) holds only while people's
+  labels wait;
+- people in view under 2 s (`vlm.label_after_s`) get colours only (16% of MOT16-09's people);
+- **one picture per person while other labels wait** (`vlm.one_when_busy`), two when there is time: two pictures of
+  the same person differ in carried items 37%, colours 22-23%, clothing types 10-13%, age and gender 0% (60 MOT16
+  people), which lowers the label's confidence and sends it to review; one picture loses that check, so only when
+  busy.
+
+| people a minute (MOT16-09) | | labels waited (median) | warnings / rounds / words dropped | the model busy |
+|---|---|---|---|---|
+| 21 | before | 9 s | 10 of 18 / 3 of 6 / 2 of 3 | 100% |
+| 21 | now | 5 s | **0 / 0 / 0** | 90% |
+| 11 | now | 4 s | 0 / 0 / 0 | 61% |
+| 87 (a crowd) | before | 86 s, 168 of 261 refused | 14 of 18 / 4 of 6 / 2 of 3 | 99% |
+| 87 (a crowd) | now | 46 s, 92 of 261 refused | 13 of 18 / 4 of 6 / 2 of 3 | 99% |
+
+Critical checks waited 2-3 s in every run. A crowd of 87 people a minute is more than this PC's vision model can
+label: the safety checks below critical are still dropped there (the Health page says so); a faster model or a second
+GPU would be needed.
 - Several people in one request was rejected: answers mixed people up (gender matched only 54%).
 - The 8B model is slower and was not more accurate.
 

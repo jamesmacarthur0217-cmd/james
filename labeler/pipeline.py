@@ -510,7 +510,7 @@ class Pipeline:
                 if st.db_id is None and st.n_frames in self.relink_cfg["check_at_frames"]:
                     st = self._try_relink(tid, st, now)
 
-                if st.n_frames >= tcfg["min_frames_for_label"] and not st.vlm_requested:
+                if self._due_for_label(st, now):
                     self._ensure_db(st)
                     self._request_vlm(st)
                 elif self._due_for_relabel(st, now):
@@ -1279,10 +1279,29 @@ class Pipeline:
         if self.cfg["student"]["skip_vlm_when_confident"] and self._student_covers_all(st):
             log.info("person #%s labeled by the fast classifiers alone (all attributes confident)", st.db_id)
             return
-        n = self.cfg["vlm"]["frames_per_track"]
+        n = self.pictures_per_person()
         frames = [(c.person, c.face) for c in st.candidates[:n]]
         self._mark_night(st)
         st.vlm_pending = self.vlm.submit(st.db_id, frames, self.mode)
+
+    def pictures_per_person(self) -> int:
+        """vlm.frames_per_track (2), or 1 while other people's labels wait (vlm.one_when_busy; Phase 50, the user's
+        choice): two pictures of the same person differ in 22-37% of carried items and colours, which lowers the
+        label's confidence (review); one picture loses that check but halves the time, so on a busy camera the
+        safety checks are not dropped (tools/incident_bench.py --busy, README "Speed")."""
+        from .vlm import PEOPLE
+        n = int(self.cfg["vlm"]["frames_per_track"])
+        waiting = getattr(self.vlm, "waiting", None)
+        if self.cfg["vlm"].get("one_when_busy", True) and waiting is not None and waiting(PEOPLE) > 0:
+            return 1
+        return n
+
+    def _due_for_label(self, st: TrackState, now: float) -> bool:
+        """First labels: after tracking.min_frames_for_label frames, and (Phase 50, the user's choice) only for people
+        in view vlm.label_after_s: someone passing by gets colours only, so the vision model's time goes to people who
+        stay and to the safety checks (tools/incident_bench.py --busy: 42 answers a minute on this PC)."""
+        return (st.n_frames >= self.cfg["tracking"]["min_frames_for_label"] and not st.vlm_requested
+                and now - st.seen_since >= float(self.cfg["vlm"].get("label_after_s", 0)))
 
     def _due_for_relabel(self, st: TrackState, now: float) -> bool:
         """Re-analyze a person who stays in view, so labels follow changes (glasses on, phone out).

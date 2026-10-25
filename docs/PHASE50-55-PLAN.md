@@ -40,6 +40,15 @@ the real vision model); no download. Re-labels already wait until the queue is e
 2. **Make room** (the choice is discussed with the user first; options): re-label less often while safety checks wait;
    skip re-labels of people already labelled well; one picture instead of three for warnings; a longer wait for warnings
    than for rounds. Keep whatever measures better, say what was tried.
+   **Done 2026-10-25**: the confirm queue's per-minute limit holds only while people's labels wait
+   (`ConfirmQueue._labels_waiting`); first labels only after `vlm.label_after_s` 2 s in view (`Pipeline._due_for_label`;
+   16% of MOT16-09's people pass quicker); and (the user's choice after the numbers, with the "try one picture" they
+   asked for) **one picture per person while other labels wait** (`vlm.one_when_busy`, `Pipeline.pictures_per_person`):
+   two pictures of the same person differ in carried items 37%, colours 22-23%, types 10-13%, age and gender 0% (60
+   MOT16 people; label accuracy itself cannot be measured here: only the best crop of a person is kept), so one
+   picture only when busy. Result (README "Speed"): 21 people a minute: nothing dropped (before 15 of 27), labels 5 s;
+   87 a minute: still over capacity (labels refused 92 of 261 instead of 168; checks below critical dropped).
+   Real run (MOT16-02 looping): no label refused, no error; 2 equipment rounds dropped, the next one answered.
 3. Health page: the vision model's load (share of time busy, waits) in the "safety checks" line.
 
 ## Phase 51: Settings for the safety checks
