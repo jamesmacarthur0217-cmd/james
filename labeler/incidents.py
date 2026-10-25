@@ -400,6 +400,11 @@ class ConfirmQueue:
                     "wait_median_s": round(waits[len(waits) // 2], 1) if waits else None,
                     "recent": list(self.recent)[-10:]}
 
+    def latest(self) -> list[dict]:
+        """Every answer kept (the last 50 since the start), newest last: the safety page (Phase 52)."""
+        with self._lock:
+            return list(self.recent)
+
     def dropped_within(self, seconds: float) -> int:
         """Suspects dropped (waited too long) in the last `seconds`."""
         now = self.clock()

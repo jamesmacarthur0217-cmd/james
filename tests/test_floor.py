@@ -65,6 +65,16 @@ def test_someone_missed_while_learning_is_not_learned():
     assert run(w, 60, t0=5) == []
 
 
+def test_it_remembers_when_it_learned():
+    """The safety page (Phase 52) shows when the empty picture was learned: the camera's time of the last look."""
+    from datetime import datetime
+    w = FloorWatch({"floor_learn_n": 3, "floor_learn_every_s": 1, "floor_learn_min": 2})
+    assert w.state()["learned_at"] is None
+    for t in range(3):
+        w.update(t, scene(seed=t), [], [WALK], datetime(2026, 10, 25, 9, 30, t))
+    assert w.state()["learned_at"] == "2026-10-25T09:30:02"
+
+
 def test_exit_waits_two_minutes_and_plain_areas_are_not_watched():
     w = learned()
     got = run(w, 130, t0=6, zones=(EXIT,), bag=True)

@@ -663,12 +663,27 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
     def safety_state():
         """Safety incidents (labeler/incidents.py, admins): the kinds with their level and words, and the confirm
         queue's counts and latest answers (yes, no, unsure) since the app started; "on": False without a safety
-        camera or the vision model."""
+        camera or the vision model. "overview": the safety page's view (Phase 52, labeler/safety_view.py)."""
+        from . import safety_view
         from .incidents import CATEGORIES
         queue = getattr(app.state, "incidents", None)
         return {"on": queue is not None,
                 "kinds": [{"category": k, "level": lv, "words": w} for k, (lv, w, _) in CATEGORIES.items()],
-                "state": queue.state() if queue is not None else None}
+                "state": queue.state() if queue is not None else None,
+                "overview": safety_view.overview(cfg, db, pipelines, queue)}
+
+    @app.get("/api/safety/empty/{name}")
+    def safety_empty(name: str):
+        """The floor check's empty picture of a safety camera now (admins; the safety page, Phase 52)."""
+        p = by_name.get(name)
+        watch = getattr(p, "floor_watch", None)
+        pic = watch.picture() if watch is not None else None
+        if pic is None:
+            raise HTTPException(404, "no empty picture (yet) for this camera")
+        ok, jpeg = cv2.imencode(".jpg", pic, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        if not ok:
+            raise HTTPException(500, "could not make the picture")
+        return Response(jpeg.tobytes(), media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
     @app.get("/api/alerts/events")
     def alert_events(since_id: int = 0, limit: int = 50):

@@ -106,6 +106,7 @@ class FloorWatch:
         self._stacked_at = -1e9
         self.light_since: float | None = None
         self.relearned = 0
+        self.learned_at: datetime | None = None   # when the empty picture was last learned whole (the safety page)
         self.saved_at = -1e9
         self.saved_wall: datetime | None = None
         self.areas: dict = {}       # area id -> {"waiting", "yes_at", "mask"}
@@ -136,6 +137,7 @@ class FloorWatch:
                 self.seen[:] = self.learn_min
                 self.learned = True
                 self.saved_wall = datetime.fromtimestamp(self.path.stat().st_mtime)
+                self.learned_at = self.learned_at or self.saved_wall   # from an earlier run: when it was saved
                 log.info("floor and exits: the empty picture from %s", self.path)
 
     def _forget(self) -> None:
@@ -233,6 +235,7 @@ class FloorWatch:
                 self._stack.append((big, small, visible))
                 if len(self._stack) >= self.learn_n:
                     self._learn()
+                    self.learned_at = wall or datetime.now()
             return []
         cur = cv2.GaussianBlur(small, (5, 5), 0)
         ref = cv2.convertScaleAbs(cv2.GaussianBlur(cv2.resize(self.empty, (w, h), interpolation=cv2.INTER_AREA),
@@ -372,4 +375,5 @@ class FloorWatch:
                     "saved": self.saved_wall.isoformat(timespec="minutes") if self.saved_wall else None,
                     "checking": changing,
                     "reported": int(np.count_nonzero(~np.isnan(self.known))) if self.known is not None else 0,
-                    "relearned": self.relearned}
+                    "relearned": self.relearned,
+                    "learned_at": self.learned_at.isoformat(timespec="seconds") if self.learned_at else None}

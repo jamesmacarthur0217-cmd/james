@@ -91,6 +91,11 @@ Steps: 1. `/api/safety` (admins): per safety camera which checks run and why one
 page, its model missing), areas with roles and what each role means for the checks, the empty picture's state (+ the
 picture itself), the latest checks, alerts per kind this week with the Check page's "right N of M"; tests. 2. The page
 `/safety`, the links, a browser check (phone width), README.
+**Step 1 done 2026-10-25**: `labeler/safety_view.py` (`overview`, `KINDS`, `role_meaning` with the running times),
+added to the existing `/api/safety` as `"overview"` (the Alerts page's keys kept); `/api/safety/empty/<camera>`
+(JPEG, admins); `FloorWatch.learned_at`; `ConfirmQueue.latest()`. Alerts per kind: the last 7 days. Real run
+(MOT16-02, three areas drawn): all ten kinds on, each area's meaning, the empty picture learned (the walking people
+left out), no errors.
 1. A page (`/safety`, admins; a link from the Alerts page and Health): per safety camera which checks run, which areas
    have which role (and what that role means for the checks), the empty picture (floor check) and when it was learned,
    the latest checks with the vision model's answers, and alerts per kind this week with the Check page's "right N of
