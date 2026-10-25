@@ -9,7 +9,9 @@ Phase 47 done 2026-10-21 (step 2 floor hazards and blocked exits, step 3 unsafe 
 restricted area, pacing, camera covered or turned) done 2026-10-25: **the Phases 44-49 plan is finished.** Next
 (proposed 2026-10-25, the user's choices): **[PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)**: 50 vision model capacity,
 51 Settings for the safety checks, 52 a safety overview page, 53 night-time measuring, 54 more behaviour signs, 55 our
-own pest model; and Phase 26 (real-camera week) after the user's restart. MIVIA fire videos
+own pest model; and Phase 26 (real-camera week) after the user's restart. **Approved 2026-10-25; Phase 50 steps 1-2
+done** (busy-camera measurement; checks use idle time, passers-by colours only, one picture per person while busy;
+1016 tests). Next: Phase 50 step 3 (the vision model's load on the Health page). MIVIA fire videos
 when the user has them.
 
 

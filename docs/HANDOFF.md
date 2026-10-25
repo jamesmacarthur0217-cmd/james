@@ -16,12 +16,31 @@ Roadmap Phase 1 (licenses) is deferred until they say otherwise. Under Malaysia'
 household use is generally outside the Act; their filled-in camera sign and data-protection summary are in
 `data/privacy/` (git-ignored, contains their email); the blank templates are in `docs/`.
 
-## 2. Current state (2026-10-21)
+## 2. Current state (2026-10-25)
 
-**Latest (2026-10-25, end of the session; Phase 49 done, the Phases 44-49 plan finished; 1011 tests + 1 PostgreSQL test that is
-skipped without `VL_TEST_POSTGRES_URL`; GitHub green).**
+**Start here (2026-10-25, end of the session; last commit `0171fd4` + this handoff; 1016 tests + 1 PostgreSQL test that
+is skipped without `VL_TEST_POSTGRES_URL`; GitHub green; working tree clean; no test copy running).**
 
-**Plan in progress: [PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)**: safety incidents on **security cameras** (the 11 kinds
+**Plan in progress: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (approved 2026-10-25, the user's choices, in this
+order): 50 vision model capacity, 51 Settings for the safety checks, 52 a safety overview page, 53 night-time
+measuring, 54 more behaviour signs, 55 our own pest model; and Phase 26 (real-camera week) after the user restarts
+their app. Same way of working: **ask before each phase and each step; discuss any architecture first**; short, simple
+answers.
+- **Phase 50 steps 1-2 done** (design agreed first, plan `fd41660`): step 1 `e89cfac` (`tools/incident_bench.py --busy`:
+  a busy camera in real time from MOT16-09's true marks, checks through the real confirm queue); the vision model gives
+  **about 42 answers a minute** on this PC (a person's label = 2); **2 requests at once: no gain** (the user's Ollama
+  setting left alone; the old "1.9x" note in VLMWorker corrected). Step 2 `0171fd4`: checks use the model's **idle
+  time** (`ConfirmQueue._labels_waiting`: the per-minute limit only while labels wait); **passers-by under 2 s get
+  colours only** (`vlm.label_after_s`, `Pipeline._due_for_label`); **one picture per person while other labels wait**
+  (`vlm.one_when_busy`, `Pipeline.pictures_per_person`; the user's choice: two pictures differ in carried items 37%,
+  colours 22-23%, age/gender 0%). Result: 21 people a minute: nothing dropped (before 15 of 27), labels 5 s; a crowd
+  (87 a minute) is still over capacity (README "Speed").
+- **Next: Phase 50 step 3** (the vision model's load on the Health page: share of time busy, waits, drops in the
+  "safety checks" line); ask the user before starting it. Then Phase 51 (discuss its design first).
+- Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
+  videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
+
+**Finished plan: [PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)**: safety incidents on **security cameras** (the 11 kinds
 the user listed + "suspicious behaviour", judged by what people do, never by looks). Each phase's design was agreed
 with the user first (their rule: **discuss any architecture before building it**; ask before each phase and step).
 - **Phase 44 done** (2026-10-20: `55a60c3` area roles, `2e6bca2` confirm queue, `3132c2e` safety alerts): quick checks
@@ -67,10 +86,7 @@ with the user first (their rule: **discuss any architecture before building it**
   (alert at once at night or when Away: `ConfirmQueue.direct`, the vision model's words added after), the camera
   covered or turned (when a person was seen in the 30 s before). Made-up cases found, 0 false alerts on still cameras
   in 86 everyday videos (README "Suspicious behaviour").
-- **Next: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (proposed 2026-10-25 from the user's choices; waiting for approval). Waiting from before: Phase 26 (a real-camera week, after
-  they restart their own app), the MIVIA fire videos. Open for the user (offer, don't change unasked): a floor
-  check's "yes" then "no" puts a real bag into the empty picture (the agreed rule); a third look could decide instead;
-  an own rodent model if they want pests after all.
+- Then the user chose the Phases 50-55 plan (above).
 
 **Measuring tools** (all on recorded videos / photos, the real camera code, the vision model):
 `tools/incident_check.py` (videos + truth CSV `video,kind,start_s,end_s,half`; `--labels`, `--areas`, `--hold-s`,
@@ -491,6 +507,12 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
    restricted area entered by people one after another, gave 2 and 29 alerts until they were limited to one a minute
    per camera (and area and sign). Every new per-person sign needs such a limit; a looping test clip (new track
    numbers each loop) shows the flood quickly.
+41. **PowerShell 5.1's `Set-Content -Encoding utf8` writes a byte-order mark** (it happened to a plan doc,
+   2026-10-25): edit files with the Edit/Write tools or Python, not Set-Content.
+42. **The vision model is the shared limit** (Phase 50): about 42 answers a minute here; every new check or label
+   costs from the same budget. Measure a change with `tools/incident_bench.py --busy` (people from MOT16's true marks,
+   `--share` for the load) before claiming it fits; a looping short clip in a test copy floods it with "new" people
+   (each loop new track numbers), heavier than a real camera.
 
 ## 7. Conventions
 
@@ -797,5 +819,5 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE44-49-PLAN.md
-> then continue with docs/PHASE50-55-PLAN.md (Phase 50 first; discuss its design with me first). Ask me before each phase and each step starts, discuss any
+> then continue with docs/PHASE50-55-PLAN.md (Phase 50 step 3: the vision model's load on the Health page). Ask me before each phase and each step starts, discuss any
 > architecture with me first, and do it step by step.
