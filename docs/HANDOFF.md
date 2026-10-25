@@ -18,7 +18,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-25)
 
-**Start here (2026-10-25, end of the session; last commit: the pitfall 44 fix + this handoff; 1038 tests + 1 PostgreSQL test that
+**Start here (2026-10-26, end of the session; last commit: Phase 53 step 1 + this handoff; 1045 tests + 1 PostgreSQL test that
 is skipped without `VL_TEST_POSTGRES_URL`; GitHub green; working tree clean; no test copy running).**
 
 **Plan in progress: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (approved 2026-10-25, the user's choices, in this
@@ -49,7 +49,10 @@ answers.
   and Health pages. What's new entry `p52`. Found and written down, not fixed: pitfall 44 (a round waiting in the
   vision model's queue blocks warnings on a flooded camera); **fixed the same day** with the user's choice (plan
   "Fix before Phase 53": rounds no longer block warnings, a round not started in 30 s is taken back; 1038 tests).
-- **Next: Phase 53** (night-time measuring); discuss its design with the user first, ask before each step.
+- **Phase 53 step 1 done** (2026-10-26; design agreed first, plan `4f13ab0`: IR and dark colour, four checks plus
+  fire, real footage looked for after): `tools/make_night_videos.py`, 506 videos x 2 in `data/datasets/night_made`
+  (8.9 GB, git-ignored, made here from the videos already here).
+- **Next: Phase 53 step 2** (measure each check by day against IR and dark with the same tools); ask first.
 - Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
   videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
 
@@ -114,7 +117,8 @@ mot20`: zip 4.7 GB + 3.2 GB unpacked + videos; the zip may be deleted), D-Fire (
 unpacked + 100 sample videos 0.44 GB), Open Images guns (`data/datasets/openimages_weapons` 127 MB test,
 `data/datasets/oi_guns` 1.03 GB training), YOLOE (`data/models/yoloe`, 27 MB), Open Images rodents
 (`data/datasets/openimages_pests`, 74 MB), the fight clips (`data/datasets/survfight`, 87 MB, a git clone). Made here:
-`data/datasets/floor_made` (1.1 GB, `tools/make_floor_videos.py`). The user may want old zips deleted
+`data/datasets/floor_made` (1.1 GB, `tools/make_floor_videos.py`), `data/datasets/night_made` (8.9 GB,
+`tools/make_night_videos.py`, Phase 53). The user may want old zips deleted
 (ask; never delete without OK).
 
 **Models only on this PC** (not in git; `tools/models.py check / pack` lists them as optional): `data/models/fire/

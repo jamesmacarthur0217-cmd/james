@@ -153,6 +153,12 @@ Steps: 1. `tools/make_night_videos.py` (IR and dark versions into `data/datasets
 to check they look right). 2. Measure each check by day (the README's numbers, the same tools and halves) against IR
 and dark. 3. The numbers to the user; any change discussed, built, measured again; then the search for real footage;
 README with day and night numbers.
+**Step 1 done 2026-10-26** (`d4d8052`, `6c9e285`): `tools/make_night_videos.py`; 506 videos in each kind (UR Fall,
+the fight clips with and without fights, D-Fire's samples, floor_made, behaviour_made, the everyday videos),
+`data/datasets/night_made/ir` 4.7 GB and `dark` 3.8 GB, the same frame counts; truth and areas files beside them.
+H.264 on the graphics card through the app's FFmpeg, as a camera sends: OpenCV's mp4v made 0.83 GB of one
+2-minute floor video with grain (about 50 GB for all), so the first run was stopped and its files deleted.
+Previews in `night_made/preview` (day | ir | dark).
 1. Made-up night videos from the ones here (darker, noisier, black-and-white like infrared) for falls (UR Fall), fights
    (the fight clips), floors and behaviour; measure found / false alarms as by day, with the same tools.
 2. Optionally real night footage: a public set with night or infrared video (size and licence checked, asked first).
