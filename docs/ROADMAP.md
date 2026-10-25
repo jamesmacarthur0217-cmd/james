@@ -6,8 +6,10 @@ Latest: Phases 44-46 done and Phases 47-49 done (2026-10-20/25; 1011 tests): saf
 ([PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)): the safety base, people (falls checked by the vision model, lying still,
 slumped, children, crowding), fire and smoke (own model on D-Fire), dangerous objects (own gun model on Open Images).
 Phase 47 done 2026-10-21 (step 2 floor hazards and blocked exits, step 3 unsafe equipment; pests measured and left out). Phase 48 (fights; collisions through the fall check) done 2026-10-23. Phase 49 (suspicious behaviour: climbing,
-restricted area, pacing, camera covered or turned) done 2026-10-25: **the Phases 44-49 plan is finished.** Next: ask
-the user. MIVIA fire videos
+restricted area, pacing, camera covered or turned) done 2026-10-25: **the Phases 44-49 plan is finished.** Next
+(proposed 2026-10-25, the user's choices): **[PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)**: 50 vision model capacity,
+51 Settings for the safety checks, 52 a safety overview page, 53 night-time measuring, 54 more behaviour signs, 55 our
+own pest model; and Phase 26 (real-camera week) after the user's restart. MIVIA fire videos
 when the user has them.
 
 

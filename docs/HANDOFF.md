@@ -67,7 +67,7 @@ with the user first (their rule: **discuss any architecture before building it**
   (alert at once at night or when Away: `ConfirmQueue.direct`, the vision model's words added after), the camera
   covered or turned (when a person was seen in the 30 s before). Made-up cases found, 0 false alerts on still cameras
   in 86 everyday videos (README "Suspicious behaviour").
-- **Next: ask the user** what comes next (no plan is open). Waiting from before: Phase 26 (a real-camera week, after
+- **Next: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (proposed 2026-10-25 from the user's choices; waiting for approval). Waiting from before: Phase 26 (a real-camera week, after
   they restart their own app), the MIVIA fire videos. Open for the user (offer, don't change unasked): a floor
   check's "yes" then "no" puts a real bag into the empty picture (the agreed rule); a third look could decide instead;
   an own rodent model if they want pests after all.
@@ -797,5 +797,5 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE44-49-PLAN.md
-> and tell me what is open; the Phases 44-49 plan is finished. Ask me before each phase and each step starts, discuss any
+> then continue with docs/PHASE50-55-PLAN.md (Phase 50 first; discuss its design with me first). Ask me before each phase and each step starts, discuss any
 > architecture with me first, and do it step by step.
