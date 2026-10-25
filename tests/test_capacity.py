@@ -1,13 +1,15 @@
 """The vision model's time (Phase 50): safety checks use its idle time (the per-minute limit holds only while people's
-labels wait), and people passing by in under vlm.label_after_s get colours only."""
+labels wait), people passing by in under vlm.label_after_s get colours only, and its load of the last 10 minutes is
+kept for the Health page."""
 import copy
+import threading
 from datetime import datetime
 
 import numpy as np
 
 from labeler.config import DEFAULTS
 from labeler.incidents import ConfirmQueue
-from labeler.vlm import PEOPLE
+from labeler.vlm import PEOPLE, VLMWorker
 
 
 class Worker:
@@ -71,3 +73,50 @@ def test_one_picture_only_while_labels_wait(db):
     assert p.pictures_per_person() == 1                       # others wait: one
     p.cfg["vlm"]["one_when_busy"] = False
     assert p.pictures_per_person() == 2
+
+
+class TwoSecondClient:
+    """Each answer takes 2 s on a made-up clock; the first waits until `go` is set."""
+
+    def __init__(self, clock: list):
+        self.clock, self.started, self.go = clock, threading.Event(), threading.Event()
+
+    def label(self, person, face=None, mode=None):
+        self.started.set()
+        assert self.go.wait(5)
+        self.clock[0] += 2.0
+        return {"answer": "no"}
+
+
+def test_the_vision_model_keeps_its_load_of_the_last_10_minutes():
+    t = [0.0]
+    client = TwoSecondClient(t)
+    w = VLMWorker(client, lambda job, results: None, max_queue=2, clock=lambda: t[0])
+    pic = np.zeros((8, 8, 3), np.uint8)
+    assert w.submit(1, [(pic, None)])
+    assert client.started.wait(5)              # the first is with the model; two more wait
+    assert w.submit(2, [(pic, None)]) and w.submit(3, [(pic, None)])
+    assert not w.submit(4, [(pic, None)])      # the queue is full: refused (colour labels only)
+    client.go.set()
+    assert w.close(5)
+    t[0] = 10.0                                # 6 s of answers in the first 10 s
+    load = w.load()
+    assert load["window_s"] == 10 and abs(load["busy"] - 0.6) < 1e-9 and load["answers_per_min"] == 18
+    assert load["labels"] == 3 and load["label_wait_s"] == 2.0 and load["refused"] == 1   # waited 0, 2 and 4 s
+    t[0] = 700.0                               # ten minutes on: all of it is older than the window
+    assert w.load() == {"window_s": 600, "busy": 0.0, "answers_per_min": 0.0, "labels": 0, "label_wait_s": None,
+                        "refused": 0}
+
+
+def test_dropped_checks_are_counted_by_time():
+    clock = [0.0]
+    cfg = copy.deepcopy(DEFAULTS)
+    q = ConfirmQueue(cfg, Worker(labels_waiting=0), {}, clock=lambda: clock[0])
+    pic = [(datetime(2026, 10, 25, 12), np.zeros((8, 8, 3), np.uint8), [])]
+    q.sent[99] = object()                      # one being checked: the next waits
+    q.suspect("cam1", "floor", "something new", pictures=pic)
+    clock[0] = cfg["safety"]["max_wait_s"] + 1
+    q.tick()
+    assert q.dropped_within(600) == 1
+    clock[0] += 601
+    assert q.dropped_within(600) == 0

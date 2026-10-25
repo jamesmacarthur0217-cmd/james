@@ -50,6 +50,12 @@ the real vision model); no download. Re-labels already wait until the queue is e
    87 a minute: still over capacity (labels refused 92 of 261 instead of 168; checks below critical dropped).
    Real run (MOT16-02 looping): no label refused, no error; 2 equipment rounds dropped, the next one answered.
 3. Health page: the vision model's load (share of time busy, waits) in the "safety checks" line.
+   **Done 2026-10-25** (the user's choice: on the **"vision model (Ollama)" line**, which always shows; the safety
+   line shows only with a security camera, and the user's own camera is a kiosk webcam): `VLMWorker.load()` keeps the
+   last 10 minutes in memory (`LOAD_WINDOW_S`: busy share, answers a minute, people's label waits, people refused);
+   `ConfirmQueue.dropped_within`; `healthcheck.load_words`. Refused or dropped: a warning, never a problem. Real run
+   (MOT16-02 looping, security): "busy 93%, 25 answers a minute, people's labels waited 40 s, 9 people refused ... more
+   work than it can do" (the looping clip floods it, pitfall 42). **Phase 50 is done.**
 
 ## Phase 51: Settings for the safety checks
 

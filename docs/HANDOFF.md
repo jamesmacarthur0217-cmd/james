@@ -18,7 +18,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-25)
 
-**Start here (2026-10-25, end of the session; last commit `0171fd4` + this handoff; 1016 tests + 1 PostgreSQL test that
+**Start here (2026-10-25, end of the session; last commit: Phase 50 step 3 + this handoff; 1020 tests + 1 PostgreSQL test that
 is skipped without `VL_TEST_POSTGRES_URL`; GitHub green; working tree clean; no test copy running).**
 
 **Plan in progress: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (approved 2026-10-25, the user's choices, in this
@@ -35,8 +35,12 @@ answers.
   (`vlm.one_when_busy`, `Pipeline.pictures_per_person`; the user's choice: two pictures differ in carried items 37%,
   colours 22-23%, age/gender 0%). Result: 21 people a minute: nothing dropped (before 15 of 27), labels 5 s; a crowd
   (87 a minute) is still over capacity (README "Speed").
-- **Next: Phase 50 step 3** (the vision model's load on the Health page: share of time busy, waits, drops in the
-  "safety checks" line); ask the user before starting it. Then Phase 51 (discuss its design first).
+- **Phase 50 step 3 done; Phase 50 is done** (2026-10-25; the user's choice: on the **"vision model (Ollama)" line**,
+  which always shows, not the safety line): `VLMWorker.load()` keeps the last 10 minutes in memory (`LOAD_WINDOW_S`:
+  busy share, answers a minute, people's label waits, people refused when the queue is full), `ConfirmQueue.
+  dropped_within`, `healthcheck.load_words`; refused or dropped is a warning ("more work than it can do"), never a
+  problem. Real run (MOT16-02 looping): busy 93%, labels waited 40 s, 9 refused. What's new entry `p50`.
+- **Next: Phase 51** (Settings for the safety checks); discuss its design with the user first, ask before each step.
 - Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
   videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
 

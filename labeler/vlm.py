@@ -8,6 +8,7 @@ import logging
 import queue
 import threading
 import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
@@ -283,6 +284,9 @@ ResultCallback = Callable[[int, list[dict[str, str]]], None]
 # Phase 45; the user's choice), then people's labels, then the slow rounds.
 CRITICAL, WARNING, PEOPLE, ROUND = 0, 5, 10, 30
 _STOP = 99
+# The Health page's load line (Phase 50 step 3) looks back this far: long enough to even out a few busy minutes,
+# short enough to show today's camera, not this morning's.
+LOAD_WINDOW_S = 600
 
 
 class VLMWorker:
@@ -293,9 +297,20 @@ class VLMWorker:
     127.0.0.1, 2 at once is no faster (2026-10-25, tools/incident_bench.py --busy: 44 answers a minute against 42, and
     critical checks wait longer), so vlm.workers stays 1.
     Jobs wait in one priority queue (CRITICAL .. ROUND); `max_queue` limits the jobs waiting at PEOPLE and below, so a
-    busy camera never fills the queue for a safety check (critical or warning)."""
+    busy camera never fills the queue for a safety check (critical or warning).
+    It also keeps its load of the last LOAD_WINDOW_S in memory (load(): share of time busy, answers a minute, how long
+    people's labels waited, how many were refused) for the Health page."""
 
-    def __init__(self, client: VLMClient, on_result: ResultCallback, max_queue: int = 32, workers: int = 1):
+    def __init__(self, client: VLMClient, on_result: ResultCallback, max_queue: int = 32, workers: int = 1,
+                 clock=time.monotonic):
+        self.clock = clock
+        self.started = clock()
+        self._load_lock = threading.Lock()
+        self._worked: deque = deque()            # (start, end) of each answered picture
+        self._running: dict[int, float] = {}     # picture number -> when it went to the model
+        self._label_waits: deque = deque()       # (when taken, seconds waited) of people's labels
+        self._refused: deque = deque()           # when a person's label was refused (the queue full)
+        self._pictures = itertools.count()
         self.client = client
         self.on_result = on_result
         self.workers = max(1, workers)
@@ -332,10 +347,46 @@ class VLMWorker:
         with self._count_lock:
             if priority >= PEOPLE and sum(n for p, n in self._waiting.items() if p >= PEOPLE) >= self.max_queue:
                 log.warning("VLM queue full; job %s is dropped (people: only color labels)", track_id)
+                if priority == PEOPLE:   # (a refused round is asked again at its next turn)
+                    with self._load_lock:
+                        self._refused.append(self.clock())
                 return False
             self._waiting[priority] = self._waiting.get(priority, 0) + 1
-        self.jobs.put((priority, next(self._order), (track_id, frames, mode)))
+        self.jobs.put((priority, next(self._order), (track_id, frames, mode, self.clock())))
         return True
+
+    def _forget_old(self, now: float) -> None:
+        """Drop what is older than the load window (called with _load_lock held)."""
+        start = now - LOAD_WINDOW_S
+        while self._worked and self._worked[0][1] < start:
+            self._worked.popleft()
+        while self._label_waits and self._label_waits[0][0] < start:
+            self._label_waits.popleft()
+        while self._refused and self._refused[0] < start:
+            self._refused.popleft()
+
+    def load(self) -> dict:
+        """The last LOAD_WINDOW_S (or since the start, if shorter): window_s, busy (share of the time at least one
+        picture was with the model), answers_per_min, labels (people's labels taken), label_wait_s (their median wait,
+        None without labels) and refused (people's labels refused, the queue full: colour labels only)."""
+        now = self.clock()
+        since = max(now - LOAD_WINDOW_S, self.started)
+        with self._load_lock:
+            self._forget_old(now)
+            spans = sorted([*self._worked, *((s, now) for s in self._running.values())])
+            answers = sum(1 for _, e in self._worked if e >= since)   # with 2 at once not quite in order
+            waits = sorted(w for _, w in self._label_waits)
+            refused = len(self._refused)
+        busy, reach = 0.0, since
+        for s, e in spans:   # the union of the spans: with 2 at once they overlap
+            s = max(s, reach)
+            if e > s:
+                busy += e - s
+                reach = e
+        window = now - since
+        return {"window_s": window, "busy": busy / window if window > 0 else 0.0,
+                "answers_per_min": answers / window * 60 if window > 0 else 0.0, "labels": len(waits),
+                "label_wait_s": waits[len(waits) // 2] if waits else None, "refused": refused}
 
     def _dispatch(self) -> None:
         while True:
@@ -348,7 +399,12 @@ class VLMWorker:
                 return
             with self._count_lock:
                 self._waiting[priority] -= 1
-            track_id, frames, mode = job
+            track_id, frames, mode, submitted = job
+            if priority == PEOPLE:
+                now = self.clock()
+                with self._load_lock:
+                    self._label_waits.append((now, now - submitted))
+                    self._forget_old(now)
             if not frames:
                 self._slots.release()
                 self._deliver(track_id, [])
@@ -370,11 +426,18 @@ class VLMWorker:
                     return
 
     def _label_one(self, track_id: int, i: int, person, face, mode, state: dict) -> None:
+        n = next(self._pictures)
+        with self._load_lock:
+            self._running[n] = self.clock()
         try:
             state["results"][i] = self.client.label(person, face, mode)
         except Exception as e:  # keep going on any model/network error
             log.error("VLM labeling failed for track %s: %s", track_id, e)
         finally:
+            now = self.clock()
+            with self._load_lock:
+                self._worked.append((self._running.pop(n), now))
+                self._forget_old(now)
             self._slots.release()
         with state["lock"]:
             state["left"] -= 1

@@ -229,6 +229,7 @@ class ConfirmQueue:
         self.counts = {"suspects": 0, "sent": 0, "yes": 0, "no": 0, "unsure": 0, "failed": 0, "dropped_old": 0,
                        "cooldown": 0, "no_pictures": 0, "direct": 0}
         self.waits: deque = deque(maxlen=200)      # seconds each sent suspect waited
+        self.dropped_at: deque = deque(maxlen=500)  # when suspects were dropped (waited too long), for the Health page
         self._numbers = itertools.count(1)
         self._lock = threading.Lock()
 
@@ -321,6 +322,7 @@ class ConfirmQueue:
             for s in old:
                 self.waiting.remove(s)
                 self.counts["dropped_old"] += 1
+                self.dropped_at.append(now)
                 log.warning("[%s] safety check dropped after %.0f s waiting: %s (%s)", s.camera, now - s.queued,
                             s.category, s.reason)
         for s in old:
@@ -397,6 +399,12 @@ class ConfirmQueue:
                     "per_min": self.per_min, "last_minute": len(self.sent_at),
                     "wait_median_s": round(waits[len(waits) // 2], 1) if waits else None,
                     "recent": list(self.recent)[-10:]}
+
+    def dropped_within(self, seconds: float) -> int:
+        """Suspects dropped (waited too long) in the last `seconds`."""
+        now = self.clock()
+        with self._lock:
+            return sum(1 for t in self.dropped_at if now - t <= seconds)
 
     def loop(self, stop: threading.Event, every_s: float = 0.5) -> None:
         while not stop.wait(every_s):

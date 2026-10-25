@@ -183,3 +183,43 @@ def test_camera_list_masks_passwords(cfg, db):
 ])
 def test_mask_password(raw, shown):
     assert mask_password(raw) == shown
+
+
+class Loaded:
+    """A vision model queue stand-in with a set load (VLMWorker.load())."""
+
+    def __init__(self, **load):
+        self._load = {"window_s": 600, "busy": 0.0, "answers_per_min": 0.0, "labels": 0, "label_wait_s": None,
+                      "refused": 0, **load}
+
+    def load(self):
+        return self._load
+
+
+class Dropping:
+    def __init__(self, n):
+        self.n = n
+
+    def dropped_within(self, seconds):
+        return self.n
+
+
+def test_the_vision_model_line_shows_its_load():
+    assert healthcheck.load_words(Loaded().load()) == ("last 10 min: idle", False)
+    words, over = healthcheck.load_words(Loaded(busy=0.92, answers_per_min=38.4, labels=40, label_wait_s=6.2).load())
+    assert words == "last 10 min: busy 92%, 38 answers a minute, people's labels waited 6 s" and not over
+    words, over = healthcheck.load_words(Loaded(window_s=30, busy=1.0, answers_per_min=42, refused=3).load(), 2)
+    assert words.startswith("since the start: busy 100%") and "3 people refused" in words
+    assert "2 safety checks dropped" in words and over
+
+
+def test_a_vision_model_with_more_work_than_it_can_do_is_a_warning(cfg, db, ollama_ok):
+    p = FakePipeline()
+    p.vlm = Loaded(busy=0.5, answers_per_min=20, label_wait_s=1.0)
+    line = healthcheck.check_ollama(cfg, [p])
+    assert line["level"] == "ok" and line["detail"].startswith("Ollama 0.12.3, model ")
+    assert "last 10 min: busy 50%, 20 answers a minute" in line["detail"]
+    assert healthcheck.check_ollama(cfg, [p], Dropping(1))["level"] == "warning"   # a safety check dropped
+    p.vlm = Loaded(busy=1.0, answers_per_min=42, refused=5)
+    body = _local(cfg, db, [p]).get("/api/health")
+    assert body.status_code == 200 and _levels(body.json())["vision model (Ollama)"] == "warning"   # not a problem

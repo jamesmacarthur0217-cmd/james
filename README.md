@@ -287,6 +287,12 @@ words question a minute, 3 minutes each, the real model). The user's choices:
 Critical checks waited 2-3 s in every run. A crowd of 87 people a minute is more than this PC's vision model can
 label: the safety checks below critical are still dropped there (the Health page says so); a faster model or a second
 GPU would be needed.
+
+**On the Health page** (Phase 50 step 3), the "vision model (Ollama)" line shows its last 10 minutes (kept in memory,
+since the start when shorter): how much of the time it was busy, answers a minute, how long people's labels waited
+(median), people refused because the queue was full (colour labels only), and safety checks dropped after waiting too
+long. Refused or dropped turns the line into a warning ("more work than it can do"), never a problem: everything
+else keeps working. Example: "last 10 min: busy 92%, 38 answers a minute, people's labels waited 6 s".
 - Several people in one request was rejected: answers mixed people up (gender matched only 54%).
 - The 8B model is slower and was not more accurate.
 

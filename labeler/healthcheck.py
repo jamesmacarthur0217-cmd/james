@@ -53,8 +53,29 @@ def check_database(db) -> dict:
                                               "is Docker Desktop running? start.bat starts it")
 
 
-def check_ollama(cfg: dict, pipelines: list) -> dict:
-    """Ollama reachable, the model pulled, and the app actually using it (it is only connected at start)."""
+def load_words(load: dict, dropped: int = 0) -> tuple[str, bool]:
+    """Phase 50 step 3: the vision model's load (VLMWorker.load()) in words, and whether it has more work than it can
+    do (people's labels refused, or safety checks dropped after waiting too long)."""
+    minutes = load["window_s"] / 60
+    span = f"last {minutes:.0f} min" if minutes >= 1 else "since the start"
+    if not load["answers_per_min"] and not load["busy"] and not load["refused"]:
+        return f"{span}: idle", bool(dropped)
+    parts = [f"{span}: busy {load['busy']:.0%}, {load['answers_per_min']:.0f} answers a minute"]
+    if load["label_wait_s"] is not None:
+        parts.append(f"people's labels waited {load['label_wait_s']:.0f} s")
+    if load["refused"]:
+        parts.append(f"{load['refused']} people refused (the queue was full: colour labels only)")
+    if dropped:
+        parts.append(f"{dropped} safety {'check' if dropped == 1 else 'checks'} dropped (waited too long)")
+    over = bool(load["refused"] or dropped)
+    if over:
+        parts.append("more work than it can do (README \"Speed\")")
+    return ", ".join(parts), over
+
+
+def check_ollama(cfg: dict, pipelines: list, incidents=None) -> dict:
+    """Ollama reachable, the model pulled, and the app actually using it (it is only connected at start); then its
+    load (Phase 50 step 3: the shared queue's last 10 minutes; a warning when it had more work than it can do)."""
     vcfg = cfg["vlm"]
     if not vcfg["enabled"]:
         return _check("vision model (Ollama)", "off", "turned off (vlm.enabled); labels come from colors and "
@@ -71,7 +92,14 @@ def check_ollama(cfg: dict, pipelines: list) -> dict:
         return _check("vision model (Ollama)", "problem",
                       f"Ollama {version} is running now, but it was not when the app started, so people get color "
                       "labels only; restart the app")
-    return _check("vision model (Ollama)", "ok", f"Ollama {version}, model {vcfg['model']}")
+    detail = f"Ollama {version}, model {vcfg['model']}"
+    worker = next((p.vlm for p in pipelines if getattr(p.vlm, "load", None) is not None), None)
+    if worker is None:
+        return _check("vision model (Ollama)", "ok", detail)
+    from .vlm import LOAD_WINDOW_S
+    dropped = incidents.dropped_within(LOAD_WINDOW_S) if incidents is not None else 0
+    words, over = load_words(worker.load(), dropped)
+    return _check("vision model (Ollama)", "warning" if over else "ok", f"{detail}; {words}")
 
 
 def check_cameras(cfg: dict, pipelines: list, camera_health, now: float) -> list[dict]:
@@ -602,7 +630,7 @@ def run_checks(cfg: dict, db, pipelines: list, camera_health=None, started_at: f
     """detail: "full" (admins), "viewer" (no log messages) or "status" (monitoring token: problems only)."""
     now_mono, now = time.monotonic(), time.time()
     errors_check, latest_errors = check_errors(now)
-    checks = [check_database(db), check_ollama(cfg, pipelines), *check_cameras(cfg, pipelines, camera_health, now_mono),
+    checks = [check_database(db), check_ollama(cfg, pipelines, incidents), *check_cameras(cfg, pipelines, camera_health, now_mono),
               check_disk(cfg), check_backup(db, now, backups.folder(cfg), cfg["backup"]), check_retraining(cfg, db), errors_check]
     try:
         checks.insert(-1, check_storage(cfg, db))

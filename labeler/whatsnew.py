@@ -150,11 +150,15 @@ ENTRIES: list[Entry] = [
           "On security cameras: two people close together with a fast arm reaching the other are checked by the vision "
           "model, and a \"yes\" alerts at once, red with a beep. A fall alert now also says whom the person touched "
           "just before (a collision).", "/alerts"),
-    Entry("p49", 49, "", "Suspicious behaviour",
+    Entry("p49", 49, "256e9b8", "Suspicious behaviour",
           "On security cameras, judged only by what people do: climbing over an area marked \"fence or wall\" (checked "
           "by the vision model; red with a beep at night or when Away), and at night (22:00-06:00) or when Away "
           "someone in a \"restricted\" area or pacing back and forth; and the camera covered or turned just after "
           "someone was seen.", "/alerts"),
+    Entry("p50", 50, "", "More room on busy cameras",
+          "The vision model's time is shared better: safety checks use its free time, people who only pass by (under "
+          "2 s) get colour labels, and one picture per person while others wait. The Health page's \"vision model\" "
+          "line shows how busy it was in the last 10 minutes.", "/health", "admin"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 
