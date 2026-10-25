@@ -83,6 +83,14 @@ Restart now button); no new architecture.
 
 ## Phase 52: Safety overview page
 
+**Design agreed with the user 2026-10-25** (all three recommended): (1) the latest checks come from **memory, as now**
+(`ConfirmQueue.recent`, the last 50 since the start, as the Health line); no new table; alerts are in the database
+anyway; (2) **admins only**, links from the Alerts and Health pages; (3) the floor check's empty picture as a **small
+picture with its date** ("learned 14:02, learned again 2 times"; FloorWatch gets a `learned_at`), click for full size.
+Steps: 1. `/api/safety` (admins): per safety camera which checks run and why one is off (switched off on the Settings
+page, its model missing), areas with roles and what each role means for the checks, the empty picture's state (+ the
+picture itself), the latest checks, alerts per kind this week with the Check page's "right N of M"; tests. 2. The page
+`/safety`, the links, a browser check (phone width), README.
 1. A page (`/safety`, admins; a link from the Alerts page and Health): per safety camera which checks run, which areas
    have which role (and what that role means for the checks), the empty picture (floor check) and when it was learned,
    the latest checks with the vision model's answers, and alerts per kind this week with the Check page's "right N of
