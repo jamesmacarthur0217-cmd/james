@@ -60,6 +60,16 @@ the real vision model); no download. Re-labels already wait until the queue is e
 ## Phase 51: Settings for the safety checks
 
 Phases 45-49 added many options with no Settings fields (only `safety_enabled` and `safety_confirm_per_min` are there).
+
+**Design agreed with the user 2026-10-25** (all three recommended): (1) **one on/off switch per kind** (10: falls,
+people down, children, crowding, fire, dangerous objects, floor and exits, equipment, fights, behaviour; behaviour is
+one switch for its 4 signs). Fire, objects, floor, equipment and behaviour have config options already, falls has its
+Settings switch; people down, children, crowding and fights get new options (`safety.down_enabled`,
+`children_enabled`, `crowd_enabled`, `fights_enabled`, default on). (2) **Main times only**: night hours, lying still
+20 s, slumped 30 s, child alone 2 min, crowded for 30 s, floor 30 s, exit 2 min, equipment round 10 min, restricted 3 s,
+pacing turns 4. Measured thresholds (fight speed, fire / gun confidence and the like) stay in config.yaml only, so the
+README's measured numbers stay true. (3) **After a restart**, like every other setting (data/settings.yaml, the
+Restart now button); no new architecture.
 1. Settings page box "Safety checks": each kind on/off (falls, people down, children, crowding, fire, dangerous objects,
    floor and exits, equipment, fights, behaviour), night hours, the main times (lying still, floor 30 s / exit 2 min,
    equipment every 10 min, restricted 3 s, pacing turns), validated like the other fields; per camera "Safety" stays.
