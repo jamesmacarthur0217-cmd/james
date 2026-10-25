@@ -817,7 +817,7 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 
 ## 9. Message to start the next session
 
-> I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
-> docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE44-49-PLAN.md
-> then continue with docs/PHASE50-55-PLAN.md (Phase 50 step 3: the vision model's load on the Health page). Ask me before each phase and each step starts, discuss any
+> I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and docs/ROADMAP.md
+> first, run the tests to confirm everything is green, then continue with docs/PHASE50-55-PLAN.md (Phase 50 step 3:
+> the vision model's load on the Health page). Ask me before each phase and each step starts, discuss any
 > architecture with me first, and do it step by step.
