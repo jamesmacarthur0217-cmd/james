@@ -1,4 +1,4 @@
-﻿# Phases 50-55 plan: capacity, settings, an overview, night, more signs, pests (approved 2026-10-25)
+# Phases 50-55 plan: capacity, settings, an overview, night, more signs, pests (approved 2026-10-25)
 
 ## Context
 
