@@ -125,6 +125,11 @@ is taken back out of the vision model's queue and counted as dropped, so no answ
    dropped; critical 3 of 3 on time (2.2 s); labels waited 46 s, 119 refused. **Moderate** (18 a minute, share 0.25):
    nothing dropped, rounds waited 12 s, warnings 4 s, critical 2.8 s. So the blocking shows only over capacity.
 2. Build A and B (VLMWorker can take back a job that has not started; ConfirmQueue), tests.
+   **Done 2026-10-25**: `VLMWorker.take_back(job)` (a job not started is skipped when reached, never answered;
+   `pending` leaves it out); `ConfirmQueue._may_send` (one at a time per lane: critical waits only for critical, a
+   warning for critical or warning, a round for a round; the per-minute limit below critical as before) and
+   `_take_back_rounds` (a round not started within `max_wait_s` after it was sent: taken back, dropped, its on_done
+   hears None; one already started is left to finish). 1038 tests.
 3. Measure again the same way; a real run on a test copy (MOT16-02 looping, as when it was found); README, pitfall 44.
 
 ## Phase 53: Night-time measuring

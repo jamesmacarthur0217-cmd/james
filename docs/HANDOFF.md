@@ -533,7 +533,8 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
    ConfirmQueue sends one non-critical check at a time; a round (the equipment round) goes into the vision model's
    queue at the lowest priority, behind people's labels. On a flooded camera (MOT16-02 looping) it was still waiting
    8 minutes later, and meanwhile every warning and round waited 30 s and was dropped (8 dropped). Critical checks
-   are not held back. A fix changes the queue: discuss it with the user first.
+   are not held back. **Fix agreed and built 2026-10-25** (the user's choice: rounds no longer block warnings; a
+   round not started within 30 s is taken back, `VLMWorker.take_back`); measured again in the fix's step 3.
 
 ## 7. Conventions
 

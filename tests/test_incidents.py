@@ -184,3 +184,81 @@ def test_the_vision_model_queue_puts_critical_checks_before_people():
     client.release.set()
     assert worker.close(5)
     assert client.order == ["first", "critical", "warning", "person a", "person b"] and done == [1, 6, 5, 2, 3]
+
+
+def test_a_job_not_started_can_be_taken_back():
+    """HANDOFF pitfall 44: a slow round still waiting in the vision model's queue is taken back; never sent, no answer."""
+    client, done = SlowClient(), []
+    worker = vlm.VLMWorker(client, lambda job, results: done.append(job), max_queue=5)
+    pic = np.zeros((8, 8, 3), np.uint8)
+    assert worker.submit(1, [(pic, None)], "first")
+    assert client.started.wait(5)                     # the first is being labelled
+    assert worker.submit(2, [(pic, None)], "round", priority=vlm.ROUND)
+    assert worker.submit(3, [(pic, None)], "person")
+    assert worker.waiting(vlm.ROUND) == 1 and worker.pending == 2
+    assert worker.take_back(2) is True
+    assert worker.take_back(2) is False and worker.take_back(1) is False   # twice, or already started: no
+    assert worker.waiting(vlm.ROUND) == 0 and worker.pending == 1
+    client.release.set()
+    assert worker.close(5)
+    assert client.order == ["first", "person"] and done == [1, 3]
+
+
+class HoldingWorker(Worker):
+    """Keeps every job (no answer comes by itself), with the vision model queue's waiting() and take_back()."""
+
+    def __init__(self, started=()):
+        super().__init__()
+        self.taken, self.started = [], set(started)
+
+    def waiting(self, priority):
+        return 0
+
+    def take_back(self, job):
+        if job in self.started:
+            return False
+        self.taken.append(job)
+        return True
+
+
+def test_a_round_out_does_not_hold_warnings_back():
+    """The user's choice (pitfall 44, A): one at a time per lane; a round waiting in the vision model's queue does not
+    stop a warning, but another round waits for it; a warning out still stops a second warning."""
+    worker = HoldingWorker()
+    q, clock = _queue(worker)
+    q.suspect("cam1", "equipment", "the round every 10 min", level="round")
+    assert q.tick().level == "round"
+    clock[0] += 1
+    q.suspect("cam1", "equipment", "the round again", area={"id": 9, "name": "hall", "points": [(0, 0), (1, 0), (1, 1)]},
+              level="round")
+    q.suspect("cam1", "floor", "patch on the walkway")
+    assert q.tick().category == "floor"               # sent although the round is still out
+    clock[0] += 1
+    q.suspect("cam1", "crowd", "6 people in hall (at most 3)")
+    assert q.tick() is None                           # a warning out: the next warning waits; the round too
+    q.suspect("cam1", "fire", "seen 3 of 5 looks")
+    assert q.tick().category == "fire"                # critical: never held back
+    assert [p for *_, p in worker.jobs] == [vlm.ROUND, vlm.WARNING, vlm.CRITICAL]
+
+
+def test_a_round_not_started_in_time_is_taken_back_and_dropped():
+    """The user's choice (pitfall 44, B): after max_wait_s not started, the round is taken back and counted as dropped
+    (its on_done hears None); then the next round can go. One already started is left to finish."""
+    worker = HoldingWorker()
+    q, clock = _queue(worker, max_wait_s=30)
+    heard = []
+    q.suspect("cam1", "equipment", "the round every 10 min", level="round", on_done=heard.append)
+    first = q.tick()
+    clock[0] += 29
+    q.tick()
+    assert worker.taken == [] and first.number in q.sent
+    clock[0] += 2
+    q.suspect("cam1", "equipment", "the next round", level="round",
+              area={"id": 4, "name": "x", "points": [(0, 0), (1, 0), (1, 1)]})
+    nxt = q.tick()
+    assert worker.taken == [job_id(first.number)] and heard == [None] and q.counts["dropped_old"] == 1
+    assert q.dropped_within(60) == 1 and nxt is not None and nxt.reason == "the next round"
+    worker.started.add(job_id(nxt.number))            # this one is with the vision model already: it stays
+    clock[0] += 60
+    q.tick()
+    assert nxt.number in q.sent and q.counts["dropped_old"] == 1

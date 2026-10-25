@@ -157,6 +157,7 @@ class Suspect:
     pictures: list = field(default_factory=list)  # [(wall time, picture, head boxes)], oldest first
     at: datetime = field(default_factory=datetime.now)
     queued: float = 0.0                  # monotonic time it was queued
+    sent: float = 0.0                    # monotonic time it went to the vision model's queue
     number: int = 0
     crop: tuple | None = None            # (x1, y1, x2, y2) fractions: the person it is about, cut out with context
     question: str | None = None          # instead of the category's own question
@@ -314,8 +315,45 @@ class ConfirmQueue:
         waiting = getattr(self.worker, "waiting", None)
         return waiting is None or waiting(PEOPLE) > 0
 
+    def _take_back_rounds(self, now: float) -> list[Suspect]:
+        """A round sent to the vision model but not started within max_wait_s is taken back out of its queue and
+        dropped (HANDOFF pitfall 44): it waits behind people's labels, and an answer minutes later would be about old
+        pictures. A stand-in worker without take_back keeps it."""
+        take_back = getattr(self.worker, "take_back", None)
+        if take_back is None:
+            return []
+        with self._lock:
+            stale = [s for s in self.sent.values() if s.level == "round" and now - s.sent > self.max_wait_s]
+        gone = []
+        for s in stale:
+            if take_back(job_id(s.number)):   # not started: it will never be answered
+                with self._lock:
+                    self.sent.pop(s.number, None)
+                    self.counts["dropped_old"] += 1
+                    self.dropped_at.append(now)
+                log.warning("[%s] safety check taken back after %.0f s not started (the vision model is busy): %s "
+                            "(%s)", s.camera, now - s.sent, s.category, s.reason)
+                gone.append(s)
+        return gone
+
+    def _may_send(self, s: Suspect) -> bool:
+        """One at a time per lane (HANDOFF pitfall 44, the user's choice): a critical check waits only for another
+        critical one; a warning for a critical or warning one; a round only for another round (it goes into the vision
+        model's queue after people's labels, where it can wait long: it must not hold the warnings back). Below
+        critical, at most confirm_per_min a minute while people's labels wait."""
+        out = {x.level for x in self.sent.values()}
+        if s.level == "critical":
+            return "critical" not in out
+        if s.level == "round":
+            if "round" in out:
+                return False
+        elif out & {"critical", "warning"}:
+            return False
+        return not (len(self.sent_at) >= self.per_min and self._labels_waiting())
+
     def tick(self) -> Suspect | None:
-        """Drop suspects that waited too long; send the next one when allowed. Returns the one sent."""
+        """Drop suspects that waited too long (and rounds not started in time); send the next one when allowed.
+        Returns the one sent."""
         now = self.clock()
         with self._lock:
             old = [s for s in self.waiting if now - s.queued > self.max_wait_s]
@@ -325,22 +363,18 @@ class ConfirmQueue:
                 self.dropped_at.append(now)
                 log.warning("[%s] safety check dropped after %.0f s waiting: %s (%s)", s.camera, now - s.queued,
                             s.category, s.reason)
-        for s in old:
+        for s in old + self._take_back_rounds(now):
             self._done(s, None)
         with self._lock:
             while self.sent_at and now - self.sent_at[0] >= 60:
                 self.sent_at.popleft()
-            if not self.waiting:
-                return None
-            s = min(self.waiting, key=lambda w: (LEVELS[w.level], w.queued))
-            critical = s.level == "critical"
-            if critical:   # never behind a lower one, nor held back by the per-minute limit
-                if any(x.level == "critical" for x in self.sent.values()):
-                    return None
-            elif self.sent or (len(self.sent_at) >= self.per_min and self._labels_waiting()):
+            s = next((w for w in sorted(self.waiting, key=lambda w: (LEVELS[w.level], w.queued)) if self._may_send(w)),
+                     None)
+            if s is None:
                 return None
             self.waiting.remove(s)
             s.number = next(self._numbers)
+            s.sent = now
             self.sent[s.number] = s
             self.sent_at.append(now)
             self.last_sent[s.key] = now

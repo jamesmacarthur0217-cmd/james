@@ -318,6 +318,10 @@ class VLMWorker:
         self.jobs: queue.PriorityQueue = queue.PriorityQueue()   # (priority, order, job or None)
         self._order = itertools.count()
         self._waiting: dict[int, int] = {}   # priority -> jobs waiting
+        # take_back() (HANDOFF pitfall 44): job id -> (order, priority) of its newest job still waiting, and the
+        # orders taken back (they stay in the PriorityQueue until reached, then are skipped).
+        self._queued: dict[int, tuple[int, int]] = {}
+        self._taken_back: set[int] = set()
         self._count_lock = threading.Lock()
         self._pool = ThreadPoolExecutor(self.workers, thread_name_prefix="vlm")
         self._slots = threading.Semaphore(self.workers)   # frames in flight
@@ -328,14 +332,15 @@ class VLMWorker:
 
     @property
     def pending(self) -> int:
-        """Jobs waiting for a free slot (not counting the ones being labeled)."""
-        return self.jobs.qsize()
+        """Jobs waiting for a free slot (not counting the ones being labeled, nor the ones taken back)."""
+        with self._count_lock:
+            return max(0, self.jobs.qsize() - len(self._taken_back))
 
     @property
     def idle(self) -> bool:
         """Nothing waiting and nothing being labeled: scene questions go only then (people and vehicles first)."""
         with self._idle:
-            return self.jobs.qsize() == 0 and self._jobs_in_flight == 0
+            return self.pending == 0 and self._jobs_in_flight == 0
 
     def waiting(self, priority: int) -> int:
         """Jobs waiting at this priority."""
@@ -352,8 +357,23 @@ class VLMWorker:
                         self._refused.append(self.clock())
                 return False
             self._waiting[priority] = self._waiting.get(priority, 0) + 1
-        self.jobs.put((priority, next(self._order), (track_id, frames, mode, self.clock())))
+            order = next(self._order)
+            self._queued[track_id] = (order, priority)
+            self.jobs.put((priority, order, (track_id, frames, mode, self.clock())))
         return True
+
+    def take_back(self, track_id: int) -> bool:
+        """Take a job back that has not started yet (its newest one with this id): True when taken back, so it is never
+        sent and on_result is not called for it; False when it has started already (or is not here). The confirm
+        queue takes back a slow round that waited too long behind people's labels (HANDOFF pitfall 44)."""
+        with self._count_lock:
+            entry = self._queued.pop(track_id, None)
+            if entry is None:
+                return False
+            order, priority = entry
+            self._taken_back.add(order)
+            self._waiting[priority] -= 1
+            return True
 
     def _forget_old(self, now: float) -> None:
         """Drop what is older than the load window (called with _load_lock held)."""
@@ -393,13 +413,19 @@ class VLMWorker:
             # A free slot first, then the job: so the job taken is the most urgent one waiting at that moment (taken
             # first, it would sit here while all slots are busy, and a critical check sent meanwhile would wait).
             self._slots.acquire()
-            priority, _, job = self.jobs.get()
+            priority, order, job = self.jobs.get()
             if job is None:
                 self._slots.release()
                 return
-            with self._count_lock:
-                self._waiting[priority] -= 1
             track_id, frames, mode, submitted = job
+            with self._count_lock:
+                if order in self._taken_back:   # taken back (its count was lowered then): skipped, no answer
+                    self._taken_back.discard(order)
+                    self._slots.release()
+                    continue
+                self._waiting[priority] -= 1
+                if self._queued.get(track_id, (None,))[0] == order:
+                    del self._queued[track_id]
             if priority == PEOPLE:
                 now = self.clock()
                 with self._load_lock:
