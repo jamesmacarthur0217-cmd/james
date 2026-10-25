@@ -10,7 +10,8 @@ Two kinds of night (the user's choice, 2026-10-26):
 For every truth file below, each video is written to data/datasets/night_made/<kind>/ under its own path (relative to
 data/datasets), with the truth file and the areas file next to it, paths changed, so the same measuring tools run on
 them (tools/incident_check.py --truth data/datasets/night_made/ir/urfd/incidents_truth.csv ...). Same frame rate and
-size; the grain is the same for every run (seeded per video). A video already made is skipped (the run can be
+size, H.264 like a security camera sends (the app's FFmpeg; OpenCV's mp4v without it); the grain is the same for
+every run (seeded per video). A video already made is skipped (the run can be
 stopped and started again). --preview writes one picture per video (day | ir | dark, from the middle) to
 data/datasets/night_made/preview/ instead, to check the look. Nothing is downloaded; the folder is git-ignored.
 """
@@ -19,6 +20,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import subprocess
 import sys
 import zlib
 from pathlib import Path
@@ -29,6 +31,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data" / "datasets"
 OUT = DATA / "night_made"
+FFMPEG = ROOT / "data" / "ffmpeg" / "ffmpeg.exe"   # the app's own (recording.ffmpeg); without it: OpenCV's mp4v
 # (truth file, areas file or None): the measuring sets of Phases 45-49.
 SETS = [("urfd/incidents_truth.csv", None),                       # falls
         ("survfight/incidents_truth.csv", None),                  # fights (and the clips without)
@@ -87,22 +90,51 @@ def _rng(video: str, kind: str) -> np.random.Generator:
     return np.random.default_rng(zlib.crc32(f"{kind}:{video}".encode()))
 
 
+class _H264:
+    """Frames to an H.264 file through the app's FFmpeg (the graphics card's encoder), as a security camera sends
+    them: grain in OpenCV's own mp4v format made 0.5 GB of each 2-minute video (about 50 GB for all), H.264 a fraction."""
+
+    def __init__(self, path: Path, fps: float, size: tuple[int, int]):
+        w, h = size
+        self.proc = subprocess.Popen(
+            [str(FFMPEG), "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24",
+             "-s", f"{w}x{h}", "-r", f"{fps:.3f}", "-i", "-", "-c:v", "h264_nvenc", "-preset", "p5", "-cq", "23",
+             "-pix_fmt", "yuv420p", "-f", "mp4", str(path)], stdin=subprocess.PIPE)
+
+    def write(self, frame: np.ndarray) -> None:
+        self.proc.stdin.write(frame.tobytes())
+
+    def release(self) -> None:
+        self.proc.stdin.close()
+        if self.proc.wait() != 0:
+            raise RuntimeError("FFmpeg could not write the video")
+
+
+def _writer(path: Path, fps: float, size: tuple[int, int]):
+    w, h = size
+    if FFMPEG.is_file() and w % 2 == 0 and h % 2 == 0:   # (H.264 in yuv420p needs an even size)
+        return _H264(path, fps, size)
+    return cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), fps, size)
+
+
 def make_video(src: Path, dst: Path, kind: str, video: str) -> int:
     cap = cv2.VideoCapture(str(src))
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     dst.parent.mkdir(parents=True, exist_ok=True)
     tmp = dst.with_name(dst.stem + ".part.mp4")
-    writer = cv2.VideoWriter(str(tmp), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+    writer = _writer(tmp, fps, (w, h))
     rng, vig, n = _rng(video, kind), _vignette((h, w)), 0
-    while True:
-        ok, frame = cap.read()
-        if not ok:
-            break
-        writer.write(night(kind, frame, rng, vig))
-        n += 1
-    cap.release()
-    writer.release()
+    try:
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            writer.write(night(kind, frame, rng, vig))
+            n += 1
+    finally:
+        cap.release()
+        writer.release()
     if n == 0:
         tmp.unlink(missing_ok=True)
         raise RuntimeError(f"no frames read from {src}")
