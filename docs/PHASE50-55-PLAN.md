@@ -140,6 +140,19 @@ is taken back out of the vision model's queue and counted as dropped, so no answ
 ## Phase 53: Night-time measuring
 
 None of the safety checks were measured at night (dark or infrared, black-and-white pictures).
+
+**Design agreed with the user 2026-10-26** (all three recommended): (1) **two kinds of night**, each measuring video
+made in both: *IR* (black and white, flat contrast, grain, slightly soft, brighter in the middle like the camera's own
+IR lamp) and *dark colour* (about a quarter of the brightness, heavy grain: no IR, street lights); (2) **the plan's
+four checks plus fire**: falls (UR Fall), fights (the fight clips), floor and exits (`floor_made`), behaviour
+(`behaviour_made`, with "camera covered" false alarms on the everyday videos: a dark picture has little contrast), fire
+and smoke (D-Fire's sample videos); (3) **real night footage looked for after the made-up run** (size and licence
+shown, nothing downloaded without the user's OK). A change found needed (e.g. other thresholds at night) is discussed
+with the user before it is built.
+Steps: 1. `tools/make_night_videos.py` (IR and dark versions into `data/datasets/night_made`, git-ignored; previews
+to check they look right). 2. Measure each check by day (the README's numbers, the same tools and halves) against IR
+and dark. 3. The numbers to the user; any change discussed, built, measured again; then the search for real footage;
+README with day and night numbers.
 1. Made-up night videos from the ones here (darker, noisier, black-and-white like infrared) for falls (UR Fall), fights
    (the fight clips), floors and behaviour; measure found / false alarms as by day, with the same tools.
 2. Optionally real night footage: a public set with night or infrared video (size and licence checked, asked first).
