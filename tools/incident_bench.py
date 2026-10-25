@@ -277,6 +277,7 @@ def busy(client: VLMClient, cfg: dict, frames: list, people: list, minutes: floa
     seconds = time.monotonic() - start
     with lock:   # at the end of the time, not after the queue has emptied
         worked, answered = busy_s[0], answers[0]
+        out_at_end = {k: c["raised"] - len(c["waits"]) - c["dropped"] - c["refused"] for k, c in checks.items()}
     left_labels = len([j for j in labels["sent"] if j < 100000])
     stop.set()
     worker.close(60)
@@ -287,8 +288,11 @@ def busy(client: VLMClient, cfg: dict, frames: list, people: list, minutes: floa
           f"{left_labels}; labelled again {labels['relabels']}")
     for kind, c in checks.items():
         if rates[kind]:
+            # Still out at the end: neither answered nor dropped yet (a round stuck in the vision model's queue
+            # behind people's labels, HANDOFF pitfall 44).
+            out = out_at_end[kind]
             print(f"  {kind:8s} {c['raised']} raised: waited {pq(c['waits'])}; dropped {c['dropped']}"
-                  + (f", not sent {c['refused']}" if c["refused"] else ""))
+                  + (f", not sent {c['refused']}" if c["refused"] else "") + (f", still out at the end {out}" if out else ""))
     print(f"  the vision model: {answered / seconds * 60:.0f} answers a minute, busy "
           f"{worked / seconds / max(1, workers):.0%} of the time ({workers} at once)")
 

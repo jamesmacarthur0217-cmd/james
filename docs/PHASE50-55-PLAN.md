@@ -119,6 +119,11 @@ a time; rounds one at a time among themselves; critical as before); (B) a round 
 is taken back out of the vision model's queue and counted as dropped, so no answer comes about old pictures.
 1. Measure first: `tools/incident_bench.py --busy` (MOT16-09, a crowd and a moderate share), warnings and rounds
    dropped, as in Phase 50.
+   **Done 2026-10-25** (3 min each, the real model; the bench now also counts checks "still out at the end", taken
+   when the time ends): **a crowd** (87 people a minute): one round answered only after **219 s** (stuck behind
+   labels), rounds 4 of 6 dropped and 2 still out, **warnings 14 of 18 dropped** and 3 still out, words 2 of 3
+   dropped; critical 3 of 3 on time (2.2 s); labels waited 46 s, 119 refused. **Moderate** (18 a minute, share 0.25):
+   nothing dropped, rounds waited 12 s, warnings 4 s, critical 2.8 s. So the blocking shows only over capacity.
 2. Build A and B (VLMWorker can take back a job that has not started; ConfirmQueue), tests.
 3. Measure again the same way; a real run on a test copy (MOT16-02 looping, as when it was found); README, pitfall 44.
 
