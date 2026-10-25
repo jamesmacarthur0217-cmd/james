@@ -659,6 +659,11 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             audit(request, "home/away", f"set to {body.mode.capitalize()}")
         return arming.state()
 
+    @app.get("/safety")
+    def safety_page():
+        """The safety overview (Phase 52, admins: not in accounts.VIEWER)."""
+        return FileResponse(STATIC / "safety.html")
+
     @app.get("/api/safety")
     def safety_state():
         """Safety incidents (labeler/incidents.py, admins): the kinds with their level and words, and the confirm

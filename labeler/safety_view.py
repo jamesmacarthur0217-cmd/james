@@ -85,7 +85,8 @@ def _floor(p) -> dict | None:
         return None
     st = watch.state()
     return {"learned": st["learning"] is None, "learning": st["learning"], "learned_at": st["learned_at"],
-            "saved": st["saved"], "relearned": st["relearned"], "picture": watch.picture() is not None}
+            "saved": st["saved"], "relearned": st["relearned"], "picture": watch.picture() is not None,
+            "ready": st["ready"]}   # share of the watched areas seen without people (a still crowd: never all)
 
 
 def _alerts(db, now: datetime) -> list[dict]:

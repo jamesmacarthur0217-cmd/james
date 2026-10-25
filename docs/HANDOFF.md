@@ -18,7 +18,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-25)
 
-**Start here (2026-10-25, end of the session; last commit: Phase 52 step 1 + this handoff; 1031 tests + 1 PostgreSQL test that
+**Start here (2026-10-25, end of the session; last commit: Phase 52 + this handoff; 1035 tests + 1 PostgreSQL test that
 is skipped without `VL_TEST_POSTGRES_URL`; GitHub green; working tree clean; no test copy running).**
 
 **Plan in progress: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (approved 2026-10-25, the user's choices, in this
@@ -45,7 +45,10 @@ answers.
   `crowd_enabled` / `fights_enabled`; measured thresholds stay in config.yaml. What's new entry `p51`.
 - **Phase 52 step 1 done** (design agreed first, plan `71fbecf`: checks from memory, admins only, the empty picture
   small with its date): `labeler/safety_view.py`, `/api/safety` "overview", `/api/safety/empty/<camera>`.
-- **Next: Phase 52 step 2** (the page `/safety`, links from Alerts and Health, phone width, README); ask first.
+- **Phase 52 step 2 done; Phase 52 is done**: the page `labeler/static/safety.html` (`/safety`), links from the Alerts
+  and Health pages. What's new entry `p52`. Found and written down, not fixed: pitfall 44 (a round waiting in the
+  vision model's queue blocks warnings on a flooded camera); offer the fix to the user (a queue change: discuss).
+- **Next: Phase 53** (night-time measuring); discuss its design with the user first, ask before each step.
 - Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
   videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
 
@@ -522,6 +525,15 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
    costs from the same budget. Measure a change with `tools/incident_bench.py --busy` (people from MOT16's true marks,
    `--share` for the load) before claiming it fits; a looping short clip in a test copy floods it with "new" people
    (each loop new track numbers), heavier than a real camera.
+43. **A page script must not declare `top`, `location`, `window` or `document`** (Phase 52): `function top()` stopped
+   the safety page ("Identifier 'top' has already been declared": window.top cannot be redeclared); node --check
+   does not see it, a browser does. A test now looks for these names in every page; look at a new page in the
+   browser pane and read its console.
+44. **A round sent to the vision model blocks the warnings behind it** (seen in Phase 52's real run, not fixed):
+   ConfirmQueue sends one non-critical check at a time; a round (the equipment round) goes into the vision model's
+   queue at the lowest priority, behind people's labels. On a flooded camera (MOT16-02 looping) it was still waiting
+   8 minutes later, and meanwhile every warning and round waited 30 s and was dropped (8 dropped). Critical checks
+   are not held back. A fix changes the queue: discuss it with the user first.
 
 ## 7. Conventions
 

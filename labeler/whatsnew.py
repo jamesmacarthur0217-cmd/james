@@ -159,10 +159,14 @@ ENTRIES: list[Entry] = [
           "The vision model's time is shared better: safety checks use its free time, people who only pass by (under "
           "2 s) get colour labels, and one picture per person while others wait. The Health page's \"vision model\" "
           "line shows how busy it was in the last 10 minutes.", "/health", "admin"),
-    Entry("p51", 51, "", "Safety checks on the Settings page",
+    Entry("p51", 51, "0583d93", "Safety checks on the Settings page",
           "Settings, \"Safety checks\": turn each kind on or off (people down, children, crowding, fire, dangerous "
           "objects, floor and exits, equipment, fights, suspicious behaviour) and change the main times, such as the "
           "night hours. Changes apply after a restart.", "/settings", "admin"),
+    Entry("p52", 52, "", "The safety page",
+          "One page for the safety checks: which checks run on each safety camera, what each area's role means, the "
+          "floor check's empty picture, the latest checks with the vision model's answers, and the week's safety "
+          "alerts. Linked from the Alerts and Health pages.", "/safety", "admin"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

@@ -79,7 +79,7 @@ def test_areas_say_what_their_role_means(db):
     kinds = _kinds(view)
     assert kinds["floor"] == kinds["crowd"] == kinds["equipment"] == kinds["weapons"] == ("on", "")
     assert cam["floor"] == {"learned": True, "learning": None, "learned_at": "2026-10-25T09:30:00",
-                            "saved": "2026-10-25T11:00", "relearned": 2, "picture": True}
+                            "saved": "2026-10-25T11:00", "relearned": 2, "picture": True, "ready": 1.0}
     cfg["safety"]["equipment_enabled"], cfg["safety"]["floor_hold_s"] = False, 45
     assert safety_view.role_meaning("walkway", cfg) == "floor check: something new on the floor 45 s is checked"
 
@@ -122,3 +122,29 @@ def test_the_api_and_the_empty_picture(db, tmp_path):
     from labeler import accounts
     assert not accounts.allowed("viewer", "GET", "/api/safety/empty/yard")    # admins only
     assert not accounts.allowed("viewer", "GET", "/api/safety")
+
+
+def test_the_page_and_its_links(db, tmp_path):
+    from pathlib import Path
+    cfg = copy.deepcopy(DEFAULTS)
+    cfg["storage"]["crop_dir"] = str(tmp_path / "crops")
+    client = TestClient(create_app(cfg, db, None), client=("127.0.0.1", 5000))
+    page = client.get("/safety")
+    assert page.status_code == 200 and 'fetch("/api/safety")' in page.text and "/api/safety/empty/" in page.text
+    from labeler import accounts
+    assert not accounts.allowed("viewer", "GET", "/safety")                  # a viewer is sent to the Live page
+    static = Path(__file__).resolve().parent.parent / "labeler" / "static"
+    assert 'href="/safety"' in (static / "alerts.html").read_text(encoding="utf-8")
+    health = (static / "health.html").read_text(encoding="utf-8")
+    assert 'href="/safety"' in health and 'class="admin-only"' in health and '"safety checks"' in health
+
+
+def test_no_page_declares_a_name_the_browser_keeps():
+    """`function top()` stopped the safety page with "Identifier 'top' has already been declared" (window.top cannot
+    be redeclared); node --check (tests/test_pages.py) does not see it. The same for location, window, document."""
+    import re
+    from pathlib import Path
+    static = Path(__file__).resolve().parent.parent / "labeler" / "static"
+    bad = re.compile(r"^(?:async\s+)?(?:function\s+|(?:let|const|var|class)\s+)(top|location|window|document)\b", re.M)
+    for page in [*static.glob("*.html"), *static.glob("*.js")]:
+        assert not bad.search(page.read_text(encoding="utf-8")), page.name

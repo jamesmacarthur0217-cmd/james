@@ -838,6 +838,15 @@ last seconds (`labeler/incidents.py`) and answers yes / no / unsure with a few w
   faces blurred for viewers) and a clip. Alerts page: "Show critical safety incidents"; the Check page measures each
   kind on its own ("fire or smoke alerts: 9 of 10 right"); Health line "safety checks" (checked since the start,
   yes / no / unsure, dropped, the latest answers).
+- **Safety page** (`/safety`, Phase 52, admins; links from the Alerts page and the Health page's safety lines): per
+  safety camera which of the ten checks run (green), partly (yellow: guns not looked for without their model, no
+  walkway or exit area yet, no area with a people limit) or not (turned off on the Settings page, no fire model, fall
+  alerts off for the camera); each area with its role and what that means for the checks, with the times in use ("a
+  knife or scissors held here is normal; fire or smoke inside it is ignored (a stove); a child here 3 s is checked");
+  the floor check's empty picture with when it was learned (and a red note when part of the walkway or exit areas was
+  never seen empty: people who never move away stay in it); the latest checks with the vision model's answers (the
+  last 50 since the start, kept in memory: the user's choice, no new table); safety alerts per kind in the last 7
+  days with the Check page's "right N of M". It refreshes every 30 s.
 - **Settings page, "Safety checks"** (Phase 51, the user's choices): each kind on or off (people down, children,
   crowding, fire and smoke, dangerous objects, floor and exits, unsafe equipment, fights, suspicious behaviour; falls
   have their own switch). Off there, the check does not run at all (no camera or vision-model time); a rule turned
@@ -1813,6 +1822,7 @@ Changes are tracked with git.
 | `labeler/supervisor.py`, `labeler/logs.py` | restart after crashes; log files |
 | `labeler/healthcheck.py` | the Health page and `/api/health` |
 | `labeler/settings.py` | the Settings page (`data/settings.yaml` over config.yaml) |
+| `labeler/safety_view.py` | the safety page's view (`/safety`, `/api/safety` "overview") |
 | `labeler/importer.py` | the Import page: recorded videos with real times |
 | `labeler/recorder.py`, `labeler/recordings_web.py` | recording while people are in view; the Recordings page |
 | `labeler/receiver.py` | receiving cameras sent from a phone or another PC (MediaMTX) |

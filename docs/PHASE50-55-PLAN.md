@@ -96,6 +96,12 @@ added to the existing `/api/safety` as `"overview"` (the Alerts page's keys kept
 (JPEG, admins); `FloorWatch.learned_at`; `ConfirmQueue.latest()`. Alerts per kind: the last 7 days. Real run
 (MOT16-02, three areas drawn): all ten kinds on, each area's meaning, the empty picture learned (the walking people
 left out), no errors.
+**Step 2 done 2026-10-25; Phase 52 is done**: `labeler/static/safety.html` (`/safety`, admins), links from the Alerts
+page and the Health page's lines "safety checks", "floor and exits", "unsafe equipment"; a red note when part of
+the walkway or exit areas was never seen empty (`ready`). Browser checks at phone width (375 px, no sideways scroll)
+on a test copy: MOT16-02 looping (areas, the empty picture) and bus.jpg (an answered equipment round in the table;
+the note at 57% seen empty). Found: `function top()` broke the page (pitfall 43, now a test); and a round waiting
+in the vision model's queue blocks the warnings (pitfall 44, not fixed: a queue change, discuss first).
 1. A page (`/safety`, admins; a link from the Alerts page and Health): per safety camera which checks run, which areas
    have which role (and what that role means for the checks), the empty picture (floor check) and when it was learned,
    the latest checks with the vision model's answers, and alerts per kind this week with the Check page's "right N of

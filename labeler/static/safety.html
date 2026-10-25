@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Safety</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/session.js"></script>
+<style>
+  .panel + .panel { margin-top: 16px; }
+  .kinds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+  .kind { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 12px; font-size: 13px;
+    background: var(--chip); }
+  .kind::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .kind.on::before { background: var(--ok); }
+  .kind.partly { background: var(--warn-bg); color: var(--warn); }
+  .kind.partly::before { background: var(--warn); }
+  .kind.off { color: var(--muted); text-decoration: line-through; }
+  .notes { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+  .notes li { margin: 2px 0; }
+  h3 { font-size: 13px; margin: 16px 0 6px; }
+  .wrap { overflow-x: auto; }
+  table.t { border-collapse: collapse; font-size: 13px; width: 100%; }
+  table.t td, table.t th { border-bottom: 1px solid var(--border); padding: 5px 8px 5px 0; text-align: left;
+    vertical-align: top; }
+  table.t th { color: var(--muted); font-weight: 500; white-space: nowrap; }
+  table.t td.num, table.t th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ans { font-weight: 600; }
+  .ans.yes, .ans.direct { color: var(--bad); }
+  .ans.unsure { color: var(--warn); }
+  .ans.no { color: var(--muted); }
+  .crit { color: var(--bad); font-weight: 600; }
+  .empty-pic { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+  .empty-pic img { width: 100%; max-width: 280px; border-radius: 6px; border: 1px solid var(--border); display: block; }
+  .empty-pic p { margin: 0 0 4px; font-size: 13px; }
+  @media (max-width: 600px) { table.t .wide { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>VisionLabeler</h1>
+  <nav><a href="/">Live</a><a href="/recordings">Recordings</a><a href="/summary">Summary</a><a href="/review" class="admin-only">Review queue</a><a href="/reports" class="admin-only">Reports</a><a href="/alerts" class="admin-only">Alerts</a><a href="/answer-key" class="admin-only">Answer key</a><a href="/check" class="admin-only">Check</a><a href="/audit" class="admin-only">Audit log</a><a href="/import" class="admin-only">Import</a><a href="/settings" class="admin-only">Settings</a><a href="/health">Health</a></nav>
+</header>
+<main>
+  <section class="panel">
+    <h2>Safety checks</h2>
+    <p class="hint">What the safety checks do on each safety camera (cameras with "Safety" ticked on the
+      <a href="/settings">Settings</a> page; security cameras by default): a quick check sees a possible incident, the
+      vision model looks at the last seconds, and only its "yes" alerts. Turn kinds on or off and change the times on the
+      Settings page (after a restart); the alerts themselves are on the <a href="/alerts">Alerts</a> page.</p>
+    <div id="top"><div class="empty">Loading…</div></div>
+  </section>
+  <div id="cameras"></div>
+  <section class="panel">
+    <h2 id="alerts-title">Safety alerts in the last 7 days</h2>
+    <p class="hint">All cameras. "Checked" is from your answers on the <a href="/check">Check</a> page (was this alert
+      right?); with only a few answers the share can change a lot.</p>
+    <div id="alerts"><div class="empty">Loading…</div></div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+let words = {};          // category -> words ("fire or smoke")
+let shownPictures = {};  // camera -> {key: when learned / saved, v: the picture's version in its address}
+
+function when(iso) {
+  if (!iso) return "";
+  const d = new Date(iso), today = new Date();
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toDateString() === today.toDateString() ? time
+    : d.toLocaleDateString([], { day: "numeric", month: "short" }) + " " + time;
+}
+
+function queueLine(o) {
+  if (!o.enabled) return '<p>The safety checks are <b>turned off</b> (Settings page, "Safety checks").</p>';
+  if (!o.cameras.length) return `<div class="empty">No safety camera. Safety checks run on cameras with "Safety"
+    ticked on the <a href="/settings">Settings</a> page (security cameras by default).</div>`;
+  const q = o.queue;
+  if (!q) return '<p class="muted">The vision model is off, so nothing is checked (Health page).</p>';
+  const parts = [`<b>${q.sent}</b> checked by the vision model since the start: ${q.yes} yes, ${q.no} no, ${q.unsure} unsure`
+    + (q.failed ? `, ${q.failed} failed` : "")];
+  if (q.wait_median_s !== null) parts.push(`waited ${q.wait_median_s} s (median)`);
+  if (q.direct) parts.push(`${q.direct} alerted without a check (pacing, restricted area, camera covered)`);
+  if (q.dropped_old) parts.push(`<span class="crit">${q.dropped_old} dropped</span> (waited too long: the vision model was busy)`);
+  if (q.waiting) parts.push(`${q.waiting} waiting now`);
+  return `<p>${parts.join(" · ")}. Night hours: ${esc(o.night_hours)}.</p>`;
+}
+
+function camera(c, kept) {
+  const kinds = c.kinds.map(k => `<span class="kind ${k.state}" title="${esc(k.state + (k.why ? ": " + k.why : ""))}">${esc(k.words.split(" (")[0])}</span>`).join("");
+  const notes = c.kinds.filter(k => k.why).map(k => `<li><b>${esc(k.words.split(" (")[0])}</b>: ${esc(k.why)}</li>`).join("");
+  const areas = c.areas.length ? `<div class="wrap"><table class="t"><tr><th>Area</th><th>Role</th><th>What the checks do there</th></tr>
+      ${c.areas.map(a => `<tr><td>${esc(a.name)}</td><td>${esc(a.role_words || "none")}</td>
+        <td>${esc(a.meaning || (a.role ? "" : "only counted"))}${a.max_people ? `${a.meaning ? "; " : ""}at most ${a.max_people} people` : ""}</td></tr>`).join("")}
+    </table></div>` : '<p class="muted">No areas yet. Draw them on the <a href="/">Live</a> page (Zones) and give each a role.</p>';
+  let floor = "";
+  if (c.floor) {
+    const f = c.floor;
+    const info = f.learned
+      ? `<p>Learned ${esc(when(f.learned_at)) || "(time not known)"}${f.relearned ? ` · learned again ${f.relearned} ${f.relearned === 1 ? "time" : "times"} (the light changed)` : ""}</p>
+         ${f.ready < 0.95 ? `<p class="crit">Only ${Math.round(f.ready * 100)}% of the walkway and exit areas were seen
+           with nobody on them: people who never move away stay in the picture, and their spots are not compared.</p>` : ""}
+         ${f.saved ? `<p class="muted">Saved ${esc(when(f.saved))}; it follows slow changes, and a "no" from the vision model puts a change into it.</p>` : ""}`
+      : `<p>Still learning (${esc(f.learning || "")}): it needs looks with nobody on the floor.</p>`;
+    const pic = f.picture ? `<a href="/api/safety/empty/${encodeURIComponent(c.name)}" target="_blank" rel="noopener"
+        title="Full size"><img alt="The empty picture of ${esc(c.name)}" data-cam="${esc(c.name)}"></a>` : "";
+    floor = `<h3>The floor check's empty picture</h3><div class="empty-pic">${pic}<div>${info}
+      <p class="muted">Walkway and exit areas are compared with it.</p></div></div>`;
+  }
+  const checks = c.checks.length ? `<div class="wrap"><table class="t"><tr><th>Time</th><th>Kind</th><th class="wide">Why</th><th>Answer</th></tr>
+      ${c.checks.map(x => `<tr><td>${esc(when(x.at))}</td><td>${esc(words[x.category] || x.category)}${x.area ? ` · ${esc(x.area)}` : ""}</td>
+        <td class="wide">${esc(x.reason)}</td>
+        <td><span class="ans ${esc(x.answer)}">${esc(x.answer === "direct" ? "alerted" : x.answer)}</span>${x.what ? ` <span class="muted">${esc(x.what)}</span>` : ""}</td></tr>`).join("")}
+    </table></div>` : '<p class="muted">None since the app started.</p>';
+  return `<section class="panel"><h2>${esc(c.name)}</h2>
+    <div class="kinds">${kinds}</div>${notes ? `<ul class="notes">${notes}</ul>` : ""}
+    <h3>Areas</h3>${areas}${floor}
+    <h3>Latest checks</h3><p class="muted" style="margin:0 0 6px">The last ${kept} since the app started (kept in memory).</p>${checks}
+  </section>`;
+}
+
+function alertsTable(o) {
+  $("alerts-title").textContent = `Safety alerts in the last ${o.days} days`;
+  if (!o.alerts.length) return '<div class="empty">No safety alerts.</div>';
+  return `<div class="wrap"><table class="t"><tr><th>Kind</th><th class="num">Alerts</th><th class="wide">Cameras</th><th>Checked</th></tr>
+    ${o.alerts.map(a => {
+      const c = a.checked, n = c ? c.right + c.wrong : 0;
+      const checked = !c || !n ? `<span class="muted">not yet (<a href="/check">Check</a> page)</span>`
+        : `right ${c.right} of ${n}` + (c.few ? ' <span class="muted">(few checks yet)</span>' : ` (${Math.round(c.share * 100)}%)`);
+      const cams = Object.entries(a.cameras).map(([k, v]) => `${esc(k)} ${v}`).join(", ");
+      return `<tr><td class="${a.level === "critical" ? "crit" : ""}">${esc(a.words)}</td><td class="num">${a.alerts}</td>
+        <td class="wide">${cams}</td><td>${checked}</td></tr>`;
+    }).join("")}</table></div>`;
+}
+
+async function load() {
+  const r = await fetch("/api/safety");
+  if (!r.ok) { $("top").innerHTML = '<div class="empty">Could not load (admins only).</div>'; return; }
+  const s = await r.json();
+  words = Object.fromEntries(s.kinds.map(k => [k.category, k.words]));
+  const o = s.overview;
+  $("top").innerHTML = queueLine(o);
+  $("cameras").innerHTML = o.cameras.map(c => camera(c, o.kept)).join("");
+  $("alerts").innerHTML = alertsTable(o);
+  // The empty pictures: fetched again only when learned anew (the page refreshes every 30 s).
+  document.querySelectorAll("img[data-cam]").forEach(img => {
+    const cam = img.dataset.cam, c = o.cameras.find(x => x.name === cam);
+    const key = (c.floor.learned_at || "") + "|" + (c.floor.saved || "");
+    if (!shownPictures[cam] || shownPictures[cam].key !== key) shownPictures[cam] = { key, v: Date.now() };
+    img.src = `/api/safety/empty/${encodeURIComponent(cam)}?v=${shownPictures[cam].v}`;
+  });
+}
+
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>

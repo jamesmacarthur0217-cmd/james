@@ -100,6 +100,8 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const NAMES = { ok: "OK", warning: "worth a look", problem: "not working", off: "off" };
+// Lines with more on the safety page (Phase 52, admins).
+const SAFETY_LINES = ["safety checks", "floor and exits", "unsafe equipment"];
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
@@ -129,7 +131,8 @@ async function load() {
   $("checks").innerHTML = (h.checks || []).map(c => `
     <div class="check ${c.level}" title="${NAMES[c.level] || c.level}">
       <span class="dot ${c.level}"></span><span class="name">${esc(c.name)}</span>
-      <span class="detail">${esc(c.detail)}</span>
+      <span class="detail">${esc(c.detail)}${SAFETY_LINES.includes(c.name)
+        ? ' <a class="admin-only" href="/safety">(safety page)</a>' : ""}</span>
     </div>`).join("");
   const errors = h.latest_errors || [];
   $("errors-panel").hidden = !errors.length;
