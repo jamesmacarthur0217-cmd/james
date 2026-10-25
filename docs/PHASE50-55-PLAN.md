@@ -1,4 +1,4 @@
-# Phases 50-55 plan: capacity, settings, an overview, night, more signs, pests (proposed 2026-10-25)
+﻿# Phases 50-55 plan: capacity, settings, an overview, night, more signs, pests (approved 2026-10-25)
 
 ## Context
 
@@ -17,6 +17,15 @@ other (pitfall 21); every new per-person sign gets a once-a-minute limit (pitfal
 
 On busy cameras safety checks were dropped after waiting 30 s (Phase 49's real run: the question for a direct alert,
 the equipment round; pitfall 37). Before adding more checks, measure and make room.
+
+**Design agreed with the user 2026-10-25** (the plan was approved in this order the same day): (1) safety checks use
+the vision model's **idle time**: the per-minute limit (`confirm_per_min`) holds only while people's labels are
+waiting; when nothing waits, checks go at once (today: at most 6 a minute, one at a time, always); (2) on a busy
+camera **people passing in under 2 s get colours only** (no vision-model label); people who stay are labelled as now;
+not chosen: the words question last, longer waits for rounds, one picture for warnings; (3) **measure two requests at
+once** (Ollama answering 2 in parallel on the GPU): changing the user's Ollama setting only with their OK and only if
+it gives more answers a minute; (4) measured with a busy camera made from the videos here (a crowded clip in a loop,
+the real vision model); no download. Re-labels already wait until the queue is empty (unchanged).
 1. **Measure**: `tools/incident_bench.py` grows a "busy camera" run: people's labels, re-labels every 15 s, safety
    checks of each level at a set rate; report how long each kind waits and how many are dropped, per minute of video.
 2. **Make room** (the choice is discussed with the user first; options): re-label less often while safety checks wait;
