@@ -28,6 +28,15 @@ it gives more answers a minute; (4) measured with a busy camera made from the vi
 the real vision model); no download. Re-labels already wait until the queue is empty (unchanged).
 1. **Measure**: `tools/incident_bench.py` grows a "busy camera" run: people's labels, re-labels every 15 s, safety
    checks of each level at a set rate; report how long each kind waits and how many are dropped, per minute of video.
+   **Done 2026-10-25** (`incident_bench.py --busy`: people from MOT16-09's true marks looped, checks through the real
+   confirm queue at 1 critical, 6 warnings, 2 rounds and 1 words question a minute, 3 min each, the real model):
+   the vision model gives **about 42 answers a minute** (1.4 s each; a person's label takes 2). Busy (87 people a
+   minute): labels waited 86 s, 168 of 261 refused (the queue full), warnings 14 of 18 dropped, rounds 4 of 6, the
+   critical ones on time (2.4 s). Moderate (21 a minute): the model already **busy 100%**, labels 9 s, warnings 10 of
+   18 dropped (the fixed 6 a minute), rounds 3 of 6, critical 2.1 s. **Two at once: no gain** (44-45 answers a minute
+   instead of 41-43; critical checks waited 4 s instead of 2.4): as measured before (README "Speed"), the GPU is the
+   limit; the user's Ollama setting is left alone. So "use idle time" helps only when there is idle time, which a
+   camera with 20 people a minute does not leave.
 2. **Make room** (the choice is discussed with the user first; options): re-label less often while safety checks wait;
    skip re-labels of people already labelled well; one picture instead of three for warnings; a longer wait for warnings
    than for rounds. Keep whatever measures better, say what was tried.

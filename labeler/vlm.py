@@ -289,7 +289,9 @@ class VLMWorker:
     """Runs VLM calls in the background so the camera loop never waits.
 
     Up to `workers` frames are sent to Ollama at once (Ollama needs OLLAMA_NUM_PARALLEL >= workers).
-    Measured on an RTX 4070 SUPER: 2 at once labels people 1.9x faster than 1; 3 or 4 add nothing.
+    On this PC (RTX 4070 SUPER) 2 at once was 1.9x faster only while "localhost" added ~2 s to each request; since
+    127.0.0.1, 2 at once is no faster (2026-10-25, tools/incident_bench.py --busy: 44 answers a minute against 42, and
+    critical checks wait longer), so vlm.workers stays 1.
     Jobs wait in one priority queue (CRITICAL .. ROUND); `max_queue` limits the jobs waiting at PEOPLE and below, so a
     busy camera never fills the queue for a safety check (critical or warning)."""
 
