@@ -30,7 +30,8 @@ BED = "bed"
 # role -> what the Live page calls it ("" = no role: a plain area for counting).
 ROLES = {"walkway": "walkway or aisle", "exit": "exit or emergency exit", "cooking": "cooking area",
          "food_prep": "food preparation", "dining": "dining or seating", "play": "children's play area",
-         "restricted": "restricted (staff or no entry)", BED: "bed or sofa (lying is normal here)"}
+         "restricted": "restricted (staff or no entry)", BED: "bed or sofa (lying is normal here)",
+         "fence": "fence or wall (climbing over it is suspicious)"}
 
 
 def role_at(zones: list[dict], pt: tuple[float, float]) -> str:

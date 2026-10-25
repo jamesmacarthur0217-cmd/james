@@ -146,10 +146,15 @@ ENTRIES: list[Entry] = [
           "something new on a walkway floor for 30 s (a spill, a bag) or in an exit for 2 minutes is checked, and two "
           "\"yes\" a minute apart alert. Every 10 minutes each area with a role is also checked for unsafe equipment "
           "(an overturned chair, cables across the floor).", "/alerts"),
-    Entry("p48", 48, "", "Fights",
+    Entry("p48", 48, "4f908e3", "Fights",
           "On security cameras: two people close together with a fast arm reaching the other are checked by the vision "
           "model, and a \"yes\" alerts at once, red with a beep. A fall alert now also says whom the person touched "
           "just before (a collision).", "/alerts"),
+    Entry("p49", 49, "", "Suspicious behaviour",
+          "On security cameras, judged only by what people do: climbing over an area marked \"fence or wall\" (checked "
+          "by the vision model; red with a beep at night or when Away), and at night (22:00-06:00) or when Away "
+          "someone in a \"restricted\" area or pacing back and forth; and the camera covered or turned just after "
+          "someone was seen.", "/alerts"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

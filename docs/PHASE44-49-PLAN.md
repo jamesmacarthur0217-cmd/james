@@ -315,6 +315,16 @@ camera covered or moved alerts at any time when a person was seen in the 30 s be
 problem, as today); (4) night = **22:00-06:00** (`behaviour.night_hours`); (5) measured on the videos here (false
 alarms on MOT16, MOT20, UR Fall, the floor videos: target none to a few an hour) and made-up cases on a test copy for
 each sign; no download.
+**Done 2026-10-25 (all three steps within step 1)**: `labeler/behaviour.py` BehaviourWatch (climbing, restricted,
+pacing, camera()), zones role "fence", `ConfirmQueue.direct` (alert now, the vision model's words added after by
+`IncidentAlerts.add_words`; once a minute per camera, area and sign), alerts keep a suspect's own level (critical
+climbing), Pipeline `_look_for_behaviour`, config `behaviour`, `tools/make_behaviour_videos.py`, Health line counts
+direct alerts. Measured: made-up pacing 2 of 2, covered and turned found, a dimmed light nothing; 86 everyday videos
+with the whole picture as a fence: 67 climbing checks all "no", no pacing, no camera alert on still cameras ("turned"
+once on each of the 6 moving cameras: true). Found on the way: single pictures for the camera check failed on a busy
+street (now the middle value of 5 looks), a whole clip played back and forth was no pacing test, and 29 direct alerts
+in 90 s in a real run (now once a minute). README "Suspicious behaviour". **Phase 49 is done; the Phases 44-49 plan is
+finished.**
 
 1. **Behaviour signs** (rules, each with its own setting): came back to the same area 3 times in 30 minutes (re-linked
    person); pacing back and forth across an area; stopping at several doors or vehicles in a row; a hand at a parked

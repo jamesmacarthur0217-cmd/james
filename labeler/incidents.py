@@ -11,6 +11,11 @@ pictures from the last seconds and answers yes / no / unsure with a few words. T
 - IncidentAlerts (step 3): a "yes" becomes an alert for each enabled rule of that kind (built-in: one per kind,
   alerts.ensure_incident_rules), with the newest picture (and a face-blurred copy for viewers) and a clip; "no" and
   "unsure" alert nothing and only show on the Health page.
+- Direct alerts (Phase 49): ConfirmQueue.direct alerts at once through the same listeners, for a pattern the vision
+  model cannot see in a few seconds (someone pacing, in a restricted area at night) or the camera covered; with a
+  question, the vision model is asked afterwards what the person is doing and its words are added to the alert's
+  message (IncidentAlerts.add_words). It never stops the alert. At most one a `cooldown_s` per camera, kind, area and
+  sign: a real run alerted 29 times in 90 s as people walked one after another into a restricted area.
 - ConfirmQueue: suspects wait here (critical first, then oldest); one is sent to the vision model at a time, at most
   `confirm_per_min` a minute, in the shared priority queue (labeler/vlm.py: critical checks, then warnings, then
   people's labels, then the slow rounds). A critical check never waits for a lower one: it goes even while a warning
@@ -220,7 +225,7 @@ class ConfirmQueue:
         self.recent: deque = deque(maxlen=50)      # the latest answers, newest last
         self.listeners: list = []                  # called with (suspect, answer dict)
         self.counts = {"suspects": 0, "sent": 0, "yes": 0, "no": 0, "unsure": 0, "failed": 0, "dropped_old": 0,
-                       "cooldown": 0, "no_pictures": 0}
+                       "cooldown": 0, "no_pictures": 0, "direct": 0}
         self.waits: deque = deque(maxlen=200)      # seconds each sent suspect waited
         self._numbers = itertools.count(1)
         self._lock = threading.Lock()
@@ -231,9 +236,10 @@ class ConfirmQueue:
     def suspect(self, camera: str, category: str, reason: str, area: dict | None = None, people=(),
                 pictures: list | None = None, crop: tuple | None = None, question: str | None = None,
                 level: str | None = None, on_done=None, span_s: float | None = None,
-                alert_if_yes: bool | None = None, cut: tuple | None = None) -> str:
+                alert_if_yes: bool | None = None, cut: tuple | None = None, cooldown: bool = True) -> str:
         """A fast check saw something. Returns "queued", "cooldown" (checked just now) or "no pictures"; only
-        when "queued" will on_done be called (with the answer, or None when none came)."""
+        when "queued" will on_done be called (with the answer, or None when none came). cooldown=False: not held back
+        by the cooldown (a direct alert's question, limited by direct() itself)."""
         if category not in CATEGORIES:
             raise ValueError(f"unknown incident category {category!r}")
         now = self.clock()
@@ -241,7 +247,8 @@ class ConfirmQueue:
                     level_as=level, on_done=on_done, alert_if_yes=alert_if_yes, cut=cut)
         with self._lock:
             self.counts["suspects"] += 1
-            if now - self.last_sent.get(s.key, -1e9) < self.cooldown_s or any(w.key == s.key for w in self.waiting):
+            if cooldown and (now - self.last_sent.get(s.key, -1e9) < self.cooldown_s
+                             or any(w.key == s.key for w in self.waiting)):
                 self.counts["cooldown"] += 1
                 return "cooldown"
         memory = self.memories.get(camera)
@@ -255,6 +262,49 @@ class ConfirmQueue:
         with self._lock:
             self.waiting.append(s)
         return "queued"
+
+    def direct(self, camera: str, category: str, reason: str, area: dict | None = None, people=(),
+               crop: tuple | None = None, level: str | None = None, pictures: list | None = None,
+               describe: str | None = None, sign: str = "") -> list[dict]:
+        """Alert now, without waiting for the vision model's yes (see the module text). pictures: the alert's picture
+        (default: the newest from memory); describe: a question about what the person is doing, asked afterwards,
+        whose words are added to the alerts; sign: what was seen ("pacing"), for the once-a-minute limit. Returns the
+        alerts made ([] within the limit)."""
+        if category not in CATEGORIES:
+            raise ValueError(f"unknown incident category {category!r}")
+        key = ("direct", camera, category, (area or {}).get("id"), sign)
+        with self._lock:
+            now = self.clock()
+            if now - self.last_sent.get(key, -1e9) < self.cooldown_s:
+                self.counts["cooldown"] += 1
+                return []
+            self.last_sent[key] = now
+        memory = self.memories.get(camera)
+        s = Suspect(camera, category, reason, area, list(people), queued=self.clock(), crop=crop, level_as=level)
+        s.pictures = pictures if pictures is not None else (memory.pick(1, 0) if memory else [])
+        if s.pictures:
+            s.at = s.pictures[-1][0]
+        made = []
+        for listener in self.listeners:
+            try:
+                made += listener(s, {"answer": "yes", "what": "", "direct": True}) or []
+            except Exception:
+                log.exception("a safety check listener failed")
+        with self._lock:
+            self.counts["direct"] += 1
+            self.recent.append({"camera": camera, "category": category, "level": s.level, "reason": reason,
+                                "area": (area or {}).get("name"), "at": s.at.isoformat(timespec="seconds"),
+                                "answer": "direct", "what": "", "seconds": 0.0})
+        log.warning("[%s] safety alert without a check: %s (%s)", camera, category, reason)
+        if describe and made:
+            def words(answer, made=made):
+                for listener in self.listeners:
+                    add = getattr(listener, "add_words", None)
+                    if add is not None and answer:
+                        add(made, answer)
+            self.suspect(camera, category, reason, area=area, people=people, crop=crop, question=describe,
+                         alert_if_yes=False, on_done=words, cooldown=False)
+        return made
 
     def tick(self) -> Suspect | None:
         """Drop suspects that waited too long; send the next one when allowed. Returns the one sent."""
@@ -390,12 +440,14 @@ class IncidentAlerts:
         rules = self.alerts.check_incident(s.camera, s.category, area)
         if not rules:
             return []
-        level, words, _ = CATEGORIES[s.category]
+        _, words, _ = CATEGORIES[s.category]
+        level = s.level if s.level in ("critical", "warning") else CATEGORIES[s.category][0]   # not "round"
         picture = self._save_picture(s)
         made = []
         for rule in rules:
             what = answer.get("what") or s.reason
-            message = f"{rule['name']}: {what}" + (f" (in {area})" if area else "") + f"; seen first: {s.reason}"
+            message = f"{rule['name']}: {what}" + (f" (in {area})" if area else "") + \
+                ("" if answer.get("direct") else f"; seen first: {s.reason}")
             event = self.db.record_incident_alert(rule["id"], s.camera, message, s.category, level,
                                                   answer.get("what", ""), picture)
             if event is None:
@@ -407,3 +459,14 @@ class IncidentAlerts:
                 clips.request(event["id"])
             made.append(event)
         return made
+
+    def add_words(self, events: list[dict], answer: dict) -> None:
+        """A direct alert (ConfirmQueue.direct): the vision model's words on what the person is doing, added."""
+        what = (answer or {}).get("what")
+        if not what:
+            return
+        for e in events:
+            try:
+                self.db.update_alert_message(e["id"], f"{e['message']}; the vision model: {what}")
+            except Exception:
+                log.exception("safety alert: could not add the vision model's words")

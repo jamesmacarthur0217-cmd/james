@@ -18,7 +18,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-21)
 
-**Latest (2026-10-23, end of the session; Phase 48 done; 998 tests + 1 PostgreSQL test that is
+**Latest (2026-10-25, end of the session; Phase 49 done, the Phases 44-49 plan finished; 1011 tests + 1 PostgreSQL test that is
 skipped without `VL_TEST_POSTGRES_URL`; GitHub green).**
 
 **Plan in progress: [PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)**: safety incidents on **security cameras** (the 11 kinds
@@ -61,16 +61,23 @@ with the user first (their rule: **discuss any architecture before building it**
   clips + MOT16), one "yes" alerts (critical), one fight check per camera a minute; collisions through the fall check
   ("after touching person #12"). Surveillance Camera Fight Dataset (`data/datasets/survfight`, 87 MB, downloaded with
   OK): 39 of 75 fights alerted, 0 false alerts on the everyday videos (README "Fights and collisions").
-- **Next: Phase 49** (suspicious behaviour, behaviour only), the last of the plan; discuss its design with the user
-  first. Open for the user (offer, don't change unasked): a floor check's "yes" then "no" puts a real bag into the
-  empty picture (the agreed rule); a third look could decide instead.
+- **Phase 49 done; the Phases 44-49 plan is finished** (2026-10-25; design agreed first, plan `bb4860d`): suspicious
+  behaviour, judged only by what people do (`labeler/behaviour.py`): climbing at an area with the new role "fence or
+  wall" (the vision model confirms; critical at night 22-06 or when Away), a restricted area and pacing back and forth
+  (alert at once at night or when Away: `ConfirmQueue.direct`, the vision model's words added after), the camera
+  covered or turned (when a person was seen in the 30 s before). Made-up cases found, 0 false alerts on still cameras
+  in 86 everyday videos (README "Suspicious behaviour").
+- **Next: ask the user** what comes next (no plan is open). Waiting from before: Phase 26 (a real-camera week, after
+  they restart their own app), the MIVIA fire videos. Open for the user (offer, don't change unasked): a floor
+  check's "yes" then "no" puts a real bag into the empty picture (the agreed rule); a third look could decide instead;
+  an own rodent model if they want pests after all.
 
 **Measuring tools** (all on recorded videos / photos, the real camera code, the vision model):
 `tools/incident_check.py` (videos + truth CSV `video,kind,start_s,end_s,half`; `--labels`, `--areas`, `--hold-s`,
 `--fps`, `--match` for tuning halves), `tools/crowd_check.py`, `tools/incident_bench.py` (vision-model cost),
 `tools/weapon_check.py` (coco / people / guns / openimages / photos), `tools/train_fire.py`, `tools/train_guns.py`,
 `tools/make_floor_videos.py` (made-up floor videos from still scenes), `tools/equipment_check.py`,
-`tools/pest_check.py`; `tools/incident_check.py --make-truth survfight` (fights; tune `--match '[02468]\.mp4$'`).
+`tools/pest_check.py`; `tools/make_behaviour_videos.py` (Phase 49); `tools/incident_check.py --make-truth survfight` (fights; tune `--match '[02468]\.mp4$'`).
 Numbers and limits are in README sections "Safety incidents" ... "Dangerous objects".
 
 **Data downloaded this time (all with the user's OK, git-ignored, measuring/training only):** MOT20 (`data/datasets/
@@ -311,6 +318,9 @@ labeler/floor.py     floor hazards and blocked exits (Phase 47 step 2): FloorWat
                      picture + now (Suspect.cut tighter, alert_if_yes False on the first look, True on the second)
 labeler/equipment.py unsafe equipment (Phase 47 step 3): EquipmentRounds, every area with a role to the vision model
                      every 10 min (Pipeline._round_equipment, level round; two "yes" a minute apart; "reported")
+labeler/behaviour.py suspicious behaviour (Phase 49): BehaviourWatch (climbing at a "fence" area -> confirm; restricted
+                     area and pacing -> ConfirmQueue.direct at night/Away; camera() covered/turned from the middle
+                     value of 5 looks against 10-15 s before) -> Pipeline._look_for_behaviour
 labeler/safety.py    + fights (Phase 48): SafetyWatch.fights (pairs close together, a fast wrist touching / reaching the
                      other) -> Pipeline._raise_fight (one check per camera a minute); touched() -> a fall's note
                      ("after touching person #12", Pipeline._touched_before_fall, AlertEngine.check(note=))
@@ -477,6 +487,10 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
    most of D-Fire's sample videos come from turning cameras that visit preset views ("Preset 5" on screen). Compare a
    few frames across the video (median gray difference, `cv2.phaseCorrelate`) before using one as a fixed view.
    Still here: MOT16-02, -04, -09; D-Fire FP1-5, 7-10, 15, 19-22 (FP9/FP10 have paths, the rest hills).
+40. **A sign raised per person floods on a busy camera** (Phase 48-49): a fight raised by each pair of one fight, and a
+   restricted area entered by people one after another, gave 2 and 29 alerts until they were limited to one a minute
+   per camera (and area and sign). Every new per-person sign needs such a limit; a looping test clip (new track
+   numbers each loop) shows the flood quickly.
 
 ## 7. Conventions
 
@@ -783,5 +797,5 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and
 > docs/ROADMAP.md first, run the tests to confirm everything is green, then continue with docs/PHASE44-49-PLAN.md
-> (Phase 49: suspicious behaviour; discuss its design with me first); ask me before each phase and each step starts, discuss any
+> and tell me what is open; the Phases 44-49 plan is finished. Ask me before each phase and each step starts, discuss any
 > architecture with me first, and do it step by step.

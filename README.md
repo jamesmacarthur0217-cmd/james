@@ -1064,6 +1064,47 @@ fall's message now also says whom the person touched just before ("Fall: fell; a
 person's box touching theirs from 5 s before the fall to 2 s after; SafetyWatch.touched). A trolley or a car hitting
 someone is not named (not measurable here).
 
+### Suspicious behaviour (Phase 49)
+
+Judged only by what people **do** (never age, gender, clothing, skin or a face covering; no face recognition; nothing
+happens by itself: the alert shows the picture, the clip and the reason, and a person decides). On safety cameras
+(`labeler/behaviour.py`, config `behaviour`), the four signs the user chose:
+
+| sign | how it is seen | when it alerts |
+|---|---|---|
+| **climbing a fence or wall** | at an area with the new role **"fence or wall"**, the feet rise a quarter of the person's height above where they usually were, the body not getting smaller (walking away also lifts the feet in the picture, but shrinks the body), for 1 s | when the vision model says yes; red with a beep at night (22:00-06:00, `behaviour.night_hours`) or when Away, else a plain warning |
+| **in a restricted area** | the feet inside an area with the role "restricted" for 3 s | at night or when Away, at once (once per visit) |
+| **pacing back and forth** | inside any area, the walk turns back 4 times within 3 minutes, each way at least 1.5 body heights | at night or when Away, at once |
+| **the camera covered or turned** | once a second a tiny gray picture: the middle value of the last 5 against the one 10-15 s before; covered = no edges left, turned = most edges moved (a light switched off keeps them) | at once, any time, but only when a person was seen in the 30 s before; else it stays a camera problem (Health page) |
+
+Pacing and the restricted area are patterns the vision model cannot see in a few seconds, so they alert without
+waiting (the user's choice); the vision model is asked afterwards what the person is doing, and its words are added
+to the alert ("...; the vision model: a man trying the door"); it never stops the alert. At most one such alert a
+minute per camera, area and sign (a real run on a test copy first gave 29 alerts in 90 s as people walked one after
+another into a restricted area; then one a minute, the first with "the vision model: no unusual activity"). On a very
+busy camera the words can be missing: the question waits behind people's labels and is dropped after 30 s, the alert
+stays. The camera alert's picture is from before the change (who was there).
+
+Measured (`tools/make_behaviour_videos.py`, `tools/incident_check.py`, the real camera code and vision model; no
+download, the user's choice):
+
+| videos | sign | result |
+|---|---|---|
+| made-up pacing: one person's walk across MOT16-02 / -09 played back and forth (legs of 7-8 s), 4 min each | pacing | **2 of 2** alerted, 31 and 38 s in (4 turns); again after 3 min while it went on |
+| made-up: MOT16-09, then the lens covered (black) | covered | **alerted** 5 s after |
+| made-up: MOT16-09, then the view turned (another part enlarged) | turned | **alerted** 7 s after |
+| made-up: MOT16-09, then the light dimmed to 40% | - | **nothing** (right) |
+| everyday, 86 videos, 36 min (MOT16, MOT20, UR Fall, the floor videos), the whole picture marked "fence or wall" | climbing | 67 checks (the worst case), the vision model said **no to all** |
+| the same | pacing | **none** |
+| the same, the still cameras | camera | **none** |
+| the same, the 6 videos filmed while the camera moves or pans (MOT16-05/-10/-11/-13, MOT20-02/-05) | camera | "turned" once each: true, the camera did move |
+
+Not measured: real climbing (no video of it here: only its false alarms, with the whole picture marked as a fence,
+the worst case), the user's own cameras and night pictures. Also found while measuring: comparing single pictures
+for the camera check failed on a busy street (big people close to the lens changed the picture as much as a turned
+camera), so it compares the middle value of several looks; and a made-up pacing video from a whole clip played back
+and forth did not work, as people walk out of the picture and come back as someone new.
+
 ## No movement
 
 For someone living alone (an elderly parent): an alert when nobody has been seen on the camera for a long time while

@@ -480,6 +480,8 @@ def check_safety(incidents) -> dict | None:
              f"{s['unsure']} unsure" + (f", {s['failed']} failed" if s["failed"] else "") + ")"]
     if s["wait_median_s"] is not None:
         parts.append(f"waited {s['wait_median_s']} s")
+    if s.get("direct"):
+        parts.append(f"{s['direct']} alerted without a check (pacing, restricted area, camera covered)")
     if s["dropped_old"]:
         parts.append(f"{s['dropped_old']} dropped (waited over the limit: the vision model is busy)")
     latest = [f"{r['at'][11:16]} {r['category'].replace('_', ' ')} {r['answer']}" + (f" ({r['what']})" if r["what"] else "")

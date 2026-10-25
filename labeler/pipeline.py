@@ -250,6 +250,7 @@ class Pipeline:
         # The 10-minute equipment rounds (labeler/equipment.py), Phase 47 step 3. (Pests were measured with YOLOE and
         # left out: tools/pest_check.py, README "Unsafe equipment; pests left out".)
         self.equipment = None
+        self.behaviour = None   # suspicious behaviour (labeler/behaviour.py), Phase 49
         if scfg.get("enabled") and cam.get("safety", self.mode == "security"):
             from .incidents import FrameMemory
             from .safety import SafetyWatch
@@ -283,6 +284,10 @@ class Pipeline:
             if scfg.get("equipment_enabled", True):
                 from .equipment import EquipmentRounds
                 self.equipment = EquipmentRounds(scfg)
+            bcfg = self.cfg.get("behaviour") or {}
+            if bcfg.get("enabled", True):
+                from .behaviour import BehaviourWatch
+                self.behaviour = BehaviourWatch(bcfg)
         # Areas with a loitering rule (people, vehicles): the live picture shows how long someone is in them.
         self._stay_areas: frozenset[str] = frozenset()
         self._stay_areas_v: frozenset[str] = frozenset()
@@ -522,6 +527,8 @@ class Pipeline:
                     where = zones_mod.anchor(st.box, frame.shape, self.mode)
                     role = zones_mod.role_at(self.zone_counter.zones, where)
                     self.safety_watch.update(tid, now, st.box, kpts, role, self._age_of(st), where)
+                if getattr(self, "behaviour", None) is not None:
+                    self.behaviour.update(tid, now, st.box, frame.shape, self.zone_counter.zones)
                 if getattr(self, "gestures", None) is not None:
                     sign = self.gestures.update(tid, now, kpts)
                     if sign:
@@ -557,6 +564,8 @@ class Pipeline:
                 self._look_at_floor(frame, now, seen)
             if self.equipment is not None and areas:
                 self._round_equipment(now)
+            if getattr(self, "behaviour", None) is not None:
+                self._look_for_behaviour(frame, now)
             for area, reason in self.safety_watch.crowd(now, limited, self._crowd_counts):
                 try:
                     self.incidents.suspect(self.name, "crowd", reason, area=area)
@@ -575,6 +584,8 @@ class Pipeline:
                     self._fall_db[tid] = st.db_id
                 if self.safety_watch is not None:
                     self.safety_watch.forget(tid)
+                if getattr(self, "behaviour", None) is not None:
+                    self.behaviour.forget(tid)
                 self._finish(tid, lost_at=st.last_seen)
         if self._fall_db and self.frames % 100 == 0:
             self._fall_db = {k: v for k, v in self._fall_db.items() if k in self.falls.tracks}
@@ -775,6 +786,53 @@ class Pipeline:
         reason = f"down for {int(self.falls.after_s)} s after a fall" + (f", {note}" if note else "")
         if self._raise(tid, "fall", reason, shape, db_id=db_id, question=FALL_QUESTION, on_done=done) != "queued":
             done(None)
+
+    def _look_for_behaviour(self, frame: np.ndarray, now: float) -> None:
+        """Suspicious behaviour (labeler/behaviour.py; the user's choices): climbing is checked by the vision model
+        (critical at night or when Away); pacing and a restricted area alert directly at night or when Away, with the
+        vision model's words on what the person does added afterwards; the camera covered or turned alerts at once
+        when someone was seen just before, with the picture from before."""
+        from .arming import AWAY
+        from .behaviour import CLIMB_QUESTION, DESCRIBE_QUESTION
+        wall = self.clock.wall()
+        arming = getattr(self.alerts, "arming", None) if self.alerts is not None else None
+        away = arming is not None and arming.current() == AWAY
+        watchful = away or self.behaviour.night(wall)
+        when = "when Away" if away else "at night"
+        for tid, sign, reason, area in self.behaviour.tick(now, self.zone_counter.zones, frame.shape, watchful):
+            log.warning("[%s] behaviour: %s (person %s)", self.name, reason, tid)
+            if sign == "climb":
+                self._raise(tid, "suspicious", reason + (f" {when}" if watchful else ""), frame.shape,
+                            level="critical" if watchful else None, question=CLIMB_QUESTION)
+                continue
+            st = self.tracks.get(tid)
+            crop = None
+            if st is not None:
+                self._ensure_db(st)
+                h, w = frame.shape[:2]
+                crop = (st.box[0] / w, st.box[1] / h, st.box[2] / w, st.box[3] / h)
+            try:
+                self.incidents.direct(self.name, "suspicious", f"{reason} {when}", area=area,
+                                      people=[st.db_id] if st is not None and st.db_id is not None else [],
+                                      crop=crop, describe=DESCRIBE_QUESTION, sign=sign)
+            except Exception:
+                log.exception("[%s] a behaviour alert failed", self.name)
+        if self.behaviour.camera_due(now):
+            got = self.behaviour.camera(now, frame)
+            if got is None:
+                return
+            kind, reason = got
+            seen = self.person_seen_wall
+            ago = (wall - seen).total_seconds() if seen is not None else None
+            if ago is None or ago > self.behaviour.camera_seen_s:
+                log.info("[%s] %s with nobody seen before: a camera problem only", self.name, reason)
+                return
+            before = self.memory.pick(3, 10.0)[:1] if self.memory is not None else []   # the picture before it
+            try:
+                self.incidents.direct(self.name, "suspicious", f"{reason} {int(ago)} s after someone was seen",
+                                      pictures=before or None, sign=kind)
+            except Exception:
+                log.exception("[%s] a camera alert failed", self.name)
 
     def _touched_before_fall(self, tid) -> str:
         """Collisions (Phase 48, the user's choice: through the fall check): "after touching person #12" when someone

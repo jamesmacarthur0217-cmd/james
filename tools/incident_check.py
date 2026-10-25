@@ -169,6 +169,14 @@ def run_video(video: Path, cfg: dict, embedder, fps: float, half: str, hold_s: f
         return got
 
     q.suspect = suspect
+    plain_direct = q.direct
+
+    def direct(camera, category, reason, *a, **k):   # Phase 49: an alert without the vision model's yes
+        got = plain_direct(camera, category, reason, *a, **k)
+        suspects.append((round(p.clock.t, 2), category))   # its "yes" comes through the listeners
+        return got
+
+    q.direct = direct
     # A first look (floor hazards: two "yes" alert) is listed, but its "yes" is no alert.
     q.listeners.append(lambda s, a: answers.append((round(p.clock.t, 2), s.category,
                                                     a["answer"] + (" (first look)" if s.alert_if_yes is False else ""),

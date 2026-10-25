@@ -2,10 +2,12 @@
 
 ## Status (2026-10-21)
 
-Latest: Phases 44-46 done and Phases 47-48 done (2026-10-20/23; 998 tests): safety incidents on security cameras
+Latest: Phases 44-46 done and Phases 47-49 done (2026-10-20/25; 1011 tests): safety incidents on security cameras
 ([PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)): the safety base, people (falls checked by the vision model, lying still,
 slumped, children, crowding), fire and smoke (own model on D-Fire), dangerous objects (own gun model on Open Images).
-Phase 47 done 2026-10-21 (step 2 floor hazards and blocked exits, step 3 unsafe equipment; pests measured and left out). Phase 48 (fights; collisions through the fall check) done 2026-10-23. Next: Phase 49. MIVIA fire videos
+Phase 47 done 2026-10-21 (step 2 floor hazards and blocked exits, step 3 unsafe equipment; pests measured and left out). Phase 48 (fights; collisions through the fall check) done 2026-10-23. Phase 49 (suspicious behaviour: climbing,
+restricted area, pacing, camera covered or turned) done 2026-10-25: **the Phases 44-49 plan is finished.** Next: ask
+the user. MIVIA fire videos
 when the user has them.
 
 
