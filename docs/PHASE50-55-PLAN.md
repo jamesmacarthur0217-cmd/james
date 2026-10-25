@@ -109,6 +109,19 @@ in the vision model's queue blocks the warnings (pitfall 44, not fixed: a queue 
 2. Viewers: not shown (camera pictures and alerts are admin things), unless the user wants otherwise.
 3. Browser check, README.
 
+## Fix before Phase 53: a waiting round blocks warnings (HANDOFF pitfall 44)
+
+Found in Phase 52's real run: the confirm queue sends one non-critical check at a time; a round (the equipment look,
+"not moved for 5 min") goes into the vision model's queue last, behind people's labels; on a flooded camera it waited
+8 minutes and every warning behind it was dropped after 30 s (8 dropped). **Fix agreed with the user 2026-10-25 (both
+recommended parts)**: (A) a round waiting in the vision model's queue no longer blocks warnings (warnings still one at
+a time; rounds one at a time among themselves; critical as before); (B) a round not started within `max_wait_s` (30 s)
+is taken back out of the vision model's queue and counted as dropped, so no answer comes about old pictures.
+1. Measure first: `tools/incident_bench.py --busy` (MOT16-09, a crowd and a moderate share), warnings and rounds
+   dropped, as in Phase 50.
+2. Build A and B (VLMWorker can take back a job that has not started; ConfirmQueue), tests.
+3. Measure again the same way; a real run on a test copy (MOT16-02 looping, as when it was found); README, pitfall 44.
+
 ## Phase 53: Night-time measuring
 
 None of the safety checks were measured at night (dark or infrared, black-and-white pictures).
