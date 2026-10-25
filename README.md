@@ -289,6 +289,24 @@ Critical checks waited 2-3 s in every run. A crowd of 87 people a minute is more
 label: the safety checks below critical are still dropped there (the Health page says so); a faster model or a second
 GPU would be needed.
 
+**A round must not hold warnings back** (found 2026-10-25, HANDOFF pitfall 44; the user's choice of fix): the checks
+go one at a time **per lane** (critical / warning / round), so a slow round waiting behind people's labels no longer
+stops a warning; and a round not started within 30 s (`safety.max_wait_s`) is taken back out of the vision model's
+queue and counted as dropped (an answer minutes later would be about old pictures). Measured with
+`tools/incident_bench.py --busy` (3 min each, the real model):
+
+| MOT16-09 | | warnings answered / dropped | rounds | the question after a direct alert |
+|---|---|---|---|---|
+| a crowd (87 a minute) | before | 1 / 14 of 18 (3 still out) | one answered after 219 s; 4 dropped, 2 still out | 1 of 3 answered |
+| a crowd (87 a minute) | after | **9 / 6 of 18** (3 still out) | 0 answered; 5 dropped (2 taken back), 1 still out | **3 of 3** |
+| 18 a minute | before / after | 18 / 0 both | 6 answered, 0 dropped both | 3 of 3 both |
+
+Critical checks waited 2-3 s in every run. On a crowd the warnings still dropped are held by the per-minute limit
+while labels wait (`safety.confirm_per_min`, Phase 50); rounds get no turn there at all (they come after people's
+labels: the user's order), now dropped at once instead of answered minutes later. Real run on a test copy (MOT16-02
+looping, where it was found): each equipment round that could not start was taken back after 30 s (14 in 8 min)
+instead of one round stuck for 8 minutes.
+
 **On the Health page** (Phase 50 step 3), the "vision model (Ollama)" line shows its last 10 minutes (kept in memory,
 since the start when shorter): how much of the time it was busy, answers a minute, how long people's labels waited
 (median), people refused because the queue was full (colour labels only), and safety checks dropped after waiting too

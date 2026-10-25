@@ -131,6 +131,11 @@ is taken back out of the vision model's queue and counted as dropped, so no answ
    `_take_back_rounds` (a round not started within `max_wait_s` after it was sent: taken back, dropped, its on_done
    hears None; one already started is left to finish). 1038 tests.
 3. Measure again the same way; a real run on a test copy (MOT16-02 looping, as when it was found); README, pitfall 44.
+   **Done 2026-10-25; the fix is done.** Crowd: warnings answered 9 of 18 (before 1), dropped 6 (before 14), the
+   words question 3 of 3 (before 1); rounds 0 answered, 5 dropped (2 taken back), none answered late (before one
+   after 219 s); critical 2.9 s. 18 a minute: nothing dropped, as before. The warnings still dropped on a crowd are
+   held by the per-minute limit while labels wait. Real run (MOT16-02 looping): 14 rounds taken back after 30 s in
+   8 min (only rounds came up in that clip), no errors. README "Speed".
 
 ## Phase 53: Night-time measuring
 

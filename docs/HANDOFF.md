@@ -18,7 +18,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-25)
 
-**Start here (2026-10-25, end of the session; last commit: Phase 52 + this handoff; 1035 tests + 1 PostgreSQL test that
+**Start here (2026-10-25, end of the session; last commit: the pitfall 44 fix + this handoff; 1038 tests + 1 PostgreSQL test that
 is skipped without `VL_TEST_POSTGRES_URL`; GitHub green; working tree clean; no test copy running).**
 
 **Plan in progress: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (approved 2026-10-25, the user's choices, in this
@@ -47,7 +47,8 @@ answers.
   small with its date): `labeler/safety_view.py`, `/api/safety` "overview", `/api/safety/empty/<camera>`.
 - **Phase 52 step 2 done; Phase 52 is done**: the page `labeler/static/safety.html` (`/safety`), links from the Alerts
   and Health pages. What's new entry `p52`. Found and written down, not fixed: pitfall 44 (a round waiting in the
-  vision model's queue blocks warnings on a flooded camera); offer the fix to the user (a queue change: discuss).
+  vision model's queue blocks warnings on a flooded camera); **fixed the same day** with the user's choice (plan
+  "Fix before Phase 53": rounds no longer block warnings, a round not started in 30 s is taken back; 1038 tests).
 - **Next: Phase 53** (night-time measuring); discuss its design with the user first, ask before each step.
 - Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
   videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
@@ -533,8 +534,10 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
    ConfirmQueue sends one non-critical check at a time; a round (the equipment round) goes into the vision model's
    queue at the lowest priority, behind people's labels. On a flooded camera (MOT16-02 looping) it was still waiting
    8 minutes later, and meanwhile every warning and round waited 30 s and was dropped (8 dropped). Critical checks
-   are not held back. **Fix agreed and built 2026-10-25** (the user's choice: rounds no longer block warnings; a
-   round not started within 30 s is taken back, `VLMWorker.take_back`); measured again in the fix's step 3.
+   are not held back. **Fixed 2026-10-25** (the user's choice: one check at a time per lane, so rounds no longer
+   block warnings; a round not started within 30 s is taken back, `VLMWorker.take_back`): on a crowd warnings
+   answered 9 of 18 instead of 1 (README "Speed"). A new wait in the shared queue needs the same thought: who can
+   it hold back, and for how long?
 
 ## 7. Conventions
 
