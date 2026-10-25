@@ -155,10 +155,14 @@ ENTRIES: list[Entry] = [
           "by the vision model; red with a beep at night or when Away), and at night (22:00-06:00) or when Away "
           "someone in a \"restricted\" area or pacing back and forth; and the camera covered or turned just after "
           "someone was seen.", "/alerts"),
-    Entry("p50", 50, "", "More room on busy cameras",
+    Entry("p50", 50, "6571a55", "More room on busy cameras",
           "The vision model's time is shared better: safety checks use its free time, people who only pass by (under "
           "2 s) get colour labels, and one picture per person while others wait. The Health page's \"vision model\" "
           "line shows how busy it was in the last 10 minutes.", "/health", "admin"),
+    Entry("p51", 51, "", "Safety checks on the Settings page",
+          "Settings, \"Safety checks\": turn each kind on or off (people down, children, crowding, fire, dangerous "
+          "objects, floor and exits, equipment, fights, suspicious behaviour) and change the main times, such as the "
+          "night hours. Changes apply after a restart.", "/settings", "admin"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

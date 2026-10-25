@@ -18,7 +18,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-25)
 
-**Start here (2026-10-25, end of the session; last commit: Phase 50 step 3 + this handoff; 1020 tests + 1 PostgreSQL test that
+**Start here (2026-10-25, end of the session; last commit: Phase 51 + this handoff; 1023 tests + 1 PostgreSQL test that
 is skipped without `VL_TEST_POSTGRES_URL`; GitHub green; working tree clean; no test copy running).**
 
 **Plan in progress: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (approved 2026-10-25, the user's choices, in this
@@ -40,7 +40,10 @@ answers.
   busy share, answers a minute, people's label waits, people refused when the queue is full), `ConfirmQueue.
   dropped_within`, `healthcheck.load_words`; refused or dropped is a warning ("more work than it can do"), never a
   problem. Real run (MOT16-02 looping): busy 93%, labels waited 40 s, 9 refused. What's new entry `p50`.
-- **Next: Phase 51** (Settings for the safety checks); discuss its design with the user first, ask before each step.
+- **Phase 51 done** (2026-10-25; design agreed first, plan `2d80dcf`: a switch per kind, main times only, after a
+  restart): the Settings page's "Safety checks" box; new `safety.down_enabled` / `children_enabled` /
+  `crowd_enabled` / `fights_enabled`; measured thresholds stay in config.yaml. What's new entry `p51`.
+- **Next: Phase 52** (a safety overview page); discuss its design with the user first, ask before each step.
 - Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
   videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
 

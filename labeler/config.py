@@ -121,6 +121,10 @@ DEFAULTS: dict = {
     # camera, kind and area is not checked again within cooldown_s.
     "safety": {"enabled": True, "memory_s": 10, "memory_every_s": 1.0, "memory_side": 960, "frames": 3,
                "frames_span_s": 4, "confirm_per_min": 6, "max_wait_s": 30, "cooldown_s": 60,
+               # Each kind on or off (Phase 51, the Settings page; the others: fire_enabled, weapons_enabled,
+               # floor_enabled, equipment_enabled below, behaviour.enabled, falls.enabled): people down (lying still,
+               # slumped, not moved), children, crowding (an area's limit, running together), fights.
+               "down_enabled": True, "children_enabled": True, "crowd_enabled": True, "fights_enabled": True,
                # Quick checks for people (labeler/safety.py): lying still, slumped, not moved at all (the slow round
                # for distress), in seconds; "not moved" = within still_move of the person's height.
                "down_s": 20, "slumped_s": 30, "still_s": 300, "still_move": 0.08,

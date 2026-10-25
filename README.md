@@ -128,7 +128,8 @@ The common settings can be changed on the **Settings** page instead of editing `
 remove, source, mode, own retention, detector size, fall alerts), how long people and the audit log are kept, face
 blurring (for viewers, and in saved pictures), mobility-aid labels, fall alerts (on/off, seconds down: 3-300), vehicles
 (on/off, per camera, which kinds, parked after 10-3600 s), HTTPS,
-the weekly retraining, idle mode, and recording. Every value is checked before it is
+the weekly retraining, idle mode, recording, and the **safety checks** (Phase 51: each kind on or off and the main
+times; see "Safety incidents"). Every value is checked before it is
 saved (a webcam number 0-9, a file that exists, or a camera address with a host; detector size 640/960/1280;
 0-3650 days), and every change is in the Audit log. Only the changed values are saved, in `data\settings.yaml`
 (config.yaml keeps its comments and stays the list of defaults; delete the file to go back to it).
@@ -837,6 +838,13 @@ last seconds (`labeler/incidents.py`) and answers yes / no / unsure with a few w
   faces blurred for viewers) and a clip. Alerts page: "Show critical safety incidents"; the Check page measures each
   kind on its own ("fire or smoke alerts: 9 of 10 right"); Health line "safety checks" (checked since the start,
   yes / no / unsure, dropped, the latest answers).
+- **Settings page, "Safety checks"** (Phase 51, the user's choices): each kind on or off (people down, children,
+  crowding, fire and smoke, dangerous objects, floor and exits, unsafe equipment, fights, suspicious behaviour; falls
+  have their own switch). Off there, the check does not run at all (no camera or vision-model time); a rule turned
+  off on the Alerts page still checks but does not alert. The main times too: night hours (22-06), lying still 20 s,
+  slumped 30 s, child alone 120 s (0 = never), crowded for 30 s, walkway floor 30 s, exit 120 s, equipment round
+  600 s, restricted area 3 s, pacing 4 turns. Measured thresholds (fight speed, fire and gun confidence...) stay in
+  config.yaml only, so the numbers measured below stay true. Like every setting, after a restart.
 
 Measured (`tools/incident_bench.py`, MOT16-09, qwen3-vl 4B, one request at a time): a check takes 0.6 s with 1 picture
 and 1.4 s with 3; 4 pictures at 768 px are refused (4263 tokens, over Ollama's 4096; a bigger context per request

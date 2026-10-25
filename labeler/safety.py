@@ -110,6 +110,12 @@ class _Person:
 
 class SafetyWatch:
     def __init__(self, cfg: dict):
+        # Each kind on or off (Phase 51, the Settings page). People are still followed when one is off: a fall's
+        # "after touching person #12" needs their boxes.
+        self.down_on = bool(cfg.get("down_enabled", True))
+        self.children_on = bool(cfg.get("children_enabled", True))
+        self.crowd_on = bool(cfg.get("crowd_enabled", True))
+        self.fights_on = bool(cfg.get("fights_enabled", True))
         self.down_s = float(cfg.get("down_s", 20))
         self.slumped_s = float(cfg.get("slumped_s", 30))
         self.still_s = float(cfg.get("still_s", 300))
@@ -188,6 +194,8 @@ class SafetyWatch:
         """(area or None for the whole picture, reason) for each crowding sign now. areas: the camera's areas with a
         people limit (zones with "max_people"); counts: {area id: people} from the camera's own count, if any."""
         from .zones import inside
+        if not self.crowd_on:
+            return []
         out = []
         present = [p for p in self.people.values() if p.hist and t - p.last <= 1.0]
         for z in areas:
@@ -299,7 +307,9 @@ class SafetyWatch:
 
     def fights(self, t: float) -> list[tuple]:
         """(key, other key, reason) for each two people who look like fighting now (see the module text)."""
-        present = {k: p for k, p in self.people.items() if p.wrists and t - p.last <= 0.2}
+        if not self.fights_on:
+            return []
+        present ={k: p for k, p in self.people.items() if p.wrists and t - p.last <= 0.2}
         keys = sorted(present, key=str)
         out = []
         for i, ka in enumerate(keys):
@@ -398,9 +408,12 @@ class SafetyWatch:
         """(key, category, reason, level or None, question or None) for each sign seen now."""
         out = []
         present = {k: p for k, p in self.people.items() if p.hist and t - p.last <= 1.0}
-        children = self._children(t, present)
-        for key, p in children.items():
-            out += self._child_signs(t, key, p, present, children)
+        if self.children_on:
+            children = self._children(t, present)
+            for key, p in children.items():
+                out += self._child_signs(t, key, p, present, children)
+        if not self.down_on:
+            return out
         for key, p in self.people.items():
             if not p.hist or t - p.last > 1.0 or p.role == "bed":
                 continue

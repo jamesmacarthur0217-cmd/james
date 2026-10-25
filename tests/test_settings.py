@@ -323,3 +323,29 @@ def test_every_field_marks_unsaved_changes():
     from pathlib import Path
     page = (Path(__file__).resolve().parent.parent / "labeler" / "static" / "settings.html").read_text(encoding="utf-8")
     assert 'document.querySelector("main").addEventListener(kind, () => { if (loaded) changed(); })' in page
+
+
+def test_safety_checks_each_kind_and_the_main_times(paths, db):
+    """Phase 51: each kind on/off and the main times go into their own config sections and are used at the next
+    start; night hours are checked and written the same way every time."""
+    app, _ = _app(paths, db)
+    local = TestClient(app, client=("127.0.0.1", 5000))
+    values = local.get("/api/settings").json()["values"]
+    assert values["safety_fights_enabled"] is True and values["behaviour_night_hours"] == "22-06"
+    assert values["safety_equipment_every_s"] == 600 and values["behaviour_pace_turns"] == 4
+    r = local.post("/api/settings", json=_form(safety_fights_enabled=False, behaviour_enabled=False,
+                                               behaviour_night_hours="23-5", safety_equipment_every_s=900,
+                                               safety_child_alone_s=0))
+    assert r.status_code == 200, r.json()
+    assert "safety_fights_enabled: True → False" in r.json()["changes"]
+    saved = yaml.safe_load(paths[1].read_text(encoding="utf-8"))
+    assert saved == {"safety": {"fights_enabled": False, "child_alone_s": 0, "equipment_every_s": 900},
+                     "behaviour": {"enabled": False, "night_hours": "23-05"}}
+    cfg = load_config(paths[0])
+    assert cfg["safety"]["fights_enabled"] is False and cfg["behaviour"]["night_hours"] == "23-05"
+    assert cfg["safety"]["crowd_enabled"] is True and "_settings_ignored" not in cfg
+    for bad in ({"behaviour_night_hours": "25-06"}, {"behaviour_night_hours": "22-22"},
+                {"behaviour_night_hours": "night"}, {"safety_equipment_every_s": 60}, {"behaviour_pace_turns": 1}):
+        r = local.post("/api/settings", json=_form(**bad))
+        assert r.status_code == 400, bad
+    assert "night hours look like 22-06" in local.post("/api/settings", json=_form(behaviour_night_hours="x")).json()["detail"]

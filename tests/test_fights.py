@@ -159,3 +159,10 @@ def test_the_camera_raises_one_check_about_both(db, camera):
     assert category == "fight" and kw["people"] == [] and kw["span_s"] == 2
     assert reason == f"two people close (people #{p.tracks[7].db_id} and #{p.tracks[8].db_id})"
     assert kw["crop"] == (100 / 640, 100 / 480, 280 / 640, 400 / 480)   # around both
+
+
+def test_fights_turned_off_raise_nothing_but_touches_are_still_known():
+    """Phase 51: fights off; a fall's "after touching person #12" still works (people are still followed)."""
+    w = SafetyWatch({"fights_enabled": False})
+    assert run(w, 20, punching) == []
+    assert w.touched("a", 0.0, 2.0) == ["b"]

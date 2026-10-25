@@ -185,21 +185,26 @@ unusual:
 # last seconds before anything alerts. On security cameras by default (cameras[].safety: true/false to choose).
 safety:
   enabled: true
-  confirm_per_min: 6          # at most this many checks a minute, so people's labels keep up
+  confirm_per_min: 6          # at most this many checks a minute while people's labels wait (none wait: no limit)
   max_wait_s: 30              # a check that waited longer is dropped (and counted on the Health page)
   cooldown_s: 60              # the same camera, kind and area is not checked again sooner
   frames: 3                   # pictures per check (at most 3: Ollama's context), from the last frames_span_s s
   frames_span_s: 4
+  down_enabled: true          # people down: lying still, slumped, not moved (each kind on/off: Settings page)
   down_s: 20                  # people (Phase 45): lying still this long -> checked
   slumped_s: 30               # slumped (head below the shoulders), not moving, this long -> checked
   still_s: 300                # not moved at all this long -> checked last, after people's labels (distress)
+  children_enabled: true      # children: small or labelled as a child, alone, in a cooking area, climbing
   child_alone_s: 120          # a child with no adult near this long -> checked (0 = off: at home this can be often)
   child_area_s: 3             # a child in a cooking, food preparation or restricted area this long -> checked
+  crowd_enabled: true         # crowding: over an area's people limit, people running together
   crowd_s: 30                 # more people than an area's limit (Live page) this long -> checked
   crowd_imgsz: 1280           # people in areas are counted once a second at this picture size
+  fights_enabled: true        # fights (Phase 48)
   fight_speed: 2.5            # fights: a wrist this fast (body heights a second) touching another person -> checked
   fire_enabled: true          # fire and smoke: our own model (tools/train_fire.py) looks once a second
   fire_hold: 3                # seen on this many of the last 5 looks -> checked by the vision model
+  weapons_enabled: true       # dangerous objects held: knives, scissors, bats, guns, machetes, swords (Phase 47)
   floor_enabled: true         # walkway and exit areas against the camera's empty picture (Phase 47)
   floor_hold_s: 30            # something new on a walkway floor this long -> checked (two "yes" a minute apart alert)
   exit_hold_s: 120            # something new in an exit area this long -> checked
@@ -212,6 +217,7 @@ safety:
 behaviour:
   enabled: true
   night_hours: "22-06"        # "night" for these alerts
+  restricted_s: 3             # in a "restricted" area this long (at night or when Away) -> alert
   pace_turns: 4               # pacing: this many turns back within pace_window_s (180 s)
 
 # PC watch: the graphics card's temperature (hot from 85 °C), each disk's health as Windows sees it, and whether the

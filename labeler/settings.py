@@ -7,7 +7,8 @@ to go back to config.yaml. Changes apply after a restart (the page has a Restart
 Only the common settings are editable here, each validated: cameras (add, remove, source, mode, retention,
 detector size), how long people and the audit log are kept, face blurring, HTTPS, weekly retraining, the
 daily database backup and its second copy, idle mode, recording, the weekly Home / Away schedule, vehicles and
-animals, scene questions (on/off, answers in a row; the questions themselves are on the Alerts page). Zones and
+animals, scene questions (on/off, answers in a row; the questions themselves are on the Alerts page), the safety
+checks (each kind on/off and the main times; the measured thresholds stay in config.yaml). Zones and
 alert rules have their own pages; accounts are managed with tools/users.py.
 
 A camera keeps its name for good (zones, alert rules and recorded people refer to it); removing a camera keeps
@@ -96,6 +97,35 @@ class SettingsIn(BaseModel):
     quiet_enabled: bool
     safety_enabled: bool
     safety_confirm_per_min: int = Field(ge=1, le=30)
+    # Phase 51: each kind on or off (falls: falls_enabled above), and the main times. Measured thresholds (fight
+    # speed, fire and gun confidence...) stay in config.yaml, so the README's measured numbers stay true.
+    safety_down_enabled: bool = True
+    safety_children_enabled: bool = True
+    safety_crowd_enabled: bool = True
+    safety_fire_enabled: bool = True
+    safety_weapons_enabled: bool = True
+    safety_floor_enabled: bool = True
+    safety_equipment_enabled: bool = True
+    safety_fights_enabled: bool = True
+    behaviour_enabled: bool = True
+    behaviour_night_hours: str = "22-06"
+    safety_down_s: float = Field(default=20, ge=5, le=600)
+    safety_slumped_s: float = Field(default=30, ge=5, le=600)
+    safety_child_alone_s: float = Field(default=120, ge=0, le=3600)
+    safety_crowd_s: float = Field(default=30, ge=5, le=600)
+    safety_floor_hold_s: float = Field(default=30, ge=10, le=600)
+    safety_exit_hold_s: float = Field(default=120, ge=10, le=1800)
+    safety_equipment_every_s: float = Field(default=600, ge=120, le=86400)
+    behaviour_restricted_s: float = Field(default=3, ge=1, le=60)
+    behaviour_pace_turns: int = Field(default=4, ge=2, le=20)
+
+    @field_validator("behaviour_night_hours")
+    @classmethod
+    def _night(cls, v: str) -> str:
+        m = re.fullmatch(r"\s*(\d{1,2})\s*-\s*(\d{1,2})\s*", v)
+        if not m or int(m[1]) > 23 or int(m[2]) > 24 or int(m[1]) == int(m[2]) % 24:
+            raise ValueError("night hours look like 22-06 (from 22:00 until 06:00)")
+        return f"{int(m[1]):02d}-{int(m[2]):02d}"
 
     @field_validator("animal_kinds")
     @classmethod
@@ -175,6 +205,25 @@ SIMPLE = {
     "quiet_enabled": ("quiet", "enabled"),
     "safety_enabled": ("safety", "enabled"),
     "safety_confirm_per_min": ("safety", "confirm_per_min"),
+    "safety_down_enabled": ("safety", "down_enabled"),
+    "safety_children_enabled": ("safety", "children_enabled"),
+    "safety_crowd_enabled": ("safety", "crowd_enabled"),
+    "safety_fire_enabled": ("safety", "fire_enabled"),
+    "safety_weapons_enabled": ("safety", "weapons_enabled"),
+    "safety_floor_enabled": ("safety", "floor_enabled"),
+    "safety_equipment_enabled": ("safety", "equipment_enabled"),
+    "safety_fights_enabled": ("safety", "fights_enabled"),
+    "behaviour_enabled": ("behaviour", "enabled"),
+    "behaviour_night_hours": ("behaviour", "night_hours"),
+    "safety_down_s": ("safety", "down_s"),
+    "safety_slumped_s": ("safety", "slumped_s"),
+    "safety_child_alone_s": ("safety", "child_alone_s"),
+    "safety_crowd_s": ("safety", "crowd_s"),
+    "safety_floor_hold_s": ("safety", "floor_hold_s"),
+    "safety_exit_hold_s": ("safety", "exit_hold_s"),
+    "safety_equipment_every_s": ("safety", "equipment_every_s"),
+    "behaviour_restricted_s": ("behaviour", "restricted_s"),
+    "behaviour_pace_turns": ("behaviour", "pace_turns"),
     "backup_copy_to": ("backup", "copy_to"),
     "idle_enabled": ("idle", "enabled"),
     "idle_after_s": ("idle", "after_s"),

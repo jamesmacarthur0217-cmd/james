@@ -238,3 +238,16 @@ def test_a_fall_alerts_at_once_without_the_check(db, camera):
     p, st, fired = _fall_pipeline(db, camera, None)          # a kiosk camera: no confirm queue
     p._on_fall(7)
     assert fired == [(st.db_id, True)]
+
+
+def test_each_kind_can_be_turned_off():
+    """Phase 51 (the Settings page): a kind turned off raises nothing; the others still do."""
+    assert run(SafetyWatch({"down_enabled": False}), lying(), 60) == []
+    assert run(SafetyWatch({"down_enabled": False}), sitting(head_down=True), 40) == []
+    child = standing(x=340, top=250, h=150)
+    assert feed_many(SafetyWatch({"children_enabled": False, "child_alone_s": 120}), {2: (child, "", "child")}, 125) == []
+    got = feed_many(SafetyWatch({"down_enabled": False, "child_alone_s": 120}), {2: (child, "", "child")}, 125)
+    assert [g[1:] for g in got] == [(2, "child with no adult near for 120 s")]   # children still on
+    assert crowd_run(SafetyWatch({"crowd_enabled": False, "crowd_s": 30}), 5, 40) == []
+    fast = lambda k, i: 100 + 60 * k + i * 120   # noqa: E731
+    assert crowd_run(SafetyWatch({"crowd_enabled": False}), 8, 4, x_of=fast, inside=False) == []   # running too

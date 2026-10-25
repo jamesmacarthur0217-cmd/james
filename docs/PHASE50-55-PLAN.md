@@ -74,6 +74,12 @@ Restart now button); no new architecture.
    floor and exits, equipment, fights, behaviour), night hours, the main times (lying still, floor 30 s / exit 2 min,
    equipment every 10 min, restricted 3 s, pacing turns), validated like the other fields; per camera "Safety" stays.
 2. Tests, a browser check (phone width), README.
+   **Steps 1-2 done 2026-10-25** in one commit: `safety.down_enabled`, `children_enabled`, `crowd_enabled`,
+   `fights_enabled` (SafetyWatch `down_on` ...; people are still followed, so a fall's "after touching" works);
+   19 fields in `settings.SIMPLE`, night hours checked and written as 23-05; the page's own "Safety checks" box (the
+   two old safety fields moved into it; the per-minute hint now says it holds only while labels wait). Real run: saved
+   floor and fights off and night 23-5 on the page (phone width, no sideways scroll; "night" refused with a message);
+   after a restart the floor check was gone and the values in use. **Phase 51 is done.**
 
 ## Phase 52: Safety overview page
 

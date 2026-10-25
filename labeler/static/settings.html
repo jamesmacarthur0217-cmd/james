@@ -38,6 +38,8 @@
   .push-card .bad { color: #c9372c; }
   @media (max-width: 600px) { .push-card .addr { grid-template-columns: 1fr; } }
   @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+  .kinds { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 6px; }
+  .grid .kinds label { font-weight: 400; white-space: nowrap; }
   .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   .upd-changes { margin: 4px 0 10px; padding-left: 18px; font-size: 13px; }
   .picture-box { margin-top: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
@@ -181,15 +183,71 @@
       <div><input type="checkbox" id="quiet_enabled"> <span class="hint">An alert when nobody was seen on a kiosk camera
         for a long time while someone should be in (the built-in rule "No movement": 4 hours, 08:00-22:00, only when the
         house is set to Home). Change the hours or the time on the <a href="/alerts">Alerts</a> page.</span></div>
+    </div>
+  </section>
+
+  <section class="panel" id="safety-box">
+    <h2>Safety checks</h2>
+    <div class="grid">
       <label for="safety_enabled">Safety checks</label>
       <div><input type="checkbox" id="safety_enabled"> <span class="hint">On cameras with "Safety" ticked (security
         cameras by default): when a quick check sees a possible incident (a person down, fire, a fight...), the vision
-        model looks at the last seconds and an alert comes only if it confirms. Each kind is a rule on the
-        <a href="/alerts">Alerts</a> page (turn off or limit there).</span></div>
-      <label for="safety_confirm_per_min">Safety checks a minute (at most)</label>
+        model looks at the last seconds and an alert comes only if it confirms. Each kind is also a rule on the
+        <a href="/alerts">Alerts</a> page.</span></div>
+      <label>Which checks</label>
+      <div>
+        <div class="kinds">
+          <label><input type="checkbox" id="safety_down_enabled"> People down</label>
+          <label><input type="checkbox" id="safety_children_enabled"> Children</label>
+          <label><input type="checkbox" id="safety_crowd_enabled"> Crowding</label>
+          <label><input type="checkbox" id="safety_fire_enabled"> Fire and smoke</label>
+          <label><input type="checkbox" id="safety_weapons_enabled"> Dangerous objects</label>
+          <label><input type="checkbox" id="safety_floor_enabled"> Floor and exits</label>
+          <label><input type="checkbox" id="safety_equipment_enabled"> Unsafe equipment</label>
+          <label><input type="checkbox" id="safety_fights_enabled"> Fights</label>
+          <label><input type="checkbox" id="behaviour_enabled"> Suspicious behaviour</label>
+        </div>
+        <span class="hint">Off here: the check does not run at all (no camera time, no vision model time). A rule turned
+          off on the Alerts page still checks but does not alert. Falls: the Fall alerts switch above (on safety cameras
+          the vision model checks them too). Suspicious behaviour is climbing, a restricted area, pacing, and the camera
+          covered or turned.</span>
+      </div>
+      <label for="behaviour_night_hours">Night hours</label>
+      <div><input type="text" id="behaviour_night_hours" style="width:90px" spellcheck="false"> <span class="hint">For
+        example 22-06 (from 22:00 until 06:00). At night (or when Away) pacing and a restricted area alert, and
+        climbing is critical.</span></div>
+      <label for="safety_down_s">Lying still (seconds)</label>
+      <div><input type="number" id="safety_down_s" min="5" max="600" step="1"> <span class="hint">Someone lying still
+        this long is checked.</span></div>
+      <label for="safety_slumped_s">Slumped (seconds)</label>
+      <div><input type="number" id="safety_slumped_s" min="5" max="600" step="1"> <span class="hint">Head down below the
+        shoulders, not moving, this long.</span></div>
+      <label for="safety_child_alone_s">Child alone (seconds)</label>
+      <div><input type="number" id="safety_child_alone_s" min="0" max="3600" step="1"> <span class="hint">A child with no
+        adult near this long. 0 = never (at home this can be often).</span></div>
+      <label for="safety_crowd_s">Crowded for (seconds)</label>
+      <div><input type="number" id="safety_crowd_s" min="5" max="600" step="1"> <span class="hint">More people than an
+        area's limit (set on the <a href="/">Live</a> page) this long.</span></div>
+      <label for="safety_floor_hold_s">Walkway floor (seconds)</label>
+      <div><input type="number" id="safety_floor_hold_s" min="10" max="600" step="1"> <span class="hint">Something new
+        on a walkway floor this long is checked; two "yes" a minute apart alert.</span></div>
+      <label for="safety_exit_hold_s">Exit blocked (seconds)</label>
+      <div><input type="number" id="safety_exit_hold_s" min="10" max="1800" step="1"> <span class="hint">Something new
+        in an exit area this long.</span></div>
+      <label for="safety_equipment_every_s">Equipment round (seconds)</label>
+      <div><input type="number" id="safety_equipment_every_s" min="120" max="86400" step="60"> <span class="hint">Each
+        area with a role is looked at this often (600 = every 10 minutes).</span></div>
+      <label for="behaviour_restricted_s">Restricted area (seconds)</label>
+      <div><input type="number" id="behaviour_restricted_s" min="1" max="60" step="1"> <span class="hint">Inside an area
+        with the role "restricted" this long, at night or when Away.</span></div>
+      <label for="behaviour_pace_turns">Pacing (turns)</label>
+      <div><input type="number" id="behaviour_pace_turns" min="2" max="20" step="1"> <span class="hint">Turning back this
+        many times within 3 minutes.</span></div>
+      <label for="safety_confirm_per_min">Checks a minute while labels wait</label>
       <div><input type="number" id="safety_confirm_per_min" min="1" max="30" step="1"> <span class="hint">Each takes
-        the vision model about 1.5 s. Measured on a very busy camera: at 3 a minute people's labels were hardly slower,
-        at 6 they took about twice as long.</span></div>
+        the vision model about 1.5 s. The limit holds only while people's labels wait; when the vision model has free
+        time, checks go at once. Fight speed, fire and gun confidence and the like stay in config.yaml (they were
+        measured).</span></div>
     </div>
   </section>
 
@@ -308,7 +366,12 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const SIMPLE = ["retention_days", "audit_retention_days", "blur_faces", "blur_faces_for_viewers", "https", "retrain_enabled",
-                "backup_enabled", "backup_copy_to", "person_videos", "mobility_aids", "falls_enabled", "fall_after_s", "help_enabled", "help_hold_s", "vehicles_enabled", "vehicle_parked_after_s", "animals_enabled", "scene_enabled", "scene_answers_in_a_row", "quiet_enabled", "safety_enabled", "safety_confirm_per_min", "idle_enabled", "idle_after_s",
+                "backup_enabled", "backup_copy_to", "person_videos", "mobility_aids", "falls_enabled", "fall_after_s", "help_enabled", "help_hold_s", "vehicles_enabled", "vehicle_parked_after_s", "animals_enabled", "scene_enabled", "scene_answers_in_a_row", "quiet_enabled", "safety_enabled", "safety_confirm_per_min",
+                "safety_down_enabled", "safety_children_enabled", "safety_crowd_enabled", "safety_fire_enabled",
+                "safety_weapons_enabled", "safety_floor_enabled", "safety_equipment_enabled", "safety_fights_enabled",
+                "behaviour_enabled", "behaviour_night_hours", "safety_down_s", "safety_slumped_s", "safety_child_alone_s",
+                "safety_crowd_s", "safety_floor_hold_s", "safety_exit_hold_s", "safety_equipment_every_s",
+                "behaviour_restricted_s", "behaviour_pace_turns", "idle_enabled", "idle_after_s",
                 "recording_enabled", "recording_when", "recording_keep_days", "recording_max_gb",
                 "recording_alert_keep_days", "recording_alert_before_s", "recording_alert_after_s"];
 let loaded = null;        // values as saved (what the next start uses)

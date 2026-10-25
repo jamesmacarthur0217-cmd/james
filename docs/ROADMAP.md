@@ -12,7 +12,8 @@ restricted area, pacing, camera covered or turned) done 2026-10-25: **the Phases
 own pest model; and Phase 26 (real-camera week) after the user's restart. **Approved 2026-10-25; Phase 50 steps 1-2
 done** (busy-camera measurement; checks use idle time, passers-by colours only, one picture per person while busy;
 1016 tests); step 3 done the same day (the vision model's load on the Health page's "vision model" line; 1020
-tests): **Phase 50 is done.** Next: Phase 51 (Settings for the safety checks; design discussed first). MIVIA fire videos
+tests): **Phase 50 is done.** Phase 51 (Settings for the safety checks: a switch per kind, the main times) done the
+same day (1023 tests). Next: Phase 52 (a safety overview page; design discussed first). MIVIA fire videos
 when the user has them.
 
 
