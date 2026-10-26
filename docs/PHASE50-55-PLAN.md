@@ -181,6 +181,20 @@ fall alert in IR and in dark (day 0) |
 Found while measuring: at the default 10 pictures a second (every other frame of a 15-frame video) pacing was
 never found, by today's code and by Phase 49's (checked in a temporary copy of `256e9b8`); at the videos' own 15
 it is 4 of 4 again (pitfall 38: measure at the camera's own rate). The runner now uses 15 for that set.
+**Step 3 agreed with the user 2026-10-26** (all four recommended fixes; fights left as they are, 37 -> 27-29): each
+rule changed **for day and night alike, kept only if the day numbers stay the same or better** (the user's choice;
+no night switch). Each tuned on the tuning half and reported on the other (pitfall 21), measured by day, IR and
+dark with `tools/night_check.py`; ask before each:
+- 3a **falls**: when the body points are unsure, the box shape counts too (clearly wider than tall = lying).
+- 3b **camera covered**: only when the picture becomes almost uniform compared with just before, not when a dark
+  picture gets darker (lights off at night).
+- 3c **floor and exits**: a change compared with the picture's own contrast instead of a fixed amount; the vision
+  model told the pictures may be from a night camera.
+- 3d **fire in IR**: our fire model trained again with black-and-white copies of its D-Fire photos (here already,
+  no download; 2-4 h on the graphics card); the old model kept as a backup, the new one used only if not worse by
+  day.
+- 3e the search for real night footage (size and licence shown, nothing downloaded without the user's OK); README
+  with day and night numbers.
 1. Made-up night videos from the ones here (darker, noisier, black-and-white like infrared) for falls (UR Fall), fights
    (the fight clips), floors and behaviour; measure found / false alarms as by day, with the same tools.
 2. Optionally real night footage: a public set with night or infrared video (size and licence checked, asked first).
