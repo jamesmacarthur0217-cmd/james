@@ -52,7 +52,10 @@ answers.
 - **Phase 53 step 1 done** (2026-10-26; design agreed first, plan `4f13ab0`: IR and dark colour, four checks plus
   fire, real footage looked for after): `tools/make_night_videos.py`, 506 videos x 2 in `data/datasets/night_made`
   (8.9 GB, git-ignored, made here from the videos already here).
-- **Next: Phase 53 step 2** (measure each check by day against IR and dark with the same tools); ask first.
+- **Phase 53 step 2 done** (2026-10-26, `tools/night_check.py`, numbers in the plan): at night falls 1-3 of 15
+  (day 13), fire in IR 3 of 50 (day 39), floor and exits 0-1 of 9 (day 6), fights 27-29 of 75 (day 37),
+  behaviour 4 of 4 but one false "camera covered" (dark picture, lights dimmed).
+- **Next: Phase 53 step 3**: the numbers to the user, which changes to make discussed first.
 - Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
   videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
 

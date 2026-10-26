@@ -29,7 +29,8 @@ SETS = {
     "fights": ("survfight/incidents_truth.csv", None, ["--fps", "25", "--match", r"[13579]\.mp4$"]),   # odd clips
     "fire": ("dfire/videos_truth.csv", None, []),
     "floor": ("floor_made/truth.csv", "floor_made/areas.json", ["--match", "report_"]),
-    "behaviour": ("behaviour_made/truth.csv", "behaviour_made/areas.json", []),
+    # The made-up behaviour videos are 15 frames a second: at the default 10 (every other frame) pacing was never found.
+    "behaviour": ("behaviour_made/truth.csv", "behaviour_made/areas.json", ["--fps", "15"]),
     "everyday": ("behaviour_made/everyday_truth.csv", "behaviour_made/areas.json", []),
 }
 

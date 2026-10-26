@@ -159,6 +159,28 @@ the fight clips with and without fights, D-Fire's samples, floor_made, behaviour
 H.264 on the graphics card through the app's FFmpeg, as a camera sends: OpenCV's mp4v made 0.83 GB of one
 2-minute floor video with grain (about 50 GB for all), so the first run was stopped and its files deleted.
 Previews in `night_made/preview` (day | ir | dark).
+**Step 2 done 2026-10-26** (`tools/night_check.py`: each set by day, IR and dark with the README's day settings,
+every kind reported on every set; today's code by day too, so the comparison is fair; by day the README's numbers
+came back):
+
+| set | by day | IR | dark colour | why (looked into) |
+|---|---|---|---|---|
+| falls (UR Fall report half) | 13 of 15 (+1 lying still) | **1** (+1) | **3** (+2) | people are found (94-98% of
+frames, as by day) but while on the floor their body points are too unsure to read "lying" (by day most frames,
+at night 1-10): seen down in 7 / 6 of 15 instead of 14 |
+| fights (odd clips) | 37 of 75, 6 false | 27, 8 false | 29, 4 false | less sure body points |
+| fire (D-Fire videos) | 39 of 50, 5 false | **3**, 1 false | 27, 3 false | IR: our detector (trained on colour photos)
+raises 3 of 50 (by day 43): smoke in black and white looks like fog |
+| floor / exit (report videos) | 3 of 6 / 3 of 3 | **1 / 0** | **0 / 0** | changes fainter in a flat or dark picture
+(spills and exits often not raised at all), and the vision model says "no" more on gray pictures |
+| behaviour (made-up) | 4 of 4 | 4 of 4 | 4 of 4, **1 false** | the dark "lights dimmed" video: "camera covered"
+(a dark picture dimmed has too little contrast) |
+| everyday videos (36 min) | camera "turned" 6 (true: moving cameras) | 5 | 4 | no false "covered" at night; one
+fall alert in IR and in dark (day 0) |
+
+Found while measuring: at the default 10 pictures a second (every other frame of a 15-frame video) pacing was
+never found, by today's code and by Phase 49's (checked in a temporary copy of `256e9b8`); at the videos' own 15
+it is 4 of 4 again (pitfall 38: measure at the camera's own rate). The runner now uses 15 for that set.
 1. Made-up night videos from the ones here (darker, noisier, black-and-white like infrared) for falls (UR Fall), fights
    (the fight clips), floors and behaviour; measure found / false alarms as by day, with the same tools.
 2. Optionally real night footage: a public set with night or infrared video (size and licence checked, asked first).
