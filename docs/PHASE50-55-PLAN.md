@@ -198,6 +198,9 @@ dark with `tools/night_check.py`; ask before each:
   the dark dimmed false alarm gone, everyday unchanged. One dimmed video: chosen and checked on the same videos.
 - 3c **floor and exits**: a change compared with the picture's own contrast instead of a fixed amount; the vision
   model told the pictures may be from a night camera.
+  **Done 2026-10-27**: `FloorWatch.threshold` = floor_diff x the empty picture's contrast / `floor_contrast_ref` 50,
+  between `floor_diff_min` 10 and floor_diff 30; `floor.NIGHT_NOTE` in the questions. Tuning videos: day 6/6, IR
+  4/6, dark 4/6. Report videos: day 6 of 9 (unchanged), IR 5 (was 1), dark 3 (was 0), no false alerts.
 - 3d **fire in IR**: our fire model trained again with black-and-white copies of its D-Fire photos (here already,
   no download; 2-4 h on the graphics card); the old model kept as a backup, the new one used only if not worse by
   day.

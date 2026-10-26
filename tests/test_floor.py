@@ -240,3 +240,17 @@ def test_health_line():
     assert "learning the empty picture (2 of 5 looks)" in check_floor(cams)["detail"]
     run(w, 5, t0=2)
     assert check_floor(cams)["detail"] == "cam1: aisle watched"
+
+
+def test_the_limit_follows_the_pictures_contrast():
+    """Phase 53: at night everything differs less (in proportion to the picture's contrast): the limit for "differs"
+    is floor_diff for a contrasty picture, lower for a flat one, never below floor_diff_min."""
+    w = FloorWatch({})
+    rng = np.random.default_rng(5)
+    day = np.repeat(np.clip(rng.normal(120, 60, (60, 80, 1)), 0, 255).astype(np.uint8), 3, axis=2)   # gray
+    assert w.threshold(day) == 30.0                                         # contrast about 60: as before
+    night = (day.astype(np.float32) * 0.35 + 30).astype(np.uint8)          # contrast about 20
+    assert 10.0 < w.threshold(night) < 15.0
+    black = np.full_like(day, 5)
+    assert w.threshold(black) == 10.0
+    assert FloorWatch({"floor_contrast_ref": 1}).threshold(night) == 30.0   # the old fixed limit

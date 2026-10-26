@@ -60,7 +60,10 @@ answers.
   gave IR 2 -> 4 of 15: not built; look again with real night video).
 - **Phase 53 step 3b done** (camera covered = flat and the edges gone: the dark dimmed false alarm gone, the rest
   unchanged; README "Safety checks at night").
-- **Next: Phase 53 step 3c** (floor and exits at night); ask first. Then 3d fire in IR, 3e real footage + README.
+- **Phase 53 step 3c done** (2026-10-27; the floor check's limit follows the picture's contrast, the vision model
+  told about night pictures): report videos IR 5 of 9 (was 1), dark 3 (was 0), day unchanged 6.
+- **Next: Phase 53 step 3d** (fire in IR: our fire model trained again with black-and-white copies; keep the old
+  model as a backup); ask first. Then 3e real footage + README.
 - Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
   videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
 

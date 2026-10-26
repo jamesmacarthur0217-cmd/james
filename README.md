@@ -804,7 +804,7 @@ download): **IR** (black and white, flat contrast, grain, brighter in the middle
 | falls (UR Fall, report half) | 13 of 15 (+1 lying still) | 1 (+1) | 3 (+2) |
 | fights (75 clips) | 37, 6 false | 27, 8 false | 29, 4 false |
 | fire and smoke (D-Fire, 50 fire / 50 not) | 39, 5 false | 3, 1 false | 27, 3 false |
-| floor / exit (report videos) | 3 of 6 / 3 of 3 | 1 / 0 | 0 / 0 |
+| floor / exit (report videos) | 3 of 6 / 3 of 3 | 3 / 2 (before the fix below: 1 / 0) | 2 / 1 (before: 0 / 0) |
 | behaviour (made-up) | 4 of 4 | 4 of 4 | 4 of 4 (before the fix below: 1 false "camera covered") |
 | everyday videos, 36 min | no new false alarms | the same | the same |
 
@@ -824,6 +824,15 @@ out the picture's edges (edge match with 10-15 s before: 0.0 by day, IR and dark
 they were (0.87-0.92): "covered" now needs both. Measured again by day, IR and dark: covered and turned still
 alert (4 of 4 each), the dimmed dark video no longer does, the everyday videos unchanged (only the moving cameras'
 "turned", which is right). One dimmed video only: the rule was chosen and checked on the same videos.
+
+**Floor and exits at night** (fixed 2026-10-26/27, the user's choice): a spot "differs" when it is off by more than
+`safety.floor_diff` (30); at night everything differs less, in proportion to the picture's contrast (a bag 9-41
+instead of 40-94 by day; H.264 leaves little grain, 1-2). The limit is now 30 x the empty picture's contrast /
+`floor_contrast_ref` (50), at most 30, at least `floor_diff_min` (10): contrasty day scenes keep 30, a night picture
+gets about 12. The vision model is also told the pictures may be dark or black and white. Chosen on the tuning
+videos (MOT16-02, FP9: day 6 of 6, IR 4, dark 4, no false alerts); the report videos (MOT16-04, -09, FP10): day 6 of 9
+as before, IR 5 of 9 (before 1), dark 3 of 9 (before 0), no false alerts. Most of the rest are lost at the vision
+model ("no"), not at the quick check.
 
 
 Each person also gets a **mobility aid** label: wheelchair, walking stick, crutches, walker, or none. A camera

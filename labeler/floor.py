@@ -12,7 +12,10 @@ changes (daylight) by `floor_alpha` a look, but only while it matches; a spot th
 or a spill never fades into the empty picture by itself.
 
 Each look (at `floor_side` px, blurred, the current picture's brightness matched to the empty one's):
-- a spot differs when one of its colors is off by more than `floor_diff`; tiny specks are removed;
+- a spot differs when one of its colors is off by more than `floor_diff`, lowered for a picture with little contrast
+  (Phase 53: at night, IR or dark, everything differs less: a bag 9-41 instead of 40-94 by day, in proportion to the
+  picture's contrast, while H.264 leaves little grain): `floor_diff` x the empty picture's contrast (the gray values'
+  spread) / `floor_contrast_ref`, at most `floor_diff` and at least `floor_diff_min`; tiny specks are removed;
 - a spot that differs keeps the time it began to differ; under a person it is not seen and keeps that time (someone
   standing on a spill does not clean it); seen again and matching, it starts afresh;
 - spots that differed `floor_hold_s` (walkway, 30 s) or `exit_hold_s` (exit, 2 min), are seen now, and add up to at
@@ -55,6 +58,10 @@ QUESTIONS = {
             "something in picture 2 that was not there in picture 1 and is in the way (boxes, a bag, furniture, a "
             "trolley)? People walking through, shadows and a change of light do not count.",
 }
+# Phase 53 (the user's choice): at night the vision model said "no" more often to a change it was shown.
+NIGHT_NOTE = (" The pictures may be dark, grainy or black and white (a camera at night): look for the shape of an object "
+              "even when it is faint.")
+QUESTIONS = {k: q + NIGHT_NOTE for k, q in QUESTIONS.items()}
 # The cut-out around the change: 60% of its size on each side, at least a quarter of the picture (a person's check
 # takes 75% and a third: the change was then too small a part of the picture to be seen).
 CUT = (0.6, 0.26)
@@ -83,6 +90,8 @@ class FloorWatch:
         self.side = int(cfg.get("floor_side", 480))
         self.keep_side = int(cfg.get("memory_side", 960))
         self.diff = float(cfg.get("floor_diff", 30))
+        self.contrast_ref = float(cfg.get("floor_contrast_ref", 50))
+        self.diff_min = float(cfg.get("floor_diff_min", 10))
         self.min_size = float(cfg.get("floor_min_size", 0.0004))
         self.hold = {"floor": float(cfg.get("floor_hold_s", 30)), "exit": float(cfg.get("exit_hold_s", 120))}
         self.alpha = float(cfg.get("floor_alpha", 0.02))
@@ -169,6 +178,12 @@ class FloorWatch:
         self.seen = seen.sum(axis=0).astype(np.uint16)
         self.learned, self._stack = True, []
 
+    def threshold(self, ref: np.ndarray) -> float:
+        """How much a spot must differ: floor_diff, lowered in proportion for an empty picture with little contrast
+        (night), not below floor_diff_min (see the module text)."""
+        contrast = float(cv2.cvtColor(ref, cv2.COLOR_BGR2GRAY).std())
+        return max(self.diff_min, self.diff * min(1.0, contrast / self.contrast_ref))
+
     def ready_share(self, mask: np.ndarray | None = None) -> float:
         if self.seen is None:
             return 0.0
@@ -247,7 +262,7 @@ class FloorWatch:
             gain = float(np.median(gray(ref)) / max(1.0, float(np.median(gray(cur)))))
             cur = cv2.convertScaleAbs(cur, alpha=min(1.5, max(0.67, gain)))
         b, g, r = cv2.split(cv2.absdiff(cur, ref))
-        differs = (cv2.max(cv2.max(b, g), r) > self.diff).astype(np.uint8)
+        differs = (cv2.max(cv2.max(b, g), r) > self.threshold(ref)).astype(np.uint8)
         differs = cv2.morphologyEx(differs, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)).astype(bool)
         self._last = (big, visible, differs)
 

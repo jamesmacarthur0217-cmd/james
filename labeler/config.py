@@ -162,6 +162,9 @@ DEFAULTS: dict = {
                # changed (floor_light_share) for floor_light_s = learned again; a reported change still there after
                # floor_keep_h hours joins it; saved every floor_save_s.
                "floor_enabled": True, "floor_every_s": 1.0, "floor_side": 480, "floor_diff": 30,
+               # floor_diff lowered for a picture with little contrast (night): x contrast / floor_contrast_ref,
+               # not below floor_diff_min (Phase 53)
+               "floor_contrast_ref": 50, "floor_diff_min": 10,
                "floor_min_size": 0.0004, "floor_hold_s": 30, "exit_hold_s": 120, "floor_again_s": 60,
                "floor_learn_n": 15, "floor_learn_every_s": 2.0, "floor_learn_min": 5, "floor_margin": 0.2, "floor_alpha": 0.02, "floor_light_share": 0.4,
                "floor_light_s": 10, "floor_keep_h": 24, "floor_save_s": 600,

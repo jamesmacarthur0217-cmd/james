@@ -206,6 +206,7 @@ safety:
   fire_hold: 3                # seen on this many of the last 5 looks -> checked by the vision model
   weapons_enabled: true       # dangerous objects held: knives, scissors, bats, guns, machetes, swords (Phase 47)
   floor_enabled: true         # walkway and exit areas against the camera's empty picture (Phase 47)
+  floor_contrast_ref: 50      # a picture with less contrast (night) gets a lower "differs" limit, at least floor_diff_min 10
   floor_hold_s: 30            # something new on a walkway floor this long -> checked (two "yes" a minute apart alert)
   exit_hold_s: 120            # something new in an exit area this long -> checked
   equipment_enabled: true     # every 10 min each area with a role is checked for unsafe equipment (overturned...)
