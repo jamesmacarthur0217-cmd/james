@@ -3,6 +3,7 @@ when Away, pacing back and forth, the camera covered or turned; and what must no
 camera, walking straight through, a light switched off, someone passing the lens)."""
 from datetime import datetime
 
+import cv2
 import numpy as np
 
 from labeler.behaviour import BehaviourWatch
@@ -111,6 +112,14 @@ def test_a_light_or_someone_passing_is_not_the_camera():
     watch_camera(w, 15, lambda i: SCENE)
     dim = (SCENE * 0.4).astype(np.uint8)                              # the light switched off, the room still seen
     assert watch_camera(w, 15, lambda i: dim, t0=15) == []
+    # Phase 53: SCENE's small gray picture has a contrast of about 20, like a dark night picture; dimmed to a quarter it
+    # falls below covered_std (6), flat by the old rule, but its edges stay where they were: not covered (black is,
+    # test_the_camera_covered_and_turned).
+    w = BehaviourWatch({})
+    watch_camera(w, 15, lambda i: SCENE)
+    darker = (SCENE.astype(np.float32) * 0.25).astype(np.uint8)
+    small = cv2.resize(cv2.cvtColor(darker, cv2.COLOR_BGR2GRAY), (64, 36), interpolation=cv2.INTER_AREA)
+    assert small.std() < 6 and watch_camera(w, 15, lambda i: darker, t0=15) == []
 
     def passing(i):   # people walk close past the lens: a big dark shape crossing the picture in about 3 s, again and again
         f = SCENE.copy()

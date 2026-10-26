@@ -805,7 +805,7 @@ download): **IR** (black and white, flat contrast, grain, brighter in the middle
 | fights (75 clips) | 37, 6 false | 27, 8 false | 29, 4 false |
 | fire and smoke (D-Fire, 50 fire / 50 not) | 39, 5 false | 3, 1 false | 27, 3 false |
 | floor / exit (report videos) | 3 of 6 / 3 of 3 | 1 / 0 | 0 / 0 |
-| behaviour (made-up) | 4 of 4 | 4 of 4 | 4 of 4, 1 false "camera covered" |
+| behaviour (made-up) | 4 of 4 | 4 of 4 | 4 of 4 (before the fix below: 1 false "camera covered") |
 | everyday videos, 36 min | no new false alarms | the same | the same |
 
 **Falls at night**: people are found (94-98% of frames, as by day), but a fallen person is found only weakly (0.2-0.4
@@ -817,6 +817,13 @@ lenient tracker for the fall check only (IR 2 -> 4 of 15; day 15 and dark 11 of 
 little for the code. On the tuning half dark colour found 11 of 15 with today's tracker (the report half 3): the
 halves differ a lot. The made-up IR may be harsher than a real camera (its lamp lights the near floor well): falls
 are looked at again with real night video.
+
+**Camera covered at night** (fixed 2026-10-26, the user's choice): in a dark picture, the light dimmed brought the
+contrast from 21 down to 4, under the "covered" limit (6), and alerted. A hand or cloth over the lens also wipes
+out the picture's edges (edge match with 10-15 s before: 0.0 by day, IR and dark), a dimmed light keeps them where
+they were (0.87-0.92): "covered" now needs both. Measured again by day, IR and dark: covered and turned still
+alert (4 of 4 each), the dimmed dark video no longer does, the everyday videos unchanged (only the moving cameras'
+"turned", which is right). One dimmed video only: the rule was chosen and checked on the same videos.
 
 
 Each person also gets a **mobility aid** label: wheelchair, walking stick, crutches, walker, or none. A camera

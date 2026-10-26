@@ -17,7 +17,9 @@ choices (2026-10-23): four signs, moments confirmed by the vision model, pattern
 - the camera covered or turned (camera()): a tiny gray picture once a second; "now" is the middle value of each spot
   over the last NOW_LOOKS looks and "before" over the looks 10-15 s ago, so people walking past drop out (comparing
   single pictures failed on a busy street: big people close to the lens changed the edges as much as a turned camera).
-  Covered = now is flat (no edges left) and before was not, for `camera_hold_s`; turned = most of the edges moved
+  Covered = now is flat and its edges are gone (no edge where one was), and before was not, for `camera_hold_s` (only
+  "flat" took a dark night picture with the light dimmed for a covered camera: contrast 21 -> 4, but the edges stay
+  where they were, match 0.9; covered 0.0; Phase 53, tools/night_check.py); turned = most of the edges moved
   (a light switched on or off keeps them where they were), for `camera_hold_s`. The camera alerts at any time, but
   only when a person was seen in the `camera_seen_s` before (else it stays a camera problem,
   labeler/picture_check.py).
@@ -227,7 +229,7 @@ class BehaviourWatch:
         before = np.median(np.stack(old), axis=0).astype(np.uint8)
         match = float(_edges(now) @ _edges(before))
         had_picture = float(before.std()) >= 3 * self.covered_std
-        covered = had_picture and float(now.std()) < self.covered_std
+        covered = had_picture and float(now.std()) < self.covered_std and match < self.moved_corr
         turned = had_picture and not covered and match < self.moved_corr
         out = None
         for kind, now_on in (("covered", covered), ("turned", turned)):

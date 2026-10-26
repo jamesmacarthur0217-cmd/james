@@ -58,7 +58,9 @@ answers.
 - **Phase 53 step 3 agreed** (plan `610d9d2`): 3a falls done with nothing kept (the user's choice; README "Safety
   checks at night": the tracker cannot follow a weakly found fallen person at night; a lenient fall-only tracker
   gave IR 2 -> 4 of 15: not built; look again with real night video).
-- **Next: Phase 53 step 3b** (camera covered); ask first. Then 3c floor, 3d fire in IR, 3e real footage + README.
+- **Phase 53 step 3b done** (camera covered = flat and the edges gone: the dark dimmed false alarm gone, the rest
+  unchanged; README "Safety checks at night").
+- **Next: Phase 53 step 3c** (floor and exits at night); ask first. Then 3d fire in IR, 3e real footage + README.
 - Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
   videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
 

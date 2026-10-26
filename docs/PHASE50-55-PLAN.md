@@ -193,6 +193,9 @@ dark with `tools/night_check.py`; ask before each:
   alarms): not built. Falls looked at again with real night video (3e). README "Safety checks at night".
 - 3b **camera covered**: only when the picture becomes almost uniform compared with just before, not when a dark
   picture gets darker (lights off at night).
+  **Done 2026-10-26**: covered = flat **and the edges gone** (edge match with before under `moved_corr` 0.35;
+  covered 0.0, dimmed 0.87-0.92 by day, IR and dark). Measured again: covered and turned 4 of 4 each condition,
+  the dark dimmed false alarm gone, everyday unchanged. One dimmed video: chosen and checked on the same videos.
 - 3c **floor and exits**: a change compared with the picture's own contrast instead of a fixed amount; the vision
   model told the pictures may be from a night camera.
 - 3d **fire in IR**: our fire model trained again with black-and-white copies of its D-Fire photos (here already,
