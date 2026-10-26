@@ -86,3 +86,20 @@ def test_a_whole_video_is_made(tmp_path):
     cap = cv2.VideoCapture(str(dst))
     assert int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) == 5 and round(cap.get(cv2.CAP_PROP_FPS)) == 10
     cap.release()
+
+
+def test_the_day_and_night_table(tmp_path, monkeypatch, capsys):
+    """tools/night_check.py: the same truth file by day and at night; one row per kind seen, found / false alarms."""
+    import json
+    import night_check as nc
+    assert nc.base("day") == "data/datasets" and nc.base("ir") == "data/datasets/night_made/ir"
+    monkeypatch.setattr(nc, "RESULTS", tmp_path)
+    row = lambda kind, spans, found, fr, ff: {"kind": kind, "spans": spans, "found": found,   # noqa: E731
+                                               "false_raised": fr, "false_found": ff}
+    for cond, found in (("day", 14), ("ir", 3)):
+        (tmp_path / f"falls_{cond}.json").write_text(json.dumps({"rows": [
+            row("fall", 15, found, 0, 0), row("fire", 0, 0, 0, 0), row("suspicious", 0, 0, 4, 1 if cond == "ir" else 0)]}))
+    nc.summary()
+    out = capsys.readouterr().out
+    assert "| falls | fall | 14 of 15 / 0 (0) | 3 of 15 / 0 (0) | - |" in out
+    assert "| falls | suspicious | 0 (4) | 1 (4) | - |" in out and "| fire |" not in out
