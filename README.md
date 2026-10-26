@@ -792,7 +792,32 @@ each time the person is labeled, so someone still in view when the camera switch
 real colors; guesses made at night never count. The live picture shows "LOW COLOR (IR/night)" meanwhile, and
 the person is marked "low light" in the people list.
 
-## Mobility aids
+## Safety checks at night (Phase 53)
+
+Measured on made-up night versions of the measuring videos (`tools/make_night_videos.py`, the user's choice, no
+download): **IR** (black and white, flat contrast, grain, brighter in the middle like the camera's own IR lamp) and
+**dark colour** (about a quarter of the brightness, heavy grain), H.264 like a camera sends; with
+`tools/night_check.py` (the same settings as the day numbers, today's code by day too):
+
+| check (videos) | by day | IR | dark colour |
+|---|---|---|---|
+| falls (UR Fall, report half) | 13 of 15 (+1 lying still) | 1 (+1) | 3 (+2) |
+| fights (75 clips) | 37, 6 false | 27, 8 false | 29, 4 false |
+| fire and smoke (D-Fire, 50 fire / 50 not) | 39, 5 false | 3, 1 false | 27, 3 false |
+| floor / exit (report videos) | 3 of 6 / 3 of 3 | 1 / 0 | 0 / 0 |
+| behaviour (made-up) | 4 of 4 | 4 of 4 | 4 of 4, 1 false "camera covered" |
+| everyday videos, 36 min | no new false alarms | the same | the same |
+
+**Falls at night**: people are found (94-98% of frames, as by day), but a fallen person is found only weakly (0.2-0.4
+in IR, 0.86 by day). When someone falls their box turns from tall to wide, the tracker cannot follow it and needs a
+clear detection (0.5, `labeler/trackers/people.yaml`) for a new number: at night none comes, so the fall check never
+sees anyone lying. Tried and left out (the user's choice, 2026-10-26): weak detections that no number took continuing
+the person (IR 2 of 15 on the tuning half either way: the tracker's numbers come and go with gaps) and a second, more
+lenient tracker for the fall check only (IR 2 -> 4 of 15; day 15 and dark 11 of 15 both ways, no false alarms): too
+little for the code. On the tuning half dark colour found 11 of 15 with today's tracker (the report half 3): the
+halves differ a lot. The made-up IR may be harsher than a real camera (its lamp lights the near floor well): falls
+are looked at again with real night video.
+
 
 Each person also gets a **mobility aid** label: wheelchair, walking stick, crutches, walker, or none. A camera
 cannot see a disability, only an aid the person is using. It is searchable ("person in a wheelchair", "old man

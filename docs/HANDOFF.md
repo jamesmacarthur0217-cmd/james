@@ -55,7 +55,10 @@ answers.
 - **Phase 53 step 2 done** (2026-10-26, `tools/night_check.py`, numbers in the plan): at night falls 1-3 of 15
   (day 13), fire in IR 3 of 50 (day 39), floor and exits 0-1 of 9 (day 6), fights 27-29 of 75 (day 37),
   behaviour 4 of 4 but one false "camera covered" (dark picture, lights dimmed).
-- **Next: Phase 53 step 3**: the numbers to the user, which changes to make discussed first.
+- **Phase 53 step 3 agreed** (plan `610d9d2`): 3a falls done with nothing kept (the user's choice; README "Safety
+  checks at night": the tracker cannot follow a weakly found fallen person at night; a lenient fall-only tracker
+  gave IR 2 -> 4 of 15: not built; look again with real night video).
+- **Next: Phase 53 step 3b** (camera covered); ask first. Then 3c floor, 3d fire in IR, 3e real footage + README.
 - Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
   videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
 

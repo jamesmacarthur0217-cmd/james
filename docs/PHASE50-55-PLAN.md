@@ -186,6 +186,11 @@ rule changed **for day and night alike, kept only if the day numbers stay the sa
 no night switch). Each tuned on the tuning half and reported on the other (pitfall 21), measured by day, IR and
 dark with `tools/night_check.py`; ask before each:
 - 3a **falls**: when the body points are unsure, the box shape counts too (clearly wider than tall = lying).
+  **Done 2026-10-26, nothing kept** (the user's choice): the box shape is used already; the real cause is the
+  tracker (a fallen person found at 0.2-0.4 at night, a new number needs 0.5; numbers come and go with gaps).
+  Tried: weak detections no number took continuing the person (IR tuning half 2 of 15 either way: undone); a
+  lenient tracker for the fall check only, estimated (IR 2 -> 4 of 15, day 15 and dark 11 both ways, no false
+  alarms): not built. Falls looked at again with real night video (3e). README "Safety checks at night".
 - 3b **camera covered**: only when the picture becomes almost uniform compared with just before, not when a dark
   picture gets darker (lights off at night).
 - 3c **floor and exits**: a change compared with the picture's own contrast instead of a fixed amount; the vision
