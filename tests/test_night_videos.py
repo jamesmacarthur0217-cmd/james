@@ -103,3 +103,18 @@ def test_the_day_and_night_table(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "| falls | fall | 14 of 15 / 0 (0) | 3 of 15 / 0 (0) | - |" in out
     assert "| falls | suspicious | 0 (4) | 1 (4) | - |" in out and "| fire |" not in out
+
+
+def test_fire_training_copies_are_black_and_white_and_vary():
+    """tools/train_fire.py bw (Phase 53): each training picture's copy is black and white, the same for the same
+    picture every run, and the night settings differ from picture to picture (not the one fixed look it is measured on)."""
+    import zlib
+    import train_fire
+    day = _scene()
+    seeded = lambda name: np.random.default_rng(zlib.crc32(name.encode()))   # noqa: E731
+    a = train_fire.night_copy(day, seeded("AoF00001.jpg"))
+    assert a.shape == day.shape and np.array_equal(a[..., 0], a[..., 2])
+    assert np.array_equal(a, train_fire.night_copy(day, seeded("AoF00001.jpg")))
+    looks = {round(float(train_fire.night_copy(day, seeded(f"p{i}.jpg")).mean())) for i in range(8)}
+    assert len(looks) >= 5
+    assert train_fire._label_of(Path("x/train/images/a.jpg")) == Path("x/train/labels/a.txt")
