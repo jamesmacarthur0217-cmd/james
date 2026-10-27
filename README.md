@@ -1845,6 +1845,22 @@ already up when you press the button counts after 3 more seconds. Checked on a t
 tennis serve (one arm straight up): seen 3 s after pressing, no alert; without the restart of the count it was missed
 (a still photo's sign had already been given, before pressing), which is why it is there.
 
+## Choosing a speech-to-text model (not part of the app)
+
+`tools/stt_bench.py` compares Whisper (faster-whisper) with NVIDIA Parakeet (onnx-asr) on clips of your own voice
+recorded at the kiosk, where a model that does well on public tests can still miss what people say. It needs its own
+packages (`pip install faster-whisper "onnx-asr[cpu,hub]" sounddevice`); the app does not.
+
+```bash
+.venv\Scripts\python.exe tools\stt_bench.py devices                    # microphone numbers
+.venv\Scripts\python.exe tools\stt_bench.py record --set near --mic 1  # each phrase: Enter, speak, Enter
+.venv\Scripts\python.exe tools\stt_bench.py run --set near --language en
+```
+
+It prints, per model, the share of words wrong (WER), clips where it heard nothing, and speed, then the clips heard
+worst with what each model wrote. Record one set per situation (near, far, busy room) to compare them. Clips go to
+`data/stt/<set>/` with `clips.tsv` (file, tab, what was said); clips from a phone can be listed there too.
+
 ## Tests
 
 The tests need `pytest` and `httpx2` (Starlette's test client; with only the older `httpx` it warns):
@@ -1890,7 +1906,7 @@ Changes are tracked with git.
 | `remote-camera/` | for another PC: send its webcam here through Tailscale (setup-camera.bat, remove-camera.bat) |
 | `run.py`, `start.bat`, `stop.bat` | starting and stopping |
 | `install.bat` / `install.ps1`, `tools/models.py`, `tools/pack_offline.ps1` | installing on a new PC, offline package |
-| `tools/` | benchmarks, evaluation, training, backups, long-run check (`soak.py`), restore drill, FFmpeg setup, mobility-aid check (`mobility_check.py`, `get_aid_photos.py`), fall check (`fall_check.py`), vehicle check (`vehicle_check.py`) |
+| `tools/` | benchmarks, evaluation, training, backups, long-run check (`soak.py`), restore drill, FFmpeg setup, mobility-aid check (`mobility_check.py`, `get_aid_photos.py`), fall check (`fall_check.py`), vehicle check (`vehicle_check.py`), speech-to-text comparison (`stt_bench.py`) |
 | `tests/` | automated tests |
 | `data/` | person pictures, backups, log files, datasets (not in git) |
 
@@ -1908,6 +1924,7 @@ Changes are tracked with git.
 Ultralytics YOLO: AGPL-3.0 (commercial license needed for closed products, or swap in RF-DETR, Apache-2.0).
 Qwen3-VL: Apache-2.0. Age model: Apache-2.0. COCO photos: various Flickr licenses. FairFace: CC BY 4.0.
 FFmpeg (recording): the LGPL build, used as a separate program (`data\ffmpeg`, its LICENSE.txt alongside).
+Speech-to-text, if added: Whisper: MIT. Parakeet: CC BY 4.0 (credit NVIDIA).
 MediaMTX (receiving cameras from other devices): MIT (`data\mediamtx`, its license alongside).
 MOT16 (MOTChallenge, imported as the recorded camera `mot16` and used by the retrained classifiers since
 2026-10-12): CC BY-NC-SA 3.0, **non-commercial only**: before commercial use, delete that camera's people on the
