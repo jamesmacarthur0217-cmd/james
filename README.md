@@ -834,6 +834,22 @@ videos (MOT16-02, FP9: day 6 of 6, IR 4, dark 4, no false alerts); the report vi
 as before, IR 5 of 9 (before 1), dark 3 of 9 (before 0), no false alerts. Most of the rest are lost at the vision
 model ("no"), not at the quick check.
 
+**Fire in IR: tried, not used** (2026-10-27/29): our fire model trained again (`tools/train_fire.py bw`, `train
+--bw`) on D-Fire's pictures plus a black-and-white copy of each with random night settings (2 h 49 min), into
+`data/models/fire/fire_smoke_bw.pt`. On D-Fire's test photos it looked much better (mAP50 day 0.781 / IR 0.713 /
+dark 0.694, the old one 0.767 / 0.138 / 0.444), but on the 100 videos, through the app's own fire check:
+
+| D-Fire videos | day: fires / false | IR | dark |
+|---|---|---|---|
+| the old model (used) | **39** / 5 | 3 / 1 | 27 / 3 |
+| the new model | 27 / 1 | 13 / 4 | 23 / 3 |
+
+Worse by day (the user's rule: a change is kept only if day is not worse), so the old model stays. The new model
+is less sure of distant hazy smoke on hillsides (a fire video's typical best box 0.22 instead of 0.38; even at
+0.15 it sees 28 of the 50 where the old one sees 40): learning gray smoke made it careful about gray haze. The
+photos' IR copies have the night videos' look, so their IR number was optimistic. Kept on disk, unused, for a look
+with real night video.
+
 
 Each person also gets a **mobility aid** label: wheelchair, walking stick, crutches, walker, or none. A camera
 cannot see a disability, only an aid the person is using. It is searchable ("person in a wheelchair", "old man

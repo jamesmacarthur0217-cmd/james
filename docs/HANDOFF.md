@@ -62,8 +62,13 @@ answers.
   unchanged; README "Safety checks at night").
 - **Phase 53 step 3c done** (2026-10-27; the floor check's limit follows the picture's contrast, the vision model
   told about night pictures): report videos IR 5 of 9 (was 1), dark 3 (was 0), day unchanged 6.
-- **Next: Phase 53 step 3d** (fire in IR: our fire model trained again with black-and-white copies; keep the old
-  model as a backup); ask first. Then 3e real footage + README.
+- **Phase 53 step 3d done, nothing used** (2026-10-29): the fire model trained with black-and-white copies
+  (`data/models/fire/fire_smoke_bw.pt`, unused) was better on test photos but worse by day on the 100 videos (27
+  fires instead of 39): the old model stays (README "Fire in IR: tried, not used"). Using it on IR pictures only was
+  not decided: offer it again only with real IR numbers. Extra data: `data/datasets/dfire/bw` 2.7 GB and
+  `dfire/night_test` 1.6 GB (made here).
+- **Next: Phase 53 step 3e** (look for real night footage: size and licence shown, nothing downloaded without OK;
+  README); ask first.
 - Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
   videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
 

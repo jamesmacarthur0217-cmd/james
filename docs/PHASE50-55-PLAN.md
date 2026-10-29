@@ -204,6 +204,10 @@ dark with `tools/night_check.py`; ask before each:
 - 3d **fire in IR**: our fire model trained again with black-and-white copies of its D-Fire photos (here already,
   no download; 2-4 h on the graphics card); the old model kept as a backup, the new one used only if not worse by
   day.
+  **Done 2026-10-29, not used** (the user's rule): `tools/train_fire.py bw` / `train --bw` / `test --night`;
+  `fire_smoke_bw.pt` test photos mAP50 day 0.781 / IR 0.713 / dark 0.694 (old 0.767 / 0.138 / 0.444), but the 100
+  videos: day 27 fires / 1 false (old 39 / 5), IR 13 / 4 (old 3 / 1), dark 23 / 3 (old 27 / 3). Worse by day: the
+  old model stays; the new file kept unused. An IR-only use of it was not decided (the user stopped the question).
 - 3e the search for real night footage (size and licence shown, nothing downloaded without the user's OK); README
   with day and night numbers.
 1. Made-up night videos from the ones here (darker, noisier, black-and-white like infrared) for falls (UR Fall), fights
