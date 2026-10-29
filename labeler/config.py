@@ -181,7 +181,9 @@ DEFAULTS: dict = {
     "behaviour": {"enabled": True, "night_hours": "22-06", "climb_rise": 0.25, "climb_hold_s": 1.0,
                   "restricted_s": 3.0, "restricted_rearm_s": 60.0, "pace_window_s": 180.0, "pace_turns": 4,
                   "pace_span": 1.5, "camera_every_s": 1.0, "camera_hold_s": 3.0, "camera_seen_s": 30.0,
-                  "covered_std": 6.0, "moved_corr": 0.35},
+                  "covered_std": 6.0, "moved_corr": 0.35,
+                  # Phase 54: two people crossing a "door" line the same way within follow_s (following through)
+                  "follow_s": 2.0},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,
               "low_ratio": 0.5, "lost_s": 0.5, "min_width": 1.25},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored
     "embeddings": {"enabled": True, "model": "google/siglip2-base-patch16-224", "device": "cuda"},

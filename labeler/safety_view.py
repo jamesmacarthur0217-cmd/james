@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timedelta
 
-from .zones import AREA, ROLES
+from .zones import ALL_ROLES, AREA
 
 # The kinds, in the Settings page's order: (key, words, the config switch (section, key)).
 KINDS = [("falls", "falls", ("falls", "enabled")),
@@ -32,8 +32,11 @@ DAYS = 7
 
 
 def role_meaning(role: str, cfg: dict) -> str:
-    """What an area's role changes for the checks, in plain words with the running times."""
+    """What an area's (or a door line's) role changes for the checks, in plain words with the running times."""
     s, b = cfg.get("safety") or {}, cfg.get("behaviour") or {}
+    if role == "door":   # a counting line (Phase 54): not an area, so no equipment round either
+        return (f"two people through it the same way within {b.get('follow_s', 2):g} s alert at night "
+                f"({b.get('night_hours', '22-06')}) or when Away (someone following another through)")
     child = f"a child here {s.get('child_area_s', 3):g} s is checked"
     text = {
         "walkway": f"floor check: something new on the floor {s.get('floor_hold_s', 30):g} s is checked",
@@ -117,9 +120,9 @@ def overview(cfg: dict, db, pipelines: list, incidents=None, now: datetime | Non
     for p in pipelines:
         if getattr(p, "safety_watch", None) is None:
             continue
-        areas = [{"name": z["name"], "role": z.get("role") or "", "role_words": ROLES.get(z.get("role") or "", ""),
+        areas = [{"name": z["name"], "role": z.get("role") or "", "role_words": ALL_ROLES.get(z.get("role") or "", ""),
                   "max_people": z.get("max_people"), "meaning": role_meaning(z.get("role") or "", cfg)
-                  if z.get("role") else ""} for z in p.zone_counter.zones if z["kind"] == AREA]
+                  if z.get("role") else ""} for z in p.zone_counter.zones if z["kind"] == AREA or z.get("role")]
         cameras.append({"name": p.name, "kinds": _kinds(p, cfg), "areas": areas, "floor": _floor(p),
                         "checks": [c for c in reversed(latest) if c["camera"] == p.name]})
     queue = None

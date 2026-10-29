@@ -148,3 +148,13 @@ def test_no_page_declares_a_name_the_browser_keeps():
     bad = re.compile(r"^(?:async\s+)?(?:function\s+|(?:let|const|var|class)\s+)(top|location|window|document)\b", re.M)
     for page in [*static.glob("*.html"), *static.glob("*.js")]:
         assert not bad.search(page.read_text(encoding="utf-8")), page.name
+
+
+def test_a_door_line_is_listed_with_its_meaning(db):
+    """Phase 54: counting lines with the role "door" show on the safety page (a plain counting line does not)."""
+    zones = [{"id": 1, "kind": "line", "name": "front door", "role": "door", "points": [(0.5, 0), (0.5, 1)]},
+             {"id": 2, "kind": "line", "name": "count", "role": "", "points": [(0.2, 0), (0.2, 1)]}]
+    view = safety_view.overview(copy.deepcopy(DEFAULTS), db, [safety_camera(zones=zones)], now=NOW)
+    [door] = view["cameras"][0]["areas"]
+    assert door["name"] == "front door" and door["role_words"].startswith("door")
+    assert door["meaning"].startswith("two people through it the same way within 2 s") and "equipment" not in door["meaning"]

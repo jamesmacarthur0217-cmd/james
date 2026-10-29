@@ -39,7 +39,7 @@
         </select>
         <input id="zone-name" placeholder="Name, e.g. door" maxlength="100">
         <label id="zone-role-label" title="What the place is, so the safety checks know what is normal there (a bed or
-          sofa: someone lying there is not a fall)">Role <select id="zone-role"><option value="">none</option></select></label>
+          sofa: someone lying there is not a fall; a door line: someone following another through it is noticed)">Role <select id="zone-role"><option value="">none</option></select></label>
         <label id="zone-max-label" title="Too crowded: a safety check when more people than this stay in the area 30 s
           (empty: no limit)">At most <input type="number" id="zone-max" min="1" max="10000" step="1" style="width:5em"> people</label>
         <button id="zone-undo">Undo point</button>
@@ -539,7 +539,8 @@ function drawZonePreview() {
   const enough = kind === "area" ? zoneDraw.points.length >= 3 : zoneDraw.points.length === 2;
   $("zone-save").disabled = !enough || !$("zone-name").value.trim();
   $("zone-hint").textContent = ZONE_HINT[kind];
-  $("zone-role-label").hidden = $("zone-max-label").hidden = kind !== "area";
+  $("zone-max-label").hidden = kind !== "area";
+  fillRoleChoice(kind);
 }
 
 $("zone-draw").addEventListener("click", (e) => {
@@ -558,16 +559,24 @@ document.addEventListener("keydown", (e) => {
 });
 new ResizeObserver(() => { if (zoneDraw.on) drawZonePreview(); }).observe($("live"));
 
-// Area roles (Phase 44): what the place is, for the safety checks; offered from /api/zones/roles.
+// Roles (Phase 44 areas, Phase 54 counting lines: "door"): what the place is, for the safety checks; offered from
+// /api/zones/roles with their kind.
 let zoneRoles = null;
 async function loadZoneRoles() {
   if (zoneRoles) return;
   zoneRoles = await (await fetch("/api/zones/roles")).json();
-  for (const r of zoneRoles) $("zone-role").add(new Option(r.words, r.role));
+  fillRoleChoice($("zone-kind").value);
 }
-function roleOptions(current) {
-  const roles = zoneRoles.some(r => r.role === current) || !current ? zoneRoles
-    : [...zoneRoles, { role: current, words: current }];   // a role set before the list was narrowed
+function fillRoleChoice(kind) {   // the new zone's role picker: the roles of its kind
+  if (!zoneRoles) return;
+  const sel = $("zone-role"), keep = sel.value;
+  sel.replaceChildren(new Option("none", ""), ...zoneRoles.filter(r => r.kind === kind).map(r => new Option(r.words, r.role)));
+  sel.value = [...sel.options].some(o => o.value === keep) ? keep : "";
+}
+function roleOptions(current, kind = "area") {
+  const own = zoneRoles.filter(r => r.kind === kind);
+  const roles = own.some(r => r.role === current) || !current ? own
+    : [...own, { role: current, words: current }];   // a role set before the list was narrowed
   return '<option value="">no role</option>' + roles.map(r =>
     `<option value="${esc(r.role)}"${r.role === current ? " selected" : ""}>${esc(r.words)}</option>`).join("");
 }
@@ -577,7 +586,9 @@ async function loadZoneList() {
   const zones = await (await fetch("/api/zones?camera=" + encodeURIComponent(zoneCamera()))).json();
   $("zone-list").innerHTML = zones.length
     ? zones.map(z => `<div class="zone-item"><span><b>${esc(z.name)}</b> <span class="muted">${z.kind === "line"
-        ? "counting line" : "area"}</span>${z.kind === "area" ? ` <select class="zone-role-edit" data-zone="${z.id}"
+        ? "counting line" : "area"}</span>${z.kind === "line" ? ` <select class="zone-role-edit" data-zone="${z.id}"
+        title="A door: someone following another through it is noticed at night or when Away">${roleOptions(z.role, "line")}</select>`
+        : ""}${z.kind === "area" ? ` <select class="zone-role-edit" data-zone="${z.id}"
         title="What the place is (safety checks)">${roleOptions(z.role)}</select> <label class="muted">at most
         <input type="number" class="zone-max-edit" data-zone="${z.id}" min="1" max="10000" step="1" style="width:4.5em"
         value="${z.max_people ?? ""}" placeholder="any" title="Too crowded above this many people (empty: no limit)">
@@ -610,7 +621,7 @@ $("zone-save").onclick = async () => {
   const r = await fetch("/api/zones", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ camera: zoneCamera(), name: $("zone-name").value.trim(),
                            kind: $("zone-kind").value, points: zoneDraw.points,
-                           role: $("zone-kind").value === "area" ? $("zone-role").value : "",
+                           role: $("zone-role").value,
                            max_people: $("zone-kind").value === "area" ? (+$("zone-max").value || null) : null }) });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) { $("zone-msg").textContent = data.detail || "Could not save."; return; }

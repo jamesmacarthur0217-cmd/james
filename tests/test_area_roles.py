@@ -31,8 +31,12 @@ def test_roles_in_the_database(db):
     assert plain["role"] == "" and plain["lying_ok"] is False
     with pytest.raises(ValueError, match="unknown area role"):
         db.add_zone("cam1", "x", "area", SQUARE, role="kitchen sink")
-    with pytest.raises(ValueError, match="only areas"):
+    with pytest.raises(ValueError, match="a role for areas, not counting lines"):
         db.add_zone("cam1", "y", "line", [(0, 0.5), (1, 0.5)], role="exit")
+    door = db.add_zone("cam1", "front door", "line", [(0, 0.5), (1, 0.5)], role="door")   # Phase 54: lines too
+    assert door["role"] == "door" and door["lying_ok"] is False
+    with pytest.raises(ValueError, match="a role for counting lines, not areas"):
+        db.add_zone("cam1", "z", "area", SQUARE, role="door")
 
 
 def test_changing_a_role_keeps_lying_ok_in_step(db):
@@ -57,9 +61,13 @@ def test_an_area_from_before_roles_reads_as_a_bed(db):
 
 def test_api(db, tmp_path):
     client = _client(db, tmp_path)
-    assert [r["role"] for r in client.get("/api/zones/roles").json()] == list(zones.ROLES)
+    roles = client.get("/api/zones/roles").json()
+    assert [r["role"] for r in roles] == [*zones.ROLES, *zones.LINE_ROLES]
+    assert {r["kind"] for r in roles if r["role"] == "door"} == {"line"}
     narrowed = _client(db, tmp_path, roles=["exit", "walkway", "nonsense"]).get("/api/zones/roles").json()
-    assert narrowed == [{"role": "exit", "words": zones.ROLES["exit"]}, {"role": "walkway", "words": zones.ROLES["walkway"]}]
+    assert narrowed == [{"role": "exit", "words": zones.ROLES["exit"], "kind": "area"},
+                        {"role": "walkway", "words": zones.ROLES["walkway"], "kind": "area"},
+                        {"role": "door", "words": zones.LINE_ROLES["door"], "kind": "line"}]   # lines: always
     made = client.post("/api/zones", json={"camera": "cam1", "name": "kitchen", "kind": "area",
                                            "points": [list(p) for p in SQUARE], "role": "cooking"})
     assert made.status_code == 200 and made.json()["role"] == "cooking"

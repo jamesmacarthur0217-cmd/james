@@ -516,8 +516,11 @@ class Pipeline:
                 elif self._due_for_relabel(st, now):
                     self._relabel(st)
                 if self.zone_counter.zones:
-                    st.zone_log += self.zone_counter.update(
+                    events = self.zone_counter.update(
                         st.zones, zones_mod.anchor(st.box, frame.shape, self.mode), self.clock.wall())
+                    st.zone_log += events
+                    if events and getattr(self, "behaviour", None) is not None:
+                        self._check_doors(tid, events, now, frame.shape)
                     self._flush_zone_events(st)
                 if self.falls is not None:
                     ok = zones_mod.lying_ok(self.zone_counter.zones, zones_mod.anchor(st.box, frame.shape, self.mode))
@@ -792,13 +795,9 @@ class Pipeline:
         (critical at night or when Away); pacing and a restricted area alert directly at night or when Away, with the
         vision model's words on what the person does added afterwards; the camera covered or turned alerts at once
         when someone was seen just before, with the picture from before."""
-        from .arming import AWAY
         from .behaviour import CLIMB_QUESTION, DESCRIBE_QUESTION
         wall = self.clock.wall()
-        arming = getattr(self.alerts, "arming", None) if self.alerts is not None else None
-        away = arming is not None and arming.current() == AWAY
-        watchful = away or self.behaviour.night(wall)
-        when = "when Away" if away else "at night"
+        watchful, when = self._watchful(wall)
         for tid, sign, reason, area in self.behaviour.tick(now, self.zone_counter.zones, frame.shape, watchful):
             log.warning("[%s] behaviour: %s (person %s)", self.name, reason, tid)
             if sign == "climb":
@@ -833,6 +832,49 @@ class Pipeline:
                                       pictures=before or None, sign=kind)
             except Exception:
                 log.exception("[%s] a camera alert failed", self.name)
+
+    def _watchful(self, wall) -> tuple[bool, str]:
+        """(True, "at night" or "when Away") while the behaviour patterns alert: at night (behaviour.night_hours) or when
+        the house is set to Away (labeler/arming.py)."""
+        from .arming import AWAY
+        arming = getattr(self.alerts, "arming", None) if self.alerts is not None else None
+        away = arming is not None and arming.current() == AWAY
+        return away or self.behaviour.night(wall), "when Away" if away else "at night"
+
+    def _check_doors(self, tid, events: list[dict], now: float, shape: tuple) -> None:
+        """Following through a door (Phase 54, labeler/behaviour.py crossed; the user's choice): two people crossing a
+        "door" line the same way within behaviour.follow_s alert directly at night or when Away, once a minute per door
+        (the confirm queue's direct limit), with the vision model's words on what they do added afterwards."""
+        from .behaviour import DESCRIBE_QUESTION
+        doors = {z["id"]: z for z in self.zone_counter.zones if z.get("role") == "door"}
+        for ev in events:
+            door = doors.get(ev["zone_id"])
+            got = self.behaviour.crossed(now, tid, door, ev["kind"]) if door is not None else None
+            if got is None or getattr(self, "incidents", None) is None:
+                continue
+            other, reason = got
+            watchful, when = self._watchful(self.clock.wall())
+            if not watchful:
+                log.info("[%s] behaviour: %s (by day: no alert)", self.name, reason)
+                continue
+            log.warning("[%s] behaviour: %s (people %s and %s)", self.name, reason, other, tid)
+            boxes, ids = [], []
+            for key in (other, tid):
+                st = self.tracks.get(key)
+                if st is None:
+                    continue
+                self._ensure_db(st)
+                boxes.append(st.box[:4])
+                if st.db_id is not None:
+                    ids.append(st.db_id)
+            h, w = shape[:2]
+            crop = (min(b[0] for b in boxes) / w, min(b[1] for b in boxes) / h, max(b[2] for b in boxes) / w,
+                    max(b[3] for b in boxes) / h) if boxes else None
+            try:   # no area: a line has no inside to cut out; the door's name is in the reason
+                self.incidents.direct(self.name, "suspicious", f"{reason} {when}", people=ids, crop=crop,
+                                      describe=DESCRIBE_QUESTION, sign=f"following {door['id']}")
+            except Exception:
+                log.exception("[%s] a door alert failed", self.name)
 
     def _touched_before_fall(self, tid) -> str:
         """Collisions (Phase 48, the user's choice: through the fall check): "after touching person #12" when someone

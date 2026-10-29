@@ -14,6 +14,9 @@ choices (2026-10-23): four signs, moments confirmed by the vision model, pattern
   when Away; once per visit (outside again for `restricted_rearm_s` re-arms it).
 - pacing back and forth (a pattern): inside any area, the walk turns back `pace_turns` times within `pace_window_s`,
   each leg at least `pace_span` body heights (along the way the person moves most); at night or when Away.
+- following through a door (a pattern, Phase 54; the user's choice): on a counting line with the role "door", two
+  people crossing it the same way within `follow_s` (someone following another through, as when slipping in behind a
+  resident); at night or when Away, alerted directly once a minute per door (by day two friends do it all the time).
 - the camera covered or turned (camera()): a tiny gray picture once a second; "now" is the middle value of each spot
   over the last NOW_LOOKS looks and "before" over the looks 10-15 s ago, so people walking past drop out (comparing
   single pictures failed on a busy street: big people close to the lens changed the edges as much as a turned camera).
@@ -83,6 +86,8 @@ class BehaviourWatch:
         self.camera_seen_s = float(cfg.get("camera_seen_s", 30.0))
         self.covered_std = float(cfg.get("covered_std", 6.0))
         self.moved_corr = float(cfg.get("moved_corr", 0.35))
+        self.follow_s = float(cfg.get("follow_s", 2.0))
+        self.crossings: dict = {}     # door line id -> deque of (t, key, "in" or "out"), the last follow_s
         self.people: dict = {}
         self.looks: deque = deque()   # (t, edges, std of the gray picture)
         self.last_look = -1e9
@@ -209,6 +214,23 @@ class BehaviourWatch:
             if t - out_since >= self.restricted_rearm_s:
                 p.fired.discard(f"restricted {zid}")
         return []
+
+    # Doors -------------------------------------------------------------------------------------------------------
+
+    def crossed(self, t: float, key, zone: dict, direction: str) -> tuple | None:
+        """Someone crossed a counting line ("in" or "out"). On a "door" line: (other key, reason) when someone else
+        crossed it the same way within follow_s before (following them through), else None."""
+        if zone.get("role") != "door" or direction not in ("in", "out"):
+            return None
+        recent = self.crossings.setdefault(zone["id"], deque())
+        while recent and t - recent[0][0] > self.follow_s:
+            recent.popleft()
+        before = next(((ti, k) for ti, k, d in reversed(recent) if d == direction and k != key), None)
+        recent.append((t, key, direction))
+        if before is None:
+            return None
+        return before[1], (f"two people went {direction} through {zone['name']} {t - before[0]:.1f} s apart (someone "
+                           f"following another through)")
 
     # The camera --------------------------------------------------------------------------------------------------
 

@@ -261,3 +261,44 @@ def test_a_direct_alert_and_the_words_added_after(db, camera, tmp_path):
     assert len(q.waiting) == 1
     climb = q.direct("cam1", "suspicious", "climbing at back wall when Away", level="critical", sign="climb")
     assert climb[0]["level"] == "critical"
+
+
+DOOR = {"id": 9, "name": "front door", "kind": "line", "role": "door", "points": [(0.5, 0.0), (0.5, 1.0)]}
+
+
+def test_following_someone_through_a_door():
+    """Phase 54: on a "door" line, two people crossing the same way within follow_s (2 s); not one person twice, not
+    the other way, not later, not a plain counting line."""
+    w = BehaviourWatch({})
+    assert w.crossed(10.0, 1, DOOR, "in") is None
+    other, reason = w.crossed(11.4, 2, DOOR, "in")
+    assert other == 1 and reason == ("two people went in through front door 1.4 s apart (someone following another "
+                                     "through)")
+    assert w.crossed(12.0, 3, DOOR, "out") is None                 # the other way: meeting, not following
+    assert w.crossed(12.5, 3, DOOR, "in")[0] == 2                  # within 2 s of person 2
+    assert w.crossed(20.0, 4, DOOR, "in") is None                  # 7.5 s later: alone
+    w2 = BehaviourWatch({})
+    w2.crossed(0.0, 1, DOOR, "in")
+    assert w2.crossed(1.0, 1, DOOR, "in") is None                  # the same person (back and forth on the line)
+    plain = {**DOOR, "id": 10, "role": ""}
+    w3 = BehaviourWatch({})
+    w3.crossed(0.0, 1, plain, "in")
+    assert w3.crossed(0.5, 2, plain, "in") is None                 # a plain counting line
+
+
+def test_the_camera_alerts_following_only_at_night_or_when_away(db, camera):
+    from labeler.pipeline import TrackState
+    for hour, away, alerts in ((12, False, 0), (23, False, 1), (12, True, 1)):
+        p = camera_pipe(db, camera, hour=hour, away=away)
+        p.zone_counter.zones = [DOOR]
+        p.tracks[5].box = (300, 200, 360, 400)
+        p.tracks[6] = TrackState(6, datetime.now(), 0.0, db_id=db.create_track(camera, 6, datetime.now()))
+        p.tracks[6].box = (380, 200, 440, 400)
+        p._check_doors(5, [{"zone_id": 9, "kind": "in"}], 10.0, SHAPE)
+        p._check_doors(6, [{"zone_id": 9, "kind": "in"}], 11.0, SHAPE)
+        assert len(p.incidents.direct_) == alerts, (hour, away)
+        if alerts:
+            [(category, reason, kw)] = p.incidents.direct_
+            assert category == "suspicious" and reason.startswith("two people went in through front door 1.0 s apart")
+            assert reason.endswith("when Away" if away else "at night") and kw["sign"] == "following 9"
+            assert sorted(kw["people"]) == sorted([p.tracks[5].db_id, p.tracks[6].db_id]) and kw["crop"][0] < 0.6

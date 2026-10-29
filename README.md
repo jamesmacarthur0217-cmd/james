@@ -1236,6 +1236,23 @@ for the camera check failed on a busy street (big people close to the lens chang
 camera), so it compares the middle value of several looks; and a made-up pacing video from a whole clip played back
 and forth did not work, as people walk out of the picture and come back as someone new.
 
+### Following through a door (Phase 54)
+
+A counting line can have the role **door** (Live page, Zones: the role picker now also shows for lines; the safety page
+lists door lines). When two people cross a door line the same way within 2 s (`behaviour.follow_s`), someone may be
+following another through (slipping in behind a resident): at night or when Away it alerts directly, once a minute
+per door, with the vision model's words on what they do added afterwards ("two people went in through front door
+1.4 s apart ... at night; the vision model: ..."). By day it is only logged: friends and families do it all the
+time. Draw a door line only across a real door, where two people at once is unusual at night.
+
+Measured (2026-10-29): on MOT16's busy streets, with a line down the middle, two people really pass the same way
+within 2 s 91 times in 3.6 minutes (from the videos' own marks); the app, run as if at night on the 86 everyday
+videos with that line marked as a door: 14 alerts in 36 minutes, all on the busy streets (in 4 of the 7 MOT16
+clips, each under a minute, so at most one alert each; MOT20 and the floor videos made from MOT16 streets), none on
+the 70 indoor UR Fall clips (one person each). A real run on a test copy (MOT16-09, night all day, a door line): the
+first pair alerted with the vision model's words, the next ones within the minute only logged; no errors. Not
+measured: a real door at night (no video of one here).
+
 ## No movement
 
 For someone living alone (an elderly parent): an alert when nobody has been seen on the camera for a long time while

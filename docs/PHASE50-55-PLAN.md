@@ -247,6 +247,12 @@ Measured like Phase 49: made-up cases on test copies, false alarms on the everyd
   once a minute per door, at night or when Away.
 Steps (ask before each): 1. following through a door; 2. bag left; 3. at parked cars; 4. came back again and again;
 each with its tests, made-up cases, false alarms on the everyday videos, a real run, README; What's new at the end.
+**Step 1 done 2026-10-29** (following through a door): `zones.LINE_ROLES` ("door"), `check_role` per kind,
+`/api/zones/roles` with `kind`; `BehaviourWatch.crossed`, `behaviour.follow_s` 2; `Pipeline._check_doors` and
+`_watchful` (shared with the Phase 49 signs); Live page role picker for lines; safety page lists door lines;
+`incident_check.py --areas` takes `"kind": "line"`. Measured: MOT16's own marks 91 true "following" passes in
+3.6 min (busy streets); the everyday videos as if at night 14 alerts in 36 min, all on busy streets, none on UR
+Fall; a real run alerted once with the words, then only logged within the minute.
 
 ## Phase 55: Our own pest model
 

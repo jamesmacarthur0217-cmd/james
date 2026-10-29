@@ -15,6 +15,8 @@ Area roles (Phase 44): an area can say what the place is, so the safety checks k
 a flame in the cooking area; someone lying on the bed). The roles are fixed here because later checks depend on their
 meaning; `safety.roles` in the config picks which ones the Live page offers. "bed" is the old "lying is normal here"
 (zones.lying_ok is kept the same, so fall checks and old databases work unchanged).
+Line roles (Phase 54): a counting line can be a "door": two people crossing it the same way within seconds is someone
+following another through it (labeler/behaviour.py). Stored in the same zones.role column (no schema change).
 """
 from __future__ import annotations
 
@@ -32,6 +34,8 @@ ROLES = {"walkway": "walkway or aisle", "exit": "exit or emergency exit", "cooki
          "food_prep": "food preparation", "dining": "dining or seating", "play": "children's play area",
          "restricted": "restricted (staff or no entry)", BED: "bed or sofa (lying is normal here)",
          "fence": "fence or wall (climbing over it is suspicious)"}
+LINE_ROLES = {"door": "door (someone following another through it is noticed)"}
+ALL_ROLES = {**ROLES, **LINE_ROLES}
 
 
 def role_at(zones: list[dict], pt: tuple[float, float]) -> str:
@@ -58,10 +62,14 @@ def check_limit(kind: str, max_people) -> int | None:
 def check_role(kind: str, role: str | None) -> str:
     """A valid role for a zone ("" for none); only areas have one."""
     role = (role or "").strip()
-    if role and role not in ROLES:
-        raise ValueError(f"unknown area role {role!r} (one of: {', '.join(ROLES)})")
-    if role and kind != AREA:
-        raise ValueError("only areas have a role, not counting lines")
+    if not role:
+        return role
+    allowed = ROLES if kind == AREA else LINE_ROLES
+    if role not in allowed:
+        if role in ALL_ROLES:
+            raise ValueError(f"{role!r} is a role for {'counting lines' if kind == AREA else 'areas'}, not "
+                             f"{'areas' if kind == AREA else 'counting lines'}")
+        raise ValueError(f"unknown {'area' if kind == AREA else 'line'} role {role!r} (one of: {', '.join(allowed)})")
     return role
 
 

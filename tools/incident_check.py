@@ -18,7 +18,8 @@ the vision model answers: this measures what is found, not how fast the PC is (t
 --hold-s repeats each video's last picture that long (UR Fall clips end a few seconds after the fall). --no-vlm answers
 every check "yes": the quick checks alone. --labels: people also get their labels from the vision model, as in the app
 (the age group decides who is a child; the video waits for them too). --areas: a JSON file {video: [{"name", "role",
-"points"}]} with areas drawn on that video's picture (fractions), e.g. a cooking area.
+"points"}]} with areas drawn on that video's picture (fractions), e.g. a cooking area; "kind": "line" for a counting
+line (2 points), e.g. a door (Phase 54).
 
 Per kind it prints:
   spans      true incident spans in the videos (kind given)
@@ -140,7 +141,7 @@ def run_video(video: Path, cfg: dict, embedder, fps: float, half: str, hold_s: f
 
     db = Database("sqlite:///" + (Path(tempfile.mkdtemp(prefix="incident_check_")) / "check.db").as_posix())
     for a in areas or []:
-        db.add_zone("check", a["name"], "area", a["points"], role=a.get("role", ""))
+        db.add_zone("check", a["name"], a.get("kind", "area"), a["points"], role=a.get("role", ""))
     cam = {"name": "check", "source": "imported videos", "mode": "security", "loop_files": False, "ignore_zones": [],
            "vehicles": False, "animals": False, "safety": True}
     cfg = copy.deepcopy(cfg)

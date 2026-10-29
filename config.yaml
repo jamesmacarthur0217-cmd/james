@@ -220,6 +220,7 @@ behaviour:
   night_hours: "22-06"        # "night" for these alerts
   restricted_s: 3             # in a "restricted" area this long (at night or when Away) -> alert
   pace_turns: 4               # pacing: this many turns back within pace_window_s (180 s)
+  follow_s: 2                 # two people through a "door" line the same way this close (following through)
 
 # PC watch: the graphics card's temperature (hot from 85 °C), each disk's health as Windows sees it, and whether the
 # app or the PC stopped without warning last time (power cut, PC turned off without stop.bat).

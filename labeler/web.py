@@ -722,15 +722,17 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
 
     @app.get("/api/zones/roles")
     def zone_roles():
-        """The area roles the Live page offers (config zones.roles, else all), with their words."""
-        from .zones import ROLES
+        """The roles the Live page offers, with their words and kind: area roles (config zones.roles, else all), then
+        the counting lines' ("door", Phase 54)."""
+        from .zones import LINE_ROLES, ROLES
         offered = cfg["zones"].get("roles") or list(ROLES)
-        return [{"role": r, "words": ROLES[r]} for r in offered if r in ROLES]
+        return ([{"role": r, "words": ROLES[r], "kind": "area"} for r in offered if r in ROLES]
+                + [{"role": r, "words": w, "kind": "line"} for r, w in LINE_ROLES.items()])
 
     @app.patch("/api/zones/{zone_id}")
     def update_zone(zone_id: int, body: ZoneUpdate, request: Request):
-        """An area's role and/or people limit (only the fields sent change)."""
-        from .zones import ROLES
+        """A zone's role and/or an area's people limit (only the fields sent change)."""
+        from .zones import ALL_ROLES as ROLES
         fields = {k: getattr(body, k) for k in body.model_fields_set}
         try:
             zone = db.update_zone(zone_id, **fields)
@@ -745,7 +747,8 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             what.append(ROLES[zone["role"]] if zone["role"] else "no role")
         if "max_people" in fields:
             what.append(f"at most {zone['max_people']} people" if zone["max_people"] else "no people limit")
-        audit(request, "zone changed", f"area {zone['name']!r} on camera {zone['camera']}: " + ", ".join(what))
+        audit(request, "zone changed", f"{'area' if zone['kind'] == 'area' else 'line'} {zone['name']!r} on camera "
+                                        f"{zone['camera']}: " + ", ".join(what))
         return zone
 
     @app.post("/api/zones")
@@ -758,7 +761,7 @@ def create_app(cfg: dict, db: Database, pipelines: Pipeline | list[Pipeline] | N
             raise HTTPException(400, str(e))
         if body.camera in by_name:
             by_name[body.camera].reload_zones()
-        from .zones import ROLES
+        from .zones import ALL_ROLES as ROLES
         audit(request, "zone added", f"{zone['kind']} {zone['name']!r} on camera {zone['camera']}"
                                      + (f" ({ROLES[zone['role']]})" if zone["role"] else "")
                                      + (f", at most {zone['max_people']} people" if zone["max_people"] else ""))
