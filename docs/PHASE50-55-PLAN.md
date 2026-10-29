@@ -231,6 +231,23 @@ The four of Phase 49's list not built yet (the design per sign discussed with th
 4. Following through a door: two people crossing an exit line within 2 s the same way.
 Measured like Phase 49: made-up cases on test copies, false alarms on the everyday videos.
 
+**Design agreed with the user 2026-10-29** (all four recommended):
+- **Came back again and again**: by look: a newcomer's clothing picture (the SigLIP embedding the app already keeps)
+  matched against the people who entered the same area in the last 30 minutes; the 3rd visit alerts directly (a
+  pattern, `ConfirmQueue.direct` with the words question after), only at night or when Away (few people then:
+  look-alikes matter less). Today's re-linking joins tracks only within 30 s. No new model.
+- **Bag left**: each person's position kept for the last few minutes; when the floor check (Phase 47) finds a new
+  object, who was next to it when it appeared; if that person has left the view, the floor alert says "left by person
+  #12, who walked away" and becomes a warning. The floor check's timing as now (30 s, two looks).
+- **At parked cars**: a wrist at a parked car's door or window for 5 s, or stopping at 2 or more parked cars in a row;
+  at night or when Away; the vision model looks once ("is someone trying a car's door or looking into it?"), only
+  its "yes" alerts.
+- **Following through a door**: lines get a role like areas (the zones table has `role` already: no schema change;
+  `zones.check_role` allows "door" on lines); on a "door" line, two people crossing the same way within 2 s alert,
+  once a minute per door, at night or when Away.
+Steps (ask before each): 1. following through a door; 2. bag left; 3. at parked cars; 4. came back again and again;
+each with its tests, made-up cases, false alarms on the everyday videos, a real run, README; What's new at the end.
+
 ## Phase 55: Our own pest model
 
 YOLOE found 3% of rodents (Phase 47 step 3). Like the gun model (Phase 47 step 1):
