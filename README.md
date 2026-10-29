@@ -850,6 +850,14 @@ is less sure of distant hazy smoke on hillsides (a fire video's typical best box
 photos' IR copies have the night videos' look, so their IR number was optimistic. Kept on disk, unused, for a look
 with real night video.
 
+**What these night numbers are not** (Phase 53 finished 2026-10-29): all of them come from made-up night versions of
+daytime videos. No public set of real near-infrared night video (a security camera's black-and-white night mode)
+with falls, fights or fire and a clear licence and direct download was found (looked at: LLVIP, real dark street
+photos with thermal pairs, non-commercial; a fire and smoke set with 7,000 night photos in colour, no licence
+stated, on Roboflow; MUVIM, near-IR falls from a ceiling camera, by emailed request; the MIVIA fire videos, asked
+for). The user's choice: no download. Real night numbers come from a real camera at night: the user's own (Phase
+26) or a security camera added later; falls and fire in IR are the first things to look at then.
+
 
 Each person also gets a **mobility aid** label: wheelchair, walking stick, crutches, walker, or none. A camera
 cannot see a disability, only an aid the person is using. It is searchable ("person in a wheelchair", "old man

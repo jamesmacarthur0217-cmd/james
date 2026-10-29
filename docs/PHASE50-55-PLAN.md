@@ -210,6 +210,10 @@ dark with `tools/night_check.py`; ask before each:
   old model stays; the new file kept unused. An IR-only use of it was not decided (the user stopped the question).
 - 3e the search for real night footage (size and licence shown, nothing downloaded without the user's OK); README
   with day and night numbers.
+  **Done 2026-10-29; Phase 53 is done.** No public real near-IR night video with falls, fights or fire, a clear
+  licence and a direct download (LLVIP: thermal pairs of dark street photos, non-commercial; a FireAndSmoke set:
+  7,000 colour night photos, no licence, Roboflow; MUVIM: near-IR falls from a ceiling camera, by request; MIVIA:
+  asked for). The user's choice: finish with the made-up night only; README "What these night numbers are not".
 1. Made-up night videos from the ones here (darker, noisier, black-and-white like infrared) for falls (UR Fall), fights
    (the fight clips), floors and behaviour; measure found / false alarms as by day, with the same tools.
 2. Optionally real night footage: a public set with night or infrared video (size and licence checked, asked first).

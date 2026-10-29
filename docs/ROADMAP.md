@@ -14,9 +14,9 @@ done** (busy-camera measurement; checks use idle time, passers-by colours only, 
 1016 tests); step 3 done the same day (the vision model's load on the Health page's "vision model" line; 1020
 tests): **Phase 50 is done.** Phase 51 (Settings for the safety checks: a switch per kind, the main times) done the
 same day (1023 tests). Phase 52 (the safety page `/safety`) done the same day; then a fix found in its real run (a waiting round
-blocked warnings, HANDOFF pitfall 44; 1038 tests). Next: Phase 53
-(night-time measuring; design discussed first). MIVIA fire videos
-when the user has them.
+blocked warnings, HANDOFF pitfall 44; 1038 tests). Phase 53 (night-time measuring) done 2026-10-29 (1049 tests):
+camera covered and floor and exits fixed for night, falls and fire in IR measured and left (README "Safety checks
+at night"). Next: Phase 54 (more behaviour signs; design discussed first). MIVIA fire videos when the user has them.
 
 
 Latest: Phases 36-43 and 28 are done (2026-10-17 to 2026-10-20; 892 tests); the

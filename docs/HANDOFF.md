@@ -18,7 +18,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-25)
 
-**Start here (2026-10-26, end of the session; last commit: Phase 53 step 1 + this handoff; 1045 tests + 1 PostgreSQL test that
+**Start here (2026-10-29, end of the session; last commit: Phase 53 done + this handoff; 1049 tests + 1 PostgreSQL test that
 is skipped without `VL_TEST_POSTGRES_URL`; GitHub green; working tree clean; no test copy running).**
 
 **Plan in progress: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (approved 2026-10-25, the user's choices, in this
@@ -67,8 +67,10 @@ answers.
   fires instead of 39): the old model stays (README "Fire in IR: tried, not used"). Using it on IR pictures only was
   not decided: offer it again only with real IR numbers. Extra data: `data/datasets/dfire/bw` 2.7 GB and
   `dfire/night_test` 1.6 GB (made here).
-- **Next: Phase 53 step 3e** (look for real night footage: size and licence shown, nothing downloaded without OK;
-  README); ask first.
+- **Phase 53 step 3e done; Phase 53 is done** (2026-10-29): no public real near-IR night video fits; the user's
+  choice: no download, the made-up night numbers with their limits in the README. What's new entry `p53`.
+- **Next: Phase 54** (more behaviour signs: came back again and again, a bag left, at parked cars, following through
+  a door); discuss each sign's design with the user first, ask before each step.
 - Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
   videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
 

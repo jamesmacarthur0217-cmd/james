@@ -163,10 +163,14 @@ ENTRIES: list[Entry] = [
           "Settings, \"Safety checks\": turn each kind on or off (people down, children, crowding, fire, dangerous "
           "objects, floor and exits, equipment, fights, suspicious behaviour) and change the main times, such as the "
           "night hours. Changes apply after a restart.", "/settings", "admin"),
-    Entry("p52", 52, "", "The safety page",
+    Entry("p52", 52, "4e87b9b", "The safety page",
           "One page for the safety checks: which checks run on each safety camera, what each area's role means, the "
           "floor check's empty picture, the latest checks with the vision model's answers, and the week's safety "
           "alerts. Linked from the Alerts and Health pages.", "/safety", "admin"),
+    Entry("p53", 53, "", "Safety checks at night",
+          "Measured on dark and infrared pictures: a light dimmed in a dark room is no longer taken for a covered "
+          "camera, and things left on a walkway or in an exit are found better at night. Falls and fire in "
+          "infrared are still weak; the README says what was measured.", "", "admin"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 
