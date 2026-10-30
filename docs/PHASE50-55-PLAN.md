@@ -279,6 +279,22 @@ YOLOE found 3% of rodents (Phase 47 step 3). Like the gun model (Phase 47 step 1
    "yes" alerts).
 3. Cockroaches: no boxes in Open Images; said honestly.
 
+**Design agreed with the user 2026-10-30**: training photos as above (step 1); a YOLO11s with one class "rodent",
+measured close-up, far (about 40 px) and on black-and-white "night" copies, tuned on one half and reported on the
+other, kept only if it finds about half of the close-up mice with few pest boxes on computer mice and kitchens (step 2);
+in the app it looks only at **cut-out cooking, food-prep and dining areas** (a mouse is bigger there, and it is
+cheaper), about once a second on safety cameras; 2 of the last 3 looks, the vision model confirms, one "yes" alerts, at
+most once a minute per camera and area (step 3). Plain photos first; black-and-white training copies only if night
+measures poor (they made fire worse by day).
+
+**Step 1 done (2026-10-30)**: `tools/get_pest_training.py` (downloaded with the user's OK after the size and licence
+were shown: 2.26 GB box list read and not kept, 0.43 GB kept in `data/datasets/oi_pests`, git-ignored). 657 Open Images
+V6 training photos with a mouse (781 boxes; 44 with only drawn mice left out), 500 with a computer mouse, 500 kitchens
+(oven, sink, stove, fridge, counter...), each with a YOLO label file; none of the 251 test photos among them. Open
+Images' "Mouse" is any small rodent: rats and mice, but also squirrels, chipmunks, hamsters and guinea pigs (seen on a
+sample); the test photos are the same class. Most are close-ups (median box half the photo's width, 6 of 781 under a
+tenth): the far case depends on training with shrunken copies (step 2).
+
 ## Phase 26 (waiting): a real-camera week
 
 After the user restarts their own app (stop.bat, start.bat; the safe-update test passed on their database), a week of

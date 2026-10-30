@@ -34,7 +34,7 @@ before claiming; a change is kept only if day (or the old behaviour) is not wors
 | 52 safety overview page | done | `/safety` (admins); then the pitfall 44 fix (rounds no longer block warnings; a stuck round taken back) |
 | 53 night-time measuring | done | made-up IR/dark videos (`tools/make_night_videos.py`, `tools/night_check.py`); fixed: camera covered, floor/exits; falls and fire in IR measured and left (README "Safety checks at night") |
 | 54 more behaviour signs | done | door lines (following through), "left by person #N" in floor alerts, at parked cars, came back again and again (0.96 by look) |
-| **55 our own pest model** | **next** | design to discuss first; Open Images mouse photos: download size and licence shown, the user's OK before any download |
+| **55 our own pest model** | **step 1 done** | design agreed 2026-10-30 (the plan); training photos in `data/datasets/oi_pests` (0.43 GB, `tools/get_pest_training.py`); next: step 2 train and measure |
 | 26 real-camera week | waiting | after the user restarts their app (stop.bat, start.bat; then the First-run check) |
 
 Things to know from Phases 50-54:
@@ -122,7 +122,7 @@ Numbers and limits are in README sections "Safety incidents" ... "Dangerous obje
 mot20`: zip 4.7 GB + 3.2 GB unpacked + videos; the zip may be deleted), D-Fire (`data/datasets/dfire`: zip 3.0 GB +
 unpacked + 100 sample videos 0.44 GB), Open Images guns (`data/datasets/openimages_weapons` 127 MB test,
 `data/datasets/oi_guns` 1.03 GB training), YOLOE (`data/models/yoloe`, 27 MB), Open Images rodents
-(`data/datasets/openimages_pests`, 74 MB), the fight clips (`data/datasets/survfight`, 87 MB, a git clone). Made here:
+(`data/datasets/openimages_pests`, 74 MB; training photos `data/datasets/oi_pests`, 0.43 GB, 2026-10-30), the fight clips (`data/datasets/survfight`, 87 MB, a git clone). Made here:
 `data/datasets/floor_made` (1.1 GB, `tools/make_floor_videos.py`), `data/datasets/night_made` (8.9 GB,
 `tools/make_night_videos.py`, Phase 53). The user may want old zips deleted
 (ask; never delete without OK).
