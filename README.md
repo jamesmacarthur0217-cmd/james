@@ -1244,6 +1244,21 @@ for the camera check failed on a busy street (big people close to the lens chang
 camera), so it compares the middle value of several looks; and a made-up pacing video from a whole clip played back
 and forth did not work, as people walk out of the picture and come back as someone new.
 
+### Came back again and again (Phase 54)
+
+At night or when Away (the user's choice): someone entering an area the 3rd time within 30 minutes (visits at least
+a minute apart; `behaviour.visit_*`) alerts directly. A visit is the same tracker number, or the same look: the
+app's look vector (SigLIP, as for search by photo) of at least 0.96. The alert's picture is a strip of the visits'
+pictures, oldest first, so a person can see whether it really is one person (faces blurred for viewers as usual);
+once an area every 10 minutes, the vision model's words added after.
+
+Measured before building (MOT16's true identities, 95 people, each person's early and late look): at 0.96 the same
+person matched 47%, two different people 4% (0.90: 91% / 65%; 0.98: 15% / 0.3%). So it catches few (about 1 in 5
+of real 3-time visitors) and rarely mixes up people when few come by: the user's choice after these numbers. The
+everyday videos as if at night (whole picture an area): no alert on the 81 videos where nobody comes back; 3 on the
+looped floor videos of busy streets (MOT16-02, -04, -09), where people really do come back every loop (whether each
+strip shows one person or two look-alikes who both returned cannot be told there); none on the quiet booth.
+
 ### At parked cars (Phase 54)
 
 On a security camera that sees vehicles, at night or when Away (the user's choice): **a hand at a parked car** (a

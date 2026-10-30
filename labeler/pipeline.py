@@ -51,6 +51,27 @@ def relink_settings(cfg: dict, mode: str) -> dict:
     return rc
 
 
+def _small_picture(person: np.ndarray, head: tuple | None, height: int = 160) -> tuple:
+    """(a person's crop at `height` px, their head box in it) for a visit (kept a while: small)."""
+    k = height / max(1, person.shape[0])
+    small = cv2.resize(person, (max(1, round(person.shape[1] * k)), height), interpolation=cv2.INTER_AREA)
+    return small, tuple(v * k for v in head) if head is not None else None
+
+
+def _strip(pictures: list[tuple]) -> tuple | None:
+    """The visits' pictures side by side, oldest first: (picture, head boxes to blur for viewers)."""
+    if not pictures:
+        return None
+    gap = np.full((pictures[0][0].shape[0], 6, 3), 255, np.uint8)
+    parts, heads, x = [], [], 0
+    for pic, head in pictures:
+        parts += [pic, gap]
+        if head is not None:
+            heads.append((head[0] + x, head[1], head[2] + x, head[3]))
+        x += pic.shape[1] + gap.shape[1]
+    return np.hstack(parts[:-1]), heads
+
+
 class LiveClock:
     """Time for a live camera: now."""
 
@@ -528,6 +549,7 @@ class Pipeline:
                     st.zone_log += events
                     if events and getattr(self, "behaviour", None) is not None:
                         self._check_doors(tid, events, now, frame.shape)
+                        self._check_visits(st, events, now)
                     self._flush_zone_events(st)
                 if self.falls is not None:
                     ok = zones_mod.lying_ok(self.zone_counter.zones, zones_mod.anchor(st.box, frame.shape, self.mode))
@@ -892,6 +914,43 @@ class Pipeline:
                                       describe=DESCRIBE_QUESTION, sign=f"following {door['id']}")
             except Exception:
                 log.exception("[%s] a door alert failed", self.name)
+
+    def _check_visits(self, st: TrackState, events: list[dict], now: float) -> None:
+        """Came back again and again (Phase 54, labeler/behaviour.py entered; the user's choice): each area entry is
+        noted with the person's look and a small picture; the visit_count-th visit within the window alerts directly at
+        night or when Away, its picture a strip of the visits (faces blurred for viewers as usual)."""
+        from .behaviour import DESCRIBE_QUESTION
+        areas = {z["id"]: z for z in self.zone_counter.zones if z["kind"] == zones_mod.AREA}
+        for ev in events:
+            area = areas.get(ev["zone_id"])
+            if area is None or ev["kind"] != "enter":
+                continue
+            if st.vector is None and self.embedder is not None and st.candidates:
+                try:
+                    st.vector = self.embedder.track_vector([c.person for c in st.candidates])
+                except Exception:
+                    log.exception("[%s] a look vector for a visit failed", self.name)
+            best = max(st.candidates, key=lambda c: c.score) if st.candidates else None
+            got = self.behaviour.entered(now, st.tracker_id, area, st.vector,
+                                         _small_picture(best.person, best.head) if best is not None else None)
+            if got is None or getattr(self, "incidents", None) is None:
+                continue
+            reason, pictures = got
+            wall = self.clock.wall()
+            watchful, when = self._watchful(wall)
+            if not watchful:
+                log.info("[%s] behaviour: %s (by day: no alert)", self.name, reason)
+                continue
+            log.warning("[%s] behaviour: %s (person %s)", self.name, reason, st.tracker_id)
+            self._ensure_db(st)
+            strip = _strip(pictures)
+            try:   # no area: the strip is not the camera's picture, an outline would be in the wrong place
+                self.incidents.direct(self.name, "suspicious", f"{reason} {when}",
+                                      people=[st.db_id] if st.db_id is not None else [],
+                                      pictures=[(wall, *strip)] if strip is not None else None,
+                                      describe=DESCRIBE_QUESTION, sign="came back")
+            except Exception:
+                log.exception("[%s] a came-back alert failed", self.name)
 
     def _touched_before_fall(self, tid) -> str:
         """Collisions (Phase 48, the user's choice: through the fall check): "after touching person #12" when someone

@@ -264,6 +264,10 @@ raises one vision-model check (`_raise(..., box=)` around person and car). Tests
 stroll past a car for a hand at it: now the person must stay where they stood). The everyday videos as night: no
 car check, but almost no parked cars in them; a real run (MOT16-04 at night, a parked motorbike): no check, no
 errors. No video of someone at a car door, nor a car park, here.
+**Step 4 done 2026-10-30; Phase 54 is done** (came back): measured first (MOT16 identities: at 0.96 same person 47%,
+different 4%); the user chose to build it at 0.96 anyway. `BehaviourWatch.entered` (`visit_*`), `Pipeline.
+_check_visits`, `_small_picture`, `_strip` (the visits' pictures with their head boxes). Everyday videos as night:
+0 alerts on 81 single-pass videos, 3 on the looped busy-street floor videos (real returns). What's new `p54`.
 
 ## Phase 55: Our own pest model
 

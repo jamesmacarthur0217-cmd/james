@@ -186,7 +186,11 @@ DEFAULTS: dict = {
                   "follow_s": 2.0,
                   # Phase 54, at parked cars (night or Away): a hand at one car_hold_s, or stops (car_stop_s) at
                   # car_count cars within car_window_s; one car check a camera every car_rearm_s
-                  "car_hold_s": 5.0, "car_stop_s": 3.0, "car_count": 2, "car_window_s": 120.0, "car_rearm_s": 60.0},
+                  "car_hold_s": 5.0, "car_stop_s": 3.0, "car_count": 2, "car_window_s": 120.0, "car_rearm_s": 60.0,
+                  # Phase 54, came back (night or Away): the visit_count-th visit to an area within visit_window_s,
+                  # visits visit_gap_s apart, the same person by look (>= visit_similarity); once an area a visit_rearm_s
+                  "visit_window_s": 1800.0, "visit_similarity": 0.96, "visit_count": 3, "visit_gap_s": 60.0,
+                  "visit_rearm_s": 600.0},
     "falls": {"enabled": True, "after_s": 10.0, "drop_s": 1.0, "min_drop": 0.4, "getup_s": 1.0, "lying_angle": 60.0,
               "low_ratio": 0.5, "lost_s": 0.5, "min_width": 1.25},   # optional fields (schema.OPTIONAL_FIELDS); off = not asked, not stored
     "embeddings": {"enabled": True, "model": "google/siglip2-base-patch16-224", "device": "cuda"},

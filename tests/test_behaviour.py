@@ -377,3 +377,56 @@ def test_the_camera_asks_the_vision_model_about_someone_at_a_car(db, camera):
             assert category == "suspicious" and reason == "a hand at a parked car for 5 s at night"
             assert kw["question"] == CAR_QUESTION and kw["people"] == [p.tracks[5].db_id]
             assert kw["crop"][0] == CAR_A[0] / SHAPE[1] and kw["crop"][1] == 190 / SHAPE[0]   # around both
+
+
+YARD_AREA = {"id": 3, "name": "yard", "kind": "area", "role": "", "points": [(0, 0), (1, 0), (1, 1), (0, 1)]}
+
+
+def _look(i):
+    """A unit look vector: the same i is the same person (similarity 1), different i are far apart (0)."""
+    v = np.zeros(8, np.float32)
+    v[i] = 1.0
+    return v
+
+
+def test_coming_back_again_and_again():
+    """Phase 54: the 3rd visit to an area within 30 min, visits a minute apart, the same person by look (another
+    tracker number each time) or the same number; not someone else, not a quick step out and back, not after 30 min."""
+    w = BehaviourWatch({})
+    assert w.entered(0.0, 1, YARD_AREA, _look(0), ("a", None)) is None
+    assert w.entered(30.0, 1, YARD_AREA, _look(0)) is None                 # back in after 30 s: the same visit
+    assert w.entered(300.0, 2, YARD_AREA, _look(1), ("b", None)) is None   # someone else
+    assert w.entered(400.0, 3, YARD_AREA, _look(0), ("c", None)) is None   # 2nd visit (new number, same look)
+    reason, pictures = w.entered(900.0, 4, YARD_AREA, _look(0), ("d", None))
+    assert reason == "the same person (by look) came into yard 3 times in 15 min" and [pic for pic, _ in pictures] == ["a", "c", "d"]
+    assert w.entered(1000.0, 5, YARD_AREA, _look(0)) is None               # once an area every 10 min
+    w2 = BehaviourWatch({})
+    for i, t in enumerate((0.0, 1000.0, 2000.0)):                          # 3 visits, but over 33 min
+        got = w2.entered(t, 10 + i, YARD_AREA, _look(0))
+    assert got is None
+    w3 = BehaviourWatch({})
+    w3.entered(0.0, 7, YARD_AREA, None)
+    w3.entered(100.0, 7, YARD_AREA, None)                                  # no look: the same number still counts
+    assert w3.entered(200.0, 7, YARD_AREA, None)[0].endswith("3 times in 3 min")
+
+
+def test_the_camera_alerts_a_comeback_at_night_with_the_visits_pictures(db, camera):
+    from labeler.pipeline import Candidate, TrackState
+    for hour, alerts in ((12, 0), (23, 1)):
+        p = camera_pipe(db, camera, hour=hour)
+        p.zone_counter.zones = [YARD_AREA]
+        p.embedder = None
+        for i, t in enumerate((0.0, 200.0, 400.0)):
+            st = TrackState(20 + i, datetime.now(), t, db_id=db.create_track(camera, 20 + i, datetime.now()))
+            st.vector = _look(0)
+            st.candidates = [Candidate(0.9, np.full((320, 120, 3), 100 + i, np.uint8), None, (20, 0, 100, 60))]
+            p.tracks[st.tracker_id] = st
+            p._check_visits(st, [{"zone_id": 3, "kind": "enter"}], t)
+        assert len(p.incidents.direct_) == alerts, hour
+        if alerts:
+            [(category, reason, kw)] = p.incidents.direct_
+            assert category == "suspicious" and reason.endswith("3 times in 7 min at night")
+            assert kw["sign"] == "came back" and kw["people"] == [p.tracks[22].db_id]
+            [(_, strip, heads)] = kw["pictures"]
+            assert strip.shape[0] == 160 and strip.shape[1] == 3 * 60 + 2 * 6 and len(heads) == 3
+            assert heads[1][0] == 66 + 10 and heads[0][3] == 30                # the 2nd head moved along the strip

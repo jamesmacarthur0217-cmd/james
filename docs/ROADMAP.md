@@ -16,7 +16,8 @@ tests): **Phase 50 is done.** Phase 51 (Settings for the safety checks: a switch
 same day (1023 tests). Phase 52 (the safety page `/safety`) done the same day; then a fix found in its real run (a waiting round
 blocked warnings, HANDOFF pitfall 44; 1038 tests). Phase 53 (night-time measuring) done 2026-10-29 (1049 tests):
 camera covered and floor and exits fixed for night, falls and fire in IR measured and left (README "Safety checks
-at night"). Next: Phase 54 (more behaviour signs; design discussed first). MIVIA fire videos when the user has them.
+at night"). Phase 54 (more behaviour signs: door, bag left, parked cars, came back) done 2026-10-30 (1059 tests).
+Next: Phase 55 (our own pest model; design discussed first). MIVIA fire videos when the user has them.
 
 
 Latest: Phases 36-43 and 28 are done (2026-10-17 to 2026-10-20; 892 tests); the

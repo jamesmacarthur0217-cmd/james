@@ -18,6 +18,13 @@ choices (2026-10-23): four signs, moments confirmed by the vision model, pattern
   motorbike) while the person stands at it, hardly moving, for `car_hold_s`; or stopping (`car_stop_s`, hardly moving)
   at `car_count` different parked cars within `car_window_s`. Only at night or when Away; the vision model looks once
   (CAR_QUESTION) and only its "yes" alerts; at most one car check a camera every `car_rearm_s`.
+- came back again and again (a pattern, Phase 54; the user's choice): someone entering an area the `visit_count`th
+  time within `visit_window_s` (visits at least `visit_gap_s` apart): the same tracker number, or a look match (the
+  SigLIP vector the app keeps, labeler/embed.py) of at least `visit_similarity`; at night or when Away, alerted
+  directly with a strip of the visits' pictures, so a person can see whether it really is one person; once an area
+  every `visit_rearm_s`. Measured on MOT16's true identities (2026-10-30): at 0.96 the same person later matched 47%,
+  two different people 4%: it catches few (about 1 in 5 of real 3-time visitors) and rarely mixes up people when few
+  come by (the user's choice after the numbers).
 - following through a door (a pattern, Phase 54; the user's choice): on a counting line with the role "door", two
   people crossing it the same way within `follow_s` (someone following another through, as when slipping in behind a
   resident); at night or when Away, alerted directly once a minute per door (by day two friends do it all the time).
@@ -52,6 +59,7 @@ CAR_QUESTION = ("Is a person trying to open a car's door, reaching into a car, o
                 "into their own car normally, or just walking past)? Judge only what they do.")
 CAR_KINDS = ("car", "lorry", "motorbike")   # the parked vehicles the car signs look at (labeler/vehicles.py names)
 WRISTS = (9, 10)                              # COCO body points: left and right wrist
+VISITS_KEPT = 300    # area entries kept per area (a busy street enters areas all the time; pictures are small)
 FEET_WINDOW_S = 10.0
 THUMB = (64, 36)     # the camera check looks at a tiny gray picture
 NOW_LOOKS = 5        # "now": the middle value of the last 5 looks
@@ -100,6 +108,13 @@ class BehaviourWatch:
         self.covered_std = float(cfg.get("covered_std", 6.0))
         self.moved_corr = float(cfg.get("moved_corr", 0.35))
         self.follow_s = float(cfg.get("follow_s", 2.0))
+        self.visit_window_s = float(cfg.get("visit_window_s", 1800.0))
+        self.visit_similarity = float(cfg.get("visit_similarity", 0.96))
+        self.visit_count = int(cfg.get("visit_count", 3))
+        self.visit_gap_s = float(cfg.get("visit_gap_s", 60.0))
+        self.visit_rearm_s = float(cfg.get("visit_rearm_s", 600.0))
+        self.visits: dict = {}        # area id -> deque of (t, key, look vector, (picture, head) or None)
+        self.visit_fired: dict = {}   # area id -> when "came back" was last raised there
         self.car_hold_s = float(cfg.get("car_hold_s", 5.0))
         self.car_stop_s = float(cfg.get("car_stop_s", 3.0))
         self.car_count = int(cfg.get("car_count", 2))
@@ -295,6 +310,29 @@ class BehaviourWatch:
             return []
         self.car_last = t
         return out[:1]
+
+    # Visits ------------------------------------------------------------------------------------------------------
+
+    def entered(self, t: float, key, area: dict, vector, picture=None) -> tuple | None:
+        """Someone entered an area (vector: their look, or None; picture: (crop, head box in it) or None). Returns
+        (reason, [pictures of the visits, oldest first]) when it is their visit_count-th visit (see the module text),
+        else None."""
+        visits = self.visits.setdefault(area["id"], deque(maxlen=VISITS_KEPT))
+        while visits and t - visits[0][0] > self.visit_window_s:
+            visits.popleft()
+        same = [v for v in visits if v[1] == key or (vector is not None and v[2] is not None
+                                                     and float(v[2] @ vector) >= self.visit_similarity)]
+        visits.append((t, key, vector, picture))
+        apart = []
+        for v in [*same, visits[-1]]:   # oldest first; a step out and back in within visit_gap_s is one visit
+            if not apart or v[0] - apart[-1][0] >= self.visit_gap_s:
+                apart.append(v)
+        if len(apart) < self.visit_count or t - self.visit_fired.get(area["id"], -1e9) < self.visit_rearm_s:
+            return None
+        self.visit_fired[area["id"]] = t
+        minutes = max(1, round((t - apart[0][0]) / 60))
+        return (f"the same person (by look) came into {area['name']} {len(apart)} times in {minutes} min",
+                [v[3] for v in apart if v[3] is not None])
 
     # Doors -------------------------------------------------------------------------------------------------------
 
