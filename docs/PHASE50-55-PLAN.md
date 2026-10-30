@@ -312,6 +312,8 @@ measured cut scaled to the area), the measured question; one "yes" alerts; the a
 `tools/models.py` lists the model as optional; What's new `p55`. Found in the real run: the queue's own 60-s limit
 counts from a moment later, so the second check was refused and the area would wait 2 minutes; now a refused check
 is tried again at the next sighting (the next alert came 63 s after the first). 8 tests (`tests/test_pests.py`).
+A mouse that stays alerts again each minute: kept so (the user's choice 2026-10-30, over re-arming only after the
+area was quiet, as fire does).
 
 ## Phase 26 (waiting): a real-camera week
 
