@@ -254,3 +254,37 @@ def test_the_limit_follows_the_pictures_contrast():
     black = np.full_like(day, 5)
     assert w.threshold(black) == 10.0
     assert FloorWatch({"floor_contrast_ref": 1}).threshold(night) == 30.0   # the old fixed limit
+
+
+def test_who_left_a_bag(db):
+    """Phase 54 (the user's choice: in the floor alert): the person who stopped next to the new object around when it
+    appeared (2 looks, hardly moving), if they have left the view: "left by person #N, who walked away"; not someone
+    still here, not a passer-by walking past it, not someone far away or there long before."""
+    from test_pipeline_logic import make_pipeline
+    p = make_pipeline(db)
+    shape = (480, 640, 3)
+    bag = (0.45, 0.80, 0.55, 0.90)                                    # the change, fractions: around (320, 408)
+    stood = [(99.0, 7, 70, (290, 120, 350, 400)), (100.0, 7, 70, (292, 120, 352, 400)),   # stopped on its spot
+             (101.0, 7, 70, (291, 120, 351, 400))]
+    passed = [(99.0, 8, 80, (150, 120, 210, 400)), (100.0, 8, 80, (290, 120, 350, 400)),  # walked past: 140 px a look
+              (101.0, 8, 80, (430, 120, 490, 400))]
+    p._positions.extend(stood + passed + [(40.0, 9, 90, (300, 130, 360, 410)), (41.0, 9, 90, (300, 130, 360, 410))])
+    assert p._left_by(100.0, bag, shape, seen=set()) == (70, "left by person #70, who walked away")
+    assert p._left_by(100.0, bag, shape, seen={7}) is None                 # still standing by it
+    assert p._left_by(200.0, bag, shape, seen=set()) is None               # nobody around then
+    p._positions.clear()
+    p._positions.extend(passed)
+    assert p._left_by(100.0, bag, shape, seen=set()) is None               # only a passer-by: not blamed
+    p._positions.clear()
+    p._positions.extend([(99.0, 5, None, (300, 120, 360, 410)), (100.0, 5, None, (300, 120, 360, 410)),
+                         (101.0, 5, None, (300, 120, 360, 410))])
+    assert p._left_by(100.5, bag, shape, seen=set()) == (None, "left by someone who walked away")
+    p._positions.clear()
+    p._positions.extend([(99.0, 4, 40, (450, 120, 510, 400))] * 3)       # standing still 150 px beside it
+    assert p._left_by(100.0, bag, shape, seen=set()) is None               # near, not on it: not blamed
+    p._positions.clear()
+    p._positions.extend([(99.0, 5, 50, (600, 300, 630, 360)), (100.0, 5, 50, (600, 300, 630, 360))])
+    assert p._left_by(100.0, bag, shape, seen=set()) is None               # small and far: not next to it
+    p._positions.clear()
+    p._positions.extend([(99.0, 6, 60, (290, 120, 350, 400)), (100.0, 6, 60, (290, 120, 350, 400))])   # 2 looks only
+    assert p._left_by(100.0, bag, shape, seen=set()) is None

@@ -253,6 +253,11 @@ each with its tests, made-up cases, false alarms on the everyday videos, a real 
 `incident_check.py --areas` takes `"kind": "line"`. Measured: MOT16's own marks 91 true "following" passes in
 3.6 min (busy streets); the everyday videos as if at night 14 alerts in 36 min, all on busy streets, none on UR
 Fall; a real run alerted once with the words, then only logged within the minute.
+**Step 2 done 2026-10-30** (bag left): `Pipeline._positions` (5 min, once a floor look), `_left_by`, the floor
+suspect's reason and `people`. Floor alerts were warnings already (no level change). Measured on the made-up floor
+videos (objects nobody carried: any name is wrong): within one body height -> a passer-by named for a bag; stopped
+2 looks -> people near a spill named (one confirmed, report half); **feet on the spot, 3 looks** (kept): nobody
+named in 20 videos, floor 7 of 10 and exits 5 of 5 as before, no false alerts. No real "left a bag" video here.
 
 ## Phase 55: Our own pest model
 

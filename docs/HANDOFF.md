@@ -71,7 +71,9 @@ answers.
   choice: no download, the made-up night numbers with their limits in the README. What's new entry `p53`.
 - **Phase 54 design agreed** (2026-10-29, plan `21c6162`); **step 1 done** (following through a door: a "door" role
   for counting lines, no schema change; README "Following through a door").
-- **Next: Phase 54 step 2** (bag left: positions kept, added to the floor alert); ask first.
+- **Phase 54 step 2 done** (2026-10-30, bag left: "left by person #N, who walked away" in the floor alert, only for
+  someone who stood on the spot 3 looks; looser rules wrongly named passers-by on the made-up videos).
+- **Next: Phase 54 step 3** (at parked cars); ask first.
 - Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
   videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
 

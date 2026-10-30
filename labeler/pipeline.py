@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import itertools
 import logging
+import math
 import re
 import threading
 import time
-from collections import Counter
+from collections import Counter, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -34,6 +35,9 @@ log = logging.getLogger(__name__)
 SKELETON = [(5, 6), (5, 7), (7, 9), (6, 8), (8, 10), (5, 11), (6, 12), (11, 12),
             (11, 13), (13, 15), (12, 14), (14, 16), (0, 1), (0, 2), (1, 3), (2, 4)]
 HIDDEN_VALUES = ("unknown", "none", "no")
+POSITIONS_S = 300.0   # people's positions kept this long (a bag noticed after exit_hold_s 2 min still finds who)
+LEFT_NEAR_S = 3.0     # who was next to a new object: from this long before it appeared to this long after
+LEFT_LOOKS = 3        # ... standing on its spot in at least this many looks (once a second)
 COLOR_FIELDS = ("upper_color", "lower_color")   # not stored from black-and-white (night) frames
 
 
@@ -246,6 +250,9 @@ class Pipeline:
         # Floor hazards and blocked exits (Phase 47 step 2, labeler/floor.py): walkway and exit areas against the
         # camera's empty picture, saved in <crop_dir>/empty (test copies keep their own).
         self.floor_watch = None
+        # Where each person was, once a floor look (Phase 54: who left a bag): (time, tracker number, person, box),
+        # the last POSITIONS_S.
+        self._positions: deque = deque()
         self._counted_people: tuple = (-1e9, [])   # (when, people's boxes) from the plain detector's last pass
         # The 10-minute equipment rounds (labeler/equipment.py), Phase 47 step 3. (Pests were measured with YOLOE and
         # left out: tools/pest_check.py, README "Unsafe equipment; pests left out".)
@@ -952,6 +959,9 @@ class Pipeline:
         the vision model sees the area empty and now. A first look only notes a "yes"; the second one alerts."""
         from .floor import CUT, QUESTIONS
         people = [tuple(self.tracks[t].box[:4]) for t in seen]
+        self._positions.extend((now, t, self.tracks[t].db_id, tuple(self.tracks[t].box[:4])) for t in seen)
+        while self._positions and now - self._positions[0][0] > POSITIONS_S:
+            self._positions.popleft()
         at, counted = self._counted_people
         if now - at <= 1.5:   # the plain detector finds people the pose detector misses (crowds, far away)
             people += counted
@@ -964,8 +974,14 @@ class Pipeline:
             return
         empty = self.floor_watch.picture()
         newest = self.memory.pick(1, 0) if self.memory is not None else []
+        wall = self.clock.wall()
         for f in found:
             zid = f["area"]["id"]
+            began = now - (wall - f["before"]).total_seconds() if f["before"] is not None else None
+            left = self._left_by(began, f["crop"], frame.shape, seen) if began is not None else None
+            if left is not None:
+                person, words = left
+                f["reason"] += f"; {words}"
             log.info("[%s] floor check: %s%s", self.name, f["reason"], " (first look)" if f["first_look"] else "")
             got = "no pictures"
             if newest and empty is not None:
@@ -973,6 +989,7 @@ class Pipeline:
                 try:
                     got = self.incidents.suspect(
                         self.name, f["category"], f["reason"], area=f["area"], crop=f["crop"], pictures=pictures,
+                        people=[left[0]] if left is not None and left[0] is not None else [],
                         question=QUESTIONS[f["category"]], alert_if_yes=not f["first_look"], cut=CUT,
                         on_done=lambda answer, zid=zid: self.floor_watch.answered(zid, answer))
                 except Exception:
@@ -980,6 +997,44 @@ class Pipeline:
                     got = "failed"
             if got != "queued":
                 self.floor_watch.answered(zid, None)
+
+    def _left_by(self, began: float, crop: tuple, shape: tuple, seen: set) -> tuple[int | None, str] | None:
+        """Who left a new object (Phase 54, the user's choice: in the floor alert): the person who stood next to the
+        changed spot around when it appeared (LEFT_NEAR_S either side; their feet on it: inside the change, widened by
+        a quarter of their height, in at least LEFT_LOOKS looks, moving less than half their height between them:
+        putting something down takes a stop on the spot. Measured on the made-up floor videos, where nobody carried the
+        objects: "within one body height of it" blamed a passer-by for a bag and people standing near a spill), if
+        they have left the view since: (person or None,
+        "left by person #12, who walked away"). None when nobody stopped there, or they are still here (standing by
+        their bag is not leaving it)."""
+        h, w = shape[:2]
+        x1, y1, x2, y2 = crop[0] * w, crop[1] * h, crop[2] * w, crop[3] * h
+        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+        near: dict = {}   # tracker number -> [(distance, feet x, feet y, height, person)]
+        for t, tid, person, box in self._positions:
+            if abs(t - began) > LEFT_NEAR_S:
+                continue
+            bh, fx, fy = box[3] - box[1], (box[0] + box[2]) / 2, box[3]
+            m = 0.25 * bh
+            if x1 - m <= fx <= x2 + m and y1 - m <= fy <= y2 + m:   # their feet on the changed spot
+                near.setdefault(tid, []).append((math.hypot(fx - cx, fy - cy), fx, fy, bh, person))
+        best, best_d = None, None
+        for tid, looks in near.items():
+            if len(looks) < LEFT_LOOKS:
+                continue
+            moved = max(math.hypot(a[1] - b[1], a[2] - b[2]) for a in looks for b in looks)
+            if moved > 0.5 * min(x[3] for x in looks):
+                continue   # walking past, not stopping
+            d = min(x[0] for x in looks)
+            if best_d is None or d < best_d:
+                best, best_d = (tid, next((x[4] for x in looks if x[4] is not None), None)), d
+        if best is None or best[0] in seen:
+            return None
+        tid, person = best
+        st = self.tracks.get(tid)
+        person = person if person is not None else (st.db_id if st is not None else None)
+        return person, (f"left by person #{person}, who walked away" if person is not None
+                        else "left by someone who walked away")
 
     def _look_objects(self, frame: np.ndarray, areas: list[dict], weapons: bool) -> tuple[dict | None, list]:
         """One pass of the plain detector: ({area id: people inside} (where their feet are, as for counting), or None

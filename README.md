@@ -1097,7 +1097,15 @@ compares those areas with it once a second (`labeler/floor.py`, about 10 ms at 1
 - **The lights** (most of the picture changes at once for 10 s): the empty picture is learned again, nothing is raised.
   A camera that **moves** (pans, zooms, turns between preset views) is handled the same way, again and again: this
   check is for still cameras only.
-- A left bag counts as a floor hazard (walkway) or a blocked exit (exit) for now; who left it comes in Phase 49.
+- A left bag counts as a floor hazard (walkway) or a blocked exit (exit). **Who left it** (Phase 54, the user's
+  choice: in the floor alert): the camera keeps where each person stood for 5 minutes; the person who stood **on the
+  spot** (feet inside the change, a small margin) in at least 3 looks around when it appeared, hardly moving, and
+  has left the view since, is named: "...; left by person #12, who walked away" (the alert is linked to them).
+  Someone still standing by it is not named. Measured on the made-up floor videos, where nobody carried the objects
+  (so any name is wrong): "within one body height" named a passer-by for a bag on a busy street, "stopped for 2
+  looks" still named people standing near a spill (one confirmed alert); "on the spot, 3 looks": nobody named in
+  the 20 videos, the floor check unchanged (7 of 10, exits 5 of 5, no false alerts). Not measured: someone really
+  leaving a bag (no such video here); only the tests cover naming the right person.
 
 Measured with made-up videos (the user's choice, no download; `tools/make_floor_videos.py`): still-camera videos here
 (MOT16-02, -04, -09; D-Fire's guard booth FP9 and FP10) looped to 4-5 minutes, and at 60 s a bag, a suitcase or a chair

@@ -29,7 +29,8 @@ first look (Suspect.alert_if_yes False), the second alerts. A "no" (a chair move
 empty picture, so it is not asked again. After an alert the change is "reported": not raised again while it stays; still
 there after `floor_keep_h` hours, it becomes part of the empty picture (the daily refresh).
 
-Left objects (a bag) are floor hazards on a walkway and blocked exits in an exit area for now; Phase 49 adds who left it.
+Left objects (a bag) are floor hazards on a walkway and blocked exits in an exit area; Phase 54 adds who left it
+(Pipeline._left_by: the reason says "left by person #12, who walked away").
 """
 from __future__ import annotations
 

@@ -1,5 +1,6 @@
 """Pipeline decisions without a camera or GPU: re-linking, deleting, label voting, the VLM worker."""
 import copy
+from collections import deque
 import threading
 import time
 from datetime import datetime
@@ -44,6 +45,7 @@ def make_pipeline(db, embedder=None):
     p.clips = None
     p.night_ids = set()
     p.clock = LiveClock()
+    p._positions = deque()   # people's positions (who left a bag, Phase 54)
     return p
 
 
