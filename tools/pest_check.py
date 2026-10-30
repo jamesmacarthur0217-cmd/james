@@ -36,12 +36,11 @@ sys.path.insert(0, str(ROOT))
 
 from labeler.config import load_config  # noqa: E402
 from labeler.incidents import person_crop  # noqa: E402
+from labeler.pests import QUESTION as PEST_QUESTION  # noqa: E402 (the app's question)
 from tools.make_night_videos import night  # noqa: E402
 
 # The words of YOLOE's fixed list for pests (geckos and lizards, the harmless cicak, left out on purpose).
 PEST_WORDS = ("rat", "mouse", "rodent", "roach")
-PEST_QUESTION = ("Is there a live rat, mouse or cockroach in these pictures (not a toy, a computer mouse, a drawing or a "
-                 "picture on a screen)?")
 PEST_CONF = 0.3
 MICE = ROOT / "data" / "datasets" / "openimages_pests"
 COCO = ROOT / "data" / "datasets" / "coco"

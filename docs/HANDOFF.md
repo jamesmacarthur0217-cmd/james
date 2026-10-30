@@ -22,8 +22,8 @@ household use is generally outside the Act; their filled-in camera sign and data
 PostgreSQL test that is skipped without `VL_TEST_POSTGRES_URL`; GitHub green; working tree clean; no test copy
 running).**
 
-**Plan in progress: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (approved 2026-10-25; every phase's design, step,
-measurement and commit is written there). Same way of working: **ask before each phase and each step; discuss any
+**Plan finished 2026-10-30: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (approved 2026-10-25; every phase's design,
+step, measurement and commit is written there). Next: ask the user what comes next. Same way of working: **ask before each phase and each step; discuss any
 architecture first (and again when a measurement shows the agreed design is weak)**; short, simple answers; measure
 before claiming; a change is kept only if day (or the old behaviour) is not worse.
 
@@ -34,7 +34,7 @@ before claiming; a change is kept only if day (or the old behaviour) is not wors
 | 52 safety overview page | done | `/safety` (admins); then the pitfall 44 fix (rounds no longer block warnings; a stuck round taken back) |
 | 53 night-time measuring | done | made-up IR/dark videos (`tools/make_night_videos.py`, `tools/night_check.py`); fixed: camera covered, floor/exits; falls and fire in IR measured and left (README "Safety checks at night") |
 | 54 more behaviour signs | done | door lines (following through), "left by person #N" in floor alerts, at parked cars, came back again and again (0.96 by look) |
-| **55 our own pest model** | **steps 1-2 done** | design agreed 2026-10-30 (the plan); training photos `data/datasets/oi_pests` (0.43 GB + 0.37 GB night copies); `data/models/pests/pests.pt`: close 97%, far by day 55% confirmed, far at night 11% (README); next: step 3, the check in food areas |
+| 55 our own pest model | done | `data/models/pests/pests.pt` (trained here, night copies): close 97%, far by day 55% confirmed, far at night 11%; `labeler/pests.py` looks at food areas enlarged, one "yes" alerts (README "Our own pest model") |
 | 26 real-camera week | waiting | after the user restarts their app (stop.bat, start.bat; then the First-run check) |
 
 Things to know from Phases 50-54:
@@ -128,7 +128,8 @@ unpacked + 100 sample videos 0.44 GB), Open Images guns (`data/datasets/openimag
 (ask; never delete without OK).
 
 **Models only on this PC** (not in git; `tools/models.py check / pack` lists them as optional): `data/models/fire/
-fire_smoke.pt`, `data/models/guns/guns.pt`, `data/models/yoloe/yoloe-11s-seg-pf.pt`. Without them those checks are off
+fire_smoke.pt`, `data/models/guns/guns.pt`, `data/models/yoloe/yoloe-11s-seg-pf.pt`, `data/models/pests/pests.pt`
+(Phase 55; `pests_s05.pt` and `pests_s09.pt` beside it are the unused tries). Without them those checks are off
 and the log says so.
 
 **Still waiting for the user:** restart their own app (stop.bat, start.bat) so it runs the new version (the

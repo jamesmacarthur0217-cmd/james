@@ -103,6 +103,7 @@ class SettingsIn(BaseModel):
     safety_children_enabled: bool = True
     safety_crowd_enabled: bool = True
     safety_fire_enabled: bool = True
+    safety_pests_enabled: bool = True
     safety_weapons_enabled: bool = True
     safety_floor_enabled: bool = True
     safety_equipment_enabled: bool = True
@@ -209,6 +210,7 @@ SIMPLE = {
     "safety_children_enabled": ("safety", "children_enabled"),
     "safety_crowd_enabled": ("safety", "crowd_enabled"),
     "safety_fire_enabled": ("safety", "fire_enabled"),
+    "safety_pests_enabled": ("safety", "pests_enabled"),
     "safety_weapons_enabled": ("safety", "weapons_enabled"),
     "safety_floor_enabled": ("safety", "floor_enabled"),
     "safety_equipment_enabled": ("safety", "equipment_enabled"),

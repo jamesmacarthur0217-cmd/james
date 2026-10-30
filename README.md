@@ -1194,6 +1194,17 @@ with their edges stretched, not real kitchens; no real camera footage of a mouse
 box (the vision model said "no" to all of them). Cockroaches: Open Images has no boxes for them, and a room camera is
 too far away to see one.
 
+**In the app** (`labeler/pests.py`, security cameras; Settings "Safety checks", "Mice and rats"; config
+`safety.pests_enabled`, `pest_*`): about once a second each area with the role **cooking, food preparation or dining**
+is cut out, enlarged to 1280 px and looked at (10 ms an area); a box counts when its middle is inside the area's
+outline. Seen on 2 of the last 3 looks, the vision model gets the pictures of those looks, cut out around the mouse
+as measured, with the measured question (not a toy, a computer mouse, a drawing or a screen), and **one "yes" alerts**
+("animals or pests", a warning). At most one check a minute per camera and area: a mouse that stays alerts again each
+minute. No food area: nothing is looked at (the Safety page says so). Without `data/models/pests/pests.pt` the check is
+off and the log says so (`tools/models.py` lists the model as optional). A real run on a test copy (a COCO kitchen with
+a 46-px mouse pasted on the counter, a food-preparation area drawn around it): the check 1 s after the area was drawn,
+"yes, small rodent in grass" 1.5 s later, the alert; the next one 63 s later.
+
 ### Fights and collisions (Phase 48)
 
 **Fights** (`labeler/safety.py` SafetyWatch.fights, every frame, from the body points the camera has anyway): two

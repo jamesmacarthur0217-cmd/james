@@ -171,11 +171,16 @@ ENTRIES: list[Entry] = [
           "Measured on dark and infrared pictures: a light dimmed in a dark room is no longer taken for a covered "
           "camera, and things left on a walkway or in an exit are found better at night. Falls and fire in "
           "infrared are still weak; the README says what was measured.", "", "admin"),
-    Entry("p54", 54, "", "More behaviour signs",
+    Entry("p54", 54, "6901001", "More behaviour signs",
           "On security cameras at night or when Away: someone following another through a counting line marked "
           "\"door\" (Live page, Zones), someone at parked cars (checked by the vision model), and the same person "
           "coming into an area 3 times in 30 minutes (with their pictures side by side). A floor alert about a "
           "left bag says who left it when they stood there and walked away.", "/", "admin"),
+    Entry("p55", 55, "", "Mice and rats in food areas",
+          "On security cameras, our own model looks for mice and rats in areas marked cooking, food preparation or "
+          "dining (Live page, Zones) about once a second, by day and at night. When one is seen twice, the vision "
+          "model checks the pictures and a \"yes\" alerts. A mouse far away at night is often missed. Switch: "
+          "Settings, Safety checks.", "/settings", "admin"),
 ]
 FRESH_MARK = "tracks"   # made at this start: a new database, so a new install
 

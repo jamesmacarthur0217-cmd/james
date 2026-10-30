@@ -275,9 +275,10 @@ class Pipeline:
         # the last POSITIONS_S.
         self._positions: deque = deque()
         self._counted_people: tuple = (-1e9, [])   # (when, people's boxes) from the plain detector's last pass
-        # The 10-minute equipment rounds (labeler/equipment.py), Phase 47 step 3. (Pests were measured with YOLOE and
-        # left out: tools/pest_check.py, README "Unsafe equipment; pests left out".)
+        # The 10-minute equipment rounds (labeler/equipment.py), Phase 47 step 3.
         self.equipment = None
+        # Mice and rats in food areas (Phase 55, labeler/pests.py): our own detector on each food area, enlarged.
+        self.pest_watch, self.pest_model, self._pest_path = None, None, None
         self.behaviour = None   # suspicious behaviour (labeler/behaviour.py), Phase 49
         if scfg.get("enabled") and cam.get("safety", self.mode == "security"):
             from .incidents import FrameMemory
@@ -292,6 +293,13 @@ class Pipeline:
             elif scfg.get("fire_enabled", True):
                 log.warning("[%s] fire and smoke checks are off: no model at %s (tools/train_fire.py)", self.name,
                             fire_path)
+            pest_path = resolve(scfg.get("pest_model", "data/models/pests/pests.pt"))
+            if scfg.get("pests_enabled", True) and pest_path.is_file():
+                from .pests import PestWatch
+                self.pest_watch, self._pest_path = PestWatch(scfg), pest_path
+            elif scfg.get("pests_enabled", True):
+                log.warning("[%s] mice and rats are not looked for: no model at %s (tools/train_pests.py)", self.name,
+                            pest_path)
             if scfg.get("weapons_enabled", True):
                 from .weapons import WeaponWatch
                 self.weapon_watch = WeaponWatch(scfg)
@@ -592,6 +600,8 @@ class Pipeline:
                     self._check_weapons(frame, now, objects + self._look_guns(frame) + self._look_yoloe(frame))
             if self.fire_watch is not None and self.fire_watch.due(now):
                 self._look_for_fire(frame, now)
+            if getattr(self, "pest_watch", None) is not None and self.pest_watch.due(now):
+                self._look_for_pests(frame, now)
             if self.floor_watch is not None and self.floor_watch.due(now):
                 self._look_at_floor(frame, now, seen)
             if self.equipment is not None and areas:
@@ -1022,6 +1032,42 @@ class Pipeline:
                                        span_s=float(scfg.get("fire_span_s", 8)))
             except Exception:
                 log.exception("[%s] raising a fire check failed", self.name)
+
+    def _look_for_pests(self, frame: np.ndarray, now: float) -> None:
+        """One look of the pest detector at each food area, cut out and enlarged; a warning suspect when a mouse or rat
+        stays (labeler/pests.py)."""
+        from .pests import QUESTION, area_box, food_areas, in_area
+        scfg = self.cfg.get("safety") or {}
+        areas = food_areas(self.zone_counter.zones)
+        if not areas:
+            self.pest_watch.last_look = now
+            return
+        found = {}
+        try:
+            if self.pest_model is None:
+                self.pest_model = YOLO(str(self._pest_path))
+            for z in areas:
+                x1, y1, x2, y2 = area_box(z["points"], frame.shape)
+                r = self.pest_model.predict(frame[y1:y2, x1:x2], conf=float(scfg.get("pest_conf", 0.3)),
+                                            imgsz=int(scfg.get("pest_imgsz", 1280)), device=self.det_cfg["device"],
+                                            verbose=False)[0]
+                boxes = [(float(p), (b[0] + x1, b[1] + y1, b[2] + x1, b[3] + y1))
+                         for p, b in zip(r.boxes.conf.tolist(), r.boxes.xyxy.tolist())]
+                found[z["id"]] = [(p, b) for p, b in boxes if in_area(b, frame.shape, z["points"])]
+        except Exception:
+            log.exception("[%s] looking for mice and rats failed", self.name)
+            self.pest_watch.last_look = now
+            return
+        for area, reason, crop, pictures, cut in self.pest_watch.update(now, self.clock.wall(), frame, found, areas):
+            try:
+                got = self.incidents.suspect(self.name, "pests", reason, area=area, crop=crop, pictures=pictures,
+                                             question=QUESTION, cut=cut)
+            except Exception:
+                log.exception("[%s] raising a pest check failed", self.name)
+                continue
+            (log.warning if got == "queued" else log.info)("[%s] pest check: %s (%s)", self.name, reason, got)
+            if got != "queued":   # the queue's own minute ran from a moment later: try again at the next sighting
+                self.pest_watch.raised.pop(area["id"], None)
 
     def _look_at_floor(self, frame: np.ndarray, now: float, seen: set) -> None:
         """Walkway and exit areas against the empty picture (labeler/floor.py): a change that stays is a suspect, and

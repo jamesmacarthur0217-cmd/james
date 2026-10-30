@@ -304,6 +304,15 @@ Report half (once): close 97% (26 of 246 not-mice with a box, 20 of them teddy b
 day 58% found and 69 of 125 "yes" from the vision model with 0 "yes" on the 27 false boxes; far at night 14 of 125
 "yes", 1 false "yes". YOLOE on the same half: 5%. Test mAP50 0.83. Numbers in README "Our own pest model".
 
+**Step 3 done; Phase 55 is done (2026-10-30)**: `labeler/pests.py` (PestWatch) and `Pipeline._look_for_pests`: each
+cooking / food-prep / dining area cut out and enlarged to 1280 px about once a second; 2 of the last 3 looks of an
+area -> a "pests" warning suspect with the pictures of those looks (full size, cut out around the boxes with the
+measured cut scaled to the area), the measured question; one "yes" alerts; the area again after 60 s. Config
+`safety.pests_enabled`, `pest_*`; the Settings switch "Mice and rats"; the Safety page's kind and the role meanings;
+`tools/models.py` lists the model as optional; What's new `p55`. Found in the real run: the queue's own 60-s limit
+counts from a moment later, so the second check was refused and the area would wait 2 minutes; now a refused check
+is tried again at the next sighting (the next alert came 63 s after the first). 8 tests (`tests/test_pests.py`).
+
 ## Phase 26 (waiting): a real-camera week
 
 After the user restarts their own app (stop.bat, start.bat; the safe-update test passed on their database), a week of

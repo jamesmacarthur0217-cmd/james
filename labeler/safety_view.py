@@ -22,6 +22,7 @@ KINDS = [("falls", "falls", ("falls", "enabled")),
          ("children", "children", ("safety", "children_enabled")),
          ("crowd", "crowding", ("safety", "crowd_enabled")),
          ("fire", "fire and smoke", ("safety", "fire_enabled")),
+         ("pests", "mice and rats in food areas", ("safety", "pests_enabled")),
          ("weapons", "dangerous objects", ("safety", "weapons_enabled")),
          ("floor", "floor and exits", ("safety", "floor_enabled")),
          ("equipment", "unsafe equipment", ("safety", "equipment_enabled")),
@@ -48,6 +49,9 @@ def role_meaning(role: str, cfg: dict) -> str:
         "bed": "lying here is normal: no fall or person-down check",
         "fence": "climbing over it is checked by the vision model (critical at night or when Away)",
     }.get(role, "")
+    if role in ("cooking", "food_prep", "dining") and s.get("pests_enabled", True):
+        pests = "looked at for mice and rats about once a second"
+        text = f"{text}; {pests}" if text else pests
     every = float(s.get("equipment_every_s", 600))
     if s.get("equipment_enabled", True):
         round_words = f"looked at for unsafe equipment every {every / 60:g} min"
@@ -67,6 +71,10 @@ def _kinds(p, cfg: dict) -> list[dict]:
             state, why = "off", "turned off for this camera (Settings page, Cameras)"
         elif key == "fire" and on and getattr(p, "fire_watch", None) is None:
             state, why = "off", "no fire model on this PC (tools/train_fire.py)"
+        elif key == "pests" and on and getattr(p, "pest_watch", None) is None:
+            state, why = "off", "no pest model on this PC (tools/train_pests.py)"
+        elif key == "pests" and on and not roles & {"cooking", "food_prep", "dining"}:
+            state, why = "partly", "no cooking, food preparation or dining area yet (Live page)"
         elif key == "weapons" and on:
             missing = [w for w, path in (("guns", getattr(p, "_gun_path", None)),
                                          ("machetes and swords", getattr(p, "_yoloe_path", None))) if path is None]

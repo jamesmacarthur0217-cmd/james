@@ -44,7 +44,9 @@ def names(config: Path = ROOT / "config.yaml") -> dict:
                                         ((cfg.get("safety") or {}).get("weapon_model"),
                                          (cfg.get("safety") or {}).get("weapons_enabled", True)),
                                         ((cfg.get("safety") or {}).get("gun_model"),
-                                         (cfg.get("safety") or {}).get("weapons_enabled", True))] if m and on]}
+                                         (cfg.get("safety") or {}).get("weapons_enabled", True)),
+                                        ((cfg.get("safety") or {}).get("pest_model"),
+                                         (cfg.get("safety") or {}).get("pests_enabled", True))] if m and on]}
 
 
 def detectors(n: dict) -> list[str]:

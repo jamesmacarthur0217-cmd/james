@@ -122,8 +122,8 @@ DEFAULTS: dict = {
     "safety": {"enabled": True, "memory_s": 10, "memory_every_s": 1.0, "memory_side": 960, "frames": 3,
                "frames_span_s": 4, "confirm_per_min": 6, "max_wait_s": 30, "cooldown_s": 60,
                # Each kind on or off (Phase 51, the Settings page; the others: fire_enabled, weapons_enabled,
-               # floor_enabled, equipment_enabled below, behaviour.enabled, falls.enabled): people down (lying still,
-               # slumped, not moved), children, crowding (an area's limit, running together), fights.
+               # pests_enabled, floor_enabled, equipment_enabled below, behaviour.enabled, falls.enabled): people down
+               # (lying still, slumped, not moved), children, crowding (an area's limit, running together), fights.
                "down_enabled": True, "children_enabled": True, "crowd_enabled": True, "fights_enabled": True,
                # Quick checks for people (labeler/safety.py): lying still, slumped, not moved at all (the slow round
                # for distress), in seconds; "not moved" = within still_move of the person's height.
@@ -148,6 +148,11 @@ DEFAULTS: dict = {
                "fire_enabled": True, "fire_model": "data/models/fire/fire_smoke.pt", "fire_every_s": 1.0,
                "fire_conf": 0.35, "fire_window": 5, "fire_hold": 3, "fire_inside": 0.8, "fire_rearm_s": 60,
                "fire_span_s": 8,
+               # Mice and rats (labeler/pests.py, Phase 55): our own detector (tools/train_pests.py) every pest_every_s
+               # on each cooking / food preparation / dining area, cut out and enlarged to pest_imgsz; seen on
+               # pest_hold of the last pest_window looks -> checked (one "yes" alerts); the area again after pest_rearm_s.
+               "pests_enabled": True, "pest_model": "data/models/pests/pests.pt", "pest_every_s": 1.0, "pest_conf": 0.3,
+               "pest_imgsz": 1280, "pest_window": 3, "pest_hold": 2, "pest_rearm_s": 60,
                # Dangerous objects (labeler/weapons.py): knives, scissors, bats (plain detector) and guns, machetes,
                # swords (YOLOE prompt-free, weapon_model) at a wrist on weapon_hold of the last weapon_looks looks.
                "weapons_enabled": True, "weapon_model": "data/models/yoloe/yoloe-11s-seg-pf.pt", "weapon_conf": 0.35,

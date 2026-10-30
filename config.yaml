@@ -204,6 +204,7 @@ safety:
   fight_speed: 2.5            # fights: a wrist this fast (body heights a second) touching another person -> checked
   fire_enabled: true          # fire and smoke: our own model (tools/train_fire.py) looks once a second
   fire_hold: 3                # seen on this many of the last 5 looks -> checked by the vision model
+  pests_enabled: true         # mice and rats in cooking, food preparation and dining areas: our own model (Phase 55)
   weapons_enabled: true       # dangerous objects held: knives, scissors, bats, guns, machetes, swords (Phase 47)
   floor_enabled: true         # walkway and exit areas against the camera's empty picture (Phase 47)
   floor_contrast_ref: 50      # a picture with less contrast (night) gets a lower "differs" limit, at least floor_diff_min 10
