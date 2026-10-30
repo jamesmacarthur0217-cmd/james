@@ -16,71 +16,51 @@ Roadmap Phase 1 (licenses) is deferred until they say otherwise. Under Malaysia'
 household use is generally outside the Act; their filled-in camera sign and data-protection summary are in
 `data/privacy/` (git-ignored, contains their email); the blank templates are in `docs/`.
 
-## 2. Current state (2026-10-25)
+## 2. Current state (2026-10-30)
 
-**Start here (2026-10-30, end of the session; last commit: Phase 54 done + this handoff; 1059 tests + 1 PostgreSQL test that
-is skipped without `VL_TEST_POSTGRES_URL`; GitHub green; working tree clean; no test copy running).**
+**Start here (2026-10-30, end of the session; last commit: this handoff, after Phase 54 `6901001`; 1059 tests + 1
+PostgreSQL test that is skipped without `VL_TEST_POSTGRES_URL`; GitHub green; working tree clean; no test copy
+running).**
 
-**Plan in progress: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (approved 2026-10-25, the user's choices, in this
-order): 50 vision model capacity, 51 Settings for the safety checks, 52 a safety overview page, 53 night-time
-measuring, 54 more behaviour signs, 55 our own pest model; and Phase 26 (real-camera week) after the user restarts
-their app. Same way of working: **ask before each phase and each step; discuss any architecture first**; short, simple
-answers.
-- **Phase 50 steps 1-2 done** (design agreed first, plan `fd41660`): step 1 `e89cfac` (`tools/incident_bench.py --busy`:
-  a busy camera in real time from MOT16-09's true marks, checks through the real confirm queue); the vision model gives
-  **about 42 answers a minute** on this PC (a person's label = 2); **2 requests at once: no gain** (the user's Ollama
-  setting left alone; the old "1.9x" note in VLMWorker corrected). Step 2 `0171fd4`: checks use the model's **idle
-  time** (`ConfirmQueue._labels_waiting`: the per-minute limit only while labels wait); **passers-by under 2 s get
-  colours only** (`vlm.label_after_s`, `Pipeline._due_for_label`); **one picture per person while other labels wait**
-  (`vlm.one_when_busy`, `Pipeline.pictures_per_person`; the user's choice: two pictures differ in carried items 37%,
-  colours 22-23%, age/gender 0%). Result: 21 people a minute: nothing dropped (before 15 of 27), labels 5 s; a crowd
-  (87 a minute) is still over capacity (README "Speed").
-- **Phase 50 step 3 done; Phase 50 is done** (2026-10-25; the user's choice: on the **"vision model (Ollama)" line**,
-  which always shows, not the safety line): `VLMWorker.load()` keeps the last 10 minutes in memory (`LOAD_WINDOW_S`:
-  busy share, answers a minute, people's label waits, people refused when the queue is full), `ConfirmQueue.
-  dropped_within`, `healthcheck.load_words`; refused or dropped is a warning ("more work than it can do"), never a
-  problem. Real run (MOT16-02 looping): busy 93%, labels waited 40 s, 9 refused. What's new entry `p50`.
-- **Phase 51 done** (2026-10-25; design agreed first, plan `2d80dcf`: a switch per kind, main times only, after a
-  restart): the Settings page's "Safety checks" box; new `safety.down_enabled` / `children_enabled` /
-  `crowd_enabled` / `fights_enabled`; measured thresholds stay in config.yaml. What's new entry `p51`.
-- **Phase 52 step 1 done** (design agreed first, plan `71fbecf`: checks from memory, admins only, the empty picture
-  small with its date): `labeler/safety_view.py`, `/api/safety` "overview", `/api/safety/empty/<camera>`.
-- **Phase 52 step 2 done; Phase 52 is done**: the page `labeler/static/safety.html` (`/safety`), links from the Alerts
-  and Health pages. What's new entry `p52`. Found and written down, not fixed: pitfall 44 (a round waiting in the
-  vision model's queue blocks warnings on a flooded camera); **fixed the same day** with the user's choice (plan
-  "Fix before Phase 53": rounds no longer block warnings, a round not started in 30 s is taken back; 1038 tests).
-- **Phase 53 step 1 done** (2026-10-26; design agreed first, plan `4f13ab0`: IR and dark colour, four checks plus
-  fire, real footage looked for after): `tools/make_night_videos.py`, 506 videos x 2 in `data/datasets/night_made`
-  (8.9 GB, git-ignored, made here from the videos already here).
-- **Phase 53 step 2 done** (2026-10-26, `tools/night_check.py`, numbers in the plan): at night falls 1-3 of 15
-  (day 13), fire in IR 3 of 50 (day 39), floor and exits 0-1 of 9 (day 6), fights 27-29 of 75 (day 37),
-  behaviour 4 of 4 but one false "camera covered" (dark picture, lights dimmed).
-- **Phase 53 step 3 agreed** (plan `610d9d2`): 3a falls done with nothing kept (the user's choice; README "Safety
-  checks at night": the tracker cannot follow a weakly found fallen person at night; a lenient fall-only tracker
-  gave IR 2 -> 4 of 15: not built; look again with real night video).
-- **Phase 53 step 3b done** (camera covered = flat and the edges gone: the dark dimmed false alarm gone, the rest
-  unchanged; README "Safety checks at night").
-- **Phase 53 step 3c done** (2026-10-27; the floor check's limit follows the picture's contrast, the vision model
-  told about night pictures): report videos IR 5 of 9 (was 1), dark 3 (was 0), day unchanged 6.
-- **Phase 53 step 3d done, nothing used** (2026-10-29): the fire model trained with black-and-white copies
-  (`data/models/fire/fire_smoke_bw.pt`, unused) was better on test photos but worse by day on the 100 videos (27
-  fires instead of 39): the old model stays (README "Fire in IR: tried, not used"). Using it on IR pictures only was
-  not decided: offer it again only with real IR numbers. Extra data: `data/datasets/dfire/bw` 2.7 GB and
-  `dfire/night_test` 1.6 GB (made here).
-- **Phase 53 step 3e done; Phase 53 is done** (2026-10-29): no public real near-IR night video fits; the user's
-  choice: no download, the made-up night numbers with their limits in the README. What's new entry `p53`.
-- **Phase 54 design agreed** (2026-10-29, plan `21c6162`); **step 1 done** (following through a door: a "door" role
-  for counting lines, no schema change; README "Following through a door").
-- **Phase 54 step 2 done** (2026-10-30, bag left: "left by person #N, who walked away" in the floor alert, only for
-  someone who stood on the spot 3 looks; looser rules wrongly named passers-by on the made-up videos).
-- **Phase 54 step 3 done** (2026-10-30, at parked cars: a hand at one 5 s or stops at 2, night/Away, the vision model
-  checks; measured by tests only: no video with parked cars and people here).
-- **Phase 54 step 4 done; Phase 54 is done** (2026-10-30; came back again and again at 0.96 by look, the user's
-  choice after the numbers: same person 47%, look-alikes 4%). What's new `p54`.
-- **Next: Phase 55** (our own pest model: Open Images mouse photos, download size and licence asked first); discuss
-  its design with the user first. Then the plan is finished (Phase 26 waits for the user's restart).
-- Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
-  videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
+**Plan in progress: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (approved 2026-10-25; every phase's design, step,
+measurement and commit is written there). Same way of working: **ask before each phase and each step; discuss any
+architecture first (and again when a measurement shows the agreed design is weak)**; short, simple answers; measure
+before claiming; a change is kept only if day (or the old behaviour) is not worse.
+
+| Phase | State | In one line (details: the plan; numbers: README) |
+|---|---|---|
+| 50 vision model capacity | done | idle time for checks, passers-by colours only, one picture while busy; load on the Health "vision model" line |
+| 51 Settings for safety checks | done | a switch per kind + main times (Settings "Safety checks") |
+| 52 safety overview page | done | `/safety` (admins); then the pitfall 44 fix (rounds no longer block warnings; a stuck round taken back) |
+| 53 night-time measuring | done | made-up IR/dark videos (`tools/make_night_videos.py`, `tools/night_check.py`); fixed: camera covered, floor/exits; falls and fire in IR measured and left (README "Safety checks at night") |
+| 54 more behaviour signs | done | door lines (following through), "left by person #N" in floor alerts, at parked cars, came back again and again (0.96 by look) |
+| **55 our own pest model** | **next** | design to discuss first; Open Images mouse photos: download size and licence shown, the user's OK before any download |
+| 26 real-camera week | waiting | after the user restarts their app (stop.bat, start.bat; then the First-run check) |
+
+Things to know from Phases 50-54:
+- **The vision model is the shared limit**: about 42 answers a minute here (pitfall 42); checks go one at a time per
+  lane (critical / warning / round), a round not started in 30 s is taken back (pitfall 44).
+- **Night**: all night numbers come from made-up night versions of daytime videos; no public real near-IR video fit
+  (the user chose no download). Falls at night: the tracker cannot follow a weakly found fallen person (0.2-0.4, a new
+  number needs 0.5); tried and not kept (README). Fire in IR: `data/models/fire/fire_smoke_bw.pt` (trained with
+  black-and-white copies) is on disk, **unused** (worse by day on the videos, 27 vs 39); using it only on IR pictures was
+  not decided: offer it again only with real IR numbers.
+- **Behaviour signs** (`labeler/behaviour.py`): patterns alert directly at night or when Away (`Pipeline._watchful`),
+  moments go to the vision model; every per-person sign has a once-a-minute (or per-area) limit (pitfall 40). Parked
+  cars and "left a bag" have no real video here: covered by tests only (README says so). "Came back" uses the SigLIP
+  look at 0.96: the same person 47%, look-alikes 4% (measured on MOT16 identities).
+- **Line roles**: counting lines can have the role "door" (`zones.LINE_ROLES`, the same `role` column: no schema
+  change); `/api/zones/roles` returns each role's `kind`.
+
+**Waiting for the user:** restart their own app (stop.bat, start.bat; the safe-update test passed on their database),
+then the First-run check, then Phase 26; the MIVIA fire videos (requested). Open, offer but don't change unasked: the
+floor check's third look (not chosen 2026-10-25); fire model on IR pictures only (see above).
+
+**Data made this session (git-ignored, made here from what was already here, nothing downloaded):**
+`data/datasets/night_made` 8.9 GB (night videos and `results/`, `results/before_3b`, `results/before_3c`),
+`data/datasets/dfire/bw` 2.7 GB and `dfire/night_test` 1.6 GB (fire training and test copies),
+`data/models/fire/fire_smoke_bw.pt` and `runs/dfire_bw` (unused model). The user may want some deleted: ask, never
+delete without OK.
 
 **Finished plan: [PHASE44-49-PLAN.md](PHASE44-49-PLAN.md)**: safety incidents on **security cameras** (the 11 kinds
 the user listed + "suspicious behaviour", judged by what people do, never by looks). Each phase's design was agreed
@@ -560,7 +540,7 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
    the safety page ("Identifier 'top' has already been declared": window.top cannot be redeclared); node --check
    does not see it, a browser does. A test now looks for these names in every page; look at a new page in the
    browser pane and read its console.
-44. **A round sent to the vision model blocks the warnings behind it** (seen in Phase 52's real run, not fixed):
+44. **A round sent to the vision model blocks the warnings behind it** (seen in Phase 52's real run; fixed, see the end):
    ConfirmQueue sends one non-critical check at a time; a round (the equipment round) goes into the vision model's
    queue at the lowest priority, behind people's labels. On a flooded camera (MOT16-02 looping) it was still waiting
    8 minutes later, and meanwhile every warning and round waited 30 s and was dropped (8 dropped). Critical checks
@@ -568,6 +548,11 @@ made-up data, serve `create_app(cfg, db, None)` with uvicorn on 8001 from a scri
    block warnings; a round not started within 30 s is taken back, `VLMWorker.take_back`): on a crowd warnings
    answered 9 of 18 instead of 1 (README "Speed"). A new wait in the shared queue needs the same thought: who can
    it hold back, and for how long?
+45. **Measuring tools keep more than they print** (Phase 54): `tools/incident_check.py` prints only warnings, but its
+   `--json` keeps every check's reason (`results[video]["answers"]`: time, kind, answer, reason): read it there. And
+   made-up test cases can measure the *wrong* side only: the made-up floor objects were carried by nobody, so any
+   "left by person #N" there is wrong (that is how a passer-by being blamed was found); a feature with no true case
+   here (parked cars, a bag really left) is covered by tests only, and the README must say so.
 
 ## 7. Conventions
 
@@ -873,6 +858,7 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and docs/ROADMAP.md
-> first, run the tests to confirm everything is green, then continue with docs/PHASE50-55-PLAN.md (Phase 50 step 3:
-> the vision model's load on the Health page). Ask me before each phase and each step starts, discuss any
-> architecture with me first, and do it step by step.
+> first, run the tests to confirm everything is green, then continue with docs/PHASE50-55-PLAN.md: Phase 55 (our own
+> pest model) is next; discuss its design with me first, and show me the download size and licence before downloading
+> anything. Ask me before each phase and each step starts, discuss any architecture with me first, and do it step by
+> step.
