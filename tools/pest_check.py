@@ -1,9 +1,10 @@
 """Pests (Phase 47 step 3): does YOLOE prompt-free find real mice, and what does it take for a mouse where there is
 none? Then the vision model's answer to the pest question about the part around each box. Measured 2026-10-21: too
 poor (3% of real rodents found, computer mice taken for mice), so pests were left out of the app (the user's choice);
-kept to try a better model later.
+kept to try a better model later. Phase 55: --model measures our own detector (tools/train_pests.py) instead.
 
-    python tools/pest_check.py [--half tune|report|all] [--far] [--vlm] [--cut wide|tight|close]
+    python tools/pest_check.py [--half tune|report|all] [--model data/models/pests/pests.pt] [--far | --area]
+                               [--night] [--vlm] [--cut wide|tight|close]
 
 Mice: Open Images validation and test photos with a mouse (the animal; tools/get_weapon_photos.py --kind pests, CC BY
 2.0), their true boxes in boxes.json; a mouse is found when a pest box (rat, mouse, rodent, roach) overlaps a true one
@@ -11,14 +12,19 @@ Mice: Open Images validation and test photos with a mouse (the animal; tools/get
 a kitchen (oven, sink, microwave, refrigerator); any pest box there is a false alarm. Halves (pitfall 21): the photos in
 name order, even = tune, odd = report. --far: most Open Images mice are close-ups; this shrinks each photo so the
 mouse (or, for COCO, the photo's largest marked thing) is about 40 px wide in a 1280 x 720 frame, the edges repeated,
-as a mouse across a kitchen would look. Per threshold: mice found, photos with a false pest; with --vlm at 0.3
-the vision model's yes / no / unsure on found mice and on the false boxes (--cut: how much around the box).
+as a mouse across a kitchen would look. --area: as --far, then only a food area is looked at, as the app does
+(Phase 55): a third of the frame each way (427 x 240, about a kitchen counter) with the mouse (or the largest thing)
+somewhere inside, the same place for a photo on every run. --night: the picture in the made-up infrared look of
+tools/make_night_videos.py (black and white, flat, grainy), after --far and before the area is cut. Per threshold: mice
+found, photos with a false pest; with --vlm at the app's threshold the vision model's yes / no / unsure on found mice
+and on the false boxes (--cut: how much around the box).
 """
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+import zlib
 from collections import Counter
 from pathlib import Path
 
@@ -30,6 +36,7 @@ sys.path.insert(0, str(ROOT))
 
 from labeler.config import load_config  # noqa: E402
 from labeler.incidents import person_crop  # noqa: E402
+from tools.make_night_videos import night  # noqa: E402
 
 # The words of YOLOE's fixed list for pests (geckos and lizards, the harmless cicak, left out on purpose).
 PEST_WORDS = ("rat", "mouse", "rodent", "roach")
@@ -42,6 +49,7 @@ NOT_MICE = {64: "computer mouse", 77: "teddy bear", 68: "microwave", 69: "oven",
 THRESHOLDS = (0.1, 0.2, 0.3, 0.4, 0.5)
 CUTS = {"wide": (0.75, 0.35), "tight": (0.6, 0.26), "close": (1.0, 0.15)}   # (margin, smallest share): person_crop
 FAR_W, FAR_H, FAR_PX = 1280, 720, 40
+AREA_W, AREA_H = FAR_W // 3, FAR_H // 3
 
 
 def iou(a, b) -> float:
@@ -60,6 +68,16 @@ def far(img, box):
     frame = cv2.copyMakeBorder(small, top, max(0, FAR_H - sh - top), left, max(0, FAR_W - sw - left),
                                cv2.BORDER_REPLICATE)[:FAR_H, :FAR_W]
     return frame, [box[0] * k + left, box[1] * k + top, box[2] * k + left, box[3] * k + top]
+
+
+def area(frame, box, name: str):
+    """An AREA_W x AREA_H part of the frame with box (pixels) inside it at a place fixed by the photo's name; returns
+    (part, its left, its top)."""
+    rng = np.random.default_rng(zlib.crc32(name.encode()))
+    bw, bh = box[2] - box[0], box[3] - box[1]
+    x = int(np.clip(box[0] - rng.uniform(0, max(0.0, AREA_W - bw)), 0, FAR_W - AREA_W))
+    y = int(np.clip(box[1] - rng.uniform(0, max(0.0, AREA_H - bh)), 0, FAR_H - AREA_H))
+    return frame[y:y + AREA_H, x:x + AREA_W], x, y
 
 
 def cases(half: str, limit: int) -> list[dict]:
@@ -96,20 +114,31 @@ def main() -> int:
     ap.add_argument("--config", default=str(ROOT / "config.yaml"))
     ap.add_argument("--half", choices=["tune", "report", "all"], default="tune")
     ap.add_argument("--limit", type=int, default=300, help="COCO photos per half")
+    ap.add_argument("--model", help="our own detector (tools/train_pests.py) instead of YOLOE")
+    ap.add_argument("--conf", type=float, default=PEST_CONF, help="the threshold for --vlm and the words")
     ap.add_argument("--far", action="store_true")
+    ap.add_argument("--area", action="store_true", help="--far, then only a food area around the mouse")
+    ap.add_argument("--night", action="store_true")
+    ap.add_argument("--imgsz", type=int, default=640, help="the size the detector looks at (an area is enlarged)")
     ap.add_argument("--vlm", action="store_true")
     ap.add_argument("--cut", choices=list(CUTS), default="wide")
     args = ap.parse_args()
+    args.far = args.far or args.area
     cfg = load_config(Path(args.config))
     scfg = cfg["safety"]
-    from ultralytics import YOLOE
-    model = YOLOE(str(ROOT / scfg["weapon_model"]))
-    ids = [i for i, n in model.names.items() if n.lower() in PEST_WORDS]
+    if args.model:
+        from ultralytics import YOLO
+        model = YOLO(str(ROOT / args.model))
+        ids = list(model.names)
+    else:
+        from ultralytics import YOLOE
+        model = YOLOE(str(ROOT / scfg["weapon_model"]))
+        ids = [i for i, n in model.names.items() if n.lower() in PEST_WORDS]
     client = None
     if args.vlm:
         from labeler.vlm import VLMClient, incident_prompt
         client = VLMClient(cfg["vlm"], "security")
-    conf_app = PEST_CONF
+    conf_app = args.conf
     mice = [c for c in cases(args.half, args.limit) if c["mouse"]]
     not_mice = [c for c in cases(args.half, args.limit) if not c["mouse"]]
     found = Counter()
@@ -126,12 +155,17 @@ def main() -> int:
             else:   # the photo's largest marked thing stands in for the mouse's size
                 cx, cy, bw, bh = max(c["rows"], key=lambda r: r[2] * r[3])
                 ref = [(cx - bw / 2) * w, (cy - bh / 2) * h, (cx + bw / 2) * w, (cy + bh / 2) * h]
-            k_img, _ = far(img, ref)
-            k = k_img.shape[1] / w   # not exact (the border), so map the truth boxes again below
+            k_img, ref = far(img, ref)
             if c["mouse"]:
                 c["truth"] = [far(img, b)[1] for b in c["truth"]]
             img = k_img
-        r = model.predict(img, classes=ids, conf=min(THRESHOLDS), imgsz=640, verbose=False)[0]
+        if args.night:
+            img = night("ir", img, np.random.default_rng(zlib.crc32(c["path"].name.encode())))
+        if args.area:
+            img, x, y = area(img, ref, c["path"].name)
+            if c["mouse"]:
+                c["truth"] = [[b[0] - x, b[1] - y, b[2] - x, b[3] - y] for b in c["truth"]]
+        r = model.predict(img, classes=ids, conf=min(THRESHOLDS), imgsz=args.imgsz, verbose=False)[0]
         dets = [(model.names[int(cl)].lower(), float(p), list(b))
                 for cl, p, b in zip(r.boxes.cls.tolist(), r.boxes.conf.tolist(), r.boxes.xyxy.tolist())]
         if c["mouse"]:
@@ -161,7 +195,8 @@ def main() -> int:
             if not c["mouse"] or got.get("answer") != "yes":
                 print(f"  {c['path'].name} ({'mouse' if c['mouse'] else c['kind']}): {pick[0]} {pick[1]:.2f} -> "
                       f"{got.get('answer')} ({got.get('what', '')})")
-    print(f"half {args.half}{', far' if args.far else ''}: {len(mice)} mouse photos, {len(not_mice)} without "
+    how = "".join(f", {k}" for k in ("area", "far", "night") if getattr(args, k) and not (k == "far" and args.area))
+    print(f"{args.model or 'YOLOE'}, half {args.half}{how}: {len(mice)} mouse photos, {len(not_mice)} without "
           f"({dict(Counter(c['kind'] for c in not_mice))})")
     for t in THRESHOLDS:
         print(f"  conf {t:.1f}: mice found {found[t]}/{len(mice)} ({found[t] / max(1, len(mice)):.0%}), "

@@ -295,6 +295,15 @@ Images' "Mouse" is any small rodent: rats and mice, but also squirrels, chipmunk
 sample); the test photos are the same class. Most are close-ups (median box half the photo's width, 6 of 781 under a
 tenth): the far case depends on training with shrunken copies (step 2).
 
+**Step 2 done (2026-10-30)**: `tools/train_pests.py` (prepare, prepare-bw, train, test) and `tools/pest_check.py
+--model / --area / --night / --imgsz`. Tune half, threshold 0.3, three versions: plain (close 96%, far area 18%, at
+1280 px 48%, night close 74%, night far 2%), wider zoom 0.9 (97%, 22%, 53%, 74%, 3%), wider zoom + night copies (96%,
+21%, **61%**, **93%**, **15%**): kept the last as `data/models/pests/pests.pt` (the others stay as pests_s05.pt,
+pests_s09.pt). Looking at a food area enlarged to 1280 px is what makes far mice findable (10.6 ms vs 10.1 at 640).
+Report half (once): close 97% (26 of 246 not-mice with a box, 20 of them teddy bears), night close 90%, far area by
+day 58% found and 69 of 125 "yes" from the vision model with 0 "yes" on the 27 false boxes; far at night 14 of 125
+"yes", 1 false "yes". YOLOE on the same half: 5%. Test mAP50 0.83. Numbers in README "Our own pest model".
+
 ## Phase 26 (waiting): a real-camera week
 
 After the user restarts their own app (stop.bat, start.bat; the safe-update test passed on their database), a week of

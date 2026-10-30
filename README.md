@@ -1166,6 +1166,34 @@ computer mouse: 34 of 46 COCO photos with one got a pest box. `tools/pest_check.
 better model later (our own, as for guns). Open Images has no rat or cockroach class. The built-in "animals or pests"
 rule stays; nothing raises it now.
 
+### Our own pest model (Phase 55)
+
+**Trained here** (`tools/train_pests.py`, from `yolo11s.pt`, one class "rodent"; `data/models/pests/pests.pt`,
+git-ignored) on Open Images V6 training photos (`tools/get_pest_training.py`, photos CC BY 2.0, boxes CC BY 4.0,
+downloaded with the user's OK): 657 photos with a mouse, 500 with a computer mouse and 500 kitchens without one, and a
+black-and-white "infrared" copy of each (the look of `tools/make_night_videos.py`), with a wide zoom range (0.1x-1.9x)
+so it also sees small mice. Open Images' "Mouse" is any small rodent: rats and mice, but also squirrels, chipmunks,
+hamsters and guinea pigs, so it may be found on those too. Three versions were tried on the tune half (plain; wider
+zoom; wider zoom + the night copies); the last was best everywhere, by day too. 10 ms per look on this PC.
+
+Measured with `tools/pest_check.py --model` on the same 251 photos as YOLOE (never trained on), report half (tune half
+within a few points); not mice: COCO photos with a computer mouse, a teddy bear or a kitchen; threshold 0.3:
+
+| report half | mice found | photos with a false pest |
+|---|---|---|
+| YOLOE prompt-free (Phase 47) | 5% of 125 | 29 of 246 |
+| ours, close-up | **97%** | 26 (20 teddy bears) |
+| ours, close-up, night look | **90%** | 30 |
+| ours, far: the mouse 40 px in a 1280 x 720 frame, only a food area (427 x 240) looked at, enlarged to 1280 | **58%** | 27 |
+| the same, the vision model asked about each box | **55%** "yes" (69 of 125) | **0** "yes" |
+| ours, far, night look, the vision model asked | 11% "yes" (14 of 125) | 1 "yes" |
+
+So: close-up mice day and night, and far mice by day once the vision model confirms; **a mouse far away at night is
+mostly missed** (the grain of a night picture hides a 40-px mouse). Limits: the far photos are close-ups made small
+with their edges stretched, not real kitchens; no real camera footage of a mouse; teddy bears are the most common false
+box (the vision model said "no" to all of them). Cockroaches: Open Images has no boxes for them, and a room camera is
+too far away to see one.
+
 ### Fights and collisions (Phase 48)
 
 **Fights** (`labeler/safety.py` SafetyWatch.fights, every frame, from the body points the camera has anyway): two
