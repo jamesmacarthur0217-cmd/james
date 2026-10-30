@@ -14,6 +14,10 @@ choices (2026-10-23): four signs, moments confirmed by the vision model, pattern
   when Away; once per visit (outside again for `restricted_rearm_s` re-arms it).
 - pacing back and forth (a pattern): inside any area, the walk turns back `pace_turns` times within `pace_window_s`,
   each leg at least `pace_span` body heights (along the way the person moves most); at night or when Away.
+- at parked cars (a moment, Phase 54; the user's choice): a wrist inside a parked car's box (car, van or lorry,
+  motorbike) while the person stands at it, hardly moving, for `car_hold_s`; or stopping (`car_stop_s`, hardly moving)
+  at `car_count` different parked cars within `car_window_s`. Only at night or when Away; the vision model looks once
+  (CAR_QUESTION) and only its "yes" alerts; at most one car check a camera every `car_rearm_s`.
 - following through a door (a pattern, Phase 54; the user's choice): on a counting line with the role "door", two
   people crossing it the same way within `follow_s` (someone following another through, as when slipping in behind a
   resident); at night or when Away, alerted directly once a minute per door (by day two friends do it all the time).
@@ -29,6 +33,7 @@ choices (2026-10-23): four signs, moments confirmed by the vision model, pattern
 """
 from __future__ import annotations
 
+import math
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -43,6 +48,10 @@ CLIMB_QUESTION = ("Is a person climbing over or onto a fence, wall or gate (not 
 DESCRIBE_QUESTION = ("Is a person here doing something other than walking or standing normally (for example trying "
                      "doors or windows, looking into places, hiding, or carrying something away)? Judge only what they "
                      "do, never how they look.")
+CAR_QUESTION = ("Is a person trying to open a car's door, reaching into a car, or looking into its windows (not getting "
+                "into their own car normally, or just walking past)? Judge only what they do.")
+CAR_KINDS = ("car", "lorry", "motorbike")   # the parked vehicles the car signs look at (labeler/vehicles.py names)
+WRISTS = (9, 10)                              # COCO body points: left and right wrist
 FEET_WINDOW_S = 10.0
 THUMB = (64, 36)     # the camera check looks at a tiny gray picture
 NOW_LOOKS = 5        # "now": the middle value of the last 5 looks
@@ -60,6 +69,10 @@ class _Person:
     restricted_in: dict = field(default_factory=dict)    # area id -> since when inside
     restricted_out: dict = field(default_factory=dict)   # area id -> since when outside (after a visit)
     paced: dict = field(default_factory=dict)      # area id -> when pacing was raised
+    wrists: list = field(default_factory=list)     # the wrists seen this frame (pixels)
+    spots: deque = field(default_factory=deque)    # (t, feet x, feet y, height) for FEET_WINDOW_S
+    car_hand: dict = field(default_factory=dict)   # car key -> (since when a hand is at it, feet x, feet y then)
+    car_stops: list = field(default_factory=list)  # (t, car key) of each stop at a parked car
 
 
 def _edges(gray: np.ndarray) -> np.ndarray:
@@ -87,6 +100,12 @@ class BehaviourWatch:
         self.covered_std = float(cfg.get("covered_std", 6.0))
         self.moved_corr = float(cfg.get("moved_corr", 0.35))
         self.follow_s = float(cfg.get("follow_s", 2.0))
+        self.car_hold_s = float(cfg.get("car_hold_s", 5.0))
+        self.car_stop_s = float(cfg.get("car_stop_s", 3.0))
+        self.car_count = int(cfg.get("car_count", 2))
+        self.car_window_s = float(cfg.get("car_window_s", 120.0))
+        self.car_rearm_s = float(cfg.get("car_rearm_s", 60.0))
+        self.car_last = -1e9          # when a car sign was last raised (one a camera every car_rearm_s)
         self.crossings: dict = {}     # door line id -> deque of (t, key, "in" or "out"), the last follow_s
         self.people: dict = {}
         self.looks: deque = deque()   # (t, edges, std of the gray picture)
@@ -100,7 +119,7 @@ class BehaviourWatch:
 
     # People ------------------------------------------------------------------------------------------------------
 
-    def update(self, key, t: float, box: tuple, shape: tuple, zones: list[dict]) -> None:
+    def update(self, key, t: float, box: tuple, shape: tuple, zones: list[dict], kpts=None) -> None:
         p = self.people.setdefault(key, _Person())
         x1, y1, x2, y2 = box[:4]
         h = max(y2 - y1, 1.0)
@@ -108,6 +127,11 @@ class BehaviourWatch:
         p.feet.append((t, y2, h))
         while p.feet and t - p.feet[0][0] > FEET_WINDOW_S:
             p.feet.popleft()
+        p.spots.append((t, (x1 + x2) / 2, y2, h))
+        while p.spots and t - p.spots[0][0] > FEET_WINDOW_S:
+            p.spots.popleft()
+        p.wrists = [(float(kpts[i][0]), float(kpts[i][1])) for i in WRISTS
+                    if kpts is not None and len(kpts) > i and kpts[i][2] >= 0.3]
         H, W = shape[:2]
         feet = ((x1 + x2) / 2 / W, y2 / H)
         for z in zones:
@@ -214,6 +238,63 @@ class BehaviourWatch:
             if t - out_since >= self.restricted_rearm_s:
                 p.fired.discard(f"restricted {zid}")
         return []
+
+    # Parked cars -------------------------------------------------------------------------------------------------
+
+    def _still(self, t: float, p: _Person, seconds: float) -> bool:
+        """Seen for `seconds` and the feet moved less than half a body height over them."""
+        spots = [s for s in p.spots if t - s[0] <= seconds]
+        if not spots or t - spots[0][0] < seconds - 0.5:
+            return False
+        xs, ys = [s[1] for s in spots], [s[2] for s in spots]
+        return max(max(xs) - min(xs), max(ys) - min(ys)) < 0.5 * min(s[3] for s in spots)
+
+    @staticmethod
+    def _at_car(p: _Person, car: tuple) -> bool:
+        """The person stands at the car: their feet beside it (within a quarter of its width) and around its bottom."""
+        cx1, cy1, cx2, cy2 = car[:4]
+        cw, ch = cx2 - cx1, cy2 - cy1
+        fx, fy = (p.box[0] + p.box[2]) / 2, p.box[3]
+        return cx1 - 0.25 * cw <= fx <= cx2 + 0.25 * cw and cy1 + 0.4 * ch <= fy <= cy2 + 0.4 * (p.box[3] - p.box[1])
+
+    def cars(self, t: float, parked: list[tuple], watchful: bool) -> list[tuple]:
+        """(person key, sign, reason, car box) for a car sign now; parked: (car key, box, kind) of the parked cars in
+        view. Only when watchful (night or Away); at most one a camera every car_rearm_s."""
+        if not watchful:
+            for p in self.people.values():
+                p.car_hand.clear()
+                p.car_stops.clear()
+            return []
+        out = []
+        for key, p in self.people.items():
+            if t - p.last > 1.0 or not p.box:
+                continue
+            for ck, box, kind in parked:
+                at = self._at_car(p, box)
+                pad = 0.05 * (box[2] - box[0])
+                hand = at and any(box[0] - pad <= x <= box[2] + pad and box[1] - pad <= y <= box[3] + pad
+                                  for x, y in p.wrists)
+                fx, fy, h = (p.box[0] + p.box[2]) / 2, p.box[3], p.box[3] - p.box[1]
+                since, sx, sy = p.car_hand.get(ck, (t, fx, fy))
+                if hand and math.hypot(fx - sx, fy - sy) < 0.5 * h:   # the hand stays, and so do they (no stroll)
+                    p.car_hand[ck] = (since, sx, sy)
+                    if t - since >= self.car_hold_s:
+                        out.append((key, "car", f"a hand at a parked {kind} for {int(t - since)} s", box))
+                        p.car_hand.clear()
+                else:
+                    p.car_hand.pop(ck, None)
+                if at and self._still(t, p, self.car_stop_s) and (not p.car_stops or p.car_stops[-1][1] != ck):
+                    p.car_stops.append((t, ck))
+            p.car_stops = [s for s in p.car_stops if t - s[0] <= self.car_window_s]
+            visited = list(dict.fromkeys(ck for _, ck in p.car_stops))
+            if len(visited) >= self.car_count:
+                box = next((b for ck, b, _ in parked if ck == visited[-1]), p.box)   # the last car (else the person)
+                out.append((key, "cars", f"stopped at {len(visited)} parked vehicles in a row", box))
+                p.car_stops.clear()
+        if not out or t - self.car_last < self.car_rearm_s:
+            return []
+        self.car_last = t
+        return out[:1]
 
     # Doors -------------------------------------------------------------------------------------------------------
 

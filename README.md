@@ -1244,6 +1244,23 @@ for the camera check failed on a busy street (big people close to the lens chang
 camera), so it compares the middle value of several looks; and a made-up pacing video from a whole clip played back
 and forth did not work, as people walk out of the picture and come back as someone new.
 
+### At parked cars (Phase 54)
+
+On a security camera that sees vehicles, at night or when Away (the user's choice): **a hand at a parked car** (a
+wrist inside a parked car, van or lorry, or motorbike, by someone standing at it and staying where they stood when
+the hand reached it, for 5 s: `behaviour.car_hold_s`), or **stopping at 2 parked vehicles in a row** (3 s each,
+hardly moving, within 2 minutes). Either one is shown to the vision model once ("is a person trying to open a car's
+door, reaching into a car, or looking into its windows, not getting into their own car or just walking past?"),
+cut out around the person and the car; only its "yes" alerts. At most one car check a camera a minute. By day
+nothing (people at their own cars).
+
+Measured: the tests (a hand held 5 s; not by day; not a slow stroll past a car with a hand over it, which the first
+version took for a hand at the car; not a hand above the car; one car however long is not "in a row"; once a
+minute). The everyday videos as if at night: no car check, but they have almost no parked cars (cars count as
+parked after 60 s standing; the long ones are streets and a booth), so this says little about false alarms. A
+real run on a test copy (MOT16-04 at night): vehicles tracked, a motorbike parked, no car check, no errors. Not
+measured: someone at a car's door, and a car park with people walking to their cars (no such video here).
+
 ### Following through a door (Phase 54)
 
 A counting line can have the role **door** (Live page, Zones: the role picker now also shows for lines; the safety page

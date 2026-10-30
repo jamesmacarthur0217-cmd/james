@@ -302,3 +302,78 @@ def test_the_camera_alerts_following_only_at_night_or_when_away(db, camera):
             assert category == "suspicious" and reason.startswith("two people went in through front door 1.0 s apart")
             assert reason.endswith("when Away" if away else "at night") and kw["sign"] == "following 9"
             assert sorted(kw["people"]) == sorted([p.tracks[5].db_id, p.tracks[6].db_id]) and kw["crop"][0] < 0.6
+
+
+CAR_A = (100, 250, 300, 380)       # a parked car, pixels
+CAR_B = (400, 250, 600, 380)
+
+
+def _at(x, wrist=None):
+    """A person standing with their feet at y 390 (beside a car's bottom), 200 px tall, centred at x; a wrist if given."""
+    k = np.zeros((17, 3), np.float32)
+    if wrist:
+        k[10] = (*wrist, 0.9)
+    return (x - 30, 190, x + 30, 390), k
+
+
+def _cars_run(w, frames, seconds, t0=0.0, parked=((1, CAR_A, "car"), (2, CAR_B, "car")), watchful=True, fps=5):
+    """frames(t) -> (box, kpts); returns [(t, sign, reason)] of the car signs."""
+    out = []
+    for i in range(int(seconds * fps)):
+        t = t0 + i / fps
+        box, k = frames(t)
+        w.update(5, t, box, SHAPE, [], k)
+        out += [(round(t, 1), s, r) for _, s, r, _ in w.cars(t, list(parked), watchful)]
+    return out
+
+
+def test_a_hand_at_a_parked_car_for_5_s():
+    """Phase 54: standing at a parked car, a wrist in it, hardly moving, 5 s: one sign; not by day; not walking past."""
+    got = _cars_run(BehaviourWatch({}), lambda t: _at(200, (220, 300)), 8)
+    assert [(s, r) for _, s, r in got] == [("car", "a hand at a parked car for 5 s")] and 5.0 <= got[0][0] <= 6.2
+    assert _cars_run(BehaviourWatch({}), lambda t: _at(200, (220, 300)), 8, watchful=False) == []   # by day
+    walking = lambda t: _at(60 + 40 * t, (80 + 40 * t, 300))   # noqa: E731  (a wrist over the car, walking past)
+    assert [s for _, s, _ in _cars_run(BehaviourWatch({}), walking, 8)] == []
+    assert _cars_run(BehaviourWatch({}), lambda t: _at(200, (220, 120)), 8) == []   # the hand above the car, not in it
+
+
+def test_stopping_at_two_parked_cars_in_a_row():
+    w = BehaviourWatch({})
+    a = _cars_run(w, lambda t: _at(200), 4)                         # stops 4 s at car A
+    walk = _cars_run(w, lambda t: _at(200 + 50 * (t - 4)), 4, t0=4)  # walks on to car B
+    b = _cars_run(w, lambda t: _at(500), 4, t0=8)                   # stops 4 s at car B
+    assert a == [] and walk == [] and [(s, r) for _, s, r in b] == [("cars", "stopped at 2 parked vehicles in a row")]
+    w2 = BehaviourWatch({})
+    _cars_run(w2, lambda t: _at(200), 4)
+    assert _cars_run(w2, lambda t: _at(200), 10, t0=4) == []        # one car, however long: not a pattern
+
+
+def test_one_car_check_a_minute_per_camera():
+    w = BehaviourWatch({})
+    assert len(_cars_run(w, lambda t: _at(200, (220, 300)), 8)) == 1
+    assert _cars_run(w, lambda t: _at(500, (520, 300)), 8, t0=10) == []      # 18 s later, another car: held back
+    assert len(_cars_run(w, lambda t: _at(500, (520, 300)), 8, t0=70)) == 1  # a minute on: again
+
+
+def test_the_camera_asks_the_vision_model_about_someone_at_a_car(db, camera):
+    from types import SimpleNamespace
+
+    from labeler.behaviour import CAR_QUESTION
+    car = SimpleNamespace(key=1, box=CAR_A, kind="car", parked=True, left=False)
+    for hour, checks in ((12, 0), (23, 1)):
+        p = camera_pipe(db, camera, hour=hour)
+        p.vehicles = SimpleNamespace(tracks={1: car})
+        frame = np.zeros(SHAPE, np.uint8)
+        for i in range(40):
+            t = i / 5
+            box, k = _at(200, (220, 300))
+            p.tracks[5].box = box
+            p.behaviour.update(5, t, box, SHAPE, [], k)
+            p._look_for_behaviour(frame, t)
+        cars = [r for r in p.incidents.raised if "parked car" in r[1]]
+        assert len(cars) == checks, hour
+        if checks:
+            category, reason, kw = cars[0]
+            assert category == "suspicious" and reason == "a hand at a parked car for 5 s at night"
+            assert kw["question"] == CAR_QUESTION and kw["people"] == [p.tracks[5].db_id]
+            assert kw["crop"][0] == CAR_A[0] / SHAPE[1] and kw["crop"][1] == 190 / SHAPE[0]   # around both

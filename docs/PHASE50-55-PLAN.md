@@ -258,6 +258,12 @@ suspect's reason and `people`. Floor alerts were warnings already (no level chan
 videos (objects nobody carried: any name is wrong): within one body height -> a passer-by named for a bag; stopped
 2 looks -> people near a spill named (one confirmed, report half); **feet on the spot, 3 looks** (kept): nobody
 named in 20 videos, floor 7 of 10 and exits 5 of 5 as before, no false alerts. No real "left a bag" video here.
+**Step 3 done 2026-10-30** (at parked cars): `BehaviourWatch.cars` (`CAR_KINDS`, `CAR_QUESTION`, `behaviour.car_*`),
+`BehaviourWatch.update(..., kpts)` keeps the wrists, `Pipeline._look_for_behaviour` feeds the parked vehicles and
+raises one vision-model check (`_raise(..., box=)` around person and car). Tests (the first version took a slow
+stroll past a car for a hand at it: now the person must stay where they stood). The everyday videos as night: no
+car check, but almost no parked cars in them; a real run (MOT16-04 at night, a parked motorbike): no check, no
+errors. No video of someone at a car door, nor a car park, here.
 
 ## Phase 55: Our own pest model
 

@@ -538,7 +538,7 @@ class Pipeline:
                     role = zones_mod.role_at(self.zone_counter.zones, where)
                     self.safety_watch.update(tid, now, st.box, kpts, role, self._age_of(st), where)
                 if getattr(self, "behaviour", None) is not None:
-                    self.behaviour.update(tid, now, st.box, frame.shape, self.zone_counter.zones)
+                    self.behaviour.update(tid, now, st.box, frame.shape, self.zone_counter.zones, kpts)
                 if getattr(self, "gestures", None) is not None:
                     sign = self.gestures.update(tid, now, kpts)
                     if sign:
@@ -823,6 +823,16 @@ class Pipeline:
                                       crop=crop, describe=DESCRIBE_QUESTION, sign=sign)
             except Exception:
                 log.exception("[%s] a behaviour alert failed", self.name)
+        if self.vehicles is not None:   # at parked cars (Phase 54): the vision model looks once, only its "yes" alerts
+            from .behaviour import CAR_KINDS, CAR_QUESTION
+            parked = [(v.key, v.box, v.kind) for v in list(self.vehicles.tracks.values())
+                      if v.parked and not v.left and v.kind in CAR_KINDS]
+            for tid, sign, reason, car in self.behaviour.cars(now, parked, watchful):
+                log.warning("[%s] behaviour: %s (person %s)", self.name, reason, tid)
+                st = self.tracks.get(tid)
+                both = car if st is None else (min(car[0], st.box[0]), min(car[1], st.box[1]),
+                                               max(car[2], st.box[2]), max(car[3], st.box[3]))
+                self._raise(tid, "suspicious", f"{reason} {when}", frame.shape, question=CAR_QUESTION, box=both)
         if self.behaviour.camera_due(now):
             got = self.behaviour.camera(now, frame)
             if got is None:
@@ -1141,9 +1151,10 @@ class Pipeline:
         return None if group == "unknown" else "child" if group == "child" else "adult"
 
     def _raise(self, tid: int, category: str, reason: str, shape: tuple | None, db_id: int | None = None,
-               level: str | None = None, question: str | None = None, on_done=None) -> str:
+               level: str | None = None, question: str | None = None, on_done=None, box: tuple | None = None) -> str:
         """A quick check saw something about this person: ask the confirm queue (labeler/incidents.py), with the
-        part of the picture around them. Returns the queue's answer ("queued", ...) or "off"."""
+        part of the picture around them (box: around them and something else, e.g. the car they are at). Returns the
+        queue's answer ("queued", ...) or "off"."""
         if getattr(self, "incidents", None) is None or getattr(self, "memory", None) is None:
             return "off"
         st = self.tracks.get(tid)
@@ -1151,9 +1162,10 @@ class Pipeline:
             self._ensure_db(st)
             db_id = st.db_id
         crop = None
-        if st is not None and shape is not None:
+        box = box if box is not None else (st.box if st is not None else None)
+        if box is not None and shape is not None:
             h, w = shape[:2]
-            x1, y1, x2, y2 = st.box[:4]
+            x1, y1, x2, y2 = box[:4]
             crop = (x1 / w, y1 / h, x2 / w, y2 / h)
         try:
             return self.incidents.suspect(self.name, category, reason, people=[db_id] if db_id is not None else [],

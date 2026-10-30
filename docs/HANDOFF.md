@@ -18,7 +18,7 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-25)
 
-**Start here (2026-10-29, end of the session; last commit: Phase 54 step 1 + this handoff; 1052 tests + 1 PostgreSQL test that
+**Start here (2026-10-30, end of the session; last commit: Phase 54 step 3 + this handoff; 1057 tests + 1 PostgreSQL test that
 is skipped without `VL_TEST_POSTGRES_URL`; GitHub green; working tree clean; no test copy running).**
 
 **Plan in progress: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (approved 2026-10-25, the user's choices, in this
@@ -73,7 +73,9 @@ answers.
   for counting lines, no schema change; README "Following through a door").
 - **Phase 54 step 2 done** (2026-10-30, bag left: "left by person #N, who walked away" in the floor alert, only for
   someone who stood on the spot 3 looks; looser rules wrongly named passers-by on the made-up videos).
-- **Next: Phase 54 step 3** (at parked cars); ask first.
+- **Phase 54 step 3 done** (2026-10-30, at parked cars: a hand at one 5 s or stops at 2, night/Away, the vision model
+  checks; measured by tests only: no video with parked cars and people here).
+- **Next: Phase 54 step 4** (came back again and again: by look, 30 min, night/Away); ask first.
 - Waiting for the user: restart their own app (stop.bat, start.bat; then the First-run check; Phase 26); the MIVIA fire
   videos. Open (offer, don't change unasked): the floor check's third look (not chosen 2026-10-25).
 
