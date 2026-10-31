@@ -18,13 +18,13 @@ household use is generally outside the Act; their filled-in camera sign and data
 
 ## 2. Current state (2026-10-30)
 
-**Start here (2026-10-30, end of the session; last commit: this handoff, after Phase 54 `6901001`; 1059 tests + 1
+**Start here (2026-10-31, end of the session; last commit: this handoff, after Phase 55 `40f18b0`; 1070 tests + 1
 PostgreSQL test that is skipped without `VL_TEST_POSTGRES_URL`; GitHub green; working tree clean; no test copy
 running).**
 
 **Plan finished 2026-10-30: [PHASE50-55-PLAN.md](PHASE50-55-PLAN.md)** (approved 2026-10-25; every phase's design,
-step, measurement and commit is written there). Next: ask the user what comes next. Same way of working: **ask before each phase and each step; discuss any
-architecture first (and again when a measurement shows the agreed design is weak)**; short, simple answers; measure
+step, measurement and commit is written there). Next: ask the user what comes next. Same way of working: **ask before
+each phase and each step; discuss any architecture first (and again when a measurement shows the agreed design is weak)**; short, simple answers; measure
 before claiming; a change is kept only if day (or the old behaviour) is not worse.
 
 | Phase | State | In one line (details: the plan; numbers: README) |
@@ -859,7 +859,6 @@ family vs strangers, licenses, sounds, privacy masks, Malay/Chinese pages, blurr
 ## 9. Message to start the next session
 
 > I'm continuing the VisionLabeler project in C:\VisionLabeler. Please read docs/HANDOFF.md and docs/ROADMAP.md
-> first, run the tests to confirm everything is green, then continue with docs/PHASE50-55-PLAN.md: Phase 55 (our own
-> pest model) is next; discuss its design with me first, and show me the download size and licence before downloading
-> anything. Ask me before each phase and each step starts, discuss any architecture with me first, and do it step by
-> step.
+> first, run the tests to confirm everything is green. The Phases 50-55 plan is finished; ask me what comes next
+> (Phase 26 waits for my app's restart). Show me the download size and licence before downloading anything. Ask me
+> before each phase and each step starts, discuss any architecture with me first, and do it step by step.
