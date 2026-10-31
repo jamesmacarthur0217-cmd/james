@@ -289,7 +289,7 @@ Critical checks waited 2-3 s in every run. A crowd of 87 people a minute is more
 label: the safety checks below critical are still dropped there (the Health page says so); a faster model or a second
 GPU would be needed.
 
-**A round must not hold warnings back** (found 2026-10-25, HANDOFF pitfall 44; the user's choice of fix): the checks
+**A round must not hold warnings back** (found 2026-10-25; the user's choice of fix): the checks
 go one at a time **per lane** (critical / warning / round), so a slow round waiting behind people's labels no longer
 stops a warning; and a round not started within 30 s (`safety.max_wait_s`) is taken back out of the vision model's
 queue and counted as dropped (an answer minutes later would be about old pictures). Measured with
@@ -897,9 +897,8 @@ Measured 2026-10-13 (`tools/mobility_check.py`; answers checked by eye):
 
 ## Safety incidents (Phase 44: the base)
 
-Twelve kinds of safety incident on security cameras (the user's list, 2026-10-20; plan:
-[docs/PHASE44-49-PLAN.md](docs/PHASE44-49-PLAN.md)): a person needing help, a fall or collision, fire or smoke,
-aggression, a dangerous object, a child in danger, a floor hazard, a blocked exit or aisle, unsafe equipment, animals or
+Twelve kinds of safety incident on security cameras (the user's list, 2026-10-20): a person needing help, a fall or
+collision, fire or smoke, aggression, a dangerous object, a child in danger, a floor hazard, a blocked exit or aisle, unsafe equipment, animals or
 pests, unusual crowding, suspicious behaviour (judged only by what a person does, never by how they look). The way it
 works (the user's choices): **quick checks** every frame or second (body points, YOLO objects, simple rules: one phase
 per group of kinds, from Phase 45) only raise a *suspect*; the **vision model confirms** it from up to 3 pictures of the

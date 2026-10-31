@@ -6,3 +6,7 @@ data/
 .env
 # the remote-camera folder zipped to give to another PC (made from the folder, not kept in git)
 remote-camera.zip
+# working notes (handoff, roadmap, phase plans): kept on this PC only, not on GitHub
+docs/HANDOFF.md
+docs/ROADMAP.md
+docs/PHASE*-PLAN.md
